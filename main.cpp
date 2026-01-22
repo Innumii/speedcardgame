@@ -1,8 +1,22 @@
 #include <SDL2/SDL.h>
 #include <iostream>
-using namespace std;
+#include "Game.hpp"
+
 
 int main(int argv, char** args) {
+    try {
+        std::cout << "Beginning Game";
+        
+        Game game("SpeedCardGame", 100,100,800,600,false);
+        while (game.running()) {
+            game.handleEvents();
+            game.update();
+            game.render();
+        }
+    } catch (const std::exception& e) {
+        std::cerr << e.what() << std::endl;
+        return 1;
+    }
 
-
+    return 0;
 }

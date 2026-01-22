@@ -4,7 +4,7 @@
 
 Game::Game(const char *title, int xpos, int ypos, int width, int height, bool fullscreen) {
     //Initialize SDL
-    if (SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_TIMER != 0) {
+    if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_TIMER) != 0) {
         throw std::runtime_error(std::string("SDL_Init failed: ") + SDL_GetError());
     }
 
@@ -48,7 +48,10 @@ void Game::handleEvents() {
 
 void Game::update() {}
 
-void Game::render() {}
+void Game::render() {
+    SDL_RenderClear(renderer.get());
+    SDL_RenderPresent(renderer.get());
+}
 
 void Game::clean() {
     if (isRunning) {
