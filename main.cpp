@@ -7,7 +7,7 @@ int main(int argv, char** args) {
     try {
         std::cout << "Beginning Game";
         
-        Game game("SpeedCardGame", 100,100,800,600,false);
+        Game game("SpeedCardGame", 100,100,800,600,false); //note that if set to true it just enlarges EVERYTHING, like a large zoom in
         while (game.running()) {
             game.handleEvents();
             game.update();
