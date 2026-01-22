@@ -1,0 +1,53 @@
+//if
+#ifndef GAME_HPP
+#define GAME_HPP
+
+#include "SDL2/SDL.h"
+#include <stdio.h>
+#include <memory> //for smart pointers
+#include <stdexcept> //for signalling fatal init errors
+
+class Game {
+
+public:  
+    //constructor
+    Game(const char* title,
+     int xpos,
+     int ypos,
+     int width,
+     int height,
+     bool fullscreen);
+
+    //destructor, uses RAII cleanup
+    ~Game(); 
+
+    Game(const Game&) = delete; //ensure you cannot copy the Game object
+    Game& operator=(const Game&) = delete; //ensure you cannot reassign another existing Game object to it
+
+    //This is to handle mem resource transfer between Game objects to ensure only 1 object owns the resources at any time
+    Game(Game&&) noexcept = default;
+    Game& operator=(Game&&) noexcept = default;
+    
+    void handleEvents();
+    void update();
+    void render();
+    void clean();
+
+    bool running() const;
+
+private:
+    bool isRunning{false};
+
+    //RAII smart pointers, chain their destruction to the Game object's destruction
+    using WindowPtr =
+        std::unique_ptr<SDL_Window, decltype(&SDL_DestroyWindow)>;
+
+    using RendererPtr =
+        std::unique_ptr<SDL_Renderer, decltype(&SDL_DestroyRenderer)>;
+
+    WindowPtr window{nullptr, SDL_DestroyWindow};
+    RendererPtr renderer{nullptr, SDL_DestroyRenderer};
+
+};
+
+#endif 
