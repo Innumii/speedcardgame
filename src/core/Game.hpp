@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include <memory> //for smart pointers
 #include <stdexcept> //for signalling fatal init errors
+#include "GameState.hpp"
 
 class Game {
 
@@ -47,7 +48,10 @@ private:
 
     WindowPtr window{nullptr, SDL_DestroyWindow};
     RendererPtr renderer{nullptr, SDL_DestroyRenderer};
+    
+    //GameState::Title used because Title is not in global scope, only exists within GameState
+    GameState state{GameState::Title};
 
 };
 
-#endif 
+#endif

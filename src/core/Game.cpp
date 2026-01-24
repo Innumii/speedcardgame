@@ -4,7 +4,7 @@
 
 Game::Game(const char *title, int xpos, int ypos, int width, int height, bool fullscreen) {
     //Initialize SDL
-    if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_TIMER) != 0) {
+    if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_TIMER | SDL_INIT_GAMECONTROLLER) != 0) {
         throw std::runtime_error(std::string("SDL_Init failed: ") + SDL_GetError());
     }
 
@@ -25,7 +25,7 @@ Game::Game(const char *title, int xpos, int ypos, int width, int height, bool fu
         SDL_Quit();
         throw std::runtime_error(std::string("SDL_CreateRenderer Failed: ") + SDL_GetError());
     }
-    SDL_SetRenderDrawColor(renderer.get(), 0, 0, 0, 255);
+    SDL_SetRenderDrawColor(renderer.get(), 255, 0, 0, 255);
     
     isRunning = true;
 }
@@ -36,14 +36,20 @@ Game::~Game() {
 
 void Game::handleEvents() {
     SDL_Event event;
-    SDL_PollEvent(&event);
-    switch(event.type) {
-        case SDL_QUIT:
-            isRunning = false;
-            break;
-        default:
-            break;
+    while (SDL_PollEvent(&event)) {
+        if (event.type == SDL_QUIT) {
+        state = GameState::Quit;
+        }
+        switch (state) {
+            case GameState::Title:
+                break;
+        }
     }
+    if (state == GameState::Quit) {
+        isRunning = false;
+    }
+    
+    
 }
 
 void Game::update() {}
