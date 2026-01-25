@@ -30,9 +30,6 @@ void Title::update(Game& game) {
 void Title::render(Game& game) {
     SDL_Renderer* renderer = game.getRenderer();
 
-    SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
-    SDL_RenderClear(renderer);
-
     // Draw the quit button
     SDL_SetRenderDrawColor(renderer, 0, 200, 0, 255);
     SDL_RenderFillRect(renderer, &quitButton);
@@ -40,5 +37,4 @@ void Title::render(Game& game) {
     SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
     SDL_RenderDrawRect(renderer, &quitButton);
 
-    SDL_RenderPresent(renderer);
 }
