@@ -34,28 +34,52 @@ Game::~Game() {
     clean(); //quits SDL
 }
 
-void Game::handleEvents() {
-    SDL_Event event;
-    while (SDL_PollEvent(&event)) {
-        if (event.type == SDL_QUIT) {
-        state = GameState::Quit;
-        }
-        switch (state) {
-            case GameState::Title:
-                break;
-        }
-    }
+void Game::setState(GameState newState) {
+    state = newState;
     if (state == GameState::Quit) {
         isRunning = false;
     }
-    
-    
+}
+
+GameState Game::getState() const {
+    return state;
+}
+
+SDL_Renderer* Game::getRenderer() const {
+    return renderer.get();
+}
+
+void Game::handleEvents() {
+    SDL_Event event;
+    while (SDL_PollEvent(&event)) {
+        switch (state) {
+            case GameState::Title:
+                titleState.handleEvents(*this, event);
+                break;
+
+            default:
+                break;
+        }
+    }
 }
 
 void Game::update() {}
 
 void Game::render() {
+    // Clear the screen once per frame
+    SDL_SetRenderDrawColor(renderer.get(), 0, 0, 0, 255); // black background
     SDL_RenderClear(renderer.get());
+
+    // Draw the current state
+    switch (state) {
+        case GameState::Title:
+            titleState.render(*this); // draws button
+            break;
+        default:
+            break;
+    }
+
+    // Present everything at once
     SDL_RenderPresent(renderer.get());
 }
 

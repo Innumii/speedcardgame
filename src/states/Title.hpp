@@ -9,7 +9,7 @@ class Game; //use this over #include to prevent circular dependency and tight co
 
 class Title {
 public:
-    void handleEvents(Game& game);
+    void handleEvents(Game& game, const SDL_Event& event);
     void update(Game& game);
     void render(Game& game);
 private:

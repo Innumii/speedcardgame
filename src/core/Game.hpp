@@ -7,6 +7,7 @@
 #include <memory> //for smart pointers
 #include <stdexcept> //for signalling fatal init errors
 #include "GameState.hpp"
+#include "../states/Title.hpp"
 
 class Game {
 
@@ -34,6 +35,11 @@ public:
     void render();
     void clean();
 
+    //Getters and Setters
+    void setState(GameState newState);
+    GameState getState() const;
+    SDL_Renderer* getRenderer() const;
+
     bool running() const;
 
 private:
@@ -51,6 +57,7 @@ private:
     
     //GameState::Title used because Title is not in global scope, only exists within GameState
     GameState state{GameState::Title};
+    Title titleState;
 
 };
 
