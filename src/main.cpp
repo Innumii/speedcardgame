@@ -27,8 +27,6 @@ int main(int argc, char** argv) {
         const int drawInterval = parseDrawInterval(argc, argv).value_or(defaultDrawIntervalSeconds);
         const bool fullscreen = parseFullscreenFlag(argc, argv);
 
-        std::cout << "Beginning Game (draw every " << drawInterval << "s)" << std::endl;
-
         Game game("SpeedCardGame", 100, 100, 800, 600, fullscreen, drawInterval);
         while (game.running()) {
             game.handleEvents();
