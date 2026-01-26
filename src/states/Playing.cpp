@@ -5,6 +5,7 @@
 #include <SDL2/SDL_ttf.h>
 #include "objects/CreatureCard.h"
 #include "objects/SpellCard.h"
+#include <algorithm>
 #include <iostream>
 #include <memory>
 #include <sstream>
@@ -35,6 +36,10 @@ namespace {
         }
 
         return lines;
+    }
+
+    bool pointInRect(const SDL_Rect& rect, int x, int y) {
+        return x >= rect.x && x < rect.x + rect.w && y >= rect.y && y < rect.y + rect.h;
     }
 }
 
@@ -118,6 +123,88 @@ void Playing::drawWrappedText(const std::string& text, TTF_Font* font, SDL_Color
     }
 }
 
+std::vector<SDL_Rect> Playing::computeCardLayout(std::size_t count, int screenW, int screenH) const {
+    std::vector<SDL_Rect> layout;
+    if (count == 0 || screenW <= 0 || screenH <= 0) return layout;
+
+    const int margin = 30;
+    const int minCardWidth = 80;
+    const int maxCardWidth = 120;
+
+    const int usableWidth = std::max(0, screenW - margin * 2);
+    const int baseWidth = usableWidth > 0 && count > 0
+        ? (usableWidth / static_cast<int>(count))
+        : maxCardWidth;
+
+    int cardWidth = baseWidth;
+    if (cardWidth < minCardWidth) cardWidth = minCardWidth;
+    if (cardWidth > maxCardWidth) cardWidth = maxCardWidth;
+    int totalCardWidth = static_cast<int>(count) * cardWidth;
+    int remainingSpace = std::max(0, usableWidth - totalCardWidth);
+    int spacing = count > 1 ? remainingSpace / (static_cast<int>(count) - 1) : 0;
+
+    const int totalWidth = totalCardWidth + spacing * (static_cast<int>(count) - 1);
+    const int startX = std::max(margin, (screenW - totalWidth) / 2);
+
+    const int cardHeight = static_cast<int>(cardWidth * 1.5f);
+    const int startY = screenH - cardHeight - 40;
+
+    for (std::size_t i = 0; i < count; ++i) {
+        layout.push_back(SDL_Rect{
+            startX + static_cast<int>(i) * (cardWidth + spacing),
+            startY,
+            cardWidth,
+            cardHeight
+        });
+    }
+
+    return layout;
+}
+
+void Playing::handleEvent(Game& /*game*/, const SDL_Event& event) {
+    if (!renderer) return;
+
+    int screenW = 0, screenH = 0;
+    if (SDL_GetRendererOutputSize(renderer, &screenW, &screenH) != 0) {
+        return;
+    }
+
+    cardRects = computeCardLayout(player.hand.size(), screenW, screenH);
+
+    switch (event.type) {
+        case SDL_MOUSEBUTTONDOWN:
+            if (event.button.button == SDL_BUTTON_LEFT) {
+                const int mx = event.button.x;
+                const int my = event.button.y;
+                for (int i = static_cast<int>(cardRects.size()) - 1; i >= 0; --i) {
+                    if (pointInRect(cardRects[static_cast<std::size_t>(i)], mx, my)) {
+                        drag.active = true;
+                        drag.index = static_cast<std::size_t>(i);
+                        drag.offsetX = mx - cardRects[drag.index].x;
+                        drag.offsetY = my - cardRects[drag.index].y;
+                        drag.x = cardRects[drag.index].x;
+                        drag.y = cardRects[drag.index].y;
+                        break;
+                    }
+                }
+            }
+            break;
+        case SDL_MOUSEMOTION:
+            if (drag.active) {
+                drag.x = event.motion.x - drag.offsetX;
+                drag.y = event.motion.y - drag.offsetY;
+            }
+            break;
+        case SDL_MOUSEBUTTONUP:
+            if (drag.active && event.button.button == SDL_BUTTON_LEFT) {
+                drag.active = false;
+            }
+            break;
+        default:
+            break;
+    }
+}
+
 void Playing::run() {
     if (!renderer) {
         throw std::runtime_error("Call setup() before run()");
@@ -157,6 +244,12 @@ void Playing::render(Game& game) {
     SDL_SetRenderDrawColor(renderer, 30, 30, 30, 255);
     SDL_RenderClear(renderer);
 
+    int screenW = 0, screenH = 0;
+    if (SDL_GetRendererOutputSize(renderer, &screenW, &screenH) != 0) {
+        screenW = 800;
+        screenH = 600;
+    }
+
     drawText(
         "Health: " + std::to_string(player.health),
         fontLarge.get(),
@@ -165,21 +258,12 @@ void Playing::render(Game& game) {
         20
     );
 
-    const int cardWidth = 120;
-    const int cardHeight = 180;
-    const int spacing = 20;
+    cardRects = computeCardLayout(player.hand.size(), screenW, screenH);
 
-    for (std::size_t i = 0; i < player.hand.size(); i++) {
-        const auto& cardPtr = player.hand[i];
+    auto drawCardAt = [&](std::size_t idx, const SDL_Rect& cardRect) {
+        const auto& cardPtr = player.hand[idx];
         const Card* card = cardPtr.get();
-        if (!card) continue;
-
-        SDL_Rect cardRect{
-            50 + static_cast<int>(i) * (cardWidth + spacing),
-            350,
-            cardWidth,
-            cardHeight
-        };
+        if (!card) return;
 
         SDL_SetRenderDrawColor(renderer, 200, 200, 200, 255);
         SDL_RenderFillRect(renderer, &cardRect);
@@ -230,6 +314,22 @@ void Playing::render(Game& game) {
                 );
             }
         }
+    };
+
+    const bool draggingCard = drag.active && drag.index < player.hand.size();
+
+    for (std::size_t i = 0; i < player.hand.size(); ++i) {
+        if (draggingCard && i == drag.index) continue;
+        if (i < cardRects.size()) {
+            drawCardAt(i, cardRects[i]);
+        }
+    }
+
+    if (draggingCard && drag.index < cardRects.size()) {
+        SDL_Rect floating = cardRects[drag.index];
+        floating.x = drag.x;
+        floating.y = drag.y;
+        drawCardAt(drag.index, floating);
     }
 
     SDL_RenderPresent(renderer);
