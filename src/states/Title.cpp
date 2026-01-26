@@ -1,5 +1,5 @@
-#include "Title.hpp"
-#include "../core/Game.hpp"
+#include "states/Title.hpp"
+#include "core/Game.hpp"
 #include <SDL2/SDL.h>
 
 void Title::handleEvents(Game& game, const SDL_Event& event) {

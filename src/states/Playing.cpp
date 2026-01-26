@@ -1,6 +1,6 @@
-#include "Playing.hpp"
+#include "states/Playing.hpp"
 
-#include "../core/Game.hpp"
+#include "core/Game.hpp"
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_ttf.h>
 #include "objects/CreatureCard.h"

@@ -8,8 +8,8 @@
 #include <memory> //for smart pointers
 #include <stdexcept> //for signalling fatal init errors
 #include "GameState.hpp"
-#include "../states/Title.hpp"
-#include "../states/Playing.hpp"
+#include "states/Title.hpp"
+#include "states/Playing.hpp"
 #include "objects/Player.h"
 #include "objects/Deck.h"
 

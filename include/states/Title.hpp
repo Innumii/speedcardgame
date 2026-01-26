@@ -2,7 +2,7 @@
 #define TITLE_HPP
 
 #include <SDL2/SDL.h>
-#include "../core/GameState.hpp" //need this as we plan to use specific GameState stuff with this class
+#include "core/GameState.hpp" //need this as we plan to use specific GameState stuff with this class
 
 class Game; //use this over #include to prevent circular dependency and tight coupling
 //since you're not grabbing anything specific from Game you can just declare

@@ -7,7 +7,7 @@
 #include <memory>
 #include <string>
 
-#include "../core/GameState.hpp" //need this as we plan to use specific GameState stuff with this class
+#include "core/GameState.hpp" //need this as we plan to use specific GameState stuff with this class
 #include "objects/Player.h"
 #include "objects/Deck.h"
 
