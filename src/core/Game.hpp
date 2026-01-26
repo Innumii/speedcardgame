@@ -4,10 +4,13 @@
 
 #include "SDL2/SDL.h"
 #include <stdio.h>
+#include <cstddef>
 #include <memory> //for smart pointers
 #include <stdexcept> //for signalling fatal init errors
 #include "GameState.hpp"
 #include "../states/Title.hpp"
+#include "objects/Player.h"
+#include "objects/Deck.h"
 
 class Game {
 
@@ -18,7 +21,8 @@ public:
      int ypos,
      int width,
      int height,
-     bool fullscreen);
+     bool fullscreen,
+     int drawIntervalSeconds = 3);
 
     //destructor, uses RAII cleanup
     ~Game(); 
@@ -45,6 +49,12 @@ public:
 private:
     bool isRunning{false};
 
+    Player player;
+    Deck deck;
+    int drawIntervalSeconds{3};
+    Uint32 lastDrawTick{0};
+    std::size_t lastLoggedHandSize{0};
+
     //RAII smart pointers, chain their destruction to the Game object's destruction
     using WindowPtr =
         std::unique_ptr<SDL_Window, decltype(&SDL_DestroyWindow)>;
@@ -54,10 +64,18 @@ private:
 
     WindowPtr window{nullptr, SDL_DestroyWindow};
     RendererPtr renderer{nullptr, SDL_DestroyRenderer};
-    
+
     //GameState::Title used because Title is not in global scope, only exists within GameState
     GameState state{GameState::Title};
     Title titleState;
+
+    void populateDeck();
+    void updatePlaying();
+    void renderPlaying();
+    void renderHealthBar();
+    void renderDeckIndicator();
+    void renderCardWidget(const Card& card, int x, int y);
+    void logLatestDraw();
 
 };
 

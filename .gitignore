@@ -2,4 +2,5 @@ GPT
 main.exe
 *.dll
 *.pdb
-.vscode
+.vscode/
+.github/
