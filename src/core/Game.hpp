@@ -9,6 +9,7 @@
 #include <stdexcept> //for signalling fatal init errors
 #include "GameState.hpp"
 #include "../states/Title.hpp"
+#include "../states/Playing.hpp"
 #include "objects/Player.h"
 #include "objects/Deck.h"
 
@@ -54,6 +55,7 @@ private:
     int drawIntervalSeconds{3};
     Uint32 lastDrawTick{0};
     std::size_t lastLoggedHandSize{0};
+    bool playingSetup{false};
 
     //RAII smart pointers, chain their destruction to the Game object's destruction
     using WindowPtr =
@@ -68,15 +70,7 @@ private:
     //GameState::Title used because Title is not in global scope, only exists within GameState
     GameState state{GameState::Title};
     Title titleState;
-
-    void populateDeck();
-    void updatePlaying();
-    void renderPlaying();
-    void renderHealthBar();
-    void renderDeckIndicator();
-    void renderCardWidget(const Card& card, int x, int y);
-    void logLatestDraw();
-
+    Playing playingState{drawIntervalSeconds};
 };
 
 #endif
