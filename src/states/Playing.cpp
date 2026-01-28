@@ -90,6 +90,12 @@ void Playing::setup(Game& game) {
     }
 
     deck.shuffle();
+
+    constexpr int startingHandSize = 6;
+    for (int i = 0; i < startingHandSize; ++i) {
+        player.drawCard(deck);
+    }
+
     lastDrawTick = SDL_GetTicks();
     running = true;
 }
@@ -160,18 +166,54 @@ std::vector<SDL_Rect> Playing::computeCardLayout(std::size_t count, int screenW,
     return layout;
 }
 
-SDL_Rect Playing::computeDiscardZone(int screenW, int screenH) const {
-    const int zoneWidth = 180;
-    const int zoneHeight = 120;
+void Playing::computeZones(int screenW, int screenH) {
+    playSlots.clear();
+
+    if (screenW <= 0 || screenH <= 0) {
+        discardZone = SDL_Rect{0, 0, 0, 0};
+        return;
+    }
+
+    const int handCardHeight = 165;
+    const int handYOffset = 30;
+    const int slotCount = 5;
+    const int slotWidth = 120;
+    const int slotHeight = 160;
+    const int slotSpacing = 12;
     const int margin = 20;
+    const int discardWidth = 110;
+    const int discardHeight = 130;
+    const int gapToDiscard = 18;
 
-    const int cardHeight = 165;
-    const int handY = screenH - cardHeight - 30;
+    int handY = screenH - handCardHeight - handYOffset;
+    if (!cardRects.empty()) {
+        handY = cardRects.front().y;
+    }
 
-    const int x = screenW - zoneWidth - margin;
-    const int y = std::max(margin, handY - zoneHeight - 12);
+    int totalSlotsWidth = slotCount * slotWidth + (slotCount - 1) * slotSpacing;
+    int totalWidthWithDiscard = totalSlotsWidth + gapToDiscard + discardWidth;
 
-    return SDL_Rect{x, y, zoneWidth, zoneHeight};
+    int startX = std::max(margin, (screenW - totalWidthWithDiscard) / 2);
+    int slotY = handY - slotHeight - 16;
+    if (slotY < margin) slotY = margin;
+
+    playSlots.reserve(static_cast<std::size_t>(slotCount));
+    for (int i = 0; i < slotCount; ++i) {
+        playSlots.push_back(SDL_Rect{
+            startX + i * (slotWidth + slotSpacing),
+            slotY,
+            slotWidth,
+            slotHeight
+        });
+    }
+
+    int discardX = startX + totalSlotsWidth + gapToDiscard;
+    if (discardX + discardWidth + margin > screenW) {
+        discardX = screenW - discardWidth - margin;
+    }
+
+    int discardY = slotY + (slotHeight - discardHeight) / 2;
+    discardZone = SDL_Rect{discardX, discardY, discardWidth, discardHeight};
 }
 
 void Playing::handleEvent(Game& /*game*/, const SDL_Event& event) {
@@ -183,7 +225,7 @@ void Playing::handleEvent(Game& /*game*/, const SDL_Event& event) {
     }
 
     cardRects = computeCardLayout(player.hand.size(), screenW, screenH);
-    discardZone = computeDiscardZone(screenW, screenH);
+    computeZones(screenW, screenH);
 
     switch (event.type) {
         case SDL_MOUSEBUTTONDOWN:
@@ -223,7 +265,7 @@ void Playing::handleEvent(Game& /*game*/, const SDL_Event& event) {
                     player.addMana(manaGain);
                     player.hand.erase(player.hand.begin() + static_cast<std::ptrdiff_t>(drag.index));
                     cardRects = computeCardLayout(player.hand.size(), screenW, screenH);
-                    discardZone = computeDiscardZone(screenW, screenH);
+                    computeZones(screenW, screenH);
                 }
 
                 drag.active = false;
@@ -273,6 +315,8 @@ void Playing::render(Game& game) {
     SDL_SetRenderDrawColor(renderer, 30, 30, 30, 255);
     SDL_RenderClear(renderer);
 
+    const Uint32 now = SDL_GetTicks();
+
     int screenW = 0, screenH = 0;
     if (SDL_GetRendererOutputSize(renderer, &screenW, &screenH) != 0) {
         screenW = 800;
@@ -301,11 +345,55 @@ void Playing::render(Game& game) {
     );
 
     cardRects = computeCardLayout(player.hand.size(), screenW, screenH);
-    discardZone = computeDiscardZone(screenW, screenH);
+    computeZones(screenW, screenH);
 
     int mouseX = 0, mouseY = 0;
     SDL_GetMouseState(&mouseX, &mouseY);
     const bool hoveringDiscard = pointInRect(discardZone, mouseX, mouseY);
+
+    const bool draggingCard = drag.active && drag.index < player.hand.size();
+
+    std::size_t newHoverIndex = static_cast<std::size_t>(-1);
+    if (!draggingCard) {
+        for (std::size_t i = 0; i < cardRects.size(); ++i) {
+            if (pointInRect(cardRects[i], mouseX, mouseY)) {
+                newHoverIndex = i;
+                break;
+            }
+        }
+    }
+
+    if (newHoverIndex != hoverIndex) {
+        hoverIndex = newHoverIndex;
+        hoverStartTick = now;
+    }
+
+    constexpr Uint32 hoverDelayMs = 1000;
+    const bool showPreview =
+        hoverIndex != static_cast<std::size_t>(-1) &&
+        hoverIndex < player.hand.size() &&
+        now - hoverStartTick >= hoverDelayMs;
+
+    if (!playSlots.empty()) {
+        const int areaX = playSlots.front().x;
+        const int areaY = playSlots.front().y;
+
+        const int labelY = std::max(10, areaY - 18);
+        drawText(
+            "Play Zone",
+            fontSmall.get(),
+            SDL_Color{210, 230, 210, 255},
+            areaX,
+            labelY
+        );
+
+        for (const auto& slot : playSlots) {
+            SDL_SetRenderDrawColor(renderer, 60, 80, 60, 190);
+            SDL_RenderFillRect(renderer, &slot);
+            SDL_SetRenderDrawColor(renderer, 140, 190, 140, 255);
+            SDL_RenderDrawRect(renderer, &slot);
+        }
+    }
 
     SDL_SetRenderDrawColor(renderer, hoveringDiscard ? 80 : 60, 80, 110, 255);
     SDL_RenderFillRect(renderer, &discardZone);
@@ -385,7 +473,72 @@ void Playing::render(Game& game) {
         }
     };
 
-    const bool draggingCard = drag.active && drag.index < player.hand.size();
+    auto drawCardPreview = [&](const Card& card) {
+        const int previewWidth = 260;
+        const int previewHeight = 240;
+        const int padding = 12;
+
+        int handY = screenH - 165 - 30;
+        if (!cardRects.empty()) {
+            handY = cardRects.front().y;
+        }
+
+        int previewY = handY - previewHeight - 10;
+        if (previewY < 20) previewY = 20;
+        const int previewX = 20;
+
+        SDL_Rect panel{previewX, previewY, previewWidth, previewHeight};
+        SDL_SetRenderDrawColor(renderer, 45, 45, 60, 245);
+        SDL_RenderFillRect(renderer, &panel);
+        SDL_SetRenderDrawColor(renderer, 220, 220, 240, 255);
+        SDL_RenderDrawRect(renderer, &panel);
+
+        drawText(card.getName(), fontLarge.get(), SDL_Color{255, 255, 255, 255}, previewX + padding, previewY + padding);
+
+        const std::string costText = "Cost: " + std::to_string(card.getManaCost());
+        int costW = 0, costH = 0;
+        TTF_SizeText(fontSmall.get(), costText.c_str(), &costW, &costH);
+        drawText(costText, fontSmall.get(), SDL_Color{230, 230, 230, 255}, previewX + previewWidth - padding - costW, previewY + padding);
+
+        drawText(
+            "Value: " + std::to_string(card.getManaValue()),
+            fontSmall.get(),
+            SDL_Color{230, 230, 230, 255},
+            previewX + padding,
+            previewY + padding + 28
+        );
+
+        const int descY = previewY + padding + 52;
+        const int wrapWidth = std::max(16, (previewWidth - 2 * padding) / 7);
+        drawWrappedText(
+            card.getText(),
+            fontSmall.get(),
+            SDL_Color{220, 220, 220, 255},
+            previewX + padding,
+            descY,
+            static_cast<std::size_t>(wrapWidth)
+        );
+
+        if (card.getType() == CardType::Creature) {
+            const auto* creature = dynamic_cast<const CreatureCard*>(&card);
+            if (creature) {
+                const std::string statsText =
+                    std::to_string(creature->getPower()) + "/" +
+                    std::to_string(creature->getToughness());
+
+                int statsW = 0, statsH = 0;
+                TTF_SizeText(fontSmall.get(), statsText.c_str(), &statsW, &statsH);
+
+                drawText(
+                    statsText,
+                    fontSmall.get(),
+                    SDL_Color{230, 230, 230, 255},
+                    previewX + previewWidth - padding - statsW,
+                    previewY + previewHeight - padding - statsH
+                );
+            }
+        }
+    };
 
     for (std::size_t i = 0; i < player.hand.size(); ++i) {
         if (draggingCard && i == drag.index) continue;
@@ -399,6 +552,12 @@ void Playing::render(Game& game) {
         floating.x = drag.x;
         floating.y = drag.y;
         drawCardAt(drag.index, floating);
+    }
+
+    if (showPreview) {
+        if (const auto& cardPtr = player.hand[hoverIndex]) {
+            drawCardPreview(*cardPtr);
+        }
     }
 
     SDL_RenderPresent(renderer);

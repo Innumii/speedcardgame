@@ -37,13 +37,16 @@ private:
     FontPtr fontLarge{nullptr, TTF_CloseFont};
     FontPtr fontSmall{nullptr, TTF_CloseFont};
     std::vector<SDL_Rect> cardRects;
+    std::vector<SDL_Rect> playSlots;
     SDL_Rect discardZone{0, 0, 0, 0};
     DragState drag;
+    std::size_t hoverIndex{static_cast<std::size_t>(-1)};
+    Uint32 hoverStartTick{0};
 
     void drawText(const std::string& text, TTF_Font* font, SDL_Color color, int x, int y);
     void drawWrappedText(const std::string& text, TTF_Font* font, SDL_Color color, int x, int y, std::size_t maxLineLen);
     std::vector<SDL_Rect> computeCardLayout(std::size_t count, int screenW, int screenH) const;
-    SDL_Rect computeDiscardZone(int screenW, int screenH) const;
+    void computeZones(int screenW, int screenH);
 
 public:
     Playing(int drawIntervalSeconds = 3);
