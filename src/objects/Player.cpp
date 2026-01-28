@@ -19,3 +19,8 @@ void Player::drawCard(Deck& deck) {
 bool Player::isDead() const {
     return health <= 0;
 }
+
+void Player::addMana(int amount) {
+    if (amount <= 0) return;
+    mana += amount;
+}

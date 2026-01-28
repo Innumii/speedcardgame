@@ -37,11 +37,13 @@ private:
     FontPtr fontLarge{nullptr, TTF_CloseFont};
     FontPtr fontSmall{nullptr, TTF_CloseFont};
     std::vector<SDL_Rect> cardRects;
+    SDL_Rect discardZone{0, 0, 0, 0};
     DragState drag;
 
     void drawText(const std::string& text, TTF_Font* font, SDL_Color color, int x, int y);
     void drawWrappedText(const std::string& text, TTF_Font* font, SDL_Color color, int x, int y, std::size_t maxLineLen);
     std::vector<SDL_Rect> computeCardLayout(std::size_t count, int screenW, int screenH) const;
+    SDL_Rect computeDiscardZone(int screenW, int screenH) const;
 
 public:
     Playing(int drawIntervalSeconds = 3);

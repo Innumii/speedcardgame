@@ -127,27 +127,26 @@ std::vector<SDL_Rect> Playing::computeCardLayout(std::size_t count, int screenW,
     std::vector<SDL_Rect> layout;
     if (count == 0 || screenW <= 0 || screenH <= 0) return layout;
 
-    const int margin = 30;
-    const int minCardWidth = 80;
-    const int maxCardWidth = 120;
+    const int cardWidth = 110;
+    const int cardHeight = 165;
+    const int maxWidth = static_cast<int>(screenW * 0.8f); // Use 80% of screen width
+    
+    // 1. Calculate how much space we need if cards didn't overlap
+    int totalWidthNoOverlap = static_cast<int>(count) * cardWidth;
+    
+    // 2. Determine spacing. 
+    // If totalWidth > maxWidth, spacing becomes negative (overlap).
+    int spacing = 10; // Default gap between cards
+    if (totalWidthNoOverlap > maxWidth && count > 1) {
+        spacing = (maxWidth - totalWidthNoOverlap) / static_cast<int>(count - 1);
+    }
 
-    const int usableWidth = std::max(0, screenW - margin * 2);
-    const int baseWidth = usableWidth > 0 && count > 0
-        ? (usableWidth / static_cast<int>(count))
-        : maxCardWidth;
-
-    int cardWidth = baseWidth;
-    if (cardWidth < minCardWidth) cardWidth = minCardWidth;
-    if (cardWidth > maxCardWidth) cardWidth = maxCardWidth;
-    int totalCardWidth = static_cast<int>(count) * cardWidth;
-    int remainingSpace = std::max(0, usableWidth - totalCardWidth);
-    int spacing = count > 1 ? remainingSpace / (static_cast<int>(count) - 1) : 0;
-
-    const int totalWidth = totalCardWidth + spacing * (static_cast<int>(count) - 1);
-    const int startX = std::max(margin, (screenW - totalWidth) / 2);
-
-    const int cardHeight = static_cast<int>(cardWidth * 1.5f);
-    const int startY = screenH - cardHeight - 40;
+    // 3. Calculate actual total width with the new spacing
+    int finalHandWidth = (static_cast<int>(count) * cardWidth) + (static_cast<int>(count - 1) * spacing);
+    
+    // 4. Center the start position
+    int startX = (screenW - finalHandWidth) / 2;
+    int startY = screenH - cardHeight - 30; // Fixed distance from bottom
 
     for (std::size_t i = 0; i < count; ++i) {
         layout.push_back(SDL_Rect{
@@ -161,6 +160,20 @@ std::vector<SDL_Rect> Playing::computeCardLayout(std::size_t count, int screenW,
     return layout;
 }
 
+SDL_Rect Playing::computeDiscardZone(int screenW, int screenH) const {
+    const int zoneWidth = 180;
+    const int zoneHeight = 120;
+    const int margin = 20;
+
+    const int cardHeight = 165;
+    const int handY = screenH - cardHeight - 30;
+
+    const int x = screenW - zoneWidth - margin;
+    const int y = std::max(margin, handY - zoneHeight - 12);
+
+    return SDL_Rect{x, y, zoneWidth, zoneHeight};
+}
+
 void Playing::handleEvent(Game& /*game*/, const SDL_Event& event) {
     if (!renderer) return;
 
@@ -170,6 +183,7 @@ void Playing::handleEvent(Game& /*game*/, const SDL_Event& event) {
     }
 
     cardRects = computeCardLayout(player.hand.size(), screenW, screenH);
+    discardZone = computeDiscardZone(screenW, screenH);
 
     switch (event.type) {
         case SDL_MOUSEBUTTONDOWN:
@@ -197,6 +211,21 @@ void Playing::handleEvent(Game& /*game*/, const SDL_Event& event) {
             break;
         case SDL_MOUSEBUTTONUP:
             if (drag.active && event.button.button == SDL_BUTTON_LEFT) {
+                const int releaseX = event.button.x;
+                const int releaseY = event.button.y;
+
+                const bool droppedInDiscard =
+                    drag.index < player.hand.size() &&
+                    pointInRect(discardZone, releaseX, releaseY);
+
+                if (droppedInDiscard) {
+                    const auto manaGain = player.hand[drag.index]->getManaValue();
+                    player.addMana(manaGain);
+                    player.hand.erase(player.hand.begin() + static_cast<std::ptrdiff_t>(drag.index));
+                    cardRects = computeCardLayout(player.hand.size(), screenW, screenH);
+                    discardZone = computeDiscardZone(screenW, screenH);
+                }
+
                 drag.active = false;
             }
             break;
@@ -258,7 +287,47 @@ void Playing::render(Game& game) {
         20
     );
 
+    const std::string manaText = "Mana: " + std::to_string(player.mana);
+    int manaW = 0, manaH = 0;
+    if (fontLarge) {
+        TTF_SizeText(fontLarge.get(), manaText.c_str(), &manaW, &manaH);
+    }
+    drawText(
+        manaText,
+        fontLarge.get(),
+        SDL_Color{255, 255, 255, 255},
+        screenW - manaW - 20,
+        20
+    );
+
     cardRects = computeCardLayout(player.hand.size(), screenW, screenH);
+    discardZone = computeDiscardZone(screenW, screenH);
+
+    int mouseX = 0, mouseY = 0;
+    SDL_GetMouseState(&mouseX, &mouseY);
+    const bool hoveringDiscard = pointInRect(discardZone, mouseX, mouseY);
+
+    SDL_SetRenderDrawColor(renderer, hoveringDiscard ? 80 : 60, 80, 110, 255);
+    SDL_RenderFillRect(renderer, &discardZone);
+    SDL_SetRenderDrawColor(renderer, 190, 190, 220, 255);
+    SDL_RenderDrawRect(renderer, &discardZone);
+
+    drawText(
+        "Discard Zone",
+        fontSmall.get(),
+        SDL_Color{255, 255, 255, 255},
+        discardZone.x + 10,
+        discardZone.y + 10
+    );
+
+    drawWrappedText(
+        "Drop cards here to gain mana",
+        fontSmall.get(),
+        SDL_Color{220, 220, 220, 255},
+        discardZone.x + 10,
+        discardZone.y + 32,
+        20
+    );
 
     auto drawCardAt = [&](std::size_t idx, const SDL_Rect& cardRect) {
         const auto& cardPtr = player.hand[idx];
