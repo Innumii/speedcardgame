@@ -12,6 +12,7 @@
 #include "states/Playing.hpp"
 #include "objects/Player.h"
 #include "objects/Deck.h"
+#include "Board.hpp"
 
 class Game {
 
@@ -47,11 +48,20 @@ public:
 
     bool running() const;
 
+    //Match logic
+    void getRemoteDeckHandSize(std::size_t remoteDeckSize, std::size_t remoteHandSize);
+
+
 private:
     bool isRunning{false};
 
     Player player;
+    Player remotePlayer;
     Deck deck;
+    std::size_t remoteDeckSize;
+    std::size_t remoteHandSize;
+    Board board;
+
     int drawIntervalSeconds{3};
     Uint32 lastDrawTick{0};
     std::size_t lastLoggedHandSize{0};

@@ -40,6 +40,11 @@ Game::~Game() {
     clean();
 }
 
+void Game::getRemoteDeckHandSize(std::size_t remoteDeckSize, std::size_t remoteHandSize) {
+    this->remoteDeckSize = remoteDeckSize;
+    this->remoteHandSize = remoteHandSize;
+}
+
 void Game::setState(GameState newState) {
     state = newState;
     if (state == GameState::Playing && !playingSetup) {

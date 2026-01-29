@@ -2,6 +2,7 @@ all:
 	g++ -I include -L lib -o main \
 		src/main.cpp \
 		src/core/Game.cpp \
+		src/core/Board.cpp \
 		src/states/Title.cpp \
 		src/states/Playing.cpp \
 		src/objects/Card.cpp \

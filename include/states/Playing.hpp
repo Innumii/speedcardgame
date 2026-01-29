@@ -11,6 +11,7 @@
 #include "core/GameState.hpp" //need this as we plan to use specific GameState stuff with this class
 #include "objects/Player.h"
 #include "objects/Deck.h"
+#include "core/Board.hpp"
 
 class Game; // forward declaration to avoid circular include
 
@@ -18,6 +19,8 @@ class Playing {
 private:
     Player player;
     Deck deck;
+    Board board;
+
     int drawIntervalSeconds;
     Uint32 lastDrawTick{0};
     bool running{false};

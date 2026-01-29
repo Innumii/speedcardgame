@@ -75,6 +75,9 @@ void Playing::setup(Game& game) {
         throw std::runtime_error(std::string("Failed to load font (14pt): ") + TTF_GetError());
     }
 
+    //init board
+    board = Board();
+
     for (int i = 0; i < 20; i++) {
         deck.addCard(std::make_unique<CreatureCard>(
             "Goblin",
@@ -216,7 +219,7 @@ void Playing::computeZones(int screenW, int screenH) {
     discardZone = SDL_Rect{discardX, discardY, discardWidth, discardHeight};
 }
 
-void Playing::handleEvent(Game& /*game*/, const SDL_Event& event) {
+void Playing::handleEvent(Game& game, const SDL_Event& event) {
     if (!renderer) return;
 
     int screenW = 0, screenH = 0;
@@ -261,14 +264,25 @@ void Playing::handleEvent(Game& /*game*/, const SDL_Event& event) {
                     pointInRect(discardZone, releaseX, releaseY);
 
                 if (droppedInDiscard) {
-                    const auto manaGain = player.hand[drag.index]->getManaValue();
-                    player.addMana(manaGain);
-                    player.hand.erase(player.hand.begin() + static_cast<std::ptrdiff_t>(drag.index));
-                    cardRects = computeCardLayout(player.hand.size(), screenW, screenH);
-                    computeZones(screenW, screenH);
+                    std::cout << "Discarding " << player.hand[drag.index].get()->getName() << "\n";
+                    const auto manaGain = player.hand[drag.index].get()->getManaValue();
+                    if (board.addToDiscard(std::move(player.hand[drag.index]), player.id)) {
+
+                        std::cout << "Adding mana\n";
+                        player.addMana(manaGain);
+                        
+                        std::cout << "Removing card from hand\n";
+                        player.hand.erase(player.hand.begin() + static_cast<std::ptrdiff_t>(drag.index));
+                        
+                    }
+                    
                 }
 
                 drag.active = false;
+                cardRects = computeCardLayout(player.hand.size(), screenW, screenH);
+                computeZones(screenW, screenH);
+                // board.displayDiscard(player.id);
+                
             }
             break;
         default:
