@@ -41,6 +41,9 @@ namespace {
     bool pointInRect(const SDL_Rect& rect, int x, int y) {
         return x >= rect.x && x < rect.x + rect.w && y >= rect.y && y < rect.y + rect.h;
     }
+
+    SDL_Rect playZoneBand{0, 0, 0, 0};
+
 }
 
 Playing::Playing(int drawIntervalSeconds)
@@ -209,6 +212,17 @@ void Playing::computeZones(int screenW, int screenH) {
             slotHeight
         });
     }
+    if (!playSlots.empty()) {
+        const SDL_Rect& firstSlot = playSlots.front();
+        const SDL_Rect& lastSlot = playSlots.back();
+
+        playZoneBand.x = firstSlot.x;
+        playZoneBand.y = firstSlot.y;
+        playZoneBand.w = (lastSlot.x + lastSlot.w) - firstSlot.x; // from left edge of first to right edge of last
+        playZoneBand.h = firstSlot.h; // all slots have same height
+    } else {
+        playZoneBand = SDL_Rect{0,0,0,0};
+    }
 
     int discardX = startX + totalSlotsWidth + gapToDiscard;
     if (discardX + discardWidth + margin > screenW) {
@@ -262,7 +276,10 @@ void Playing::handleEvent(Game& game, const SDL_Event& event) {
                 const bool droppedInDiscard =
                     drag.index < player.hand.size() &&
                     pointInRect(discardZone, releaseX, releaseY);
-
+                const bool droppedInPlay = 
+                    drag.index < player.hand.size() &&
+                    pointInRect(playZoneBand, releaseX, releaseY);
+                
                 if (droppedInDiscard) {
                     std::cout << "Discarding " << player.hand[drag.index].get()->getName() << "\n";
                     const auto manaGain = player.hand[drag.index].get()->getManaValue();
@@ -272,16 +289,46 @@ void Playing::handleEvent(Game& game, const SDL_Event& event) {
                         player.addMana(manaGain);
                         
                         std::cout << "Removing card from hand\n";
-                        player.hand.erase(player.hand.begin() + static_cast<std::ptrdiff_t>(drag.index));
-                        
+                        player.hand.erase(player.hand.begin() + static_cast<std::ptrdiff_t>(drag.index));   
+                    } 
+                } else if (droppedInPlay) {
+                    std::cout << "Playing " << player.hand[drag.index].get()->getName() << "\n";
+                    //move card to board object
+                    //if succeed, cut mana by cost
+                    //erase card from hand
+
+                    //Determine lane
+                    const int laneWidth = playSlots.front().w; // assuming uniform width
+                    const int laneSpacing = (playSlots.size() > 1)
+                        ? playSlots[1].x - (playSlots[0].x + playSlots[0].w)
+                        : 0;
+
+                    const int relativeX = releaseX - playZoneBand.x;
+                    const int bandSegmentWidth = laneWidth + laneSpacing;
+                    int laneIndex = relativeX / bandSegmentWidth;
+
+                    if (laneIndex >= 0 && laneIndex < static_cast<int>(playSlots.size())) {
+                        std::cout << "Playing " << player.hand[drag.index]->getName()
+                                << " into lane " << laneIndex << "\n";
+
+                        const int cost = player.hand[drag.index]->getManaCost();
+                        if (player.mana >= cost && board.isZoneEmpty(laneIndex, player.id)) {
+                            if (board.addToPlay(laneIndex, player.id, std::move(player.hand[drag.index]))) {
+                                player.mana -= cost;
+                                player.hand.erase(player.hand.begin() + static_cast<std::ptrdiff_t>(drag.index));
+                            }
+                            
+                        } else {
+                            std::cout << "Not enough mana\n";
+                        }
                     }
-                    
                 }
 
                 drag.active = false;
                 cardRects = computeCardLayout(player.hand.size(), screenW, screenH);
                 computeZones(screenW, screenH);
                 // board.displayDiscard(player.id);
+                board.displayPlay(player.id);
                 
             }
             break;
@@ -487,6 +534,25 @@ void Playing::render(Game& game) {
         }
     };
 
+    auto drawCardAtPtr = [&](const Card* card, const SDL_Rect& cardRect) {
+        if (!card) return;
+
+        SDL_SetRenderDrawColor(renderer, 200, 200, 200, 255);
+        SDL_RenderFillRect(renderer, &cardRect);
+        SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
+        SDL_RenderDrawRect(renderer, &cardRect);
+
+        const int textMargin = 10;
+        drawText(card->getName(), fontSmall.get(), SDL_Color{0, 0, 0, 255}, cardRect.x + textMargin, cardRect.y + textMargin);
+
+        drawText("Cost: " + std::to_string(card->getManaCost()), fontSmall.get(),
+                SDL_Color{0,0,0,255}, cardRect.x + cardRect.w - 40, cardRect.y + textMargin);
+
+        drawText("Value: " + std::to_string(card->getManaValue()), fontSmall.get(),
+                SDL_Color{0,0,0,255}, cardRect.x + textMargin, cardRect.y + textMargin + 22);
+    };
+
+
     auto drawCardPreview = [&](const Card& card) {
         const int previewWidth = 260;
         const int previewHeight = 240;
@@ -554,6 +620,7 @@ void Playing::render(Game& game) {
         }
     };
 
+    //draw cards in hand
     for (std::size_t i = 0; i < player.hand.size(); ++i) {
         if (draggingCard && i == drag.index) continue;
         if (i < cardRects.size()) {
@@ -561,6 +628,25 @@ void Playing::render(Game& game) {
         }
     }
 
+    //draw cards on board
+    for (int pid = 0; pid <= 1; ++pid) { // 0 = local, 1 = opponent
+        for (size_t lane = 0; lane < board.getLaneCount(); ++lane) {
+            const auto& optCard = board.getZone(static_cast<int>(lane), pid);
+            if (optCard && *optCard) {
+                const Card* card = optCard->get();
+
+                SDL_Rect rect = playSlots[lane];
+                if (pid == 1) {
+                    // offset for opponent's cards (optional)
+                    rect.y -= 50;
+                }
+
+                drawCardAtPtr(card, rect);
+            }
+        }
+    }
+
+    //draw floating card
     if (draggingCard && drag.index < cardRects.size()) {
         SDL_Rect floating = cardRects[drag.index];
         floating.x = drag.x;

@@ -4,19 +4,24 @@
 
 //:lanes(laneCount) executes before constructor body
 //initialises each lane as a std::vector, and calls the vector constructor
-Board::Board(int laneCount):lanes(laneCount){
+Board::Board(int count):laneCount(count){
+    for (int player = 0; player < 2; player++) {
+        lanes[player].resize(laneCount);
+    }
 
 }
 
-bool Board::isLaneEmpty(int lane) const {
-    return !lanes[lane].has_value();
+bool Board::isZoneEmpty(int lane, int playerId) const {
+    if (playerId < 0 || playerId > 1 || lane < 0 || lane >= laneCount) return false;
+    return !lanes[playerId][lane];
 }
 
-bool Board::placeCard(int lane, std::unique_ptr<Card> card) {
-    if (!isLaneEmpty(lane) || !card) return false;
+bool Board::addToPlay(int lane, int playerId, std::unique_ptr<Card> card) {
+    if (!isZoneEmpty(lane, playerId) || !card) return false;
+    if (playerId < 0 || playerId > 1 || lane < 0 || lane >= laneCount) return false;
 
     try {
-        lanes[lane] = std::move(card);
+        lanes[playerId][lane] = std::move(card);
     } catch (...) {
         std::cerr << "Failed to place card\n";
         return false;
@@ -25,12 +30,37 @@ bool Board::placeCard(int lane, std::unique_ptr<Card> card) {
     return true;
 }
 
-const std::optional<std::unique_ptr<Card>>& Board::getLane(int lane) const {
-    return lanes[lane];
+void Board::displayPlay(int playerId) {
+    if (playerId < 0 || playerId > 1) {
+            std::cerr << "Invalid player ID\n";
+            return;
+    }
+
+    const auto& pile = lanes[playerId];
+    if (pile.empty()) {
+        std::cout << "Player " << playerId << "'s play zone is empty.\n";
+        return;
+    }
+
+    std::cout << "Player " << playerId << "'s play zone:\n";
+    for (int i = 0; i < laneCount; i++) {
+        if (pile[i] && *pile[i]) { //if optional has value + card ptr is not null
+            std::cout << i << ": " << (*pile[i])->getName() << "\n";
+        } else {
+            std::cout << i << "\n";
+        }
+    }
 }
 
-int Board::laneCount() const {
-    return lanes.size();
+const std::optional<std::unique_ptr<Card>>& Board::getZone(int lane, int playerId) const {
+    if (playerId < 0 || playerId > 1 || lane < 0 || lane >= laneCount) {
+        throw std::out_of_range("Invalid lane or playerId");
+    }
+    return lanes[playerId][lane];
+}
+
+int Board::getLaneCount() const {
+    return laneCount;
 }
 
 bool Board::addToDiscard(std::unique_ptr<Card> card, int playerId) {

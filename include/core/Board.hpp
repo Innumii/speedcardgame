@@ -7,24 +7,26 @@ class Card;
 
 class Board { //stores data on what cards are on the board
 public:
-    explicit Board(int laneCount = 5);
-    bool isLaneEmpty(int lane) const;
+    explicit Board(int count = 5);
+    bool isZoneEmpty(int lane, int playerId) const;
 
     //transfers ownership of card to Board object
-    bool placeCard(int lane, std::unique_ptr<Card> card);
+    bool addToPlay(int lane, int playerId, std::unique_ptr<Card> card);
+    void displayPlay(int playerId);
 
-    //return reference to Card object, if card is present on the lane
-    const std::optional<std::unique_ptr<Card>>& getLane(int lane) const;
-    int laneCount() const;
+    //return reference to Card object, if card is present on the zone
+    const std::optional<std::unique_ptr<Card>>& getZone(int lane, int playerId) const;
+    int getLaneCount() const;
 
-    //Discard Zone interaction (0 for local, 1 for remote)
+    //Discard Zone interaction (id 0 for local, 1 for remote)
     bool addToDiscard(std::unique_ptr<Card> card, int playerId);
     std::vector<std::unique_ptr<Card>>& getDiscard(int playerId);
     void displayDiscard(int playerId);
 
 
 private:
-    std::vector<std::optional<std::unique_ptr<Card>>> lanes;
+    int laneCount;
+    std::vector<std::optional<std::unique_ptr<Card>>> lanes[2];
 
     //Discard Zones
     std::vector<std::unique_ptr<Card>> discard[2];
