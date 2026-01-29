@@ -50,6 +50,7 @@ private:
     void drawWrappedText(const std::string& text, TTF_Font* font, SDL_Color color, int x, int y, std::size_t maxLineLen);
     std::vector<SDL_Rect> computeCardLayout(std::size_t count, int screenW, int screenH) const;
     void computeZones(int screenW, int screenH);
+    static bool pointInRect(const SDL_Rect& rect, int x, int y);
 
 public:
     Playing(int drawIntervalSeconds = 3);
