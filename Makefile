@@ -5,7 +5,6 @@ all:
 		src/core/Board.cpp \
 		src/states/Title.cpp \
 		src/states/Playing.cpp \
-		src/states/PlayingRender.cpp \
 		src/objects/Card.cpp \
 		src/objects/CreatureCard.cpp \
 		src/objects/SpellCard.cpp \

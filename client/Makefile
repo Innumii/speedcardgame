@@ -1,0 +1,22 @@
+CXX := g++
+INCLUDES := -I include
+LIBDIR := -L lib
+LIBS := -lmingw32 -lSDL2main -lSDL2 -lSDL2_ttf
+BUILD_DIR := build
+MKDIR_P := powershell -NoProfile -Command "New-Item -ItemType Directory -Force -Path"
+
+# Pick up .cpp files in src and one/two-level subdirs.
+SRCS := $(wildcard src/*.cpp src/*/*.cpp src/*/*/*.cpp)
+OBJS := $(patsubst src/%.cpp,$(BUILD_DIR)/%.o,$(SRCS))
+
+all: main
+
+main: $(OBJS)
+	$(CXX) -o $@ $^ $(LIBDIR) $(LIBS)
+
+$(BUILD_DIR)/%.o: src/%.cpp
+	$(MKDIR_P) $(@D)
+	$(CXX) $(INCLUDES) -c $< -o $@
+
+clean:
+	$(RM) -r $(BUILD_DIR) main
