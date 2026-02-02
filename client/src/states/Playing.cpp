@@ -1,6 +1,7 @@
 #include "states/Playing.hpp"
 
 #include "core/Game.hpp"
+#include "render/RenderPLaying.hpp"
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_ttf.h>
 #include "objects/CreatureCard.h"
@@ -315,5 +316,9 @@ void Playing::update(Game& /*game*/) {
         }
         lastDrawTick = now;
     }
+}
+
+void Playing::render(Game& game) {
+    RenderPlaying::render(*this, game);
 }
 
