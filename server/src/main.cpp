@@ -2,14 +2,16 @@
 #include <iostream>
 
 int main() {
-    try {
-        Server server(5555);
-        server.run();
-    }
-    catch (const std::exception& e) {
-        std::cerr << "Server crashed: " << e.what() << std::endl;
+    TcpServer server(4000);
+
+    if (!server.start()) {
+        std::cerr << "Failed to start server\n";
         return 1;
     }
 
+    std::cout << "Server running. Press Enter to stop...\n";
+    std::cin.get();
+
+    server.stop();
     return 0;
 }

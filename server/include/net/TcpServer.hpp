@@ -4,6 +4,10 @@
 //dynamic array
 #include <vector>
 #include <string>
+#include <thread>
+#include <mutex>
+#include <atomic>
+
 
 class TcpServer {
 public:
@@ -16,7 +20,7 @@ public:
 
     bool start();
     void stop();
-    void handleClient(int clientSocket);
+    // void handleClient(int clientSocket);
 private:
     int listenPort;
     int listenSocket;
