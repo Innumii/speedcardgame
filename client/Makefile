@@ -1,7 +1,7 @@
 CXX := g++
 INCLUDES := -I include
 LIBDIR := -L lib
-LIBS := -lmingw32 -lSDL2main -lSDL2 -lSDL2_ttf
+LIBS := -lmingw32 -lSDL2main -lSDL2 -lSDL2_ttf -lWs2_32
 BUILD_DIR := build
 MKDIR_P := powershell -NoProfile -Command "New-Item -ItemType Directory -Force -Path"
 

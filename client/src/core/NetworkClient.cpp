@@ -5,7 +5,7 @@
     #include <Ws2tcpip.h>
     #pragma comment(lib, "Ws2_32.lib")
     //create alias as Winsock returns int datatype
-    using ssize_t = int;
+    // using ssize_t = int;
     #define CLOSE_SOCKET(s) closesocket(s)
 
 #else
@@ -121,7 +121,11 @@ int NetworkClient::receive(void* buffer, size_t size) {
     }
 
     //recv will return 1 of 3 values (>0, 0, <0)
+#ifdef _WIN32
+    int received = ::recv(socketFd, static_cast<char*>(buffer), static_cast<int>(size), 0);
+#else
     ssize_t received = ::recv(socketFd, buffer, size, 0);
+#endif
 
     if (received <= 0) { //connection closed by peer gracefully
         if (received < 0) { // error occurred
