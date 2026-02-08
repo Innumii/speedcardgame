@@ -97,7 +97,7 @@ void Game::handleEvents() {
                 titleState.handleEvents(*this, event);
                 break;
             case GameState::Playing:
-                playingState.handleEvent(*this, event);
+                playingState.handleEvents(*this, event);
                 break;
             case GameState::GameOver:
             case GameState::Connecting:

@@ -178,7 +178,7 @@ void Playing::computeZones(int screenW, int screenH) {
     discardZone = SDL_Rect{discardX, discardY, discardWidth, discardHeight};
 }
 
-void Playing::handleEvent(Game& game, const SDL_Event& event) {
+void Playing::handleEvents(Game& game, const SDL_Event& event) {
     if (!renderer) return;
 
     int screenW = 0, screenH = 0;

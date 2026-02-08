@@ -61,7 +61,7 @@ public:
     Playing(Playing&&) noexcept = default;
     Playing& operator=(Playing&&) noexcept = default;
     void setup(Game& game);
-    void handleEvent(Game& game, const SDL_Event& event);
+    void handleEvents(Game& game, const SDL_Event& event);
     void run();
     void update(Game& game);
     void render(Game&);
