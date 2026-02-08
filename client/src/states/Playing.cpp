@@ -41,12 +41,12 @@ void Playing::setup(Game& game) {
         throw std::runtime_error(std::string("TTF_Init failed: ") + TTF_GetError());
     }
 
-    fontLarge.reset(TTF_OpenFont("assets/font.ttf", 24));
+    fontLarge.reset(TTF_OpenFont("assets/font.TTF", 24));
     if (!fontLarge) {
         throw std::runtime_error(std::string("Failed to load font (24pt): ") + TTF_GetError());
     }
 
-    fontSmall.reset(TTF_OpenFont("assets/font.ttf", 14));
+    fontSmall.reset(TTF_OpenFont("assets/font.TTF", 14));
     if (!fontSmall) {
         fontLarge.reset();
         throw std::runtime_error(std::string("Failed to load font (14pt): ") + TTF_GetError());

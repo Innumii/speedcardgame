@@ -30,6 +30,7 @@ int main(int argc, char** argv) {
         Game game("SpeedCardGame", 100, 100, 800, 600, fullscreen, drawInterval);
         while (game.running()) {
             game.handleEvents();
+            game.commitStateChange();
             game.update();
             game.render();
         }

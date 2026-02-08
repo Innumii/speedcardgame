@@ -33,6 +33,9 @@ Game::Game(const char *title, int xpos, int ypos, int width, int height, bool fu
 
     SDL_SetRenderDrawBlendMode(renderer.get(), SDL_BLENDMODE_BLEND);
 
+    SDL_RaiseWindow(window.get());
+    SDL_SetWindowInputFocus(window.get());
+
     isRunning = true;
 }
 
@@ -45,30 +48,47 @@ void Game::getRemoteDeckHandSize(std::size_t remoteDeckSize, std::size_t remoteH
     this->remoteHandSize = remoteHandSize;
 }
 
-void Game::setState(GameState newState) {
-    state = newState;
-    if (state == GameState::Playing && !playingSetup) {
-        playingState.setup(*this);
-        playingSetup = true;
+void Game::commitStateChange() {
+    if (nextState != state) {
+        state = nextState;
+
+        if (state == GameState::Playing && !playingSetup) {
+            playingState.setup(*this);
+            playingSetup = true;
+        }
+        if (state == GameState::Quit || state == GameState::GameOver) {
+            isRunning = false;
+        }
     }
-    if (state == GameState::Quit || state == GameState::GameOver) {
-        isRunning = false;
-    }
+    
+}
+
+void Game::setNextState(GameState newState) {
+    nextState = newState;
 }
 
 GameState Game::getState() const {
     return state;
 }
 
+GameState Game::getNextState() const {
+    return nextState;
+}
+
 SDL_Renderer* Game::getRenderer() const {
     return renderer.get();
 }
+
+NetworkClient& Game::getNetworkClient() {
+    return netClient;
+}
+
 
 void Game::handleEvents() {
     SDL_Event event;
     while (SDL_PollEvent(&event)) {
         if (event.type == SDL_QUIT) {
-            setState(GameState::Quit);
+            setNextState(GameState::Quit);
             continue;
         }
 

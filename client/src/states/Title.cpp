@@ -1,11 +1,12 @@
 #include "states/Title.hpp"
 #include "core/Game.hpp"
 #include <SDL2/SDL.h>
+#include <iostream>
 
 void Title::handleEvents(Game& game, const SDL_Event& event) {
     if (event.type == SDL_QUIT)
     {
-        game.setState(GameState::Quit);
+        game.setNextState(GameState::Quit);
     }
 
     if (event.type == SDL_MOUSEBUTTONDOWN &&
@@ -20,9 +21,9 @@ void Title::handleEvents(Game& game, const SDL_Event& event) {
                             (mouseY >= quitButton.y && mouseY <= (quitButton.y + quitButton.h));
 
         if (inStart) {
-            game.setState(GameState::Playing);
+            game.setNextState(GameState::Playing);
         } else if (inQuit) {
-            game.setState(GameState::Quit);
+            game.setNextState(GameState::Quit);
         }
     }
 

@@ -7,9 +7,15 @@
 #include <cstddef>
 #include <memory> //for smart pointers
 #include <stdexcept> //for signalling fatal init errors
+
+//core
 #include "GameState.hpp"
+#include "NetworkClient.hpp"
+
 #include "states/Title.hpp"
 #include "states/Playing.hpp"
+// #include "states/Connecting.hpp"
+
 #include "objects/Player.h"
 #include "objects/Deck.h"
 #include "Board.hpp"
@@ -35,6 +41,9 @@ public:
     //This is to handle mem resource transfer between Game objects to ensure only 1 object owns the resources at any time
     Game(Game&&) noexcept = default;
     Game& operator=(Game&&) noexcept = default;
+
+    //returns reference to NetworkClient object, NOT a copy
+    NetworkClient& getNetworkClient();
     
     void handleEvents();
     void update();
@@ -42,8 +51,11 @@ public:
     void clean();
 
     //Getters and Setters
-    void setState(GameState newState);
+    void setNextState(GameState newState);
+    void commitStateChange();
+
     GameState getState() const;
+    GameState getNextState() const;
     SDL_Renderer* getRenderer() const;
 
     bool running() const;
@@ -54,6 +66,7 @@ public:
 
 private:
     bool isRunning{false};
+    NetworkClient netClient;
 
     Player player;
     Player remotePlayer;
@@ -79,8 +92,11 @@ private:
 
     //GameState::Title used because Title is not in global scope, only exists within GameState
     GameState state{GameState::Title};
+    GameState nextState{GameState::Title};
+
     Title titleState;
     Playing playingState{drawIntervalSeconds};
+    // Connecting connectingState;
 };
 
 #endif
