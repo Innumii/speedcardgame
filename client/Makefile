@@ -8,6 +8,7 @@ MKDIR_P := powershell -NoProfile -Command "New-Item -ItemType Directory -Force -
 # Pick up .cpp files in src and one/two-level subdirs.
 SRCS := $(wildcard src/*.cpp src/*/*.cpp src/*/*/*.cpp)
 OBJS := $(patsubst src/%.cpp,$(BUILD_DIR)/%.o,$(SRCS))
+DEPS := $(OBJS:.o=.d)
 
 all: main
 
@@ -16,7 +17,11 @@ main: $(OBJS)
 
 $(BUILD_DIR)/%.o: src/%.cpp
 	$(MKDIR_P) $(@D)
-	$(CXX) $(INCLUDES) -c $< -o $@
+	$(CXX) $(INCLUDES) -MMD -MP -c $< -o $@
+
+-include $(DEPS)
 
 clean:
-	$(RM) -r $(BUILD_DIR) main
+	powershell -NoProfile -Command "Remove-Item -Recurse -Force -ErrorAction SilentlyContinue $(BUILD_DIR), main"
+
+.PHONY: all clean
