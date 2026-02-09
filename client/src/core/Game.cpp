@@ -2,6 +2,7 @@
 #include <algorithm>
 #include <iostream>
 #include <stdexcept>
+#include <fstream>
 
 namespace {
     int clampPositive(int value, int maxValue) {
@@ -9,6 +10,20 @@ namespace {
         if (value > maxValue) return maxValue;
         return value;
     }
+}
+
+//helper functions
+bool isWSL() {
+    // Check env variable first
+    if (std::getenv("WSL_DISTRO_NAME")) return true;
+
+    // Fallback to osrelease
+    std::ifstream f("/proc/sys/kernel/osrelease");
+    if (!f) return false;
+    std::string line;
+    std::getline(f, line);
+    for (auto &c : line) c = tolower(c);
+    return line.find("microsoft") != std::string::npos;
 }
 
 Game::Game(const char *title, int xpos, int ypos, int width, int height, bool fullscreen, int drawIntervalSeconds)
@@ -25,11 +40,32 @@ Game::Game(const char *title, int xpos, int ypos, int width, int height, bool fu
         throw std::runtime_error(std::string("SDL_CreateWindow Failed: ") + SDL_GetError());
     }
 
-    renderer.reset(SDL_CreateRenderer(window.get(), -1, SDL_RENDERER_ACCELERATED));
-    if (!renderer) {
-        SDL_Quit();
-        throw std::runtime_error(std::string("SDL_CreateRenderer Failed: ") + SDL_GetError());
+    bool forceSoftware = true;
+#ifdef _WIN32
+    // Accelerated is safe on Windows
+    forceSoftware = false;
+#else
+    // On Linux/WSL: check environment
+    if (isWSL()) {
+        std::cout << "WSL detected: forcing software renderer\n";
+        forceSoftware = true;
     }
+#endif
+
+    if (!forceSoftware) {
+        renderer.reset(SDL_CreateRenderer(window.get(), -1, SDL_RENDERER_ACCELERATED));
+        if (!renderer) {
+            SDL_Quit();
+            throw std::runtime_error(std::string("SDL_CreateRenderer Failed: ") + SDL_GetError());
+        }
+    } else {
+        renderer.reset(SDL_CreateRenderer(window.get(), -1, SDL_RENDERER_SOFTWARE));
+        if (!renderer) {
+            SDL_Quit();
+            throw std::runtime_error(std::string("SDL_CreateRenderer Failed: ") + SDL_GetError());
+        }
+    }
+    
 
     SDL_SetRenderDrawBlendMode(renderer.get(), SDL_BLENDMODE_BLEND);
 
