@@ -19,11 +19,15 @@ void Title::handleEvents(Game& game, const SDL_Event& event) {
                              (mouseY >= startButton.y && mouseY <= (startButton.y + startButton.h));
         const bool inQuit = (mouseX >= quitButton.x && mouseX <= (quitButton.x + quitButton.w)) &&
                             (mouseY >= quitButton.y && mouseY <= (quitButton.y + quitButton.h));
+        const bool inBuildDeck = (mouseX >= BuildDeckButton.x && mouseX <= (BuildDeckButton.x + BuildDeckButton.w)) &&
+                                 (mouseY >= BuildDeckButton.y && mouseY <= (BuildDeckButton.y + BuildDeckButton.h));
 
         if (inStart) {
             game.setNextState(GameState::Playing);
         } else if (inQuit) {
             game.setNextState(GameState::Quit);
+        } else if (inBuildDeck) {
+            game.setNextState(GameState::DeckBuilding);
         }
     }
 
@@ -59,5 +63,11 @@ void Title::render(Game& game) {
     SDL_RenderFillRect(renderer, &quitButton);
     SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
     SDL_RenderDrawRect(renderer, &quitButton);
+
+    // build deck button
+    SDL_SetRenderDrawColor(renderer, 200, 200, 80, 255);
+    SDL_RenderFillRect(renderer, &BuildDeckButton);
+    SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
+    SDL_RenderDrawRect(renderer, &BuildDeckButton);
 
 }

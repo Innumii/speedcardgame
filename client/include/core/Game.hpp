@@ -14,6 +14,7 @@
 
 #include "states/Title.hpp"
 #include "states/Playing.hpp"
+#include "states/DeckBuilding.hpp"
 // #include "states/Connecting.hpp"
 
 #include "objects/Player.h"
@@ -96,6 +97,7 @@ private:
 
     Title titleState;
     Playing playingState{drawIntervalSeconds};
+    DeckBuilding deckBuildingState;
     // Connecting connectingState;
 };
 

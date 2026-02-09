@@ -96,6 +96,9 @@ void Game::handleEvents() {
             case GameState::Title:
                 titleState.handleEvents(*this, event);
                 break;
+            case GameState::DeckBuilding:
+                deckBuildingState.handleEvents(*this, event);
+                break;
             case GameState::Playing:
                 playingState.handleEvents(*this, event);
                 break;
@@ -114,8 +117,15 @@ void Game::update() {
         return;
     }
 
-    if (state == GameState::Playing) {
-        playingState.update(*this);
+    switch (state) {
+        case GameState::Playing:
+            playingState.update(*this);
+            break;
+        case GameState::DeckBuilding:
+            deckBuildingState.update(*this);
+            break;
+        default:
+            break;
     }
 }
 
@@ -126,6 +136,9 @@ void Game::render() {
     switch (state) {
         case GameState::Title:
             titleState.render(*this);
+            break;
+        case GameState::DeckBuilding:
+            deckBuildingState.render(*this);
             break;
         case GameState::Playing:
             playingState.render(*this);

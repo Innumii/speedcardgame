@@ -15,6 +15,7 @@ public:
 private:
     SDL_Rect startButton{300,150,200,80};
     SDL_Rect quitButton{300,250,200,80};
+    SDL_Rect BuildDeckButton{300,350,200,80};
 };
 
 #endif
