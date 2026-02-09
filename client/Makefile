@@ -1,4 +1,5 @@
 CXX := g++
+STD := -std=c++17
 INCLUDES := -I include
 LIBDIR := -L lib
 LIBS := -lmingw32 -lSDL2main -lSDL2 -lSDL2_ttf -lWs2_32
@@ -13,11 +14,11 @@ DEPS := $(OBJS:.o=.d)
 all: main
 
 main: $(OBJS)
-	$(CXX) -o $@ $^ $(LIBDIR) $(LIBS)
+	$(CXX) $(STD) -o $@ $^ $(LIBDIR) $(LIBS)
 
 $(BUILD_DIR)/%.o: src/%.cpp
 	$(MKDIR_P) $(@D)
-	$(CXX) $(INCLUDES) -MMD -MP -c $< -o $@
+	$(CXX) $(STD) $(INCLUDES) -MMD -MP -c $< -o $@
 
 -include $(DEPS)
 

@@ -1,4 +1,5 @@
 CXX := g++
+STD := -std=c++17
 INCLUDES := -I include
 LIBDIR := -L lib
 LIBS := -lSDL2 -lSDL2_ttf
@@ -12,11 +13,11 @@ OBJS := $(patsubst src/%.cpp,$(BUILD_DIR)/%.o,$(SRCS))
 all: main
 
 main: $(OBJS)
-	$(CXX) -o $@ $^ $(LIBDIR) $(LIBS)
+	$(CXX) $(STD) -o $@ $^ $(LIBDIR) $(LIBS)
 
 $(BUILD_DIR)/%.o: src/%.cpp
 	$(MKDIR_P) $(@D)
-	$(CXX) $(INCLUDES) -c $< -o $@
+	$(CXX) $(STD) $(INCLUDES) -c $< -o $@
 
 clean:
 	$(RM) -r $(BUILD_DIR) main
