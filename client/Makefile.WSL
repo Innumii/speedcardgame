@@ -6,6 +6,9 @@ LIBS := -lSDL2 -lSDL2_ttf
 BUILD_DIR := build
 MKDIR_P := mkdir -p
 
+CXXFLAGS := -g -O1 -Wall -Wextra -Wshadow -fsanitize=address -fstack-protector-all
+LDFLAGS := -fsanitize=address
+
 # Pick up .cpp files in src and one/two-level subdirs.
 SRCS := $(wildcard src/*.cpp src/*/*.cpp src/*/*/*.cpp)
 OBJS := $(patsubst src/%.cpp,$(BUILD_DIR)/%.o,$(SRCS))
@@ -13,11 +16,11 @@ OBJS := $(patsubst src/%.cpp,$(BUILD_DIR)/%.o,$(SRCS))
 all: main
 
 main: $(OBJS)
-	$(CXX) $(STD) -o $@ $^ $(LIBDIR) $(LIBS)
+	$(CXX) $(STD) $(LDFLAGS) -o $@ $^ $(LIBDIR) $(LIBS)
 
 $(BUILD_DIR)/%.o: src/%.cpp
 	$(MKDIR_P) $(@D)
-	$(CXX) $(STD) $(INCLUDES) -c $< -o $@
+	$(CXX) $(STD) $(CXXFLAGS) $(INCLUDES) -c $< -o $@
 
 clean:
 	$(RM) -r $(BUILD_DIR) main
