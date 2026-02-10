@@ -7,6 +7,7 @@
 #include <cstddef>
 #include <memory> //for smart pointers
 #include <stdexcept> //for signalling fatal init errors
+#include <optional>
 
 //core
 #include "GameState.hpp"
@@ -15,7 +16,7 @@
 #include "states/Title.hpp"
 #include "states/Playing.hpp"
 #include "states/DeckBuilding.hpp"
-// #include "states/Connecting.hpp"
+#include "states/Connecting.hpp"
 
 #include "objects/Player.h"
 #include "objects/Deck.h"
@@ -98,7 +99,7 @@ private:
     Title titleState;
     Playing playingState{drawIntervalSeconds};
     DeckBuilding deckBuildingState;
-    // Connecting connectingState;
+    std::optional<Connecting> connectingState;
 };
 
 #endif

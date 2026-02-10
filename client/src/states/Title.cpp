@@ -22,12 +22,17 @@ void Title::handleEvents(Game& game, const SDL_Event& event) {
         const bool inBuildDeck = (mouseX >= BuildDeckButton.x && mouseX <= (BuildDeckButton.x + BuildDeckButton.w)) &&
                                  (mouseY >= BuildDeckButton.y && mouseY <= (BuildDeckButton.y + BuildDeckButton.h));
 
+        const bool inConnect = (mouseX >= ConnectButton.x && mouseX <= (ConnectButton.x + ConnectButton.w)) &&
+                                 (mouseY >= ConnectButton.y && mouseY <= (ConnectButton.y + ConnectButton.h));
+
         if (inStart) {
             game.setNextState(GameState::Playing);
         } else if (inQuit) {
             game.setNextState(GameState::Quit);
         } else if (inBuildDeck) {
             game.setNextState(GameState::DeckBuilding);
+        } else if (inConnect) {
+            game.setNextState(GameState::Connecting);
         }
     }
 
@@ -69,5 +74,11 @@ void Title::render(Game& game) {
     SDL_RenderFillRect(renderer, &BuildDeckButton);
     SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
     SDL_RenderDrawRect(renderer, &BuildDeckButton);
+
+    // build connect button
+    SDL_SetRenderDrawColor(renderer, 80, 80, 80, 255);
+    SDL_RenderFillRect(renderer, &ConnectButton);
+    SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
+    SDL_RenderDrawRect(renderer, &ConnectButton);
 
 }

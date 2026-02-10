@@ -88,6 +88,17 @@ void Game::commitStateChange() {
     if (nextState != state) {
         state = nextState;
 
+        if (state == GameState::Connecting) {
+            connectingState.reset();
+        }
+
+        state = nextState;
+
+        if (state == GameState::Connecting) {
+            //hardcoded for now
+            connectingState.emplace("127.0.0.1", 4000);
+        }
+
         if (state == GameState::Playing && !playingSetup) {
             playingState.setup(*this);
             playingSetup = true;
@@ -140,6 +151,10 @@ void Game::handleEvents() {
                 break;
             case GameState::GameOver:
             case GameState::Connecting:
+                if (connectingState) {
+                    connectingState->handleEvents(*this, event);
+                }
+                break;
             case GameState::Waiting:
             default:
                 break;
@@ -160,6 +175,11 @@ void Game::update() {
         case GameState::DeckBuilding:
             deckBuildingState.update(*this);
             break;
+        case GameState::Connecting:
+            if (connectingState) {
+                connectingState->update(*this);
+            }
+            break;
         default:
             break;
     }
@@ -179,7 +199,10 @@ void Game::render() {
         case GameState::Playing:
             playingState.render(*this);
             break;
-        case GameState::GameOver:
+        case GameState::Connecting:
+            if (connectingState) {
+                connectingState->render(*this);
+            }
             break;
         default:
             break;

@@ -9,7 +9,7 @@ int main() {
         return 1;
     }
 
-    std::cout << "Server running. Press Enter to stop...\n";
+    std::cout << "Server running.\n";
     std::cin.get();
 
     server.stop();
