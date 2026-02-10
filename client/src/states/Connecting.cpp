@@ -25,27 +25,48 @@ void Connecting::handleEvents(Game& game, const SDL_Event& event) {
 void Connecting::update(Game& game) {
     if (!attemptedConnection) {
         attemptedConnection = true;
-        connectionThread = std::thread([this, &game](){
-            bool ok = game.getNetworkClient().connectTo(serverIp, serverPort);
+
+        // Copy IP/port for thread
+        std::string ipCopy = serverIp;
+        int portCopy = serverPort;
+
+        // Start background thread for probe connection
+        connectionThread = std::thread([ipCopy, portCopy, this]() {
+            NetworkClient tempClient;
+            bool ok = tempClient.connectTo(ipCopy, portCopy);
+
+            // Only store result in atomic flags, no Game access
             success = ok;
             finished = true;
         });
     }
 
-    // Main thread polls flags and updates UI, no blocking
+    // Main thread polls result
     if (finished) {
         if (success) {
-            // Connected successfully, rectangle turns green
-            std::cout << "Connected!\n";
+            std::cout << "Connection succeeded!\n";
+
+            // Now safely connect persistent client on main thread
+            if (!game.getNetworkClient().isConnected()) {
+                bool ok = game.getNetworkClient().connectTo(serverIp, serverPort);
+                if (!ok) {
+                    std::cerr << "Failed to initialize persistent NetworkClient\n";
+                    game.setNextState(GameState::Title);
+                    finished = false;
+                    return;
+                }
+            }
+
             game.setNextState(GameState::Waiting);
         } else {
             std::cerr << "Failed to connect\n";
             game.setNextState(GameState::Title);
         }
 
-        finished = false; // reset for retry if needed
+        finished = false;
     }
 }
+
 
 void Connecting::render(Game& game) {
     SDL_Renderer* renderer = game.getRenderer();
