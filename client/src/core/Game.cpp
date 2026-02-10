@@ -76,7 +76,9 @@ Game::Game(const char *title, int xpos, int ypos, int width, int height, bool fu
 }
 
 Game::~Game() {
+    std::cout << "cleaning up!\n";
     clean();
+    std::cout << "Goodbye!~\n";
 }
 
 void Game::getRemoteDeckHandSize(std::size_t remoteDeckSize, std::size_t remoteHandSize) {
