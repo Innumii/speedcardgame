@@ -88,6 +88,7 @@ void Game::getRemoteDeckHandSize(std::size_t remoteDeckSize, std::size_t remoteH
 
 void Game::commitStateChange() {
     if (nextState != state) {
+        const GameState previousState = state;
         state = nextState;
 
         if (state == GameState::Connecting) {
@@ -114,6 +115,21 @@ void Game::commitStateChange() {
 
 void Game::setNextState(GameState newState) {
     nextState = newState;
+}
+
+void Game::setPlayingDeck(Deck newDeck) {
+    playingState.setDeck(std::move(newDeck));
+    playingSetup = false;
+}
+
+bool Game::tryStartPlayingWithBuiltDeck() {
+    if (!deckBuildingState.hasCardsInDeck()) {
+        return false;
+    }
+
+    setPlayingDeck(deckBuildingState.buildDeck());
+    setNextState(GameState::Playing);
+    return true;
 }
 
 GameState Game::getState() const {

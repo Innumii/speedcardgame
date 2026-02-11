@@ -34,6 +34,21 @@ void RenderDeckBuilding::render(DeckBuilding& deckBuilding, Game& game) {
         deckBuilding.TitleButton.y + 10
     );
 
+    const bool canPlay = deckBuilding.hasCardsInDeck();
+    SDL_SetRenderDrawColor(renderer, canPlay ? 80 : 60, canPlay ? 200 : 60, canPlay ? 120 : 60, 255);
+    SDL_RenderFillRect(renderer, &deckBuilding.PlayButton);
+    SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
+    SDL_RenderDrawRect(renderer, &deckBuilding.PlayButton);
+
+    textRenderer.drawText(
+        renderer,
+        "Play",
+        font,
+        SDL_Color{255, 255, 255, 255},
+        deckBuilding.PlayButton.x + 10,
+        deckBuilding.PlayButton.y + 10
+    );
+
     if (font) {
         TTF_CloseFont(font);
     }

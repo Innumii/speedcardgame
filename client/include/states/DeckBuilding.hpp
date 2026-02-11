@@ -5,6 +5,8 @@
 #include <memory>
 #include <vector>
 
+#include "objects/Deck.h"
+
 class Game;
 class RenderDeckBuilding;
 class Card;
@@ -16,6 +18,8 @@ public:
 	void handleEvents(Game& game, const SDL_Event& event);
 	void update(Game& game);
 	void render(Game& game);
+	Deck buildDeck() const;
+	bool hasCardsInDeck() const;
 
 private:
 	struct Layout {
@@ -32,6 +36,7 @@ private:
 	void tryRemoveFromDeck(int cardIndex);
 
 	SDL_Rect TitleButton{20, 20, 140, 50};
+	SDL_Rect PlayButton{20, 80, 140, 50};
 	std::vector<std::unique_ptr<Card>> availableCards;
 	std::vector<int> deckCopies;
 

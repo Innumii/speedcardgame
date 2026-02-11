@@ -60,6 +60,7 @@ public:
     Playing(Playing&&) noexcept = default;
     Playing& operator=(Playing&&) noexcept = default;
     void setup(Game& game);
+    void setDeck(Deck newDeck);
     void handleEvents(Game& game, const SDL_Event& event);
     void run();
     void update(Game& game);

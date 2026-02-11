@@ -53,6 +53,16 @@ void DeckBuilding::handleEvents(Game& game, const SDL_Event& event) {
         game.setNextState(GameState::Title);
     };
 
+    const bool inPlay = (event.type == SDL_MOUSEBUTTONDOWN) &&
+                    (event.button.button == SDL_BUTTON_LEFT) &&
+                    (event.button.x >= PlayButton.x && event.button.x <= (PlayButton.x + PlayButton.w)) &&
+                    (event.button.y >= PlayButton.y && event.button.y <= (PlayButton.y + PlayButton.h));
+    if (inPlay && hasCardsInDeck()) {
+        game.setPlayingDeck(buildDeck());
+        game.setNextState(GameState::Playing);
+        return;
+    }
+
     if (event.type == SDL_MOUSEBUTTONDOWN && event.button.button == SDL_BUTTON_LEFT) {
         const auto layout = buildLayout(game);
         const SDL_Point point = getPoint(event.button.x, event.button.y);
@@ -210,5 +220,53 @@ void DeckBuilding::tryRemoveFromDeck(int cardIndex) {
     if (cardIndex < 0 || cardIndex >= static_cast<int>(deckCopies.size())) return;
     if (deckCopies[cardIndex] <= 0) return;
     deckCopies[cardIndex] -= 1;
+}
+
+Deck DeckBuilding::buildDeck() const {
+    Deck deck;
+    for (std::size_t i = 0; i < availableCards.size(); ++i) {
+        if (deckCopies[i] <= 0) continue;
+
+        const Card* base = availableCards[i].get();
+        if (!base) continue;
+
+        for (int copy = 0; copy < deckCopies[i]; ++copy) {
+            switch (base->getType()) {
+                case CardType::Creature: {
+                    const auto* creature = dynamic_cast<const CreatureCard*>(base);
+                    if (!creature) break;
+                    deck.addCard(std::make_unique<CreatureCard>(
+                        creature->getName(),
+                        creature->getText(),
+                        creature->getManaValue(),
+                        creature->getManaCost(),
+                        creature->getPower(),
+                        creature->getToughness()
+                    ));
+                    break;
+                }
+                case CardType::Spell: {
+                    deck.addCard(std::make_unique<SpellCard>(
+                        base->getName(),
+                        base->getText(),
+                        base->getManaValue(),
+                        base->getManaCost()
+                    ));
+                    break;
+                }
+                default:
+                    break;
+            }
+        }
+    }
+
+    return deck;
+}
+
+bool DeckBuilding::hasCardsInDeck() const {
+    for (int copies : deckCopies) {
+        if (copies > 0) return true;
+    }
+    return false;
 }
 

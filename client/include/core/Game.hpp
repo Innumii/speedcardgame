@@ -55,6 +55,8 @@ public:
     //Getters and Setters
     void setNextState(GameState newState);
     void commitStateChange();
+    void setPlayingDeck(Deck newDeck);
+    bool tryStartPlayingWithBuiltDeck();
 
     GameState getState() const;
     GameState getNextState() const;

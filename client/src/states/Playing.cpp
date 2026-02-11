@@ -32,11 +32,21 @@ Playing::~Playing() {
     }
 }
 
+void Playing::setDeck(Deck newDeck) {
+    deck = std::move(newDeck);
+}
+
 void Playing::setup(Game& game) {
     renderer = game.getRenderer();
     if (!renderer) {
         throw std::runtime_error("Renderer not available from Game");
     }
+
+    player = Player();
+    board = Board();
+    drag = DragState{};
+    hoverIndex = static_cast<std::size_t>(-1);
+    hoverStartTick = 0;
 
     if (!TTF_WasInit() && TTF_Init() != 0) {
         throw std::runtime_error(std::string("TTF_Init failed: ") + TTF_GetError());
@@ -53,21 +63,20 @@ void Playing::setup(Game& game) {
         throw std::runtime_error(std::string("Failed to load font (14pt): ") + TTF_GetError());
     }
 
-    //init board
-    board = Board();
+    if (deck.size() == 0) {
+        for (int i = 0; i < 20; i++) {
+            deck.addCard(std::make_unique<CreatureCard>(
+                "Goblin",
+                "A small but angry creature",
+                1, 1, 1, 1
+            ));
 
-    for (int i = 0; i < 20; i++) {
-        deck.addCard(std::make_unique<CreatureCard>(
-            "Goblin",
-            "A small but angry creature",
-            1, 1, 1, 1
-        ));
-
-        deck.addCard(std::make_unique<SpellCard>(
-            "Fireball",
-            "Deal 3 damage",
-            2, 2
-        ));
+            deck.addCard(std::make_unique<SpellCard>(
+                "Fireball",
+                "Deal 3 damage",
+                2, 2
+            ));
+        }
     }
 
     deck.shuffle();

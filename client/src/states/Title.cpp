@@ -26,7 +26,9 @@ void Title::handleEvents(Game& game, const SDL_Event& event) {
                                  (mouseY >= ConnectButton.y && mouseY <= (ConnectButton.y + ConnectButton.h));
 
         if (inStart) {
-            game.setNextState(GameState::Playing);
+            if (!game.tryStartPlayingWithBuiltDeck()) {
+                game.setNextState(GameState::Playing);
+            }
         } else if (inQuit) {
             game.setNextState(GameState::Quit);
         } else if (inBuildDeck) {
