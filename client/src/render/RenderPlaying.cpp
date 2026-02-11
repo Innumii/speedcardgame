@@ -103,7 +103,7 @@ void RenderPlaying::render(Playing& playing, Game& game) {
 
 	if (showPreview) {
 		if (const auto& cardPtr = playing.player.hand[playing.hoverIndex]) {
-			const int previewWidth = 260;
+			const int previewWidth = 180;
 			const int previewHeight = 240;
 			const int padding = 12;
 

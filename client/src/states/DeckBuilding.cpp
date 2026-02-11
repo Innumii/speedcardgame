@@ -135,21 +135,11 @@ namespace {
     }
 }
 
-DeckBuilding::DeckBuilding() {
-    availableCards.push_back(std::make_unique<CreatureCard>("Blazing Drake", "Flying", 3, 3, 3, 2));
-    availableCards.push_back(std::make_unique<CreatureCard>("River Sentinel", "Guard", 2, 2, 2, 3));
-    availableCards.push_back(std::make_unique<CreatureCard>("Stone Golem", "Heavy", 4, 4, 4, 4));
-    availableCards.push_back(std::make_unique<SpellCard>("Spark", "Deal 2 damage", 1, 1));
-    availableCards.push_back(std::make_unique<SpellCard>("Frost Bind", "Freeze a foe", 2, 2));
-    availableCards.push_back(std::make_unique<CreatureCard>("Night Stalker", "Stealth", 3, 3, 3, 1));
-    availableCards.push_back(std::make_unique<SpellCard>("Arcane Surge", "Draw 1", 3, 3));
-    availableCards.push_back(std::make_unique<CreatureCard>("Sunblade", "Charge", 5, 5, 5, 4));
-
-    deckCopies.resize(availableCards.size(), 0);
-}
+DeckBuilding::DeckBuilding() = default;
 
 void DeckBuilding::enter(Game& game) {
     cardsLoadedFromService = loadAvailableCardsFromService(game);
+    collectionPage = 0;
 }
 
 void DeckBuilding::exit(Game& game) {
@@ -186,11 +176,24 @@ void DeckBuilding::handleEvents(Game& game, const SDL_Event& event) {
         const auto layout = buildLayout(game);
         const SDL_Point point = getPoint(event.button.x, event.button.y);
 
+        if (layout.pageCount > 1 && pointInRect(point, layout.prevPageButton) && collectionPage > 0) {
+            collectionPage -= 1;
+            return;
+        }
+        if (layout.pageCount > 1 && pointInRect(point, layout.nextPageButton) && collectionPage < layout.pageCount - 1) {
+            collectionPage += 1;
+            return;
+        }
+
         for (std::size_t i = 0; i < layout.collectionCardRects.size(); ++i) {
             if (pointInRect(point, layout.collectionCardRects[i])) {
                 dragging = true;
                 draggingFromDeck = false;
-                draggedCardIndex = static_cast<int>(i);
+                if (i < layout.collectionCardIndices.size()) {
+                    draggedCardIndex = layout.collectionCardIndices[i];
+                } else {
+                    draggedCardIndex = static_cast<int>(i);
+                }
                 dragPos = point;
                 dragOffset.x = point.x - layout.collectionCardRects[i].x;
                 dragOffset.y = point.y - layout.collectionCardRects[i].y;
@@ -259,24 +262,70 @@ DeckBuilding::Layout DeckBuilding::buildLayout(Game& game) const {
         SDL_GetRendererOutputSize(renderer, &screenW, &screenH);
     }
 
-    const int cardWidth = 110;
-    const int cardHeight = 150;
+    const int cardWidth = 140;
+    const int cardHeight = 200;
     const int marginX = 16;
     const int marginY = 16;
-    const int gridCols = 4;
     const int gridRows = 2;
+
+    const int startX = 40;
+    const int baseStartY = 100;
+    const int leftPadding = startX - 20;
+    const int rightPadding = 20;
+    const int deckGap = 12;
+    const int deckWidth = 240;
+
+    const int availableGridWidth = screenW - leftPadding - rightPadding - deckWidth - deckGap;
+    int gridCols = (availableGridWidth + marginX) / (cardWidth + marginX);
+    if (gridCols < 1) gridCols = 1;
+    if (gridCols > 4) gridCols = 4;
     const int maxSlots = gridCols * gridRows;
 
     const int gridWidth = gridCols * cardWidth + (gridCols - 1) * marginX;
     const int gridHeight = gridRows * cardHeight + (gridRows - 1) * marginY;
-    const int startX = 40;
-    const int startY = 100;
 
-    layout.collectionArea = SDL_Rect{startX - 20, startY - 40, gridWidth + 40, gridHeight + 60};
-    layout.deckArea = SDL_Rect{screenW - 270, 90, 240, screenH - 140};
+    const int pagerHeight = 24;
+    const int pagerSpacing = 8;
+    const int bottomPadding = 20;
+    const int collectionHeight = gridHeight + 60;
+    const int totalHeight = collectionHeight + pagerSpacing + pagerHeight;
+    int collectionY = baseStartY - 40;
+    const int maxTop = screenH - bottomPadding - totalHeight;
+    if (collectionY > maxTop) {
+        collectionY = maxTop;
+    }
+    if (collectionY < 20) collectionY = 20;
 
-    const int slotCount = std::min(static_cast<int>(availableCards.size()), maxSlots);
+    layout.collectionArea = SDL_Rect{leftPadding, collectionY, gridWidth + 40, collectionHeight};
+
+    int deckX = layout.collectionArea.x + layout.collectionArea.w + deckGap;
+    int deckY = layout.collectionArea.y;
+    int deckH = layout.collectionArea.h;
+    if (deckX + deckWidth > screenW - rightPadding) {
+        deckX = screenW - deckWidth - rightPadding;
+    }
+    if (deckX < layout.collectionArea.x + layout.collectionArea.w + deckGap) {
+        deckX = layout.collectionArea.x + layout.collectionArea.w + deckGap;
+    }
+    layout.deckArea = SDL_Rect{deckX, deckY, deckWidth, deckH};
+
+    const int totalCards = static_cast<int>(availableCards.size());
+    int pageCount = (totalCards + maxSlots - 1) / maxSlots;
+    if (pageCount < 1) pageCount = 1;
+
+    int pageIndex = collectionPage;
+    if (pageIndex < 0) pageIndex = 0;
+    if (pageIndex > pageCount - 1) pageIndex = pageCount - 1;
+
+    const int startIndex = pageIndex * maxSlots;
+    const int remaining = totalCards - startIndex;
+    const int slotCount = std::min(remaining < 0 ? 0 : remaining, maxSlots);
+    layout.maxSlots = maxSlots;
+    layout.pageCount = pageCount;
+    layout.pageIndex = pageIndex;
     layout.collectionCardRects.reserve(slotCount);
+    layout.collectionCardIndices.reserve(slotCount);
+    const int startY = layout.collectionArea.y + 40;
     for (int i = 0; i < slotCount; ++i) {
         int row = i / gridCols;
         int col = i % gridCols;
@@ -287,7 +336,13 @@ DeckBuilding::Layout DeckBuilding::buildLayout(Game& game) const {
             cardHeight
         };
         layout.collectionCardRects.push_back(cardRect);
+        layout.collectionCardIndices.push_back(startIndex + i);
     }
+
+    const int pagerY = layout.collectionArea.y + layout.collectionArea.h + pagerSpacing;
+    layout.prevPageButton = SDL_Rect{layout.collectionArea.x + 10, pagerY, 70, pagerHeight};
+    layout.nextPageButton = SDL_Rect{layout.collectionArea.x + layout.collectionArea.w - 80, pagerY, 70, pagerHeight};
+    layout.pageLabelRect = SDL_Rect{layout.prevPageButton.x + layout.prevPageButton.w + 8, pagerY, layout.nextPageButton.x - (layout.prevPageButton.x + layout.prevPageButton.w + 16), pagerHeight};
 
     const auto deckOrder = getDeckEntryOrder();
     layout.deckEntryCardIndices = deckOrder;

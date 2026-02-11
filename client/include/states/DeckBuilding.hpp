@@ -2,6 +2,7 @@
 #define DECKBUILDING_HPP
 
 #include <SDL2/SDL.h>
+#include <cstddef>
 #include <memory>
 #include <vector>
 
@@ -27,9 +28,16 @@ private:
 	struct Layout {
 		SDL_Rect collectionArea{};
 		SDL_Rect deckArea{};
+		SDL_Rect prevPageButton{};
+		SDL_Rect nextPageButton{};
+		SDL_Rect pageLabelRect{};
 		std::vector<SDL_Rect> collectionCardRects;
+		std::vector<int> collectionCardIndices;
 		std::vector<SDL_Rect> deckEntryRects;
 		std::vector<int> deckEntryCardIndices;
+		int maxSlots{0};
+		int pageCount{1};
+		int pageIndex{0};
 	};
 
 	Layout buildLayout(Game& game) const;
@@ -50,6 +58,9 @@ private:
 	SDL_Point dragPos{0, 0};
 	SDL_Point dragOffset{0, 0};
 	bool cardsLoadedFromService{false};
+	std::size_t hoverIndex{static_cast<std::size_t>(-1)};
+	Uint32 hoverStartTick{0};
+	int collectionPage{0};
 
 	static constexpr int MaxDeckCopies = 4;
 };

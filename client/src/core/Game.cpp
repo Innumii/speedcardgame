@@ -33,6 +33,7 @@ Game::Game(const char *title, int xpos, int ypos, int width, int height, bool fu
     }
 
     Uint32 flags = fullscreen ? SDL_WINDOW_FULLSCREEN : 0;
+    flags |= SDL_WINDOW_RESIZABLE;
 
     window.reset(SDL_CreateWindow(title, xpos, ypos, width, height, flags));
     if (!window) {
