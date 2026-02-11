@@ -10,6 +10,35 @@
 #include <algorithm>
 #include <vector>
 
+void RenderBoard::drawOpponentPlayZones(SDL_Renderer* renderer, RenderText& textRenderer, const std::vector<SDL_Rect>& playSlots, TTF_Font* fontSmall) {
+	if (!renderer || !fontSmall) return;
+	if (playSlots.empty()) return;
+
+	const int areaX = playSlots.front().x;
+	const int opponentOffset = 200;
+	const int areaY = playSlots.front().y - opponentOffset;
+
+	const int labelY = std::max(10, areaY - 18);
+	textRenderer.drawText(
+		renderer,
+		"Opponent Play Zone",
+		fontSmall,
+		SDL_Color{210, 230, 210, 255},
+		areaX,
+		labelY
+	);
+
+	for (const auto& slot : playSlots) {
+		SDL_Rect adjustedSlot = slot;
+		adjustedSlot.y -= opponentOffset;
+
+		SDL_SetRenderDrawColor(renderer, 80, 60, 60, 190);
+		SDL_RenderFillRect(renderer, &adjustedSlot);
+		SDL_SetRenderDrawColor(renderer, 190, 140, 140, 255);
+		SDL_RenderDrawRect(renderer, &adjustedSlot);
+	}
+}
+
 void RenderBoard::drawPlayZones(SDL_Renderer* renderer, RenderText& textRenderer, const std::vector<SDL_Rect>& playSlots, TTF_Font* fontSmall) {
 	if (!renderer || !fontSmall) return;
 	if (playSlots.empty()) return;

@@ -103,6 +103,7 @@ private:
     Playing playingState{drawIntervalSeconds};
     DeckBuilding deckBuildingState;
     std::optional<Connecting> connectingState;
+    // Connecting connectingState;
 };
 
 #endif

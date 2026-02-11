@@ -82,6 +82,7 @@ void RenderPlaying::render(Playing& playing, Game& game) {
 		playing.hoverIndex < playing.player.hand.size() &&
 		now - playing.hoverStartTick >= hoverDelayMs;
 
+	RenderBoard::drawOpponentPlayZones(renderer, textRenderer, playing.playSlots, playing.fontSmall.get());
 	RenderBoard::drawPlayZones(renderer, textRenderer, playing.playSlots, playing.fontSmall.get());
 	RenderBoard::drawDiscardZone(renderer, textRenderer, playing.discardZone, hoveringDiscard, playing.fontSmall.get());
 
