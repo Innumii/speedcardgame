@@ -20,3 +20,14 @@
         make
         
         ./server
+
+## How to Run Cards Service
+1. cd to the cards folder
+
+        cd cards
+
+2. Open Docker and run the following command
+
+        docker-compose up -d --build
+
+- Note: Please copy and fill in the .env located in cards/
