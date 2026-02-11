@@ -1,0 +1,92 @@
+package main
+
+import (
+	"fmt"
+	"log"
+	"net/http"
+	"os"
+
+	"github.com/go-chi/chi"
+	"github.com/go-chi/cors"
+	"github.com/joho/godotenv"
+	"github.com/Ryanljk/speedcardgame/cards/config"
+    "github.com/Ryanljk/speedcardgame/cards/models"
+	"github.com/Ryanljk/speedcardgame/cards/util"
+    "github.com/Ryanljk/speedcardgame/cards/services"
+	"gorm.io/gorm"
+)
+
+var db *gorm.DB //defining the gorm dependency
+
+func main() {
+	godotenv.Load(".env") //loads data from .env file
+
+	portString := os.Getenv("PORT") //grab port value from .env
+	if portString == "" {
+		log.Fatal("PORT not found in env")
+	}
+	fmt.Println("Port", portString)
+
+	// Connect to PostgreSQL database using GORM
+	dsn := os.Getenv("DATABASE_URL") // You can set this in your .env file
+	if err := config.InitializeDatabase(dsn); err != nil {
+		log.Fatal("Failed to connect to database", err)
+	}
+
+	// Migrate models
+	if err := config.DB.AutoMigrate(&models.Deck{}, &models.Card{}); err != nil {
+		log.Fatalf("Error auto-migrating tables: %v", err)
+	}
+
+	fmt.Println("Connecting to database:", dsn)
+	//db.Exec("CREATE TABLE test_table (id SERIAL PRIMARY KEY, name VARCHAR(100));")  //create table just for testing purposes
+
+
+	//Define the router
+	router := chi.NewRouter() //setup router
+	router.Use(cors.Handler(cors.Options{
+		AllowedOrigins:   []string{"https://*", "http://*"},
+		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		AllowedHeaders:   []string{"*"},
+		ExposedHeaders:   []string{"Link"},
+		AllowCredentials: false,
+		MaxAge:           300,
+	}))
+
+	r := chi.NewRouter()
+	//define routes
+	r.Get("/health", health) // Check health of service
+
+	r.Post("/decks", services.CreateDeck)  		// Create deck
+	r.Get("/decks", services.ListDecks)    		// List all decks
+	r.Delete("/decks", services.DeleteDeck)
+
+	r.Post("/cards", services.CreateCard)  		// Create card
+	r.Get("/cards", services.ListCards)  		// List all cards
+	r.Put("/cards", services.UpdateCard)
+	r.Delete("/cards", services.DeleteCard)
+
+	r.Post("/inventories", services.CreateInventory)  			// Create inventory
+	r.Get("/inventories", services.ListInventories)   			// List all inventories
+	r.Get("/inventories", services.GetInventoryByUserID) 		// Get inventory by user ID
+	r.Put("/inventories", services.UpdateInventory) 			// Update inventory by user ID
+
+
+	router.Mount("/cardbase", r)  //api prefix
+
+	srv := &http.Server{
+		Handler: router,
+		Addr:    ":" + portString,
+	}
+
+	//start server on port
+	if err := srv.ListenAndServe(); err != nil {
+		log.Fatal(err)
+	}
+
+}
+
+func health(w http.ResponseWriter, r *http.Request) {
+	response := map[string]string{"message": "Healthy"}
+    util.RespondWithJSON(w, 200, response)
+}
