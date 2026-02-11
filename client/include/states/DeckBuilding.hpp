@@ -41,6 +41,7 @@ private:
 	};
 
 	Layout buildLayout(Game& game) const;
+	void updateMenuButtons(const Layout& layout);
 	std::vector<int> getDeckEntryOrder() const;
 	void tryAddToDeck(int cardIndex);
 	void tryRemoveFromDeck(int cardIndex);

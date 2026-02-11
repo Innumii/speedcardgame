@@ -13,10 +13,12 @@ public:
     void update(Game& game);
     void render(Game& game);
 private:
+    void updateLayout(SDL_Renderer* renderer);
     SDL_Rect startButton{300,150,200,80};
     SDL_Rect quitButton{300,250,200,80};
     SDL_Rect BuildDeckButton{300,350,200,80};
     SDL_Rect ConnectButton{300, 450, 200, 80};
+    SDL_Rect titleBanner{180, 40, 440, 70};
 };
 
 #endif

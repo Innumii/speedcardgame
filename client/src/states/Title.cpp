@@ -3,7 +3,46 @@
 #include <SDL2/SDL.h>
 #include <iostream>
 
+void Title::updateLayout(SDL_Renderer* renderer) {
+    int screenW = 800;
+    int screenH = 600;
+    if (renderer) {
+        SDL_GetRendererOutputSize(renderer, &screenW, &screenH);
+    }
+
+    const int bannerW = titleBanner.w;
+    const int bannerH = titleBanner.h;
+    const int buttonW = startButton.w;
+    const int buttonH = startButton.h;
+    const int bannerGap = 24;
+    const int buttonGap = 16;
+
+    const int buttonsTotalH = (buttonH * 4) + (buttonGap * 3);
+    const int totalH = bannerH + bannerGap + buttonsTotalH;
+    int topY = (screenH - totalH) / 2;
+    if (topY < 20) topY = 20;
+
+    const int centerX = screenW / 2;
+
+    titleBanner.x = centerX - (bannerW / 2);
+    titleBanner.y = topY;
+
+    startButton.x = centerX - (buttonW / 2);
+    startButton.y = titleBanner.y + bannerH + bannerGap;
+
+    quitButton.x = startButton.x;
+    quitButton.y = startButton.y + buttonH + buttonGap;
+
+    BuildDeckButton.x = startButton.x;
+    BuildDeckButton.y = quitButton.y + buttonH + buttonGap;
+
+    ConnectButton.x = startButton.x;
+    ConnectButton.y = BuildDeckButton.y + buttonH + buttonGap;
+}
+
 void Title::handleEvents(Game& game, const SDL_Event& event) {
+    updateLayout(game.getRenderer());
+
     if (event.type == SDL_QUIT)
     {
         game.setNextState(GameState::Quit);
@@ -46,13 +85,13 @@ void Title::update(Game& game) {
 
 void Title::render(Game& game) {
     SDL_Renderer* renderer = game.getRenderer();
+    updateLayout(renderer);
 
     // background
     SDL_SetRenderDrawColor(renderer, 25, 25, 25, 255);
     SDL_RenderClear(renderer);
 
     // title banner
-    SDL_Rect titleBanner{180, 40, 440, 70};
     SDL_SetRenderDrawColor(renderer, 80, 120, 200, 255);
     SDL_RenderFillRect(renderer, &titleBanner);
     SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);

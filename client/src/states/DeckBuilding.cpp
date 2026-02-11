@@ -153,6 +153,9 @@ void DeckBuilding::handleEvents(Game& game, const SDL_Event& event) {
         game.setNextState(GameState::Title);
     }
 
+    const auto layout = buildLayout(game);
+    updateMenuButtons(layout);
+
     // Further event handling for deck building would go here
     const bool inTitle = (event.type == SDL_MOUSEBUTTONDOWN) &&
                      (event.button.button == SDL_BUTTON_LEFT) &&
@@ -173,7 +176,6 @@ void DeckBuilding::handleEvents(Game& game, const SDL_Event& event) {
     }
 
     if (event.type == SDL_MOUSEBUTTONDOWN && event.button.button == SDL_BUTTON_LEFT) {
-        const auto layout = buildLayout(game);
         const SDL_Point point = getPoint(event.button.x, event.button.y);
 
         if (layout.pageCount > 1 && pointInRect(point, layout.prevPageButton) && collectionPage > 0) {
@@ -219,7 +221,6 @@ void DeckBuilding::handleEvents(Game& game, const SDL_Event& event) {
     }
 
     if (event.type == SDL_MOUSEBUTTONUP && event.button.button == SDL_BUTTON_LEFT && dragging) {
-        const auto layout = buildLayout(game);
         const SDL_Point point = getPoint(event.button.x, event.button.y);
         const bool overDeck = pointInRect(point, layout.deckArea);
 
@@ -242,6 +243,9 @@ void DeckBuilding::update(Game& game) {
 
 void DeckBuilding::render(Game& game) {
     SDL_Renderer* renderer = game.getRenderer();
+
+    const auto layout = buildLayout(game);
+    updateMenuButtons(layout);
 
     // return to title menu
     SDL_SetRenderDrawColor(renderer, 25, 25, 25, 255);
@@ -268,14 +272,12 @@ DeckBuilding::Layout DeckBuilding::buildLayout(Game& game) const {
     const int marginY = 16;
     const int gridRows = 2;
 
-    const int startX = 40;
-    const int baseStartY = 100;
-    const int leftPadding = startX - 20;
     const int rightPadding = 20;
     const int deckGap = 12;
     const int deckWidth = 240;
 
-    const int availableGridWidth = screenW - leftPadding - rightPadding - deckWidth - deckGap;
+    const int maxContentWidth = screenW - (rightPadding * 2);
+    const int availableGridWidth = maxContentWidth - deckWidth - deckGap - 40;
     int gridCols = (availableGridWidth + marginX) / (cardWidth + marginX);
     if (gridCols < 1) gridCols = 1;
     if (gridCols > 4) gridCols = 4;
@@ -289,12 +291,16 @@ DeckBuilding::Layout DeckBuilding::buildLayout(Game& game) const {
     const int bottomPadding = 20;
     const int collectionHeight = gridHeight + 60;
     const int totalHeight = collectionHeight + pagerSpacing + pagerHeight;
-    int collectionY = baseStartY - 40;
     const int maxTop = screenH - bottomPadding - totalHeight;
+    int collectionY = (screenH - totalHeight) / 2;
     if (collectionY > maxTop) {
         collectionY = maxTop;
     }
     if (collectionY < 20) collectionY = 20;
+
+    const int totalWidth = (gridWidth + 40) + deckGap + deckWidth;
+    int leftPadding = (screenW - totalWidth) / 2;
+    if (leftPadding < 20) leftPadding = 20;
 
     layout.collectionArea = SDL_Rect{leftPadding, collectionY, gridWidth + 40, collectionHeight};
 
@@ -325,6 +331,7 @@ DeckBuilding::Layout DeckBuilding::buildLayout(Game& game) const {
     layout.pageIndex = pageIndex;
     layout.collectionCardRects.reserve(slotCount);
     layout.collectionCardIndices.reserve(slotCount);
+    const int startX = layout.collectionArea.x + 20;
     const int startY = layout.collectionArea.y + 40;
     for (int i = 0; i < slotCount; ++i) {
         int row = i / gridCols;
@@ -361,6 +368,25 @@ DeckBuilding::Layout DeckBuilding::buildLayout(Game& game) const {
     }
 
     return layout;
+}
+
+void DeckBuilding::updateMenuButtons(const Layout& layout) {
+    const int contentX = layout.collectionArea.x;
+    const int contentRight = layout.deckArea.x + layout.deckArea.w;
+    const int contentW = contentRight - contentX;
+
+    const int buttonGap = 12;
+    const int totalButtonsW = TitleButton.w + PlayButton.w + buttonGap;
+    int startX = contentX + (contentW - totalButtonsW) / 2;
+    if (startX < 20) startX = 20;
+
+    int buttonY = layout.collectionArea.y - TitleButton.h - 12;
+    if (buttonY < 20) buttonY = 20;
+
+    TitleButton.x = startX;
+    TitleButton.y = buttonY;
+    PlayButton.x = startX + TitleButton.w + buttonGap;
+    PlayButton.y = buttonY;
 }
 
 std::vector<int> DeckBuilding::getDeckEntryOrder() const {
