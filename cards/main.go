@@ -6,13 +6,13 @@ import (
 	"net/http"
 	"os"
 
+	"github.com/Ryanljk/speedcardgame/cards/config"
+	"github.com/Ryanljk/speedcardgame/cards/models"
+	"github.com/Ryanljk/speedcardgame/cards/services"
+	"github.com/Ryanljk/speedcardgame/cards/util"
 	"github.com/go-chi/chi"
 	"github.com/go-chi/cors"
 	"github.com/joho/godotenv"
-	"github.com/Ryanljk/speedcardgame/cards/config"
-    "github.com/Ryanljk/speedcardgame/cards/models"
-	"github.com/Ryanljk/speedcardgame/cards/util"
-    "github.com/Ryanljk/speedcardgame/cards/services"
 	"gorm.io/gorm"
 )
 
@@ -38,9 +38,22 @@ func main() {
 		log.Fatalf("Error auto-migrating tables: %v", err)
 	}
 
+	seedPath := os.Getenv("CARD_CSV_PATH")
+	if seedPath == "" {
+		seedPath = "cards.csv"
+	}
+	if err := services.SeedCardsFromCSV(config.DB, seedPath); err != nil {
+		if os.IsNotExist(err) {
+			log.Printf("Card seed skipped: %s not found", seedPath)
+		} else {
+			log.Printf("Card seed failed: %v", err)
+		}
+	} else {
+		log.Printf("Card seed loaded from %s", seedPath)
+	}
+
 	fmt.Println("Connecting to database:", dsn)
 	//db.Exec("CREATE TABLE test_table (id SERIAL PRIMARY KEY, name VARCHAR(100));")  //create table just for testing purposes
-
 
 	//Define the router
 	router := chi.NewRouter() //setup router
@@ -57,22 +70,21 @@ func main() {
 	//define routes
 	r.Get("/health", health) // Check health of service
 
-	r.Post("/decks", services.CreateDeck)  		// Create deck
-	r.Get("/decks", services.ListDecks)    		// List all decks
+	r.Post("/decks", services.CreateDeck) // Create deck
+	r.Get("/decks", services.ListDecks)   // List all decks
 	r.Delete("/decks", services.DeleteDeck)
 
-	r.Post("/cards", services.CreateCard)  		// Create card
-	r.Get("/cards", services.ListCards)  		// List all cards
+	r.Post("/cards", services.CreateCard) // Create card
+	r.Get("/cards", services.ListCards)   // List all cards
 	r.Put("/cards", services.UpdateCard)
 	r.Delete("/cards", services.DeleteCard)
 
-	r.Post("/inventories", services.CreateInventory)  			// Create inventory
-	r.Get("/inventories", services.ListInventories)   			// List all inventories
-	r.Get("/inventories", services.GetInventoryByUserID) 		// Get inventory by user ID
-	r.Put("/inventories", services.UpdateInventory) 			// Update inventory by user ID
+	r.Post("/inventories", services.CreateInventory)     // Create inventory
+	r.Get("/inventories", services.ListInventories)      // List all inventories
+	r.Get("/inventories", services.GetInventoryByUserID) // Get inventory by user ID
+	r.Put("/inventories", services.UpdateInventory)      // Update inventory by user ID
 
-
-	router.Mount("/cardbase", r)  //api prefix
+	router.Mount("/cardbase", r) //api prefix
 
 	srv := &http.Server{
 		Handler: router,
@@ -88,5 +100,5 @@ func main() {
 
 func health(w http.ResponseWriter, r *http.Request) {
 	response := map[string]string{"message": "Healthy"}
-    util.RespondWithJSON(w, 200, response)
+	util.RespondWithJSON(w, 200, response)
 }
