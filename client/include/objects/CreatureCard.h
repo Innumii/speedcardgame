@@ -14,7 +14,8 @@ public:
                  int manaValue,
                  int manaCost,
                  int power,
-                 int toughness);
+                 int toughness,
+                 int cardId = -1);
 
     int getPower() const;
     int getToughness() const;

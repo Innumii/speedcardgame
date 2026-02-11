@@ -61,6 +61,7 @@ public:
     GameState getState() const;
     GameState getNextState() const;
     SDL_Renderer* getRenderer() const;
+    int getPlayerId() const;
 
     bool running() const;
 

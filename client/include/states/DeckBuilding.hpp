@@ -18,6 +18,8 @@ public:
 	void handleEvents(Game& game, const SDL_Event& event);
 	void update(Game& game);
 	void render(Game& game);
+	void enter(Game& game);
+	void exit(Game& game);
 	Deck buildDeck() const;
 	bool hasCardsInDeck() const;
 
@@ -34,6 +36,8 @@ private:
 	std::vector<int> getDeckEntryOrder() const;
 	void tryAddToDeck(int cardIndex);
 	void tryRemoveFromDeck(int cardIndex);
+	bool loadAvailableCardsFromService(Game& game);
+	bool saveDeckToService(Game& game) const;
 
 	SDL_Rect TitleButton{20, 20, 140, 50};
 	SDL_Rect PlayButton{20, 80, 140, 50};
@@ -45,6 +49,7 @@ private:
 	int draggedCardIndex{-1};
 	SDL_Point dragPos{0, 0};
 	SDL_Point dragOffset{0, 0};
+	bool cardsLoadedFromService{false};
 
 	static constexpr int MaxDeckCopies = 4;
 };

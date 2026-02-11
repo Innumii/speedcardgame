@@ -10,6 +10,7 @@ enum class CardType {
 
 class Card {
 protected:
+    int id;
     std::string name;
     std::string text;
     int manaValue;
@@ -21,7 +22,8 @@ public:
          std::string text,
          int manaValue,
          int manaCost,
-         CardType type);
+            CardType type,
+            int cardId = -1);
 
     virtual ~Card() = default;
 
@@ -31,6 +33,7 @@ public:
     int getManaCost() const;
     int getManaValue() const;
     CardType getType() const;
+    int getId() const;
 
     // Polymorphic draw hook
     virtual void drawExtraInfo() const = 0;

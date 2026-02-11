@@ -8,7 +8,8 @@ public:
     SpellCard(std::string name,
               std::string text,
               int manaValue,
-              int manaCost);
+              int manaCost,
+              int cardId = -1);
 
     void drawExtraInfo() const override;
 };

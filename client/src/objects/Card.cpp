@@ -4,8 +4,10 @@ Card::Card(std::string name,
            std::string text,
            int manaValue,
            int manaCost,
-           CardType type)
-    : name(name),
+           CardType type,
+           int cardId)
+    : id(cardId),
+      name(name),
       text(text),
       manaValue(manaValue),
       manaCost(manaCost),
@@ -16,3 +18,4 @@ std::string Card::getText() const { return text; }
 int Card::getManaCost() const { return manaCost; }
 int Card::getManaValue() const { return manaValue; }
 CardType Card::getType() const { return type; }
+int Card::getId() const { return id; }

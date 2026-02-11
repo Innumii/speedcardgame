@@ -91,6 +91,14 @@ void Game::commitStateChange() {
         const GameState previousState = state;
         state = nextState;
 
+        if (previousState == GameState::DeckBuilding && state != GameState::DeckBuilding) {
+            deckBuildingState.exit(*this);
+        }
+
+        if (previousState == GameState::DeckBuilding && state != GameState::DeckBuilding) {
+            deckBuildingState.exit(*this);
+        }
+
         if (state == GameState::Connecting) {
             connectingState.reset();
         }
@@ -105,6 +113,9 @@ void Game::commitStateChange() {
         if (state == GameState::Playing && !playingSetup) {
             playingState.setup(*this);
             playingSetup = true;
+        }
+        if (state == GameState::DeckBuilding && previousState != GameState::DeckBuilding) {
+            deckBuildingState.enter(*this);
         }
         if (state == GameState::Quit || state == GameState::GameOver) {
             isRunning = false;
@@ -142,6 +153,10 @@ GameState Game::getNextState() const {
 
 SDL_Renderer* Game::getRenderer() const {
     return renderer.get();
+}
+
+int Game::getPlayerId() const {
+    return player.id;
 }
 
 NetworkClient& Game::getNetworkClient() {

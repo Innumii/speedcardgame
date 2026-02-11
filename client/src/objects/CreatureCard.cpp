@@ -6,8 +6,9 @@ CreatureCard::CreatureCard(std::string name,
                            int manaValue,
                            int manaCost,
                            int power,
-                           int toughness)
-    : Card(name, text, manaValue, manaCost, CardType::Creature),
+                           int toughness,
+                           int cardId)
+    : Card(name, text, manaValue, manaCost, CardType::Creature, cardId),
       power(power),
       toughness(toughness) {}
 
