@@ -1,17 +1,18 @@
 package services
 
-import ("net/http"
-		"encoding/json"
-		"fmt"
-        
-		"github.com/go-chi/chi"
-        "github.com/Ryanljk/speedcardgame/cards/config"
-        "github.com/Ryanljk/speedcardgame/cards/models"
+import (
+	"encoding/json"
+	"fmt"
+	"net/http"
 
-		)
+	"github.com/Ryanljk/speedcardgame/cards/config"
+	"github.com/Ryanljk/speedcardgame/cards/models"
+	"github.com/go-chi/chi"
+)
+
 var inputInventory struct {
-	Uid       int    `json:"uid"`
-	Cards    map[int]int `json:"cards"` // Map of card ID to quantity
+	Uid   int               `json:"uid"`
+	Cards models.CardCounts `json:"cards"` // Map of card ID to quantity
 }
 
 // CreateInventory creates a new inventory for a user
@@ -29,7 +30,7 @@ func CreateInventory(w http.ResponseWriter, r *http.Request) {
 	}
 	// Add in some default cards for new users
 	if inventory.Cards == nil {
-		IntroCards := make(map[int]int)
+		IntroCards := make(models.CardCounts)
 
 		// Example: Give 2 of each intro card with IDs 1 to 5
 		IntroCards[1] = 2
@@ -66,7 +67,7 @@ func ListInventories(w http.ResponseWriter, _ *http.Request) {
 }
 
 // GetInventory retrieves a specific inventory by user ID
-func GetInventory(w http.ResponseWriter, r *http.Request) {
+func GetInventoryByUserID(w http.ResponseWriter, r *http.Request) {
 	uidParam := chi.URLParam(r, "uid")
 	var inventory models.Inventory
 	if err := config.DB.Where("uid = ?", uidParam).First(&inventory).Error; err != nil {
@@ -79,13 +80,13 @@ func GetInventory(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(inventory)
 }
 
-func addCardToInventory(w http.ResponseWriter, r *http.Request) {
-	
-    // Decode the incoming request body
-    if err := json.NewDecoder(r.Body).Decode(&inputInventory); err != nil {
-        http.Error(w, "Invalid inputDeck", http.StatusBadRequest)
-        return
-    }
+func UpdateInventory(w http.ResponseWriter, r *http.Request) {
+
+	// Decode the incoming request body
+	if err := json.NewDecoder(r.Body).Decode(&inputInventory); err != nil {
+		http.Error(w, "Invalid inputDeck", http.StatusBadRequest)
+		return
+	}
 
 	// Implementation for adding a card to the inventory
 	uid := inputInventory.Uid
@@ -98,6 +99,9 @@ func addCardToInventory(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Update the inventory with new cards
+	if inventory.Cards == nil {
+		inventory.Cards = make(models.CardCounts)
+	}
 	for cid, qty := range cards {
 		inventory.Cards[cid] += qty
 	}

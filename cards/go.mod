@@ -1,4 +1,4 @@
-module github.com/justintyf01/masaladosa/card_database
+module github.com/Ryanljk/speedcardgame/cards
 
 go 1.23.1
 
@@ -6,6 +6,8 @@ require (
 	github.com/go-chi/chi v1.5.5
 	github.com/go-chi/cors v1.2.1
 	github.com/joho/godotenv v1.5.1
+	gorm.io/driver/postgres v1.5.9
+	gorm.io/gorm v1.25.11
 )
 
 require (
@@ -18,6 +20,4 @@ require (
 	golang.org/x/crypto v0.27.0 // indirect
 	golang.org/x/sync v0.8.0 // indirect
 	golang.org/x/text v0.18.0 // indirect
-	gorm.io/driver/postgres v1.5.9 // indirect
-	gorm.io/gorm v1.25.11 // indirect
 )
