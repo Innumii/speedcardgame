@@ -55,8 +55,8 @@ func CreateInventory(w http.ResponseWriter, r *http.Request) {
 func ListInventories(w http.ResponseWriter, _ *http.Request) {
 	var inventories []models.Inventory
 
-	// Preload Cards to include associated cards in the query
-	if err := config.DB.Preload("Cards").Find(&inventories).Error; err != nil {
+	// Query all inventories (Cards field is automatically loaded as JSONB)
+	if err := config.DB.Find(&inventories).Error; err != nil {
 		http.Error(w, fmt.Sprintf("Failed to retrieve inventories: %v", err), http.StatusInternalServerError)
 		return
 	}

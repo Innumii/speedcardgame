@@ -2,7 +2,7 @@ package models
 
 // Card represents a card in the game
 type Card struct {
-	Cid       int    `json:"cid"`
+	Cid       int    `json:"cid" gorm:"primaryKey"`
 	Name      string `json:"name"`
 	Type      string `json:"type"`
 	Cost      int    `json:"cost"`

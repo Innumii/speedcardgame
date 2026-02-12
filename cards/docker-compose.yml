@@ -4,7 +4,8 @@ services:
       context: .  # Build from the current directory (root)
       dockerfile: Dockerfile  # Uses Dockerfile located in root
     depends_on:
-      - db  # Ensures the DB service starts before the app
+      db:
+        condition: service_healthy  # Wait until DB is ready
     environment:
       - PORT=${PORT}  # Uses the value from the .env file
       - DATABASE_URL=${DATABASE_URL}  # Uses the value from the .env file
@@ -25,6 +26,11 @@ services:
       - postgres_data:/var/lib/postgresql/data  # Persist database data
     networks:
       - mynetwork
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
 
 networks:
   mynetwork:  # Define a shared network for the app and DB

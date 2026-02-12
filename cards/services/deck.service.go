@@ -50,8 +50,8 @@ func CreateDeck(w http.ResponseWriter, r *http.Request) {
 func ListDecks(w http.ResponseWriter, _ *http.Request) {
 	var decks []models.Deck
 
-	// Preload Cards to include associated cards in the query
-	if err := config.DB.Preload("Cards").Find(&decks).Error; err != nil {
+	// Query all decks (Cards field is automatically loaded as JSONB)
+	if err := config.DB.Find(&decks).Error; err != nil {
 		http.Error(w, fmt.Sprintf("Failed to retrieve decks: %v", err), http.StatusInternalServerError)
 		return
 	}
