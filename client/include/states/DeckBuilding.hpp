@@ -46,6 +46,7 @@ private:
 	void tryAddToDeck(int cardIndex);
 	void tryRemoveFromDeck(int cardIndex);
 	bool loadAvailableCardsFromService(Game& game);
+	bool loadAvailableCardsFromCsv(Game& game);
 	bool saveDeckToService(Game& game) const;
 
 	SDL_Rect TitleButton{20, 20, 140, 50};

@@ -17,6 +17,7 @@
 #include <algorithm>
 #include <cctype>
 #include <cstdlib>
+#include <fstream>
 #include <sstream>
 
 namespace {
@@ -133,12 +134,46 @@ namespace {
         responseBody = response.substr(headerEnd + 4);
         return true;
     }
+
+    bool parseCsvLine(const std::string& line, std::vector<std::string>& out) {
+        out.clear();
+        std::string field;
+        bool inQuotes = false;
+        for (std::size_t i = 0; i < line.size(); ++i) {
+            char c = line[i];
+            if (c == '"') {
+                if (inQuotes && i + 1 < line.size() && line[i + 1] == '"') {
+                    field.push_back('"');
+                    ++i;
+                } else {
+                    inQuotes = !inQuotes;
+                }
+                continue;
+            }
+            if (c == ',' && !inQuotes) {
+                out.push_back(field);
+                field.clear();
+                continue;
+            }
+            field.push_back(c);
+        }
+        out.push_back(field);
+        return !out.empty();
+    }
+
+    bool tryOpenCsv(const std::string& path, std::ifstream& stream) {
+        stream.open(path);
+        return stream.is_open();
+    }
 }
 
 DeckBuilding::DeckBuilding() = default;
 
 void DeckBuilding::enter(Game& game) {
     cardsLoadedFromService = loadAvailableCardsFromService(game);
+    if (!cardsLoadedFromService) {
+        cardsLoadedFromService = loadAvailableCardsFromCsv(game);
+    }
     collectionPage = 0;
 }
 
@@ -519,6 +554,74 @@ bool DeckBuilding::loadAvailableCardsFromService(Game& game) {
         }
 
         pos = objEnd + 1;
+    }
+
+    if (fetchedCards.empty()) {
+        return false;
+    }
+
+    availableCards = std::move(fetchedCards);
+    deckCopies.assign(availableCards.size(), 0);
+    return true;
+}
+
+bool DeckBuilding::loadAvailableCardsFromCsv(Game& game) {
+    (void)game;
+    const std::string envPath = getEnvOrDefault("CARDS_CSV_PATH", "");
+    std::ifstream file;
+    if (!envPath.empty() && tryOpenCsv(envPath, file)) {
+        // file opened
+    } else if (tryOpenCsv("cards/cards.csv", file)) {
+        // file opened
+    } else if (tryOpenCsv("../cards/cards.csv", file)) {
+        // file opened
+    } else if (tryOpenCsv("../../cards/cards.csv", file)) {
+        // file opened
+    } else {
+        return false;
+    }
+
+    std::string line;
+    if (!std::getline(file, line)) {
+        return false;
+    }
+
+    std::vector<std::unique_ptr<Card>> fetchedCards;
+    std::vector<std::string> fields;
+    while (std::getline(file, line)) {
+        if (line.empty()) continue;
+        if (!parseCsvLine(line, fields)) continue;
+        if (fields.size() < 8) continue;
+
+        int cid = -1;
+        int cost = 0;
+        int value = 0;
+        int power = 0;
+        int toughness = 0;
+
+        try {
+            cid = std::stoi(fields[0]);
+            cost = std::stoi(fields[3]);
+            value = std::stoi(fields[4]);
+            power = std::stoi(fields[5]);
+            toughness = std::stoi(fields[6]);
+        } catch (...) {
+            continue;
+        }
+
+        const std::string name = fields[1];
+        const std::string type = fields[2];
+        const std::string effect = fields[7];
+
+        if (name.empty()) continue;
+        const std::string typeLower = toLower(type);
+        const int manaValue = value > 0 ? value : cost;
+
+        if (typeLower == "creature") {
+            fetchedCards.push_back(std::make_unique<CreatureCard>(name, effect, manaValue, cost, power, toughness, cid));
+        } else {
+            fetchedCards.push_back(std::make_unique<SpellCard>(name, effect, manaValue, cost, cid));
+        }
     }
 
     if (fetchedCards.empty()) {
