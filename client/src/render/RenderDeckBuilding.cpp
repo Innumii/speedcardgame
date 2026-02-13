@@ -11,51 +11,58 @@
 #include <algorithm>
 #include <string>
 #include <vector>
+#include <render/RenderButton.hpp>
 
 void RenderDeckBuilding::render(DeckBuilding& deckBuilding, Game& game) {
     SDL_Renderer* renderer = game.getRenderer();
     if (!renderer) return;
 
-    if (!TTF_WasInit() && TTF_Init() != 0) {
-        return;
-    }
+    const bool ttfReady = TTF_WasInit() || TTF_Init() == 0;
 
     RenderText textRenderer;
     const auto layout = deckBuilding.buildLayout(game);
+    int mouseX = 0;
+    int mouseY = 0;
+    SDL_GetMouseState(&mouseX, &mouseY);
+    const SDL_Point mousePoint{mouseX, mouseY};
+
+    TTF_Font* fontSmall = ttfReady ? TTF_OpenFont("assets/font.TTF", 14) : nullptr;
+    TTF_Font* fontTiny = ttfReady ? TTF_OpenFont("assets/font.TTF", 12) : nullptr;
+    TTF_Font* fontLarge = ttfReady ? TTF_OpenFont("assets/font.TTF", 18) : nullptr;
+
+    TTF_Font* buttonFont = fontSmall ? fontSmall : fontLarge;
+    const SDL_Color buttonBase{80, 120, 200, 255};
+    const SDL_Color buttonHighlight{100, 150, 250, 255};
+    const SDL_Color buttonPressed{60, 90, 180, 255};
+    const SDL_Color buttonText{255, 255, 255, 255};
 
     // Title Button
-    TTF_Font* font = TTF_OpenFont("assets/font.TTF", 18);
-    textRenderer.drawText(
-        renderer,
-        "Return to Title",
-        font,
-        SDL_Color{255, 255, 255, 255},
-        deckBuilding.TitleButton.x + 10,
-        deckBuilding.TitleButton.y + 10
-    );
-
     const bool canPlay = deckBuilding.hasCardsInDeck();
-    SDL_SetRenderDrawColor(renderer, canPlay ? 80 : 60, canPlay ? 200 : 60, canPlay ? 120 : 60, 255);
-    SDL_RenderFillRect(renderer, &deckBuilding.PlayButton);
-    SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
-    SDL_RenderDrawRect(renderer, &deckBuilding.PlayButton);
-
-    textRenderer.drawText(
+    RenderButton::drawButton(
         renderer,
+        deckBuilding.PlayButton,
         "Play",
-        font,
-        SDL_Color{255, 255, 255, 255},
-        deckBuilding.PlayButton.x + 10,
-        deckBuilding.PlayButton.y + 10
+        false,
+        !canPlay,
+        buttonBase,
+        buttonHighlight,
+        buttonPressed,
+        buttonText,
+        buttonFont
     );
 
-    if (font) {
-        TTF_CloseFont(font);
-    }
-
-    TTF_Font* fontSmall = TTF_OpenFont("assets/font.TTF", 14);
-    TTF_Font* fontTiny = TTF_OpenFont("assets/font.TTF", 12);
-    TTF_Font* fontLarge = TTF_OpenFont("assets/font.TTF", 18);
+    RenderButton::drawButton(
+        renderer,
+        deckBuilding.TitleButton,
+        "Return to Title",
+        false,
+        false,
+        buttonBase,
+        buttonHighlight,
+        buttonPressed,
+        buttonText,
+        buttonFont
+    );
 
     SDL_SetRenderDrawColor(renderer, 40, 40, 50, 255);
     SDL_RenderFillRect(renderer, &layout.collectionArea);
@@ -84,17 +91,44 @@ void RenderDeckBuilding::render(DeckBuilding& deckBuilding, Game& game) {
     }
 
     if (layout.pageCount > 1) {
-        SDL_SetRenderDrawColor(renderer, 60, 60, 70, 255);
-        SDL_RenderFillRect(renderer, &layout.prevPageButton);
-        SDL_RenderFillRect(renderer, &layout.nextPageButton);
-        SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
-        SDL_RenderDrawRect(renderer, &layout.prevPageButton);
-        SDL_RenderDrawRect(renderer, &layout.nextPageButton);
+        const SDL_Color pagerBase{60, 60, 70, 255};
+        const SDL_Color pagerHighlight{80, 80, 95, 255};
+        const SDL_Color pagerPressed{40, 40, 55, 255};
+        const SDL_Color pagerText{255, 255, 255, 255};
+        const SDL_Color pagerDisabled{140, 140, 140, 255};
+
+        const bool canPrev = layout.pageIndex > 0;
+        const bool canNext = layout.pageIndex < layout.pageCount - 1;
+        const bool hoverPrev = canPrev && SDL_PointInRect(&mousePoint, &layout.prevPageButton) == SDL_TRUE;
+        const bool hoverNext = canNext && SDL_PointInRect(&mousePoint, &layout.nextPageButton) == SDL_TRUE;
+
+        RenderButton::drawButton(
+            renderer,
+            layout.prevPageButton,
+            "Prev",
+            hoverPrev,
+            false,
+            canPrev ? pagerBase : pagerPressed,
+            canPrev ? pagerHighlight : pagerPressed,
+            pagerPressed,
+            canPrev ? pagerText : pagerDisabled,
+            fontTiny
+        );
+
+        RenderButton::drawButton(
+            renderer,
+            layout.nextPageButton,
+            "Next",
+            hoverNext,
+            false,
+            canNext ? pagerBase : pagerPressed,
+            canNext ? pagerHighlight : pagerPressed,
+            pagerPressed,
+            canNext ? pagerText : pagerDisabled,
+            fontTiny
+        );
 
         if (fontTiny) {
-            textRenderer.drawText(renderer, "Prev", fontTiny, SDL_Color{255, 255, 255, 255}, layout.prevPageButton.x + 12, layout.prevPageButton.y + 4);
-            textRenderer.drawText(renderer, "Next", fontTiny, SDL_Color{255, 255, 255, 255}, layout.nextPageButton.x + 12, layout.nextPageButton.y + 4);
-
             const std::string pageText = "Page " + std::to_string(layout.pageIndex + 1) + " / " + std::to_string(layout.pageCount);
             textRenderer.drawText(renderer, pageText, fontTiny, SDL_Color{230, 230, 230, 255}, layout.pageLabelRect.x + 6, layout.pageLabelRect.y + 4);
         }
@@ -156,10 +190,6 @@ void RenderDeckBuilding::render(DeckBuilding& deckBuilding, Game& game) {
     }
 
     const Uint32 now = SDL_GetTicks();
-    int mouseX = 0;
-    int mouseY = 0;
-    SDL_GetMouseState(&mouseX, &mouseY);
-    const SDL_Point mousePoint{mouseX, mouseY};
 
     std::size_t newHoverIndex = static_cast<std::size_t>(-1);
     if (!deckBuilding.dragging) {
