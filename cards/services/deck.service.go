@@ -23,6 +23,11 @@ func CreateDeck(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if inputDeck.Uid <= 0 {
+		http.Error(w, "uid must be a positive integer", http.StatusBadRequest)
+		return
+	}
+
 	// Checks if user already has a deck
 	var existingDeck models.Deck
 	if err := config.DB.Where("uid = ?", inputDeck.Uid).First(&existingDeck).Error; err == nil {
