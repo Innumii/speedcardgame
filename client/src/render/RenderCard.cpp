@@ -184,3 +184,24 @@ void RenderCard::drawPreview(SDL_Renderer* renderer, RenderText& textRenderer, c
     if (!renderer || !fontSmall || !fontLarge) return;
     drawCardFace(renderer, textRenderer, card, previewRect, fontLarge, fontSmall, false);
 }
+
+void RenderCard::drawCardBack(SDL_Renderer* renderer, const SDL_Rect& cardRect) {
+    if (!renderer) return;
+
+    const SDL_Color border{25, 25, 35, 255};
+    const SDL_Color panel{60, 80, 120, 255};
+    const SDL_Color inner{45, 60, 95, 255};
+
+    SDL_SetRenderDrawColor(renderer, panel.r, panel.g, panel.b, panel.a);
+    SDL_RenderFillRect(renderer, &cardRect);
+    SDL_SetRenderDrawColor(renderer, border.r, border.g, border.b, border.a);
+    SDL_RenderDrawRect(renderer, &cardRect);
+
+    SDL_Rect inset{cardRect.x + 6, cardRect.y + 6, cardRect.w - 12, cardRect.h - 12};
+    if (inset.w > 0 && inset.h > 0) {
+        SDL_SetRenderDrawColor(renderer, inner.r, inner.g, inner.b, inner.a);
+        SDL_RenderFillRect(renderer, &inset);
+        SDL_SetRenderDrawColor(renderer, border.r, border.g, border.b, border.a);
+        SDL_RenderDrawRect(renderer, &inset);
+    }
+}

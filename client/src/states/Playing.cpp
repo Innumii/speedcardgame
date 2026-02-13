@@ -149,9 +149,9 @@ void Playing::computeZones(int screenW, int screenH) {
     }
 
     int totalSlotsWidth = slotCount * slotWidth + (slotCount - 1) * slotSpacing;
-    int totalWidthWithDiscard = totalSlotsWidth + gapToDiscard + discardWidth;
 
-    int startX = std::max(margin, (screenW - totalWidthWithDiscard) / 2);
+    // Center the play zone itself; deck/discard sit outside of this band.
+    int startX = std::max(margin, (screenW - totalSlotsWidth) / 2);
     int slotY = handY - slotHeight - 16;
     if (slotY < margin) slotY = margin;
 

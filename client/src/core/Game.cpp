@@ -160,6 +160,22 @@ int Game::getPlayerId() const {
     return player.id;
 }
 
+std::size_t Game::getRemoteDeckSize() const {
+    return remoteDeckSize;
+}
+
+std::size_t Game::getRemoteHandSize() const {
+    return remoteHandSize;
+}
+
+int Game::getRemoteHealth() const {
+    return remotePlayer.health;
+}
+
+int Game::getRemoteMana() const {
+    return remotePlayer.mana;
+}
+
 NetworkClient& Game::getNetworkClient() {
     return netClient;
 }

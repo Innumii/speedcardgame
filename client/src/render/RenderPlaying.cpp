@@ -12,6 +12,94 @@
 #include <algorithm>
 #include <string>
 
+namespace {
+	void drawOpponentDeckAndDiscard(SDL_Renderer* renderer, RenderText& textRenderer, const std::vector<SDL_Rect>& playSlots,
+			const SDL_Rect& playerDiscardZone, std::size_t deckSize, int screenW, TTF_Font* fontSmall) {
+		if (!renderer || !fontSmall) return;
+		if (playSlots.empty()) return;
+
+		const int opponentOffset = 200;
+		const int gap = 18;
+		const int margin = 10;
+
+		const int slotHeight = playSlots.front().h;
+		const int discardW = playerDiscardZone.w > 0 ? playerDiscardZone.w : 110;
+		const int discardH = playerDiscardZone.h > 0 ? playerDiscardZone.h : 130;
+		const int opponentZoneY = playSlots.front().y - opponentOffset;
+		const int discardY = opponentZoneY + (slotHeight - discardH) / 2;
+
+		const int leftEdge = playSlots.front().x - gap;
+		const int rightEdge = playSlots.back().x + playSlots.back().w + gap;
+
+		int discardX = leftEdge - discardW;
+		if (discardX < margin) discardX = margin;
+
+		int deckX = rightEdge;
+		if (deckX + discardW > screenW - margin) {
+			deckX = std::max(margin, screenW - margin - discardW);
+		}
+
+		SDL_Rect opponentDiscard{discardX, discardY, discardW, discardH};
+		SDL_SetRenderDrawColor(renderer, 70, 60, 80, 255);
+		SDL_RenderFillRect(renderer, &opponentDiscard);
+		SDL_SetRenderDrawColor(renderer, 170, 150, 190, 255);
+		SDL_RenderDrawRect(renderer, &opponentDiscard);
+		textRenderer.drawText(
+			renderer,
+			"Opponent Discard",
+			fontSmall,
+			SDL_Color{230, 230, 230, 255},
+			opponentDiscard.x + 6,
+			opponentDiscard.y + 6
+		);
+
+		SDL_Rect deckBase{deckX, discardY, discardW, discardH};
+		const int stackCount = static_cast<int>(std::min<std::size_t>(deckSize, 5));
+		for (int i = 0; i < stackCount; ++i) {
+			SDL_Rect card{deckBase.x + i * 4, deckBase.y - i * 2, deckBase.w, deckBase.h};
+			RenderCard::drawCardBack(renderer, card);
+		}
+		textRenderer.drawText(
+			renderer,
+			"Deck: " + std::to_string(deckSize),
+			fontSmall,
+			SDL_Color{230, 230, 230, 255},
+			deckBase.x + 6,
+			deckBase.y + 6
+		);
+	}
+
+	void drawSelfDeck(SDL_Renderer* renderer, RenderText& textRenderer, const std::vector<SDL_Rect>& playSlots,
+			const SDL_Rect& playerDiscardZone, int deckSize, TTF_Font* fontSmall) {
+		if (!renderer || !fontSmall) return;
+		if (playSlots.empty()) return;
+
+		const int gap = 18;
+		const int margin = 10;
+		const int deckW = playerDiscardZone.w > 0 ? playerDiscardZone.w : 110;
+		const int deckH = playerDiscardZone.h > 0 ? playerDiscardZone.h : 130;
+		const int deckY = playSlots.front().y + (playSlots.front().h - deckH) / 2;
+
+		int deckX = playSlots.front().x - gap - deckW;
+		if (deckX < margin) deckX = margin;
+
+		SDL_Rect deckBase{deckX, deckY, deckW, deckH};
+		const int stackCount = static_cast<int>(std::min<int>(deckSize, 5));
+		for (int i = 0; i < stackCount; ++i) {
+			SDL_Rect card{deckBase.x + i * 4, deckBase.y - i * 2, deckBase.w, deckBase.h};
+			RenderCard::drawCardBack(renderer, card);
+		}
+		textRenderer.drawText(
+			renderer,
+			"Deck: " + std::to_string(deckSize),
+			fontSmall,
+			SDL_Color{230, 230, 230, 255},
+			deckBase.x + 6,
+			deckBase.y + 6
+		);
+	}
+}
+
 void RenderPlaying::render(Playing& playing, Game& game) {
 	SDL_Renderer* renderer = game.getRenderer();
 	if (!renderer) return;
@@ -38,6 +126,14 @@ void RenderPlaying::render(Playing& playing, Game& game) {
 		20
 	);
 
+	textRenderer.drawText(
+		renderer,
+		"Opponent Health: " + std::to_string(game.getRemoteHealth()),
+		playing.fonts.small,
+		SDL_Color{210, 210, 210, 255},
+		20,
+		50
+	);
 	const std::string manaText = "Mana: " + std::to_string(playing.player.mana);
 	int manaW = 0, manaH = 0;
 	if (playing.fonts.large) {
@@ -52,8 +148,36 @@ void RenderPlaying::render(Playing& playing, Game& game) {
 		20
 	);
 
+	const std::string opponentManaText = "Opponent Mana: " + std::to_string(game.getRemoteMana());
+	int opponentManaW = 0, opponentManaH = 0;
+	if (playing.fonts.small) {
+		TTF_SizeText(playing.fonts.small, opponentManaText.c_str(), &opponentManaW, &opponentManaH);
+	}
+	textRenderer.drawText(
+		renderer,
+		opponentManaText,
+		playing.fonts.small,
+		SDL_Color{210, 210, 210, 255},
+		screenW - opponentManaW - 20,
+		50
+	);
+
 	playing.cardRects = playing.computeCardLayout(playing.player.hand.size(), screenW, screenH);
 	playing.computeZones(screenW, screenH);
+
+	const std::size_t opponentHandSize = game.getRemoteHandSize();
+	std::vector<SDL_Rect> opponentHandRects = playing.computeCardLayout(opponentHandSize, screenW, screenH);
+	if (!opponentHandRects.empty()) {
+		const int cardHeight = opponentHandRects.front().h;
+		int topHandY = 20;
+		if (!playing.playSlots.empty()) {
+			const int opponentOffset = 200;
+			topHandY = std::max(20, playing.playSlots.front().y - opponentOffset - cardHeight - 20);
+		}
+		for (auto& rect : opponentHandRects) {
+			rect.y = topHandY;
+		}
+	}
 
 	int mouseX = 0, mouseY = 0;
 	SDL_GetMouseState(&mouseX, &mouseY);
@@ -83,8 +207,29 @@ void RenderPlaying::render(Playing& playing, Game& game) {
 		now - playing.hoverStartTick >= hoverDelayMs;
 
 	RenderBoard::drawOpponentPlayZones(renderer, textRenderer, playing.playSlots, playing.fonts.small);
+	drawOpponentDeckAndDiscard(
+		renderer,
+		textRenderer,
+		playing.playSlots,
+		playing.discardZone,
+		game.getRemoteDeckSize(),
+		screenW,
+		playing.fonts.small
+	);
 	RenderBoard::drawPlayZones(renderer, textRenderer, playing.playSlots, playing.fonts.small);
 	RenderBoard::drawDiscardZone(renderer, textRenderer, playing.discardZone, hoveringDiscard, playing.fonts.small);
+	drawSelfDeck(
+		renderer,
+		textRenderer,
+		playing.playSlots,
+		playing.discardZone,
+		playing.deck.size(),
+		playing.fonts.small
+	);
+
+	for (const auto& rect : opponentHandRects) {
+		RenderCard::drawCardBack(renderer, rect);
+	}
 
 	for (std::size_t i = 0; i < playing.player.hand.size(); ++i) {
 		if (draggingCard && i == playing.drag.index) continue;
