@@ -170,6 +170,12 @@ int Game::getPlayerId() const {
     return player.id;
 }
 
+void Game::setPlayerId(int playerId) {
+    if (playerId > 0) {
+        player.id = playerId;
+    }
+}
+
 std::size_t Game::getRemoteDeckSize() const {
     return remoteDeckSize;
 }

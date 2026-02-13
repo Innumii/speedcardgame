@@ -9,13 +9,12 @@ import (
 	"github.com/Ryanljk/speedcardgame/cards/models"
 )
 
-var inputDeck struct {
-	Uid   int               `json:"uid"`
-	Cards models.CardCounts `json:"cards"`
-}
-
 // CreateDeck creates a new deck for a user
 func CreateDeck(w http.ResponseWriter, r *http.Request) {
+	var inputDeck struct {
+		Uid   int               `json:"uid"`
+		Cards models.CardCounts `json:"cards"`
+	}
 
 	// Decode the JSON body into the inputDeck struct
 	if err := json.NewDecoder(r.Body).Decode(&inputDeck); err != nil {
@@ -31,8 +30,10 @@ func CreateDeck(w http.ResponseWriter, r *http.Request) {
 	// Checks if user already has a deck
 	var existingDeck models.Deck
 	if err := config.DB.Where("uid = ?", inputDeck.Uid).First(&existingDeck).Error; err == nil {
-		// remove existing deck
-		DeleteDeck(w, r)
+		if err := config.DB.Where("uid = ?", inputDeck.Uid).Delete(&models.Deck{}).Error; err != nil {
+			http.Error(w, fmt.Sprintf("Failed to delete deck: %v", err), http.StatusInternalServerError)
+			return
+		}
 	}
 
 	// Create a new Deck directly in this handler
@@ -67,6 +68,10 @@ func ListDecks(w http.ResponseWriter, _ *http.Request) {
 }
 
 func DeleteDeck(w http.ResponseWriter, r *http.Request) {
+	var inputDeck struct {
+		Uid   int               `json:"uid"`
+		Cards models.CardCounts `json:"cards"`
+	}
 
 	// Decode the JSON body into the inputDeck struct
 	if err := json.NewDecoder(r.Body).Decode(&inputDeck); err != nil {

@@ -63,6 +63,7 @@ public:
     GameState getNextState() const;
     SDL_Renderer* getRenderer() const;
     int getPlayerId() const;
+    void setPlayerId(int playerId);
     std::size_t getRemoteDeckSize() const;
     std::size_t getRemoteHandSize() const;
     int getRemoteHealth() const;

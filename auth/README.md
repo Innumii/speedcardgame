@@ -80,7 +80,6 @@ go mod tidy
 
 - wgo runs the app in watch mode
 - App will be running on <http://localhost:8080>
-- Swagger API documentation available at <http://localhost:8080/swagger/index.html>
 
 ## Setting up Makefile
 

@@ -11,15 +11,13 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
 
-	"github.com/ryanljk/speedcardgame/auth/controllers"
-	"github.com/ryanljk/speedcardgame/auth/docs"
-	"github.com/ryanljk/speedcardgame/auth/models"
-	"github.com/ryanljk/speedcardgame/auth/repositories"
-	"github.com/ryanljk/speedcardgame/auth/services"
+	"github.com/Ryanljk/speedcardgame/auth/controllers"
+	"github.com/Ryanljk/speedcardgame/auth/dtos"
+	"github.com/Ryanljk/speedcardgame/auth/models"
+	"github.com/Ryanljk/speedcardgame/auth/repositories"
+	"github.com/Ryanljk/speedcardgame/auth/services"
 
 	"github.com/redis/go-redis/v9"
-	"github.com/swaggo/files"
-	"github.com/swaggo/gin-swagger"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
@@ -84,9 +82,6 @@ func main() {
 		log.Fatalf("Failed to migrate the database: %v", err)
 	}
 
-	// Set up Swagger
-	setSwagger()
-
 	// Initialize repositories
 	userRepository := repositories.NewGormUserRepository(db)
 
@@ -94,6 +89,7 @@ func main() {
 	sessionService := services.NewSessionService(redisClient)
 	authService := services.NewAuthService(userRepository, sessionService)
 	authController := controllers.NewAuthController(authService)
+	seedDevUsers(authService)
 
 	// Initialize Gin router
 	r := gin.Default()
@@ -106,8 +102,6 @@ func main() {
 		AllowCredentials: true,
 		MaxAge:           12 * time.Hour,
 	}))
-
-	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
 	// Auth routes
 	r.POST("/register", authController.Register)
@@ -156,11 +150,15 @@ func clearAllSessions(redisClient *redis.Client) {
 	}
 }
 
-func setSwagger() {
-	docs.SwaggerInfo.Title = "Masala Dosa API"
-	docs.SwaggerInfo.Description = "API documentation for the Masala Dosa application"
-	docs.SwaggerInfo.Version = "1.0"
-	docs.SwaggerInfo.Host = "localhost:8080"
-	docs.SwaggerInfo.BasePath = "/"
-	docs.SwaggerInfo.Schemes = []string{"http", "https"}
+func seedDevUsers(authService *services.AuthService) {
+	devUsers := []dtos.RegisterDTO{
+		{Name: "admin", Email: "admin@example.com", Password: "admin"},
+		{Name: "test", Email: "test@example.com", Password: "test"},
+	}
+
+	for _, user := range devUsers {
+		if _, err := authService.Register(user); err != nil {
+			log.Printf("Dev user seed skipped for %s: %v", user.Email, err)
+		}
+	}
 }

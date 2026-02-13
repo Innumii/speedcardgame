@@ -1,8 +1,9 @@
 package repositories
 
 import (
-	"github.com/Ryanljk/speedcardgame/auth/models"
 	"time"
+
+	"github.com/Ryanljk/speedcardgame/auth/models"
 )
 
 type UserRepository interface {
