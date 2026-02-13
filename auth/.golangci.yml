@@ -1,0 +1,33 @@
+run:
+  timeout: 5m
+  tests: true
+  concurrency: 4  # Adjust based on your CPU cores
+
+linters:
+  enable:
+    - govet           # Checks for suspicious constructs
+    - staticcheck     # Finds bugs and performance issues
+    - errcheck        # Check for unhandled errors
+    - gofmt           # Enforces code formatting
+    # - goimports       # Ensures import order
+    - gocyclo         # Checks for high code complexity
+    - ineffassign     # Detects assignments to ineffectual variables
+    - unused          # Replaces deprecated linters: deadcode, structcheck
+
+linters-settings:
+  gofmt:
+    simplify: true  # Enable code simplifications like short declarations
+  gocyclo:
+    min-complexity: 15  # Set threshold for cyclomatic complexity
+  goimports:
+    local-prefixes: "github.com/justintyf01/masaladosa"  # Replace with your project path
+
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0
+
+
+
+output:
+  formats:
+    - format: colored-line-number  # Correctly use a single format
