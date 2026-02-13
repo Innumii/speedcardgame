@@ -8,7 +8,7 @@
 
 class Player {
 public:
-    int id = 0;
+    int id = 1;
     int health = 100;
     int fatigueDamage = 1;
     int mana = 0;

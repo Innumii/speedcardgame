@@ -86,7 +86,15 @@ void RenderDeckBuilding::render(DeckBuilding& deckBuilding, Game& game) {
         if (cardIndex < 0 || cardIndex >= static_cast<int>(deckBuilding.availableCards.size())) continue;
         const Card& card = *deckBuilding.availableCards[cardIndex];
 
-        RenderCard::drawCardFace(renderer, textRenderer, card, cardRect, fontSmall, fontTiny, false);
+        const int remaining = deckBuilding.getRemainingCount(cardIndex);
+        const bool dimmed = remaining <= 0;
+        RenderCard::drawCardFace(renderer, textRenderer, card, cardRect, fontSmall, fontTiny, dimmed);
+
+        if (fontTiny) {
+            const std::string qtyText = "x" + std::to_string(remaining);
+            const SDL_Color qtyColor = dimmed ? SDL_Color{160, 160, 160, 255} : SDL_Color{235, 235, 235, 255};
+            textRenderer.drawText(renderer, qtyText, fontTiny, qtyColor, cardRect.x + 6, cardRect.y + cardRect.h + 2);
+        }
     }
 
     if (layout.pageCount > 1) {

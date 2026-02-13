@@ -47,12 +47,17 @@ private:
 	void tryRemoveFromDeck(int cardIndex);
 	bool loadAvailableCardsFromService(Game& game);
 	bool loadAvailableCardsFromCsv(Game& game);
+	bool loadInventoryFromService(Game& game);
+	bool loadDeckFromService(Game& game);
 	bool saveDeckToService(Game& game) const;
+	int getInventoryCount(int cardIndex) const;
+	int getRemainingCount(int cardIndex) const;
 
 	SDL_Rect TitleButton{20, 20, 140, 50};
 	SDL_Rect PlayButton{20, 80, 140, 50};
 	std::vector<std::unique_ptr<Card>> availableCards;
 	std::vector<int> deckCopies;
+	std::vector<int> inventoryCopies;
 
 	bool dragging{false};
 	bool draggingFromDeck{false};
@@ -60,6 +65,7 @@ private:
 	SDL_Point dragPos{0, 0};
 	SDL_Point dragOffset{0, 0};
 	bool cardsLoadedFromService{false};
+	bool inventoryLoaded{false};
 	std::size_t hoverIndex{static_cast<std::size_t>(-1)};
 	Uint32 hoverStartTick{0};
 	int collectionPage{0};

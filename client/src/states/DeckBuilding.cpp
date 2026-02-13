@@ -19,6 +19,7 @@
 #include <cstdlib>
 #include <fstream>
 #include <sstream>
+#include <unordered_map>
 
 namespace {
     SDL_Point getPoint(int x, int y) {
@@ -165,6 +166,143 @@ namespace {
         stream.open(path);
         return stream.is_open();
     }
+
+    bool findMatchingBrace(const std::string& text, std::size_t openPos, std::size_t& closePos) {
+        if (openPos >= text.size() || text[openPos] != '{') return false;
+        int depth = 0;
+        for (std::size_t i = openPos; i < text.size(); ++i) {
+            if (text[i] == '{') {
+                ++depth;
+            } else if (text[i] == '}') {
+                --depth;
+                if (depth == 0) {
+                    closePos = i;
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    bool parseJsonIntAt(const std::string& text, std::size_t& pos, int& out) {
+        while (pos < text.size() && std::isspace(static_cast<unsigned char>(text[pos]))) {
+            ++pos;
+        }
+        std::size_t start = pos;
+        if (pos < text.size() && text[pos] == '-') {
+            ++pos;
+        }
+        while (pos < text.size() && std::isdigit(static_cast<unsigned char>(text[pos]))) {
+            ++pos;
+        }
+        if (pos == start) return false;
+        try {
+            out = std::stoi(text.substr(start, pos - start));
+        } catch (...) {
+            return false;
+        }
+        return true;
+    }
+
+    bool parseJsonQuotedStringAt(const std::string& text, std::size_t& pos, std::string& out) {
+        while (pos < text.size() && std::isspace(static_cast<unsigned char>(text[pos]))) {
+            ++pos;
+        }
+        if (pos >= text.size() || text[pos] != '"') return false;
+        ++pos;
+        std::size_t start = pos;
+        while (pos < text.size()) {
+            if (text[pos] == '"' && text[pos - 1] != '\\') {
+                out = text.substr(start, pos - start);
+                ++pos;
+                return true;
+            }
+            ++pos;
+        }
+        return false;
+    }
+
+    bool extractCardsObjectForUser(const std::string& json, int userId, std::string& outCards) {
+        std::size_t pos = 0;
+        while (pos < json.size()) {
+            if (json[pos] != '{') {
+                ++pos;
+                continue;
+            }
+
+            std::size_t objEnd = 0;
+            if (!findMatchingBrace(json, pos, objEnd)) {
+                return false;
+            }
+
+            const std::string obj = json.substr(pos, objEnd - pos + 1);
+            int uid = -1;
+            readJsonIntField(obj, "uid", uid);
+            if (uid == userId) {
+                const std::string needle = "\"cards\"";
+                std::size_t cardsPos = obj.find(needle);
+                if (cardsPos == std::string::npos) return false;
+                cardsPos = obj.find('{', cardsPos + needle.size());
+                if (cardsPos == std::string::npos) return false;
+                std::size_t cardsEnd = 0;
+                if (!findMatchingBrace(obj, cardsPos, cardsEnd)) return false;
+                if (cardsEnd <= cardsPos + 1) {
+                    outCards.clear();
+                    return true;
+                }
+                outCards = obj.substr(cardsPos + 1, cardsEnd - cardsPos - 1);
+                return true;
+            }
+
+            pos = objEnd + 1;
+        }
+
+        return false;
+    }
+
+    bool parseCardsMap(const std::string& cardsJson, std::vector<std::pair<int, int>>& out) {
+        out.clear();
+        std::size_t pos = 0;
+        while (pos < cardsJson.size()) {
+            while (pos < cardsJson.size() &&
+                   (std::isspace(static_cast<unsigned char>(cardsJson[pos])) || cardsJson[pos] == ',')) {
+                ++pos;
+            }
+            if (pos >= cardsJson.size()) break;
+
+            std::string key;
+            if (!parseJsonQuotedStringAt(cardsJson, pos, key)) {
+                ++pos;
+                continue;
+            }
+
+            while (pos < cardsJson.size() && std::isspace(static_cast<unsigned char>(cardsJson[pos]))) {
+                ++pos;
+            }
+            if (pos >= cardsJson.size() || cardsJson[pos] != ':') {
+                return false;
+            }
+            ++pos;
+
+            int value = 0;
+            if (!parseJsonIntAt(cardsJson, pos, value)) {
+                return false;
+            }
+
+            int cardId = -1;
+            try {
+                cardId = std::stoi(key);
+            } catch (...) {
+                cardId = -1;
+            }
+
+            if (cardId >= 0) {
+                out.emplace_back(cardId, value);
+            }
+        }
+
+        return true;
+    }
 }
 
 DeckBuilding::DeckBuilding() = default;
@@ -173,6 +311,10 @@ void DeckBuilding::enter(Game& game) {
     cardsLoadedFromService = loadAvailableCardsFromService(game);
     if (!cardsLoadedFromService) {
         cardsLoadedFromService = loadAvailableCardsFromCsv(game);
+    }
+    if (!availableCards.empty()) {
+        loadDeckFromService(game);
+        loadInventoryFromService(game);
     }
     collectionPage = 0;
 }
@@ -230,6 +372,11 @@ void DeckBuilding::handleEvents(Game& game, const SDL_Event& event) {
                     draggedCardIndex = layout.collectionCardIndices[i];
                 } else {
                     draggedCardIndex = static_cast<int>(i);
+                }
+                if (getRemainingCount(draggedCardIndex) <= 0) {
+                    dragging = false;
+                    draggedCardIndex = -1;
+                    return;
                 }
                 dragPos = point;
                 dragOffset.x = point.x - layout.collectionCardRects[i].x;
@@ -448,6 +595,7 @@ std::vector<int> DeckBuilding::getDeckEntryOrder() const {
 void DeckBuilding::tryAddToDeck(int cardIndex) {
     if (cardIndex < 0 || cardIndex >= static_cast<int>(deckCopies.size())) return;
     if (deckCopies[cardIndex] >= MaxDeckCopies) return;
+    if (getRemainingCount(cardIndex) <= 0) return;
     deckCopies[cardIndex] += 1;
 }
 
@@ -655,5 +803,113 @@ bool DeckBuilding::saveDeckToService(Game& game) const {
 
     std::string responseBody;
     return sendHttpRequest(host, port, "POST", path, payload.str(), responseBody);
+}
+
+bool DeckBuilding::loadInventoryFromService(Game& game) {
+    if (availableCards.empty()) return false;
+
+    const std::string host = getEnvOrDefault("CARDS_SERVICE_HOST", "127.0.0.1");
+    const int port = getEnvIntOrDefault("CARDS_SERVICE_PORT", 8080);
+    const std::string path = "/cardbase/inventories";
+    const int userId = getEnvIntOrDefault("CARDS_SERVICE_UID", game.getPlayerId());
+
+    std::string responseBody;
+    if (!sendHttpRequest(host, port, "GET", path, "", responseBody)) {
+        inventoryLoaded = false;
+        inventoryCopies.assign(availableCards.size(), 0);
+        return false;
+    }
+
+    std::string cardsJson;
+    if (!extractCardsObjectForUser(responseBody, userId, cardsJson)) {
+        inventoryLoaded = false;
+        inventoryCopies.assign(availableCards.size(), 0);
+        return false;
+    }
+
+    std::vector<std::pair<int, int>> cardCounts;
+    if (!parseCardsMap(cardsJson, cardCounts)) {
+        inventoryLoaded = false;
+        inventoryCopies.assign(availableCards.size(), 0);
+        return false;
+    }
+
+    std::unordered_map<int, std::size_t> cardIndexById;
+    cardIndexById.reserve(availableCards.size());
+    for (std::size_t i = 0; i < availableCards.size(); ++i) {
+        cardIndexById.emplace(availableCards[i]->getId(), i);
+    }
+
+    inventoryCopies.assign(availableCards.size(), 0);
+    for (const auto& pair : cardCounts) {
+        const int cardId = pair.first;
+        const int copies = pair.second;
+        if (copies <= 0) continue;
+        auto it = cardIndexById.find(cardId);
+        if (it == cardIndexById.end()) continue;
+        inventoryCopies[it->second] = copies;
+    }
+
+    inventoryLoaded = true;
+    return true;
+}
+
+int DeckBuilding::getInventoryCount(int cardIndex) const {
+    if (cardIndex < 0 || cardIndex >= static_cast<int>(inventoryCopies.size())) return 0;
+    return inventoryCopies[cardIndex];
+}
+
+int DeckBuilding::getRemainingCount(int cardIndex) const {
+    if (cardIndex < 0 || cardIndex >= static_cast<int>(deckCopies.size())) return 0;
+    if (!inventoryLoaded || inventoryCopies.size() != deckCopies.size()) {
+        return MaxDeckCopies - deckCopies[cardIndex];
+    }
+    const int remaining = getInventoryCount(cardIndex) - deckCopies[cardIndex];
+    return remaining > 0 ? remaining : 0;
+}
+
+bool DeckBuilding::loadDeckFromService(Game& game) {
+    if (availableCards.empty()) return false;
+
+    const std::string host = getEnvOrDefault("CARDS_SERVICE_HOST", "127.0.0.1");
+    const int port = getEnvIntOrDefault("CARDS_SERVICE_PORT", 8080);
+    const std::string path = "/cardbase/decks";
+    const int userId = getEnvIntOrDefault("CARDS_SERVICE_UID", game.getPlayerId());
+
+    std::string responseBody;
+    if (!sendHttpRequest(host, port, "GET", path, "", responseBody)) {
+        return false;
+    }
+
+    std::string cardsJson;
+    if (!extractCardsObjectForUser(responseBody, userId, cardsJson)) {
+        deckCopies.assign(availableCards.size(), 0);
+        return false;
+    }
+
+    std::vector<std::pair<int, int>> cardCounts;
+    if (!parseCardsMap(cardsJson, cardCounts)) {
+        deckCopies.assign(availableCards.size(), 0);
+        return false;
+    }
+
+    std::unordered_map<int, std::size_t> cardIndexById;
+    cardIndexById.reserve(availableCards.size());
+    for (std::size_t i = 0; i < availableCards.size(); ++i) {
+        cardIndexById.emplace(availableCards[i]->getId(), i);
+    }
+
+    deckCopies.assign(availableCards.size(), 0);
+    for (const auto& pair : cardCounts) {
+        const int cardId = pair.first;
+        const int copies = pair.second;
+        if (copies <= 0) continue;
+        auto it = cardIndexById.find(cardId);
+        if (it == cardIndexById.end()) continue;
+        const int clamped = std::min(copies, MaxDeckCopies);
+        deckCopies[it->second] = clamped;
+    }
+
+    return true;
 }
 
