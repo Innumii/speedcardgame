@@ -73,6 +73,8 @@ Game::Game(const char *title, int xpos, int ypos, int width, int height, bool fu
     SDL_RaiseWindow(window.get());
     SDL_SetWindowInputFocus(window.get());
 
+    loginState.enter(*this);
+
     isRunning = true;
 }
 
@@ -100,6 +102,10 @@ void Game::commitStateChange() {
             deckBuildingState.exit(*this);
         }
 
+        if (previousState == GameState::Login && state != GameState::Login) {
+            loginState.exit(*this);
+        }
+
         if (state == GameState::Connecting) {
             connectingState.reset();
         }
@@ -109,6 +115,10 @@ void Game::commitStateChange() {
         if (state == GameState::Connecting) {
             //hardcoded for now
             connectingState.emplace("127.0.0.1", 4000);
+        }
+
+        if (state == GameState::Login && previousState != GameState::Login) {
+            loginState.enter(*this);
         }
 
         if (state == GameState::Playing && !playingSetup) {
@@ -193,6 +203,9 @@ void Game::handleEvents() {
             case GameState::Title:
                 titleState.handleEvents(*this, event);
                 break;
+            case GameState::Login:
+                loginState.handleEvents(*this, event);
+                break;
             case GameState::DeckBuilding:
                 deckBuildingState.handleEvents(*this, event);
                 break;
@@ -225,6 +238,9 @@ void Game::update() {
         case GameState::DeckBuilding:
             deckBuildingState.update(*this);
             break;
+        case GameState::Login:
+            loginState.update(*this);
+            break;
         case GameState::Connecting:
             if (connectingState) {
                 connectingState->update(*this);
@@ -242,6 +258,9 @@ void Game::render() {
     switch (state) {
         case GameState::Title:
             titleState.render(*this);
+            break;
+        case GameState::Login:
+            loginState.render(*this);
             break;
         case GameState::DeckBuilding:
             deckBuildingState.render(*this);

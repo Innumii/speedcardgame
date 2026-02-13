@@ -70,7 +70,7 @@ void RenderText::closeFonts(FontSet& fonts) {
 }
 
 void RenderText::drawText(SDL_Renderer* renderer, const std::string& text, TTF_Font* font, SDL_Color color, int x, int y) {
-    if (!renderer || !font) return;
+    if (!renderer || !font || text.empty()) return;
 
     SDL_Surface* surface = TTF_RenderUTF8_Blended(font, text.c_str(), color);
     if (!surface) {

@@ -14,6 +14,7 @@
 #include "NetworkClient.hpp"
 
 #include "states/Title.hpp"
+#include "states/Login.hpp"
 #include "states/Playing.hpp"
 #include "states/DeckBuilding.hpp"
 #include "states/Connecting.hpp"
@@ -100,10 +101,11 @@ private:
     RendererPtr renderer{nullptr, SDL_DestroyRenderer};
 
     //GameState::Title used because Title is not in global scope, only exists within GameState
-    GameState state{GameState::Title};
-    GameState nextState{GameState::Title};
+    GameState state{GameState::Login};
+    GameState nextState{GameState::Login};
 
     Title titleState;
+    Login loginState;
     Playing playingState{drawIntervalSeconds};
     DeckBuilding deckBuildingState;
     std::optional<Connecting> connectingState;

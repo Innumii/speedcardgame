@@ -3,6 +3,7 @@
 
 enum class GameState {
     Title,
+    Login,
     DeckBuilding,
     Connecting,
     Waiting,
