@@ -1,0 +1,82 @@
+services:
+  auth:
+    build: ./auth
+    ports:
+      - "${AUTH_APP_PORT:-8081}:8080"
+    restart: unless-stopped
+    environment:
+      POSTGRES_HOST: auth-db
+      POSTGRES_USER: ${AUTH_POSTGRES_USER}
+      POSTGRES_PASSWORD: ${AUTH_POSTGRES_PASSWORD}
+      POSTGRES_DB: ${AUTH_POSTGRES_DB}
+      POSTGRES_PORT: ${AUTH_POSTGRES_PORT}
+      POSTGRES_SSLMODE: ${AUTH_POSTGRES_SSLMODE}
+      POSTGRES_TIMEZONE: ${AUTH_POSTGRES_TIMEZONE}
+      REDIS_HOST: auth-redis
+      REDIS_PORT: ${AUTH_REDIS_PORT}
+    depends_on:
+      auth-db:
+        condition: service_healthy
+      auth-redis:
+        condition: service_healthy
+
+  auth-db:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${AUTH_POSTGRES_USER}
+      POSTGRES_PASSWORD: ${AUTH_POSTGRES_PASSWORD}
+      POSTGRES_DB: ${AUTH_POSTGRES_DB}
+    ports:
+      - "${AUTH_DB_PORT:-5432}:5432"
+    volumes:
+      - auth-postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${AUTH_POSTGRES_USER} -d ${AUTH_POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  auth-redis:
+    image: redis:7
+    restart: unless-stopped
+    ports:
+      - "${AUTH_REDIS_PORT:-6379}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  cards:
+    build:
+      context: ./cards
+      dockerfile: Dockerfile
+    depends_on:
+      cards-db:
+        condition: service_healthy
+    environment:
+      PORT: ${CARDS_PORT}
+      DATABASE_URL: ${CARDS_DATABASE_URL}
+    ports:
+      - "${CARDS_APP_PORT:-8082}:${CARDS_PORT}"
+
+  cards-db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: ${CARDS_POSTGRES_USER}
+      POSTGRES_PASSWORD: ${CARDS_POSTGRES_PASSWORD}
+      POSTGRES_DB: ${CARDS_POSTGRES_DB}
+    ports:
+      - "${CARDS_DB_PORT:-5433}:5432"
+    volumes:
+      - cards-postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${CARDS_POSTGRES_USER} -d ${CARDS_POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  auth-postgres:
+  cards-postgres:

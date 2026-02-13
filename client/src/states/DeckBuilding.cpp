@@ -656,7 +656,7 @@ bool DeckBuilding::hasCardsInDeck() const {
 bool DeckBuilding::loadAvailableCardsFromService(Game& game) {
     (void)game;
     const std::string host = getEnvOrDefault("CARDS_SERVICE_HOST", "127.0.0.1");
-    const int port = getEnvIntOrDefault("CARDS_SERVICE_PORT", 8080);
+    const int port = getEnvIntOrDefault("CARDS_SERVICE_PORT", 8082);
     const std::string path = "/cardbase/cards";
 
     std::string responseBody;
@@ -783,7 +783,7 @@ bool DeckBuilding::loadAvailableCardsFromCsv(Game& game) {
 
 bool DeckBuilding::saveDeckToService(Game& game) const {
     const std::string host = getEnvOrDefault("CARDS_SERVICE_HOST", "127.0.0.1");
-    const int port = getEnvIntOrDefault("CARDS_SERVICE_PORT", 8080);
+    const int port = getEnvIntOrDefault("CARDS_SERVICE_PORT", 8082);
     const std::string path = "/cardbase/decks";
     const int userId = getEnvIntOrDefault("CARDS_SERVICE_UID", game.getPlayerId());
 
@@ -809,7 +809,7 @@ bool DeckBuilding::loadInventoryFromService(Game& game) {
     if (availableCards.empty()) return false;
 
     const std::string host = getEnvOrDefault("CARDS_SERVICE_HOST", "127.0.0.1");
-    const int port = getEnvIntOrDefault("CARDS_SERVICE_PORT", 8080);
+    const int port = getEnvIntOrDefault("CARDS_SERVICE_PORT", 8082);
     const std::string path = "/cardbase/inventories";
     const int userId = getEnvIntOrDefault("CARDS_SERVICE_UID", game.getPlayerId());
 
@@ -872,7 +872,7 @@ bool DeckBuilding::loadDeckFromService(Game& game) {
     if (availableCards.empty()) return false;
 
     const std::string host = getEnvOrDefault("CARDS_SERVICE_HOST", "127.0.0.1");
-    const int port = getEnvIntOrDefault("CARDS_SERVICE_PORT", 8080);
+    const int port = getEnvIntOrDefault("CARDS_SERVICE_PORT", 8082);
     const std::string path = "/cardbase/decks";
     const int userId = getEnvIntOrDefault("CARDS_SERVICE_UID", game.getPlayerId());
 
