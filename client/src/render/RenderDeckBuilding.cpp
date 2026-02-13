@@ -17,8 +17,6 @@ void RenderDeckBuilding::render(DeckBuilding& deckBuilding, Game& game) {
     SDL_Renderer* renderer = game.getRenderer();
     if (!renderer) return;
 
-    const bool ttfReady = TTF_WasInit() || TTF_Init() == 0;
-
     RenderText textRenderer;
     const auto layout = deckBuilding.buildLayout(game);
     int mouseX = 0;
@@ -26,9 +24,10 @@ void RenderDeckBuilding::render(DeckBuilding& deckBuilding, Game& game) {
     SDL_GetMouseState(&mouseX, &mouseY);
     const SDL_Point mousePoint{mouseX, mouseY};
 
-    TTF_Font* fontSmall = ttfReady ? TTF_OpenFont("assets/font.TTF", 14) : nullptr;
-    TTF_Font* fontTiny = ttfReady ? TTF_OpenFont("assets/font.TTF", 12) : nullptr;
-    TTF_Font* fontLarge = ttfReady ? TTF_OpenFont("assets/font.TTF", 18) : nullptr;
+    RenderText::FontSet fonts = RenderText::loadFonts("assets/font.TTF", 14, 12, 18);
+    TTF_Font* fontSmall = fonts.small;
+    TTF_Font* fontTiny = fonts.tiny;
+    TTF_Font* fontLarge = fonts.large;
 
     TTF_Font* buttonFont = fontSmall ? fontSmall : fontLarge;
     const SDL_Color buttonBase{80, 120, 200, 255};
@@ -249,13 +248,5 @@ void RenderDeckBuilding::render(DeckBuilding& deckBuilding, Game& game) {
         RenderCard::drawCardFace(renderer, textRenderer, *deckBuilding.availableCards[deckBuilding.hoverIndex], panel, fontLarge ? fontLarge : fontSmall, fontSmall, false);
     }
 
-    if (fontSmall) {
-        TTF_CloseFont(fontSmall);
-    }
-    if (fontTiny) {
-        TTF_CloseFont(fontTiny);
-    }
-    if (fontLarge) {
-        TTF_CloseFont(fontLarge);
-    }
+    RenderText::closeFonts(fonts);
 }

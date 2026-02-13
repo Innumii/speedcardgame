@@ -2,8 +2,8 @@
 
 #include "core/Game.hpp"
 #include "render/RenderPLaying.hpp"
+#include "render/RenderText.hpp"
 #include <SDL2/SDL.h>
-#include <SDL2/SDL_ttf.h>
 #include "objects/CreatureCard.h"
 #include "objects/SpellCard.h"
 #include <algorithm>
@@ -25,11 +25,8 @@ Playing::Playing(int drawIntervalSeconds)
     : drawIntervalSeconds(drawIntervalSeconds) {}
 
 Playing::~Playing() {
-    fontSmall.reset();
-    fontLarge.reset();
-    if (TTF_WasInit()) {
-        TTF_Quit();
-    }
+    RenderText::closeFonts(fonts);
+    RenderText::shutdownTtf();
 }
 
 void Playing::setDeck(Deck newDeck) {
@@ -48,18 +45,18 @@ void Playing::setup(Game& game) {
     hoverIndex = static_cast<std::size_t>(-1);
     hoverStartTick = 0;
 
-    if (!TTF_WasInit() && TTF_Init() != 0) {
+    if (!RenderText::ensureTtfReady()) {
         throw std::runtime_error(std::string("TTF_Init failed: ") + TTF_GetError());
     }
 
-    fontLarge.reset(TTF_OpenFont("assets/font.TTF", 24));
-    if (!fontLarge) {
+    fonts = RenderText::loadFonts("assets/font.TTF", 14, 12, 24);
+    if (!fonts.large) {
+        RenderText::closeFonts(fonts);
         throw std::runtime_error(std::string("Failed to load font (24pt): ") + TTF_GetError());
     }
 
-    fontSmall.reset(TTF_OpenFont("assets/font.TTF", 14));
-    if (!fontSmall) {
-        fontLarge.reset();
+    if (!fonts.small) {
+        RenderText::closeFonts(fonts);
         throw std::runtime_error(std::string("Failed to load font (14pt): ") + TTF_GetError());
     }
 

@@ -32,7 +32,7 @@ void RenderPlaying::render(Playing& playing, Game& game) {
 	textRenderer.drawText(
 		renderer,
 		"Health: " + std::to_string(playing.player.health),
-		playing.fontLarge.get(),
+		playing.fonts.large,
 		SDL_Color{255, 255, 255, 255},
 		20,
 		20
@@ -40,13 +40,13 @@ void RenderPlaying::render(Playing& playing, Game& game) {
 
 	const std::string manaText = "Mana: " + std::to_string(playing.player.mana);
 	int manaW = 0, manaH = 0;
-	if (playing.fontLarge) {
-		TTF_SizeText(playing.fontLarge.get(), manaText.c_str(), &manaW, &manaH);
+	if (playing.fonts.large) {
+		TTF_SizeText(playing.fonts.large, manaText.c_str(), &manaW, &manaH);
 	}
 	textRenderer.drawText(
 		renderer,
 		manaText,
-		playing.fontLarge.get(),
+		playing.fonts.large,
 		SDL_Color{255, 255, 255, 255},
 		screenW - manaW - 20,
 		20
@@ -82,24 +82,24 @@ void RenderPlaying::render(Playing& playing, Game& game) {
 		playing.hoverIndex < playing.player.hand.size() &&
 		now - playing.hoverStartTick >= hoverDelayMs;
 
-	RenderBoard::drawOpponentPlayZones(renderer, textRenderer, playing.playSlots, playing.fontSmall.get());
-	RenderBoard::drawPlayZones(renderer, textRenderer, playing.playSlots, playing.fontSmall.get());
-	RenderBoard::drawDiscardZone(renderer, textRenderer, playing.discardZone, hoveringDiscard, playing.fontSmall.get());
+	RenderBoard::drawOpponentPlayZones(renderer, textRenderer, playing.playSlots, playing.fonts.small);
+	RenderBoard::drawPlayZones(renderer, textRenderer, playing.playSlots, playing.fonts.small);
+	RenderBoard::drawDiscardZone(renderer, textRenderer, playing.discardZone, hoveringDiscard, playing.fonts.small);
 
 	for (std::size_t i = 0; i < playing.player.hand.size(); ++i) {
 		if (draggingCard && i == playing.drag.index) continue;
 		if (i < playing.cardRects.size() && playing.player.hand[i]) {
-			RenderCard::drawHandCard(renderer, textRenderer, *playing.player.hand[i], playing.cardRects[i], playing.fontSmall.get());
+			RenderCard::drawHandCard(renderer, textRenderer, *playing.player.hand[i], playing.cardRects[i], playing.fonts.small);
 		}
 	}
 
-	RenderBoard::drawBoardState(renderer, textRenderer, playing.board, playing.playSlots, playing.fontSmall.get());
+	RenderBoard::drawBoardState(renderer, textRenderer, playing.board, playing.playSlots, playing.fonts.small);
 
 	if (draggingCard && playing.drag.index < playing.cardRects.size()) {
 		SDL_Rect floating = playing.cardRects[playing.drag.index];
 		floating.x = playing.drag.x;
 		floating.y = playing.drag.y;
-		RenderCard::drawHandCard(renderer, textRenderer, *playing.player.hand[playing.drag.index], floating, playing.fontSmall.get());
+		RenderCard::drawHandCard(renderer, textRenderer, *playing.player.hand[playing.drag.index], floating, playing.fonts.small);
 	}
 
 	if (showPreview) {
@@ -118,7 +118,7 @@ void RenderPlaying::render(Playing& playing, Game& game) {
 			const int previewX = 20;
 
 			SDL_Rect panel{previewX, previewY, previewWidth, previewHeight};
-			RenderCard::drawPreview(renderer, textRenderer, *cardPtr, panel, playing.fontSmall.get(), playing.fontLarge.get());
+			RenderCard::drawPreview(renderer, textRenderer, *cardPtr, panel, playing.fonts.small, playing.fonts.large);
 		}
 	}
 

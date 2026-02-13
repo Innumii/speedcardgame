@@ -2,9 +2,7 @@
 #define PLAYING_HPP
 
 #include <SDL2/SDL.h>
-#include <SDL2/SDL_ttf.h>
 #include <cstddef>
-#include <memory>
 #include <string>
 #include <vector>
 
@@ -12,6 +10,7 @@
 #include "objects/Player.h"
 #include "objects/Deck.h"
 #include "core/Board.hpp"
+#include "render/RenderText.hpp"
 
 class Game; // forward declaration to avoid circular include
 
@@ -35,11 +34,8 @@ private:
         int y{0};
     };
 
-    using FontPtr = std::unique_ptr<TTF_Font, decltype(&TTF_CloseFont)>;
-
     SDL_Renderer* renderer{nullptr}; // non-owning, provided by Game
-    FontPtr fontLarge{nullptr, TTF_CloseFont};
-    FontPtr fontSmall{nullptr, TTF_CloseFont};
+    RenderText::FontSet fonts{};
     std::vector<SDL_Rect> cardRects;
     std::vector<SDL_Rect> playSlots;
     SDL_Rect discardZone{0, 0, 0, 0};

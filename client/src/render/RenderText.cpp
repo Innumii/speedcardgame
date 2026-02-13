@@ -33,6 +33,42 @@ namespace {
     }
 }
 
+bool RenderText::ensureTtfReady() {
+    return TTF_WasInit() || TTF_Init() == 0;
+}
+
+void RenderText::shutdownTtf() {
+    if (TTF_WasInit()) {
+        TTF_Quit();
+    }
+}
+
+RenderText::FontSet RenderText::loadFonts(const char* path, int smallSize, int tinySize, int largeSize) {
+    FontSet fonts;
+    if (!path || !ensureTtfReady()) return fonts;
+
+    fonts.small = TTF_OpenFont(path, smallSize);
+    fonts.tiny = TTF_OpenFont(path, tinySize);
+    fonts.large = TTF_OpenFont(path, largeSize);
+
+    return fonts;
+}
+
+void RenderText::closeFonts(FontSet& fonts) {
+    if (fonts.small) {
+        TTF_CloseFont(fonts.small);
+        fonts.small = nullptr;
+    }
+    if (fonts.tiny) {
+        TTF_CloseFont(fonts.tiny);
+        fonts.tiny = nullptr;
+    }
+    if (fonts.large) {
+        TTF_CloseFont(fonts.large);
+        fonts.large = nullptr;
+    }
+}
+
 void RenderText::drawText(SDL_Renderer* renderer, const std::string& text, TTF_Font* font, SDL_Color color, int x, int y) {
     if (!renderer || !font) return;
 
