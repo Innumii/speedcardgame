@@ -6,3 +6,5 @@ cid,name,type,cost,value,power,toughness,effect
 5,"Kirby, The Ceaseless Hunger",Creature,8,3,3,5,"When this creature kills a creature, it gains +1/+1."
 6,LYS,Creature,10,5,8,8,"Trample, Double Strike"
 7,Jew,Creature,3,2,1,1,"When this creature enters the battlefield, Steal 1 mana from your opponent."
+8,Grizzly Bear,Creature,2,2,2,2,
+9,Russian,Creature,3,2,3,3,
