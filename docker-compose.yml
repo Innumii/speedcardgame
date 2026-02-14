@@ -76,6 +76,13 @@ services:
       interval: 5s
       timeout: 3s
       retries: 20
+  game-server:
+    build: ./server
+    ports:
+      - "4000:4000"
+    restart: unless-stopped
+    sysctls:
+      - net.core.somaxconn=65535
 
 volumes:
   auth-postgres:
