@@ -101,6 +101,10 @@ void Game::commitStateChange() {
             loginState.exit(*this);
         }
 
+        if (previousState == GameState::Register && state != GameState::Register) {
+            registerState.exit(*this);
+        }
+
         if (state == GameState::Connecting) {
             connectingState.reset();
         }
@@ -114,6 +118,10 @@ void Game::commitStateChange() {
 
         if (state == GameState::Login && previousState != GameState::Login) {
             loginState.enter(*this);
+        }
+
+        if (state == GameState::Register && previousState != GameState::Register) {
+            registerState.enter(*this);
         }
 
         if (state == GameState::Playing && !playingSetup) {
@@ -220,6 +228,9 @@ void Game::handleEvents() {
             case GameState::Login:
                 loginState.handleEvents(*this, event);
                 break;
+            case GameState::Register:
+                registerState.handleEvents(*this, event);
+                break;
             case GameState::DeckBuilding:
                 deckBuildingState.handleEvents(*this, event);
                 break;
@@ -255,6 +266,9 @@ void Game::update() {
         case GameState::Login:
             loginState.update(*this);
             break;
+        case GameState::Register:
+            registerState.update(*this);
+            break;
         case GameState::Connecting:
             if (connectingState) {
                 connectingState->update(*this);
@@ -275,6 +289,9 @@ void Game::render() {
             break;
         case GameState::Login:
             loginState.render(*this);
+            break;
+        case GameState::Register:
+            registerState.render(*this);
             break;
         case GameState::DeckBuilding:
             deckBuildingState.render(*this);

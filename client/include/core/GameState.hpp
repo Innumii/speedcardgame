@@ -2,8 +2,9 @@
 #define GAMESTATE_HPP
 
 enum class GameState {
-    Title,
     Login,
+    Register,
+    Title,
     DeckBuilding,
     Connecting,
     Waiting,

@@ -1,4 +1,4 @@
-#include "states/Login.hpp"
+#include "states/Register.hpp"
 
 #include "core/Game.hpp"
 #include "core/NetworkClient.hpp"
@@ -13,7 +13,7 @@
 #include <sstream>
 
 namespace {
-    constexpr std::size_t kMaxUsernameLen = 24;
+    constexpr std::size_t kMaxEmailLen = 64;
     constexpr std::size_t kMaxPasswordLen = 32;
 
     std::string getEnvOrDefault(const char* key, const char* fallback) {
@@ -65,61 +65,6 @@ namespace {
         return true;
     }
 
-    bool readJsonIntField(const std::string& json, const std::string& key, int& out) {
-        const std::string needle = "\"" + key + "\"";
-        std::size_t pos = json.find(needle);
-        if (pos == std::string::npos) return false;
-        pos = json.find(':', pos + needle.size());
-        if (pos == std::string::npos) return false;
-        ++pos;
-        while (pos < json.size() && std::isspace(static_cast<unsigned char>(json[pos]))) {
-            ++pos;
-        }
-        std::size_t end = pos;
-        if (end < json.size() && json[end] == '-') {
-            ++end;
-        }
-        while (end < json.size() && std::isdigit(static_cast<unsigned char>(json[end]))) {
-            ++end;
-        }
-        if (end == pos) return false;
-        try {
-            out = std::stoi(json.substr(pos, end - pos));
-        } catch (...) {
-            return false;
-        }
-        return true;
-    }
-
-    bool findMatchingBrace(const std::string& text, std::size_t openPos, std::size_t& closePos) {
-        if (openPos >= text.size() || text[openPos] != '{') return false;
-        int depth = 0;
-        for (std::size_t i = openPos; i < text.size(); ++i) {
-            if (text[i] == '{') {
-                ++depth;
-            } else if (text[i] == '}') {
-                --depth;
-                if (depth == 0) {
-                    closePos = i;
-                    return true;
-                }
-            }
-        }
-        return false;
-    }
-
-    bool extractJsonObject(const std::string& json, const std::string& key, std::string& out) {
-        const std::string needle = "\"" + key + "\"";
-        std::size_t pos = json.find(needle);
-        if (pos == std::string::npos) return false;
-        pos = json.find('{', pos + needle.size());
-        if (pos == std::string::npos) return false;
-        std::size_t closePos = std::string::npos;
-        if (!findMatchingBrace(json, pos, closePos)) return false;
-        out = json.substr(pos, closePos - pos + 1);
-        return true;
-    }
-
     bool sendHttpRequest(const std::string& host, int port, const std::string& method, const std::string& path,
                          const std::string& body, int& statusCode, std::string& responseBody) {
         statusCode = -1;
@@ -166,19 +111,26 @@ namespace {
         return true;
     }
 
-    bool parseUserIdFromLoginResponse(const std::string& responseBody, int& outUserId, std::string& error) {
-        std::string userJson;
-        if (!extractJsonObject(responseBody, "user", userJson)) {
-            error = "missing user object";
-            return false;
+    std::string deriveNameFromEmail(const std::string& email) {
+        std::size_t atPos = email.find('@');
+        if (atPos == std::string::npos || atPos == 0) {
+            return "Player";
         }
-        if (readJsonIntField(userJson, "id", outUserId)) return true;
-        if (readJsonIntField(userJson, "ID", outUserId)) return true;
-        error = "missing user id";
-        return false;
+        std::string name = email.substr(0, atPos);
+        if (name.empty()) {
+            return "Player";
+        }
+        return name;
     }
 
-    bool authenticateUser(const std::string& email, const std::string& password, int& outUserId, std::string& error) {
+    bool isLikelyEmail(const std::string& email) {
+        std::size_t atPos = email.find('@');
+        if (atPos == std::string::npos || atPos == 0 || atPos + 1 >= email.size()) return false;
+        std::size_t dotPos = email.find('.', atPos + 1);
+        return dotPos != std::string::npos && dotPos + 1 < email.size();
+    }
+
+    bool registerUser(const std::string& email, const std::string& password, std::string& error) {
         if (email.empty() || password.empty()) {
             error = "email and password required";
             return false;
@@ -186,10 +138,12 @@ namespace {
 
         const std::string host = getEnvOrDefault("AUTH_SERVICE_HOST", "127.0.0.1");
         const int port = getEnvIntOrDefault("AUTH_SERVICE_PORT", 8081);
-        const std::string path = "/login";
+        const std::string path = "/register";
+        const std::string name = deriveNameFromEmail(email);
 
         std::ostringstream payload;
-        payload << "{\"email\":\"" << escapeJsonString(email)
+        payload << "{\"name\":\"" << escapeJsonString(name)
+                << "\",\"email\":\"" << escapeJsonString(email)
                 << "\",\"password\":\"" << escapeJsonString(password) << "\"}";
 
         int statusCode = -1;
@@ -199,17 +153,13 @@ namespace {
             return false;
         }
 
-        if (statusCode != 200) {
+        if (statusCode != 201) {
             std::string responseError;
             if (readJsonStringField(responseBody, "error", responseError)) {
                 error = responseError;
             } else {
-                error = "login failed";
+                error = "registration failed";
             }
-            return false;
-        }
-
-        if (!parseUserIdFromLoginResponse(responseBody, outUserId, error)) {
             return false;
         }
 
@@ -217,27 +167,28 @@ namespace {
     }
 }
 
-Login::Login() = default;
+Register::Register() = default;
 
-Login::~Login() {
+Register::~Register() {
     RenderText::closeFonts(fonts);
 }
 
-void Login::enter(Game& game) {
+void Register::enter(Game& game) {
     ensureFonts();
-    setActiveField(Field::Username);
+    setActiveField(Field::Email);
+    statusMessage.clear();
     SDL_StartTextInput();
 }
 
-void Login::exit(Game& game) {
+void Register::exit(Game& game) {
     SDL_StopTextInput();
-    loginPressed = false;
-    registerPressed = false;
-    loginHover = false;
+    createPressed = false;
+    backPressed = false;
+    createHover = false;
     backHover = false;
 }
 
-void Login::ensureFonts() {
+void Register::ensureFonts() {
     if (fontsReady) return;
     if (!RenderText::ensureTtfReady()) return;
 
@@ -251,11 +202,11 @@ void Login::ensureFonts() {
     fontsReady = true;
 }
 
-bool Login::pointInRect(const SDL_Rect& rect, int x, int y) const {
+bool Register::pointInRect(const SDL_Rect& rect, int x, int y) const {
     return x >= rect.x && x <= rect.x + rect.w && y >= rect.y && y <= rect.y + rect.h;
 }
 
-void Login::setActiveField(Field field) {
+void Register::setActiveField(Field field) {
     activeField = field;
     if (activeField == Field::None) {
         SDL_StopTextInput();
@@ -264,7 +215,7 @@ void Login::setActiveField(Field field) {
     }
 }
 
-void Login::updateLayout(SDL_Renderer* renderer) {
+void Register::updateLayout(SDL_Renderer* renderer) {
     int screenW = 800;
     int screenH = 600;
     if (renderer) {
@@ -272,7 +223,7 @@ void Login::updateLayout(SDL_Renderer* renderer) {
     }
 
     const int panelW = std::min(560, static_cast<int>(screenW * 0.8f));
-    const int panelH = 360;
+    const int panelH = 440;
     panelRect = SDL_Rect{
         (screenW - panelW) / 2,
         (screenH - panelH) / 2,
@@ -283,21 +234,24 @@ void Login::updateLayout(SDL_Renderer* renderer) {
     const int inputW = panelW - 120;
     const int inputH = 44;
     const int inputX = panelRect.x + 60;
-    int cursorY = panelRect.y + 80;
+    int cursorY = panelRect.y + 78;
 
-    usernameRect = SDL_Rect{inputX, cursorY, inputW, inputH};
-    cursorY += inputH + 24;
+    emailRect = SDL_Rect{inputX, cursorY, inputW, inputH};
+    cursorY += inputH + 32;
 
     passwordRect = SDL_Rect{inputX, cursorY, inputW, inputH};
     cursorY += inputH + 32;
 
+    confirmRect = SDL_Rect{inputX, cursorY, inputW, inputH};
+    cursorY += inputH + 46;
+
     const int buttonW = (inputW - 20) / 2;
     const int buttonH = 46;
-    loginButtonRect = SDL_Rect{inputX, cursorY, buttonW, buttonH};
+    createButtonRect = SDL_Rect{inputX, cursorY, buttonW, buttonH};
     backButtonRect = SDL_Rect{inputX + buttonW + 20, cursorY, buttonW, buttonH};
 }
 
-void Login::handleEvents(Game& game, const SDL_Event& event) {
+void Register::handleEvents(Game& game, const SDL_Event& event) {
     updateLayout(game.getRenderer());
 
     if (event.type == SDL_QUIT) {
@@ -308,7 +262,7 @@ void Login::handleEvents(Game& game, const SDL_Event& event) {
     if (event.type == SDL_MOUSEMOTION) {
         const int mouseX = event.motion.x;
         const int mouseY = event.motion.y;
-        loginHover = pointInRect(loginButtonRect, mouseX, mouseY);
+        createHover = pointInRect(createButtonRect, mouseX, mouseY);
         backHover = pointInRect(backButtonRect, mouseX, mouseY);
     }
 
@@ -316,134 +270,193 @@ void Login::handleEvents(Game& game, const SDL_Event& event) {
         const int mouseX = event.button.x;
         const int mouseY = event.button.y;
 
-        if (pointInRect(usernameRect, mouseX, mouseY)) {
-            setActiveField(Field::Username);
+        if (pointInRect(emailRect, mouseX, mouseY)) {
+            setActiveField(Field::Email);
         } else if (pointInRect(passwordRect, mouseX, mouseY)) {
             setActiveField(Field::Password);
+        } else if (pointInRect(confirmRect, mouseX, mouseY)) {
+            setActiveField(Field::ConfirmPassword);
         } else {
             setActiveField(Field::None);
         }
 
-        if (pointInRect(loginButtonRect, mouseX, mouseY)) {
-            loginPressed = true;
+        if (pointInRect(createButtonRect, mouseX, mouseY)) {
+            createPressed = true;
         } else if (pointInRect(backButtonRect, mouseX, mouseY)) {
-            registerPressed = true;
+            backPressed = true;
         }
     }
 
     if (event.type == SDL_TEXTINPUT) {
-        if (activeField == Field::Username && username.size() < kMaxUsernameLen) {
-            username.append(event.text.text);
+        statusMessage.clear();
+        if (activeField == Field::Email && email.size() < kMaxEmailLen) {
+            email.append(event.text.text);
         } else if (activeField == Field::Password && password.size() < kMaxPasswordLen) {
             password.append(event.text.text);
+        } else if (activeField == Field::ConfirmPassword && confirmPassword.size() < kMaxPasswordLen) {
+            confirmPassword.append(event.text.text);
         }
     }
 
     if (event.type == SDL_KEYDOWN) {
         if (event.key.keysym.sym == SDLK_TAB) {
-            if (activeField == Field::Username) {
+            if (activeField == Field::Email) {
                 setActiveField(Field::Password);
+            } else if (activeField == Field::Password) {
+                setActiveField(Field::ConfirmPassword);
             } else {
-                setActiveField(Field::Username);
+                setActiveField(Field::Email);
             }
         } else if (event.key.keysym.sym == SDLK_BACKSPACE) {
-            if (activeField == Field::Username && !username.empty()) {
-                username.pop_back();
+            statusMessage.clear();
+            if (activeField == Field::Email && !email.empty()) {
+                email.pop_back();
             } else if (activeField == Field::Password && !password.empty()) {
                 password.pop_back();
+            } else if (activeField == Field::ConfirmPassword && !confirmPassword.empty()) {
+                confirmPassword.pop_back();
             }
         } else if (event.key.keysym.sym == SDLK_RETURN || event.key.keysym.sym == SDLK_KP_ENTER) {
-            loginPressed = true;
+            createPressed = true;
         } else if (event.key.keysym.sym == SDLK_ESCAPE) {
-            registerPressed = true;
+            backPressed = true;
         }
     }
 }
 
-void Login::update(Game& game) {
-    if (loginPressed) {
-        std::cout << "Login requested for user: " << username << '\n';
-        loginPressed = false;
-        int userId = -1;
-        std::string error;
-        if (!authenticateUser(username, password, userId, error)) {
-            std::cerr << "Login failed: " << error << '\n';
-            game.setNextState(GameState::Register);
+void Register::update(Game& game) {
+    if (createPressed) {
+        createPressed = false;
+        statusMessage.clear();
+
+        if (email.empty()) {
+            statusMessage = "Email is required.";
             return;
         }
-        game.setPlayerId(userId);
-        if (!game.refreshPlayerDeckFromService()) {
-            std::cerr << "Failed to refresh deck data after login\n";
+        if (!isLikelyEmail(email)) {
+            statusMessage = "Enter a valid email address.";
+            return;
         }
-        game.setNextState(GameState::Title);
+        if (password.empty()) {
+            statusMessage = "Password is required.";
+            return;
+        }
+        if (confirmPassword.empty()) {
+            statusMessage = "Re-enter your password.";
+            return;
+        }
+        if (password.size() < 8) {
+            statusMessage = "Password must be at least 8 characters.";
+            return;
+        }
+        if (password != confirmPassword) {
+            statusMessage = "Passwords do not match.";
+            return;
+        }
+
+        std::string error;
+        if (!registerUser(email, password, error)) {
+            statusMessage = error;
+            std::cerr << "Registration failed: " << error << '\n';
+            return;
+        }
+
+        email.clear();
+        password.clear();
+        confirmPassword.clear();
+        statusMessage.clear();
+        game.setNextState(GameState::Login);
         return;
     }
 
-    if (registerPressed) {
-        registerPressed = false;
-        game.setNextState(GameState::Register);
+    if (backPressed) {
+        backPressed = false;
+        game.setNextState(GameState::Login);
     }
 }
 
-void Login::render(Game& game) {
+void Register::render(Game& game) {
     SDL_Renderer* renderer = game.getRenderer();
     updateLayout(renderer);
     ensureFonts();
 
-    SDL_SetRenderDrawColor(renderer, 18, 18, 20, 255);
+    SDL_SetRenderDrawColor(renderer, 16, 16, 18, 255);
     SDL_RenderClear(renderer);
 
-    SDL_SetRenderDrawColor(renderer, 40, 45, 60, 230);
+    SDL_Color panelFill{34, 34, 36, 240};
+    SDL_Color panelOutline{120, 120, 125, 220};
+    SDL_Color white{245, 245, 245, 255};
+    SDL_Color muted{175, 175, 180, 255};
+    SDL_Color fieldFill{24, 24, 26, 255};
+    SDL_Color fieldActive{40, 40, 44, 255};
+    SDL_Color fieldOutline{110, 110, 115, 255};
+    SDL_Color errorRed{220, 90, 90, 255};
+
+    SDL_SetRenderDrawColor(renderer, panelFill.r, panelFill.g, panelFill.b, panelFill.a);
     SDL_RenderFillRect(renderer, &panelRect);
-    SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
+    SDL_SetRenderDrawColor(renderer, panelOutline.r, panelOutline.g, panelOutline.b, panelOutline.a);
     SDL_RenderDrawRect(renderer, &panelRect);
 
-    SDL_Color white{245, 245, 245, 255};
-    SDL_Color muted{190, 190, 190, 255};
-    SDL_Color fieldFill{30, 30, 34, 255};
-    SDL_Color fieldActive{45, 45, 55, 255};
-
     if (fonts.large) {
-        RenderText::drawText(renderer, "Login", fonts.large, white, panelRect.x + 30, panelRect.y + 20);
+        RenderText::drawText(renderer, "Create Account", fonts.large, white, panelRect.x + 26, panelRect.y + 20);
     }
 
     if (fonts.small) {
-        RenderText::drawText(renderer, "Username", fonts.small, muted, usernameRect.x, usernameRect.y - 22);
+        RenderText::drawText(renderer, "Email", fonts.small, muted, emailRect.x, emailRect.y - 22);
         RenderText::drawText(renderer, "Password", fonts.small, muted, passwordRect.x, passwordRect.y - 22);
+        RenderText::drawText(renderer, "Confirm Password", fonts.small, muted, confirmRect.x, confirmRect.y - 22);
     }
 
-    SDL_Color userFill = activeField == Field::Username ? fieldActive : fieldFill;
+    SDL_Color emailFill = activeField == Field::Email ? fieldActive : fieldFill;
     SDL_Color passFill = activeField == Field::Password ? fieldActive : fieldFill;
+    SDL_Color confirmFill = activeField == Field::ConfirmPassword ? fieldActive : fieldFill;
 
-    SDL_SetRenderDrawColor(renderer, userFill.r, userFill.g, userFill.b, userFill.a);
-    SDL_RenderFillRect(renderer, &usernameRect);
-    SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
-    SDL_RenderDrawRect(renderer, &usernameRect);
+    SDL_SetRenderDrawColor(renderer, emailFill.r, emailFill.g, emailFill.b, emailFill.a);
+    SDL_RenderFillRect(renderer, &emailRect);
+    SDL_SetRenderDrawColor(renderer, fieldOutline.r, fieldOutline.g, fieldOutline.b, fieldOutline.a);
+    SDL_RenderDrawRect(renderer, &emailRect);
 
     SDL_SetRenderDrawColor(renderer, passFill.r, passFill.g, passFill.b, passFill.a);
     SDL_RenderFillRect(renderer, &passwordRect);
-    SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
+    SDL_SetRenderDrawColor(renderer, fieldOutline.r, fieldOutline.g, fieldOutline.b, fieldOutline.a);
     SDL_RenderDrawRect(renderer, &passwordRect);
+
+    SDL_SetRenderDrawColor(renderer, confirmFill.r, confirmFill.g, confirmFill.b, confirmFill.a);
+    SDL_RenderFillRect(renderer, &confirmRect);
+    SDL_SetRenderDrawColor(renderer, fieldOutline.r, fieldOutline.g, fieldOutline.b, fieldOutline.a);
+    SDL_RenderDrawRect(renderer, &confirmRect);
 
     if (fonts.small) {
         const int textPad = 10;
-        RenderText::drawText(renderer, username, fonts.small, white, usernameRect.x + textPad, usernameRect.y + 12);
-        std::string mask(password.size(), '*');
-        RenderText::drawText(renderer, mask, fonts.small, white, passwordRect.x + textPad, passwordRect.y + 12);
+        RenderText::drawText(renderer, email, fonts.small, white, emailRect.x + textPad, emailRect.y + 12);
+        std::string passMask(password.size(), '*');
+        RenderText::drawText(renderer, passMask, fonts.small, white, passwordRect.x + textPad, passwordRect.y + 12);
+        std::string confirmMask(confirmPassword.size(), '*');
+        RenderText::drawText(renderer, confirmMask, fonts.small, white, confirmRect.x + textPad, confirmRect.y + 12);
     }
 
-    SDL_Color baseButton{70, 120, 200, 255};
-    SDL_Color highlightButton{90, 150, 220, 255};
-    SDL_Color pressedButton{60, 100, 180, 255};
-    SDL_Color backBase{70, 70, 70, 255};
-    SDL_Color backHighlight{90, 90, 90, 255};
-    SDL_Color registerPressed{60, 60, 60, 255};
+    std::string warningMessage = statusMessage;
+    if (warningMessage.empty() && !confirmPassword.empty() && password != confirmPassword) {
+        warningMessage = "Passwords do not match.";
+    }
+
+    if (fonts.small && !warningMessage.empty()) {
+        const int messageY = confirmRect.y + confirmRect.h + 6;
+        RenderText::drawText(renderer, warningMessage, fonts.small, errorRed, confirmRect.x, messageY);
+    }
+
+    SDL_Color baseButton{90, 90, 95, 255};
+    SDL_Color highlightButton{115, 115, 120, 255};
+    SDL_Color pressedButton{70, 70, 75, 255};
+    SDL_Color backBase{52, 52, 56, 255};
+    SDL_Color backHighlight{74, 74, 80, 255};
+    SDL_Color backPressedColor{40, 40, 44, 255};
 
     RenderButton::drawButton(
         renderer,
-        loginButtonRect,
-        "Login",
-        loginHover,
+        createButtonRect,
+        "Create",
+        createHover,
         false,
         baseButton,
         highlightButton,
@@ -455,12 +468,12 @@ void Login::render(Game& game) {
     RenderButton::drawButton(
         renderer,
         backButtonRect,
-        "Register",
+        "Back",
         backHover,
         false,
         backBase,
         backHighlight,
-        registerPressed,
+        backPressedColor,
         white,
         fonts.small
     );

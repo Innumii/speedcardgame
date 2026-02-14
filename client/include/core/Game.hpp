@@ -15,6 +15,7 @@
 
 #include "states/Title.hpp"
 #include "states/Login.hpp"
+#include "states/Register.hpp"
 #include "states/Playing.hpp"
 #include "states/DeckBuilding.hpp"
 #include "states/Connecting.hpp"
@@ -103,6 +104,7 @@ private:
 
     Title titleState;
     Login loginState;
+    Register registerState;
     Playing playingState{drawIntervalSeconds};
     DeckBuilding deckBuildingState;
     std::optional<Connecting> connectingState;
