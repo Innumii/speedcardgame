@@ -1,24 +1,17 @@
-//Socket Handling
 #include "net/TcpServer.hpp"
-#include <stdexcept>
+#include "net/PlayerConnection.hpp" // wrapper for client socket
 #include <iostream>
 #include <thread>
-#include <chrono>
-
-//socket libraries
 #include <sys/types.h>
 #include <sys/socket.h>
-#include <netinet/in.h> //sockaddr_in
-#include <unistd.h> //close()
+#include <netinet/in.h>
+#include <unistd.h>
 #include <arpa/inet.h>
-
-//memset()
 #include <cstring>
 
-//initialise listeners BEFORE construction of object
-//socket should be in invalid state first (-1)
-TcpServer::TcpServer(int port):listenPort(port),listenSocket(-1),running(false) {
-
+TcpServer::TcpServer(int port)
+    : listenPort(port), listenSocket(-1), running(false)
+{
 }
 
 TcpServer::~TcpServer() {
@@ -28,16 +21,18 @@ TcpServer::~TcpServer() {
 bool TcpServer::start() {
     if (running) return false;
 
+    // 1️⃣ Create socket
     listenSocket = socket(AF_INET, SOCK_STREAM, 0);
     if (listenSocket < 0) {
         perror("socket");
         return false;
     }
-    //allow fast restarts
+
+    // Allow quick restarts
     int opt = 1;
     setsockopt(listenSocket, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
 
-    //bind socket to port
+    // 2️⃣ Bind to port
     sockaddr_in addr{};
     addr.sin_family = AF_INET;
     addr.sin_addr.s_addr = INADDR_ANY;
@@ -46,39 +41,47 @@ bool TcpServer::start() {
     if (bind(listenSocket, (sockaddr*)&addr, sizeof(addr)) < 0) {
         perror("bind");
         close(listenSocket);
+        listenSocket = -1;
         return false;
     }
-    
-    //listen for connections
+
+    // 3️⃣ Listen for connections
     if (listen(listenSocket, SOMAXCONN) < 0) {
         perror("listen");
         close(listenSocket);
+        listenSocket = -1;
         return false;
     }
 
     running = true;
+
+    // 4️⃣ Start accept thread
     acceptThread = std::thread(&TcpServer::acceptClients, this);
     std::cout << "Server listening on port " << listenPort << "\n";
+
     return true;
 }
 
 void TcpServer::stop() {
     if (!running) return;
+
     running = false;
 
-    //stop accept loop, close socket
+    // Close listening socket to unblock accept()
     if (listenSocket >= 0) {
         close(listenSocket);
         listenSocket = -1;
     }
-    //join accept thread
+
+    // Join accept thread
     if (acceptThread.joinable()) {
         acceptThread.join();
     }
-    //close all client sockets
+
+    // Close all client sockets
     std::lock_guard<std::mutex> lock(clientsMutex);
-    for (int client : clientSockets) {
-        close(client);
+    for (int sock : clientSockets) {
+        close(sock);
     }
     clientSockets.clear();
 }
@@ -88,33 +91,32 @@ void TcpServer::acceptClients() {
         sockaddr_in clientAddr{};
         socklen_t clientLen = sizeof(clientAddr);
 
-        int clientSocket = accept(
-            listenSocket, 
-            (sockaddr*)&clientAddr,
-            &clientLen
-        );
-        
-        if (clientSocket < 0) {
-            if(running) perror("accept");
+        int clientSock = accept(listenSocket, (sockaddr*)&clientAddr, &clientLen);
+
+        if (clientSock < 0) {
+            if (running) perror("accept");
             continue;
         }
 
+        // Wrap raw socket in PlayerConnection (future-proof)
+        auto player = std::make_shared<PlayerConnection>(clientSock);
+
         {
             std::lock_guard<std::mutex> lock(clientsMutex);
-            clientSockets.push_back(clientSocket);
+            clientSockets.push_back(clientSock);
         }
 
-        std::cout << "Client connected from "
-                  << inet_ntoa(clientAddr.sin_addr)
-                  << "\n";
+        std::cout << "Client connected from " << inet_ntoa(clientAddr.sin_addr) << "\n";
 
-        // TODO:
-        // - If >= 2 clients are waiting
-        // - Pop two sockets
-        // - Create MatchSession(clientA, clientB)
+        // Fire callback (non-blocking in accept thread)
+        if (onClientConnected) {
+            try {
+                onClientConnected(player);
+            } catch (const std::exception& ex) {
+                std::cerr << "Exception in onClientConnected callback: " << ex.what() << "\n";
+            } catch (...) {
+                std::cerr << "Unknown exception in onClientConnected callback\n";
+            }
+        }
     }
 }
-
-// void TcpServer::handleClient(int clientSocket) {
-
-// }

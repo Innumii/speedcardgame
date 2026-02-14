@@ -27,7 +27,7 @@ private:
     std::atomic<bool> success{false};
     std::thread connectionThread;
     //might need to change to can retry connection?
-    bool attemptedConnection = false;
+    bool started = false;
 };
 
 #endif
