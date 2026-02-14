@@ -1,41 +1,41 @@
-#include "core/Server.hpp"
+#include "core/GameServer.hpp"
 #include <iostream>
 #include <atomic>
 #include <csignal>
 #include <mutex>
 #include <condition_variable>
 
-std::atomic<bool> running(true);
-std::mutex mtx;
-std::condition_variable cv;
+//allocate null ptr to gameserver
+//use for signal handling
+static GameServer* serverPtr = nullptr;
 
+//cannot use server.stop() as local var is not in scope
 void handleSignal(int) {
-    running = false;
-    cv.notify_all(); // wake main thread
+    if (serverPtr) {
+        std::cout << "\nSignal received. Shutting down...\n";
+        serverPtr->stop();
+    }
 }
 
+//local vars in C++ CANNOT be accessed outside the block they are declared in
 int main() {
-    std::cout.setf(std::ios::unitbuf); // automatic flush after every output
+    //flush buffer
+    std::cout.setf(std::ios::unitbuf);
 
-    // Handle Ctrl+C and Docker stop
+    //allocate on stack
+    GameServer server(4000);
+    serverPtr = &server;
+
     std::signal(SIGINT, handleSignal);
     std::signal(SIGTERM, handleSignal);
 
-    TcpServer server(4000);
-
-    if (!server.start()) {
-        std::cerr << "Failed to start server\n";
+    if(!server.start()) {
+        std::cerr << "Failed to start GameServer\n";
         return 1;
     }
+    std::cout << "Server Running...\n";
+    server.waitForShutdown();
 
-    std::cout << "Server running...\n";
-
-    // Industry-standard: main thread blocks, zero CPU usage
-    std::unique_lock<std::mutex> lock(mtx);
-    cv.wait(lock, [](){ return !running.load(); });
-
-    std::cout << "Shutting down server...\n";
-    server.stop();
-
+    std::cout << "Server exited cleanly\n";
     return 0;
 }
