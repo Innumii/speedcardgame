@@ -21,6 +21,7 @@ public:
 	void render(Game& game);
 	void enter(Game& game);
 	void exit(Game& game);
+	bool refreshFromService(Game& game);
 	Deck buildDeck() const;
 	bool hasCardsInDeck() const;
 

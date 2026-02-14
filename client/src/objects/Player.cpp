@@ -24,3 +24,7 @@ void Player::addMana(int amount) {
     if (amount <= 0) return;
     mana += amount;
 }
+
+const Deck& Player::getDeck() const {
+    return deck;
+}

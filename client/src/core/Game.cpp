@@ -84,11 +84,6 @@ Game::~Game() {
     std::cout << "Goodbye!~\n";
 }
 
-void Game::getRemoteDeckHandSize(std::size_t remoteDeckSize, std::size_t remoteHandSize) {
-    this->remoteDeckSize = remoteDeckSize;
-    this->remoteHandSize = remoteHandSize;
-}
-
 void Game::commitStateChange() {
     if (nextState != state) {
         const GameState previousState = state;
@@ -144,6 +139,15 @@ void Game::setPlayingDeck(Deck newDeck) {
     playingSetup = false;
 }
 
+bool Game::refreshPlayerDeckFromService() {
+    if (!deckBuildingState.refreshFromService(*this)) {
+        return false;
+    }
+
+    setPlayingDeck(deckBuildingState.buildDeck());
+    return true;
+}
+
 bool Game::tryStartPlayingWithBuiltDeck() {
     if (!deckBuildingState.hasCardsInDeck()) {
         return false;
@@ -176,20 +180,24 @@ void Game::setPlayerId(int playerId) {
     }
 }
 
-std::size_t Game::getRemoteDeckSize() const {
-    return remoteDeckSize;
+const Deck& Game::getDeck(const Player& player) const {
+    return player.getDeck();
 }
 
-std::size_t Game::getRemoteHandSize() const {
-    return remoteHandSize;
+const Player& Game::getPlayer(bool isOpponent) const {
+    return isOpponent ? remotePlayer : player;
 }
 
-int Game::getRemoteHealth() const {
-    return remotePlayer.health;
+std::size_t Game::getHandSize(const Player& player) const {
+    return player.hand.size();
 }
 
-int Game::getRemoteMana() const {
-    return remotePlayer.mana;
+int Game::getHealth(const Player& player) const {
+    return player.health;
+}
+
+int Game::getMana(const Player& player) const {
+    return player.mana;
 }
 
 NetworkClient& Game::getNetworkClient() {

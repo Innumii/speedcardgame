@@ -58,21 +58,21 @@ public:
     void commitStateChange();
     void setPlayingDeck(Deck newDeck);
     bool tryStartPlayingWithBuiltDeck();
+    bool refreshPlayerDeckFromService();
 
     GameState getState() const;
     GameState getNextState() const;
     SDL_Renderer* getRenderer() const;
     int getPlayerId() const;
     void setPlayerId(int playerId);
-    std::size_t getRemoteDeckSize() const;
-    std::size_t getRemoteHandSize() const;
-    int getRemoteHealth() const;
-    int getRemoteMana() const;
+
+    const Player& getPlayer(bool isOpponent) const;
+    const Deck& getDeck(const Player& player) const;
+    std::size_t getHandSize(const Player& player) const;
+    int getHealth(const Player& player) const;
+    int getMana(const Player& player) const;
 
     bool running() const;
-
-    //Match logic
-    void getRemoteDeckHandSize(std::size_t remoteDeckSize, std::size_t remoteHandSize);
 
 
 private:
@@ -81,10 +81,6 @@ private:
 
     Player player;
     Player remotePlayer;
-    Deck deck;
-    std::size_t remoteDeckSize{20};      // TODO: use live data
-    std::size_t remoteHandSize{6};
-    Board board;
 
     int drawIntervalSeconds{3};
     Uint32 lastDrawTick{0};

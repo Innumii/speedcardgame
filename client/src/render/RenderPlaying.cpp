@@ -128,7 +128,7 @@ void RenderPlaying::render(Playing& playing, Game& game) {
 
 	textRenderer.drawText(
 		renderer,
-		"Opponent Health: " + std::to_string(game.getRemoteHealth()),
+		"Opponent Health: " + std::to_string(game.getHealth(game.getPlayer(true))),
 		playing.fonts.small,
 		SDL_Color{210, 210, 210, 255},
 		20,
@@ -148,7 +148,7 @@ void RenderPlaying::render(Playing& playing, Game& game) {
 		20
 	);
 
-	const std::string opponentManaText = "Opponent Mana: " + std::to_string(game.getRemoteMana());
+	const std::string opponentManaText = "Opponent Mana: " + std::to_string(game.getMana(game.getPlayer(true)));
 	int opponentManaW = 0, opponentManaH = 0;
 	if (playing.fonts.small) {
 		TTF_SizeText(playing.fonts.small, opponentManaText.c_str(), &opponentManaW, &opponentManaH);
@@ -165,7 +165,7 @@ void RenderPlaying::render(Playing& playing, Game& game) {
 	playing.cardRects = playing.computeCardLayout(playing.player.hand.size(), screenW, screenH);
 	playing.computeZones(screenW, screenH);
 
-	const std::size_t opponentHandSize = game.getRemoteHandSize();
+	const std::size_t opponentHandSize = game.getHandSize(game.getPlayer(true));
 	std::vector<SDL_Rect> opponentHandRects = playing.computeCardLayout(opponentHandSize, screenW, screenH);
 	if (!opponentHandRects.empty()) {
 		const int cardHeight = opponentHandRects.front().h;
@@ -212,7 +212,7 @@ void RenderPlaying::render(Playing& playing, Game& game) {
 		textRenderer,
 		playing.playSlots,
 		playing.discardZone,
-		game.getRemoteDeckSize(),
+		game.getDeck(game.getPlayer(true)).size(),
 		screenW,
 		playing.fonts.small
 	);

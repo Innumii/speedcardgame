@@ -307,15 +307,26 @@ namespace {
 
 DeckBuilding::DeckBuilding() = default;
 
-void DeckBuilding::enter(Game& game) {
+bool DeckBuilding::refreshFromService(Game& game) {
     cardsLoadedFromService = loadAvailableCardsFromService(game);
     if (!cardsLoadedFromService) {
         cardsLoadedFromService = loadAvailableCardsFromCsv(game);
     }
-    if (!availableCards.empty()) {
-        loadDeckFromService(game);
-        loadInventoryFromService(game);
+
+    if (availableCards.empty()) {
+        deckCopies.clear();
+        inventoryCopies.clear();
+        inventoryLoaded = false;
+        return false;
     }
+
+    const bool deckLoaded = loadDeckFromService(game);
+    loadInventoryFromService(game);
+    return deckLoaded;
+}
+
+void DeckBuilding::enter(Game& game) {
+    refreshFromService(game);
     collectionPage = 0;
 }
 
