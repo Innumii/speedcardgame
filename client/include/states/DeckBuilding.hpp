@@ -4,6 +4,7 @@
 #include <SDL2/SDL.h>
 #include <cstddef>
 #include <memory>
+#include <string>
 #include <vector>
 
 #include "objects/Deck.h"
@@ -24,6 +25,11 @@ public:
 	bool refreshFromService(Game& game);
 	Deck buildDeck() const;
 	bool hasCardsInDeck() const;
+	bool hasFullDeck() const;
+	int getDeckCardCount() const;
+	int getDeckSizeLimit() const;
+	const std::string& getStatusMessage() const;
+	bool isStatusMessageActive(Uint32 now) const;
 
 private:
 	struct Layout {
@@ -53,6 +59,7 @@ private:
 	bool saveDeckToService(Game& game) const;
 	int getInventoryCount(int cardIndex) const;
 	int getRemainingCount(int cardIndex) const;
+	void setStatusMessage(const std::string& message, Uint32 durationMs);
 
 	SDL_Rect TitleButton{20, 20, 140, 50};
 	SDL_Rect PlayButton{20, 80, 140, 50};
@@ -70,6 +77,8 @@ private:
 	std::size_t hoverIndex{static_cast<std::size_t>(-1)};
 	Uint32 hoverStartTick{0};
 	int collectionPage{0};
+	std::string statusMessage{};
+	Uint32 statusMessageUntil{0};
 
 	static constexpr int MaxDeckCopies = 4;
 };

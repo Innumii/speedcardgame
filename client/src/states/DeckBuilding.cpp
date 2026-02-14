@@ -53,6 +53,11 @@ namespace {
         }
     }
 
+    int getDeckSizeLimitFromEnv() {
+        const int configured = getEnvIntOrDefault("DECK_SIZE", 30);
+        return configured > 0 ? configured : 30;
+    }
+
     bool readJsonStringField(const std::string& json, const std::string& key, std::string& out) {
         const std::string needle = "\"" + key + "\"";
         std::size_t pos = json.find(needle);
@@ -328,10 +333,12 @@ bool DeckBuilding::refreshFromService(Game& game) {
 void DeckBuilding::enter(Game& game) {
     refreshFromService(game);
     collectionPage = 0;
+    statusMessage.clear();
+    statusMessageUntil = 0;
 }
 
 void DeckBuilding::exit(Game& game) {
-    if (hasCardsInDeck()) {
+    if (hasFullDeck()) {
         saveDeckToService(game);
     }
 }
@@ -350,14 +357,33 @@ void DeckBuilding::handleEvents(Game& game, const SDL_Event& event) {
                      (event.button.x >= TitleButton.x && event.button.x <= (TitleButton.x + TitleButton.w)) &&
                      (event.button.y >= TitleButton.y && event.button.y <= (TitleButton.y + TitleButton.h));
     if (inTitle) {
+        if (!hasFullDeck()) {
+            const int deckCount = getDeckCardCount();
+            const int deckLimit = getDeckSizeLimit();
+            setStatusMessage(
+                "Deck size too small (" + std::to_string(deckCount) + "/" + std::to_string(deckLimit) + ").",
+                2500
+            );
+            return;
+        }
         game.setNextState(GameState::Title);
+        return;
     };
 
     const bool inPlay = (event.type == SDL_MOUSEBUTTONDOWN) &&
                     (event.button.button == SDL_BUTTON_LEFT) &&
                     (event.button.x >= PlayButton.x && event.button.x <= (PlayButton.x + PlayButton.w)) &&
                     (event.button.y >= PlayButton.y && event.button.y <= (PlayButton.y + PlayButton.h));
-    if (inPlay && hasCardsInDeck()) {
+    if (inPlay) {
+        if (!hasFullDeck()) {
+            const int deckCount = getDeckCardCount();
+            const int deckLimit = getDeckSizeLimit();
+            setStatusMessage(
+                "Deck size too small (" + std::to_string(deckCount) + "/" + std::to_string(deckLimit) + ").",
+                2500
+            );
+            return;
+        }
         game.setPlayingDeck(buildDeck());
         game.setNextState(GameState::Playing);
         return;
@@ -606,6 +632,7 @@ std::vector<int> DeckBuilding::getDeckEntryOrder() const {
 void DeckBuilding::tryAddToDeck(int cardIndex) {
     if (cardIndex < 0 || cardIndex >= static_cast<int>(deckCopies.size())) return;
     if (deckCopies[cardIndex] >= MaxDeckCopies) return;
+    if (getDeckCardCount() >= getDeckSizeLimit()) return;
     if (getRemainingCount(cardIndex) <= 0) return;
     deckCopies[cardIndex] += 1;
 }
@@ -658,10 +685,36 @@ Deck DeckBuilding::buildDeck() const {
 }
 
 bool DeckBuilding::hasCardsInDeck() const {
+    return getDeckCardCount() > 0;
+}
+
+bool DeckBuilding::hasFullDeck() const {
+    return getDeckCardCount() >= getDeckSizeLimit();
+}
+
+int DeckBuilding::getDeckCardCount() const {
+    int total = 0;
     for (int copies : deckCopies) {
-        if (copies > 0) return true;
+        total += copies;
     }
-    return false;
+    return total;
+}
+
+int DeckBuilding::getDeckSizeLimit() const {
+    return getDeckSizeLimitFromEnv();
+}
+
+const std::string& DeckBuilding::getStatusMessage() const {
+    return statusMessage;
+}
+
+bool DeckBuilding::isStatusMessageActive(Uint32 now) const {
+    return !statusMessage.empty() && now <= statusMessageUntil;
+}
+
+void DeckBuilding::setStatusMessage(const std::string& message, Uint32 durationMs) {
+    statusMessage = message;
+    statusMessageUntil = SDL_GetTicks() + durationMs;
 }
 
 bool DeckBuilding::loadAvailableCardsFromService(Game& game) {
@@ -793,6 +846,10 @@ bool DeckBuilding::loadAvailableCardsFromCsv(Game& game) {
 }
 
 bool DeckBuilding::saveDeckToService(Game& game) const {
+    if (!hasFullDeck()) {
+        return false;
+    }
+
     const std::string host = getEnvOrDefault("CARDS_SERVICE_HOST", "127.0.0.1");
     const int port = getEnvIntOrDefault("CARDS_SERVICE_PORT", 8082);
     const std::string path = "/cardbase/decks";

@@ -23,6 +23,7 @@ void RenderDeckBuilding::render(DeckBuilding& deckBuilding, Game& game) {
     int mouseY = 0;
     SDL_GetMouseState(&mouseX, &mouseY);
     const SDL_Point mousePoint{mouseX, mouseY};
+    const Uint32 now = SDL_GetTicks();
 
     RenderText::FontSet fonts = RenderText::loadFonts("assets/font.TTF", 14, 12, 18);
     TTF_Font* fontSmall = fonts.small;
@@ -36,7 +37,7 @@ void RenderDeckBuilding::render(DeckBuilding& deckBuilding, Game& game) {
     const SDL_Color buttonText{255, 255, 255, 255};
 
     // Title Button
-    const bool canPlay = deckBuilding.hasCardsInDeck();
+    const bool canPlay = deckBuilding.hasFullDeck();
     RenderButton::drawButton(
         renderer,
         deckBuilding.PlayButton,
@@ -62,6 +63,22 @@ void RenderDeckBuilding::render(DeckBuilding& deckBuilding, Game& game) {
         buttonText,
         buttonFont
     );
+
+    if (fontSmall && deckBuilding.isStatusMessageActive(now)) {
+        int msgX = layout.collectionArea.x;
+        int msgY = layout.collectionArea.y - 22;
+        if (msgY < 10) {
+            msgY = layout.collectionArea.y + 6;
+        }
+        textRenderer.drawText(
+            renderer,
+            deckBuilding.getStatusMessage(),
+            fontSmall,
+            SDL_Color{220, 80, 80, 255},
+            msgX,
+            msgY
+        );
+    }
 
     SDL_SetRenderDrawColor(renderer, 40, 40, 50, 255);
     SDL_RenderFillRect(renderer, &layout.collectionArea);
@@ -147,9 +164,12 @@ void RenderDeckBuilding::render(DeckBuilding& deckBuilding, Game& game) {
     SDL_RenderDrawRect(renderer, &layout.deckArea);
 
     if (fontSmall) {
+        const int deckCount = deckBuilding.getDeckCardCount();
+        const int deckLimit = deckBuilding.getDeckSizeLimit();
+        const std::string deckCountText = "Deck " + std::to_string(deckCount) + "/" + std::to_string(deckLimit);
         textRenderer.drawText(
             renderer,
-            "Deck",
+            deckCountText,
             fontSmall,
             SDL_Color{255, 255, 255, 255},
             layout.deckArea.x + 10,
@@ -195,8 +215,6 @@ void RenderDeckBuilding::render(DeckBuilding& deckBuilding, Game& game) {
         RenderCard::drawCardFace(renderer, textRenderer, card, dragRect, fontSmall, fontTiny, false);
         SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
     }
-
-    const Uint32 now = SDL_GetTicks();
 
     std::size_t newHoverIndex = static_cast<std::size_t>(-1);
     if (!deckBuilding.dragging) {

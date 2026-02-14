@@ -157,7 +157,7 @@ bool Game::refreshPlayerDeckFromService() {
 }
 
 bool Game::tryStartPlayingWithBuiltDeck() {
-    if (!deckBuildingState.hasCardsInDeck()) {
+    if (!deckBuildingState.hasFullDeck()) {
         return false;
     }
 
