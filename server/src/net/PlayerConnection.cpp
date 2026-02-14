@@ -42,6 +42,25 @@ int PlayerConnection::getSocket() const {
     return clientSocket;
 }
 
+//actions
+bool PlayerConnection::send(const std::string& msg) {
+    if (!running) return false;
+    ssize_t n = ::send(clientSocket, msg.c_str(), msg.size(), 0);
+    return n == static_cast<ssize_t>(msg.size());
+}
+
+bool PlayerConnection::pollMessage(std::string& outMsg) {
+    std::lock_guard<std::mutex> lock(queueMutex);
+    if (messageQueue.empty()) return false;
+    outMsg = messageQueue.front();
+    messageQueue.pop();
+    return true;
+}
+
+bool PlayerConnection::isAlive() const {
+    return running.load();
+}
+
 void PlayerConnection::readLoop() {
     constexpr size_t bufferSize = 1024;
     char buffer[bufferSize];

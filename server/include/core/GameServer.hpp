@@ -1,6 +1,7 @@
 #ifndef GAMESERVER_HPP
 #define GAMESERVER_HPP
 #include "net/TcpServer.hpp"
+#include "core/Matchmaker.hpp"
 #include <atomic>
 #include <memory>
 #include <mutex>

@@ -19,6 +19,9 @@ bool GameServer::start() {
         // -------------------------------
         tcpServer = std::make_unique<TcpServer>(port);
 
+        // Initialize Matchmaker (passive)
+        matchmaker = std::make_unique<Matchmaker>();
+
         // Register callback for new clients
         tcpServer->onClientConnected = [this](std::shared_ptr<PlayerConnection> player) {
             if (matchmaker) {
@@ -29,32 +32,18 @@ bool GameServer::start() {
         if (!tcpServer->start()) {
             std::cerr << "Failed to start TcpServer\n";
             tcpServer.reset(); // cleanup
-            return false;
-        }
-
-        std::cout << "TcpServer started on port " << port << "\n";
-
-        // -------------------------------
-        // 2️⃣ Start Matchmaker
-        // -------------------------------
-        matchmaker = std::make_unique<Matchmaker>();
-        if (!matchmaker->start()) {
-            std::cerr << "Failed to start Matchmaker\n";
-            tcpServer->stop(); // rollback TcpServer
-            tcpServer.reset();
             matchmaker.reset();
             return false;
         }
 
-        std::cout << "Matchmaker started\n";
+        std::cout << "TcpServer started on port " << port << "\n";
+        std::cout << "Matchmaker initialized\n";
 
         running = true;
         return true;
 
     } catch (const std::exception& ex) {
-        // Catch unexpected exceptions and rollback everything
         std::cerr << "Exception during GameServer startup: " << ex.what() << "\n";
-        if (matchmaker) matchmaker->stop();
         if (tcpServer) tcpServer->stop();
         tcpServer.reset();
         matchmaker.reset();
@@ -62,7 +51,6 @@ bool GameServer::start() {
         return false;
     } catch (...) {
         std::cerr << "Unknown exception during GameServer startup\n";
-        if (matchmaker) matchmaker->stop();
         if (tcpServer) tcpServer->stop();
         tcpServer.reset();
         matchmaker.reset();
@@ -77,18 +65,16 @@ void GameServer::stop() {
     running = false;
     std::cout << "Stopping GameServer...\n";
 
-    // Stop subsystems in reverse order
-    if (matchmaker) {
-        matchmaker->stop();
-        matchmaker.reset();
-    }
-
+    // Stop TcpServer first
     if (tcpServer) {
         tcpServer->stop();
         tcpServer.reset();
     }
 
-    // Wake main thread
+    // Matchmaker is passive; just destroy
+    matchmaker.reset();
+
+    // Wake main thread if blocked
     shutdownCv.notify_all();
 }
 

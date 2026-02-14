@@ -4,7 +4,7 @@
 #include <memory>
 #include <mutex>
 #include <queue>
-#include "core/MatchSession.hpp"
+#include "game/MatchSession.hpp"
 #include "net/PlayerConnection.hpp"
 
 class Matchmaker {

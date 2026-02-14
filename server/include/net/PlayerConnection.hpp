@@ -7,6 +7,7 @@
 #include <atomic>
 #include <vector>
 #include <functional>
+#include <queue>
 
 //1 object means 1 player connection from client -> server
 //need callback runs for this
@@ -24,6 +25,11 @@ public:
     void stop();
     int getSocket() const;
 
+    //actions
+    bool send(const std::string& msg);        // send message to client
+    bool pollMessage(std::string& outMsg);    // check if messages received
+    bool isAlive() const;   
+
     // Event: called when a message is received
     std::function<void(const std::vector<char>&)> onMessageReceived;
 
@@ -35,8 +41,12 @@ private:
 
     //thread to run readLoop() on
     std::thread readThread;
-    std::mutex writeMutex;
     std::atomic<bool> running;
+
+    //queue and mutex
+    std::queue<std::string> messageQueue;
+    std::mutex queueMutex;
+
 };
 
 #endif
