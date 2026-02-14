@@ -1,0 +1,43 @@
+#!/bin/bash
+set -euo pipefail
+
+yum update -y
+amazon-linux-extras install docker -y || yum install -y docker
+systemctl enable --now docker
+usermod -aG docker ec2-user
+
+if ! rpm -q docker-compose-plugin >/dev/null 2>&1; then
+  yum install -y docker-compose-plugin
+fi
+
+aws ecr get-login-password --region ${region} | docker login --username AWS --password-stdin ${account_id}.dkr.ecr.${region}.amazonaws.com
+
+mkdir -p /opt/speedcardgame-cards
+cat >/opt/speedcardgame-cards/docker-compose.yml <<'EOF'
+services:
+  cards:
+    image: ${cards_image}
+    depends_on:
+      - cards-db
+    environment:
+      PORT: ${cards_port}
+      DATABASE_URL: ${cards_database_url}
+    ports:
+      - "${cards_app_port}:${cards_port}"
+
+  cards-db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: ${cards_postgres_user}
+      POSTGRES_PASSWORD: ${cards_postgres_pass}
+      POSTGRES_DB: ${cards_postgres_db}
+    volumes:
+      - cards-postgres:/var/lib/postgresql/data
+
+volumes:
+  cards-postgres:
+EOF
+
+cd /opt/speedcardgame-cards
+
+docker compose up -d
