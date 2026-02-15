@@ -26,7 +26,7 @@ cid,name,type,cost,value,power,toughness,effect
 25,"Tian Wufeng, The Dancing Mistwalker",Creature,3,2,1,1,"Bypass (This creature attacks directly)"
 26,"Wen Ke, The Silent Mistwalker",Creature,3,1,2,1,"Stealth"
 27,"Slashing Through The Mist",Spell,3,2,0,0,"Destroy x damage to any target, where x is the number of Mistwalker creatures on your field."
-28,"Rui Jie, Mistwalker of The Twinmist Blades",Creature,4,2,2,2,"Double Strike. When summoned, deal 2 damage to the creature in front of it."
+28,"Rui Jie, Twinblade Mistwalker",Creature,4,2,2,2,"Double Strike. When summoned, deal 2 damage to the creature in front of it."
 29,"Rolling Fog Formation",Spell,4,2,0,0,"Draw 1 card. If it's a Mistwalker creature you may summon it without cost."
 30,"Aeden's Grail",Spell,4,2,0,0,"Select 1 creature you own. When it is destroyed, add its toughness to your HP."
 31,"Blackout Recall",Spell,1,1,0,0,"Select 1 creature you own, return it to your hand."
