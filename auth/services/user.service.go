@@ -86,7 +86,13 @@ func (service *AuthService) createStarterInventory(userID uint) error {
 	}
 	port := os.Getenv("CARDS_SERVICE_PORT")
 	if port == "" {
-		port = "8082"
+		port = os.Getenv("CARDS_PORT")
+	}
+	if port == "" {
+		port = os.Getenv("CARDS_APP_PORT")
+	}
+	if port == "" {
+		port = "8080"
 	}
 
 	payload, err := json.Marshal(inventoryCreateRequest{Uid: userID})
