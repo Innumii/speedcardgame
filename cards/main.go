@@ -34,7 +34,7 @@ func main() {
 	}
 
 	// Migrate models
-	if err := config.DB.AutoMigrate(&models.Deck{}, &models.Card{}); err != nil {
+	if err := config.DB.AutoMigrate(&models.Deck{}, &models.Card{}, &models.Inventory{}); err != nil {
 		log.Fatalf("Error auto-migrating tables: %v", err)
 	}
 
@@ -79,10 +79,10 @@ func main() {
 	r.Put("/cards", services.UpdateCard)
 	r.Delete("/cards", services.DeleteCard)
 
-	r.Post("/inventories", services.CreateInventory)     // Create inventory
-	r.Get("/inventories", services.ListInventories)      // List all inventories
-	r.Get("/inventories", services.GetInventoryByUserID) // Get inventory by user ID
-	r.Put("/inventories", services.UpdateInventory)      // Update inventory by user ID
+	r.Post("/inventories", services.CreateInventory)           // Create inventory
+	r.Get("/inventories", services.ListInventories)            // List all inventories
+	r.Get("/inventories/{uid}", services.GetInventoryByUserID) // Get inventory by user ID
+	r.Put("/inventories", services.UpdateInventory)            // Update inventory by user ID
 
 	router.Mount("/cardbase", r) //api prefix
 

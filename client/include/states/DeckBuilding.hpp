@@ -62,7 +62,8 @@ private:
 	void setStatusMessage(const std::string& message, Uint32 durationMs);
 
 	SDL_Rect TitleButton{20, 20, 140, 50};
-	SDL_Rect PlayButton{20, 80, 140, 50};
+	SDL_Rect SaveButton{20, 80, 140, 50};
+	SDL_Rect PlayButton{20, 140, 140, 50};
 	std::vector<std::unique_ptr<Card>> availableCards;
 	std::vector<int> deckCopies;
 	std::vector<int> inventoryCopies;

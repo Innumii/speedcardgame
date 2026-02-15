@@ -15,7 +15,7 @@ var inputInventory struct {
 	Cards models.CardCounts `json:"cards"` // Map of card ID to quantity
 }
 
-// CreateInventory creates a new inventory for a user
+// CreateInventory creates a new inventory for new user
 func CreateInventory(w http.ResponseWriter, r *http.Request) {
 
 	// Decode the JSON body into the inputInventory struct
@@ -33,11 +33,14 @@ func CreateInventory(w http.ResponseWriter, r *http.Request) {
 		IntroCards := make(models.CardCounts)
 
 		// Example: Give 2 of each intro card with IDs 1 to 5
-		IntroCards[1] = 2
-		IntroCards[2] = 2
-		IntroCards[3] = 2
-		IntroCards[4] = 2
-		IntroCards[5] = 2
+		IntroCards[1] = 4
+		IntroCards[2] = 4
+		IntroCards[3] = 4
+		IntroCards[4] = 4
+		IntroCards[5] = 4
+		IntroCards[6] = 4
+		IntroCards[7] = 4
+		IntroCards[8] = 4
 
 		inventory.Cards = IntroCards
 	}
@@ -69,6 +72,10 @@ func ListInventories(w http.ResponseWriter, _ *http.Request) {
 // GetInventory retrieves a specific inventory by user ID
 func GetInventoryByUserID(w http.ResponseWriter, r *http.Request) {
 	uidParam := chi.URLParam(r, "uid")
+	if uidParam == "" {
+		http.Error(w, "Missing uid", http.StatusBadRequest)
+		return
+	}
 	var inventory models.Inventory
 	if err := config.DB.Where("uid = ?", uidParam).First(&inventory).Error; err != nil {
 		http.Error(w, fmt.Sprintf("Failed to retrieve inventory: %v", err), http.StatusInternalServerError)

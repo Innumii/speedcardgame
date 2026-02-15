@@ -1,10 +1,15 @@
 package services
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log"
+	"net/http"
+	"os"
 	"strconv"
 	"time"
 
@@ -17,6 +22,10 @@ import (
 type AuthService struct {
 	UserRepository repositories.UserRepository
 	SessionService *SessionService
+}
+
+type inventoryCreateRequest struct {
+	Uid uint `json:"uid"`
 }
 
 func NewAuthService(userRepository repositories.UserRepository, sessionService *SessionService) *AuthService {
@@ -49,7 +58,52 @@ func (service *AuthService) Register(registerDTO dtos.RegisterDTO) (*models.User
 		return nil, err
 	}
 
+	if err := service.createStarterInventory(user.ID); err != nil {
+		deleteErr := service.UserRepository.Delete(user.ID)
+		if deleteErr != nil {
+			return nil, fmt.Errorf("inventory creation failed: %v; rollback failed: %w", err, deleteErr)
+		}
+		return nil, fmt.Errorf("inventory creation failed: %w", err)
+	}
+
 	return &user, nil
+}
+
+func (service *AuthService) createStarterInventory(userID uint) error {
+	host := os.Getenv("CARDS_SERVICE_HOST")
+	if host == "" {
+		host = "127.0.0.1"
+	}
+	port := os.Getenv("CARDS_SERVICE_PORT")
+	if port == "" {
+		port = "8082"
+	}
+
+	payload, err := json.Marshal(inventoryCreateRequest{Uid: userID})
+	if err != nil {
+		return err
+	}
+
+	url := fmt.Sprintf("http://%s:%s/cardbase/inventories", host, port)
+	req, err := http.NewRequest(http.MethodPost, url, bytes.NewReader(payload))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{Timeout: 5 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("cards service returned %d: %s", resp.StatusCode, string(body))
+	}
+
+	return nil
 }
 
 // Authenticate user with username and password

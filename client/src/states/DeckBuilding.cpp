@@ -338,9 +338,7 @@ void DeckBuilding::enter(Game& game) {
 }
 
 void DeckBuilding::exit(Game& game) {
-    if (hasFullDeck()) {
-        saveDeckToService(game);
-    }
+    (void)game;
 }
 
 void DeckBuilding::handleEvents(Game& game, const SDL_Event& event) {
@@ -357,6 +355,15 @@ void DeckBuilding::handleEvents(Game& game, const SDL_Event& event) {
                      (event.button.x >= TitleButton.x && event.button.x <= (TitleButton.x + TitleButton.w)) &&
                      (event.button.y >= TitleButton.y && event.button.y <= (TitleButton.y + TitleButton.h));
     if (inTitle) {
+        game.setNextState(GameState::Title);
+        return;
+    };
+
+    const bool inSave = (event.type == SDL_MOUSEBUTTONDOWN) &&
+                    (event.button.button == SDL_BUTTON_LEFT) &&
+                    (event.button.x >= SaveButton.x && event.button.x <= (SaveButton.x + SaveButton.w)) &&
+                    (event.button.y >= SaveButton.y && event.button.y <= (SaveButton.y + SaveButton.h));
+    if (inSave) {
         if (!hasFullDeck()) {
             const int deckCount = getDeckCardCount();
             const int deckLimit = getDeckSizeLimit();
@@ -366,9 +373,13 @@ void DeckBuilding::handleEvents(Game& game, const SDL_Event& event) {
             );
             return;
         }
-        game.setNextState(GameState::Title);
+        if (saveDeckToService(game)) {
+            setStatusMessage("Deck saved.", 2000);
+        } else {
+            setStatusMessage("Failed to save deck.", 2000);
+        }
         return;
-    };
+    }
 
     const bool inPlay = (event.type == SDL_MOUSEBUTTONDOWN) &&
                     (event.button.button == SDL_BUTTON_LEFT) &&
@@ -595,7 +606,7 @@ void DeckBuilding::updateMenuButtons(const Layout& layout) {
     const int contentW = contentRight - contentX;
 
     const int buttonGap = 12;
-    const int totalButtonsW = TitleButton.w + PlayButton.w + buttonGap;
+    const int totalButtonsW = TitleButton.w + SaveButton.w + PlayButton.w + (buttonGap * 2);
     int startX = contentX + (contentW - totalButtonsW) / 2;
     if (startX < 20) startX = 20;
 
@@ -604,7 +615,9 @@ void DeckBuilding::updateMenuButtons(const Layout& layout) {
 
     TitleButton.x = startX;
     TitleButton.y = buttonY;
-    PlayButton.x = startX + TitleButton.w + buttonGap;
+    SaveButton.x = startX + TitleButton.w + buttonGap;
+    SaveButton.y = buttonY;
+    PlayButton.x = SaveButton.x + SaveButton.w + buttonGap;
     PlayButton.y = buttonY;
 }
 

@@ -14,6 +14,8 @@ services:
       POSTGRES_TIMEZONE: ${AUTH_POSTGRES_TIMEZONE}
       REDIS_HOST: auth-redis
       REDIS_PORT: ${AUTH_REDIS_PORT}
+      CARDS_SERVICE_HOST: cards
+      CARDS_SERVICE_PORT: ${CARDS_PORT}
     depends_on:
       auth-db:
         condition: service_healthy

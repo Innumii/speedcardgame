@@ -36,14 +36,28 @@ void RenderDeckBuilding::render(DeckBuilding& deckBuilding, Game& game) {
     const SDL_Color buttonPressed{60, 90, 180, 255};
     const SDL_Color buttonText{255, 255, 255, 255};
 
-    // Title Button
+    // Menu buttons
     const bool canPlay = deckBuilding.hasFullDeck();
+    const bool canSave = deckBuilding.hasFullDeck();
     RenderButton::drawButton(
         renderer,
         deckBuilding.PlayButton,
         "Play",
         false,
         !canPlay,
+        buttonBase,
+        buttonHighlight,
+        buttonPressed,
+        buttonText,
+        buttonFont
+    );
+
+    RenderButton::drawButton(
+        renderer,
+        deckBuilding.SaveButton,
+        "Save Deck",
+        false,
+        !canSave,
         buttonBase,
         buttonHighlight,
         buttonPressed,

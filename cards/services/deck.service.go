@@ -4,10 +4,34 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
+	"strconv"
 
 	"github.com/Ryanljk/speedcardgame/cards/config"
 	"github.com/Ryanljk/speedcardgame/cards/models"
 )
+
+const defaultDeckSizeLimit = 30
+
+func getDeckSizeLimit() int {
+	value := os.Getenv("DECK_SIZE")
+	if value == "" {
+		return defaultDeckSizeLimit
+	}
+	parsed, err := strconv.Atoi(value)
+	if err != nil || parsed <= 0 {
+		return defaultDeckSizeLimit
+	}
+	return parsed
+}
+
+func countDeckCards(cards models.CardCounts) int {
+	total := 0
+	for _, count := range cards {
+		total += count
+	}
+	return total
+}
 
 // CreateDeck creates a new deck for a user
 func CreateDeck(w http.ResponseWriter, r *http.Request) {
@@ -24,6 +48,12 @@ func CreateDeck(w http.ResponseWriter, r *http.Request) {
 
 	if inputDeck.Uid <= 0 {
 		http.Error(w, "uid must be a positive integer", http.StatusBadRequest)
+		return
+	}
+
+	deckSizeLimit := getDeckSizeLimit()
+	if countDeckCards(inputDeck.Cards) != deckSizeLimit {
+		http.Error(w, fmt.Sprintf("deck must contain exactly %d cards", deckSizeLimit), http.StatusBadRequest)
 		return
 	}
 
