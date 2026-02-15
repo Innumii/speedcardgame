@@ -34,6 +34,14 @@ func NewAuthService(userRepository repositories.UserRepository, sessionService *
 
 // Register a new user
 func (service *AuthService) Register(registerDTO dtos.RegisterDTO) (*models.User, error) {
+	return service.registerUser(registerDTO, true)
+}
+
+func (service *AuthService) RegisterDevUser(registerDTO dtos.RegisterDTO) (*models.User, error) {
+	return service.registerUser(registerDTO, true)
+}
+
+func (service *AuthService) registerUser(registerDTO dtos.RegisterDTO, createInventory bool) (*models.User, error) {
 	// Check if user already exists
 	_, err := service.UserRepository.FindByEmail(registerDTO.Email)
 	if err == nil { // If nill, user exists
@@ -58,12 +66,14 @@ func (service *AuthService) Register(registerDTO dtos.RegisterDTO) (*models.User
 		return nil, err
 	}
 
-	if err := service.createStarterInventory(user.ID); err != nil {
-		deleteErr := service.UserRepository.Delete(user.ID)
-		if deleteErr != nil {
-			return nil, fmt.Errorf("inventory creation failed: %v; rollback failed: %w", err, deleteErr)
+	if createInventory {
+		if err := service.createStarterInventory(user.ID); err != nil {
+			deleteErr := service.UserRepository.Delete(user.ID)
+			if deleteErr != nil {
+				return nil, fmt.Errorf("inventory creation failed: %v; rollback failed: %w", err, deleteErr)
+			}
+			return nil, fmt.Errorf("inventory creation failed: %w", err)
 		}
-		return nil, fmt.Errorf("inventory creation failed: %w", err)
 	}
 
 	return &user, nil
@@ -101,6 +111,24 @@ func (service *AuthService) createStarterInventory(userID uint) error {
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
 		body, _ := io.ReadAll(resp.Body)
 		return fmt.Errorf("cards service returned %d: %s", resp.StatusCode, string(body))
+	}
+
+	deckUrl := fmt.Sprintf("http://%s:%s/cardbase/decks/fill", host, port)
+	deckReq, err := http.NewRequest(http.MethodPost, deckUrl, bytes.NewReader(payload))
+	if err != nil {
+		return err
+	}
+	deckReq.Header.Set("Content-Type", "application/json")
+
+	deckResp, err := client.Do(deckReq)
+	if err != nil {
+		return err
+	}
+	defer deckResp.Body.Close()
+
+	if deckResp.StatusCode != http.StatusOK && deckResp.StatusCode != http.StatusCreated {
+		body, _ := io.ReadAll(deckResp.Body)
+		return fmt.Errorf("deck fill returned %d: %s", deckResp.StatusCode, string(body))
 	}
 
 	return nil

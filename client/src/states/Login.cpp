@@ -2,6 +2,7 @@
 
 #include "core/Game.hpp"
 #include "core/NetworkClient.hpp"
+#include "utils/JsonUtil.hpp"
 #include "render/RenderButton.hpp"
 #include "render/RenderText.hpp"
 #include <SDL2/SDL.h>
@@ -47,78 +48,6 @@ namespace {
         return out;
     }
 
-    bool readJsonStringField(const std::string& json, const std::string& key, std::string& out) {
-        const std::string needle = "\"" + key + "\"";
-        std::size_t pos = json.find(needle);
-        if (pos == std::string::npos) return false;
-        pos = json.find(':', pos + needle.size());
-        if (pos == std::string::npos) return false;
-        pos = json.find('"', pos);
-        if (pos == std::string::npos) return false;
-        std::size_t end = pos + 1;
-        while (end < json.size()) {
-            if (json[end] == '"' && json[end - 1] != '\\') break;
-            ++end;
-        }
-        if (end >= json.size()) return false;
-        out = json.substr(pos + 1, end - pos - 1);
-        return true;
-    }
-
-    bool readJsonIntField(const std::string& json, const std::string& key, int& out) {
-        const std::string needle = "\"" + key + "\"";
-        std::size_t pos = json.find(needle);
-        if (pos == std::string::npos) return false;
-        pos = json.find(':', pos + needle.size());
-        if (pos == std::string::npos) return false;
-        ++pos;
-        while (pos < json.size() && std::isspace(static_cast<unsigned char>(json[pos]))) {
-            ++pos;
-        }
-        std::size_t end = pos;
-        if (end < json.size() && json[end] == '-') {
-            ++end;
-        }
-        while (end < json.size() && std::isdigit(static_cast<unsigned char>(json[end]))) {
-            ++end;
-        }
-        if (end == pos) return false;
-        try {
-            out = std::stoi(json.substr(pos, end - pos));
-        } catch (...) {
-            return false;
-        }
-        return true;
-    }
-
-    bool findMatchingBrace(const std::string& text, std::size_t openPos, std::size_t& closePos) {
-        if (openPos >= text.size() || text[openPos] != '{') return false;
-        int depth = 0;
-        for (std::size_t i = openPos; i < text.size(); ++i) {
-            if (text[i] == '{') {
-                ++depth;
-            } else if (text[i] == '}') {
-                --depth;
-                if (depth == 0) {
-                    closePos = i;
-                    return true;
-                }
-            }
-        }
-        return false;
-    }
-
-    bool extractJsonObject(const std::string& json, const std::string& key, std::string& out) {
-        const std::string needle = "\"" + key + "\"";
-        std::size_t pos = json.find(needle);
-        if (pos == std::string::npos) return false;
-        pos = json.find('{', pos + needle.size());
-        if (pos == std::string::npos) return false;
-        std::size_t closePos = std::string::npos;
-        if (!findMatchingBrace(json, pos, closePos)) return false;
-        out = json.substr(pos, closePos - pos + 1);
-        return true;
-    }
 
     bool sendHttpRequest(const std::string& host, int port, const std::string& method, const std::string& path,
                          const std::string& body, int& statusCode, std::string& responseBody) {
@@ -168,12 +97,12 @@ namespace {
 
     bool parseUserIdFromLoginResponse(const std::string& responseBody, int& outUserId, std::string& error) {
         std::string userJson;
-        if (!extractJsonObject(responseBody, "user", userJson)) {
+        if (!JsonUtil::extractJsonObject(responseBody, "user", userJson)) {
             error = "missing user object";
             return false;
         }
-        if (readJsonIntField(userJson, "id", outUserId)) return true;
-        if (readJsonIntField(userJson, "ID", outUserId)) return true;
+        if (JsonUtil::readJsonIntField(userJson, "id", outUserId)) return true;
+        if (JsonUtil::readJsonIntField(userJson, "ID", outUserId)) return true;
         error = "missing user id";
         return false;
     }
@@ -201,7 +130,7 @@ namespace {
 
         if (statusCode != 200) {
             std::string responseError;
-            if (readJsonStringField(responseBody, "error", responseError)) {
+            if (JsonUtil::readJsonStringField(responseBody, "error", responseError)) {
                 error = responseError;
             } else {
                 error = "login failed";

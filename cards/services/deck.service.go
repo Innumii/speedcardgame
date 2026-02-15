@@ -6,9 +6,11 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"sort"
 
 	"github.com/Ryanljk/speedcardgame/cards/config"
 	"github.com/Ryanljk/speedcardgame/cards/models"
+	"gorm.io/gorm"
 )
 
 const defaultDeckSizeLimit = 30
@@ -118,4 +120,123 @@ func DeleteDeck(w http.ResponseWriter, r *http.Request) {
 	// Return a success message
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{"message": "Deck deleted successfully"})
+}
+
+func FillDeckForUser(w http.ResponseWriter, r *http.Request) {
+	var input struct {
+		Uid int `json:"uid"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+		http.Error(w, "Invalid request", http.StatusBadRequest)
+		return
+	}
+
+	if input.Uid <= 0 {
+		http.Error(w, "uid must be a positive integer", http.StatusBadRequest)
+		return
+	}
+
+	var inventory models.Inventory
+	if err := config.DB.Where("uid = ?", input.Uid).First(&inventory).Error; err != nil {
+		http.Error(w, fmt.Sprintf("Failed to retrieve inventory: %v", err), http.StatusNotFound)
+		return
+	}
+
+	var allCards []models.Card
+	if err := config.DB.Order("cid").Find(&allCards).Error; err != nil {
+		http.Error(w, fmt.Sprintf("Failed to retrieve cards: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	deckCounts := buildDeckCounts(inventory.Cards, allCards, getDeckSizeLimit())
+	deck := models.Deck{
+		Uid:   input.Uid,
+		Cards: deckCounts,
+	}
+
+	if err := config.DB.Where("uid = ?", input.Uid).Delete(&models.Deck{}).Error; err != nil {
+		http.Error(w, fmt.Sprintf("Failed to delete deck: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	if err := config.DB.Create(&deck).Error; err != nil {
+		http.Error(w, fmt.Sprintf("Failed to create deck: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(deck)
+}
+
+func FillDecksFromInventories(db *gorm.DB) error {
+	var inventories []models.Inventory
+	if err := db.Find(&inventories).Error; err != nil {
+		return err
+	}
+
+	if len(inventories) == 0 {
+		return nil
+	}
+
+	deckSizeLimit := getDeckSizeLimit()
+
+	var allCards []models.Card
+	if err := db.Order("cid").Find(&allCards).Error; err != nil {
+		return err
+	}
+
+	for _, inventory := range inventories {
+		deckCounts := buildDeckCounts(inventory.Cards, allCards, deckSizeLimit)
+		deck := models.Deck{
+			Uid:   inventory.Uid,
+			Cards: deckCounts,
+		}
+
+		if err := db.Where("uid = ?", inventory.Uid).Delete(&models.Deck{}).Error; err != nil {
+			return err
+		}
+		if err := db.Create(&deck).Error; err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func buildDeckCounts(inventory models.CardCounts, allCards []models.Card, limit int) models.CardCounts {
+	deck := make(models.CardCounts)
+	remaining := limit
+
+	if inventory != nil {
+		cids := make([]int, 0, len(inventory))
+		for cid, count := range inventory {
+			if count > 0 {
+				cids = append(cids, cid)
+			}
+		}
+		sort.Ints(cids)
+
+		for _, cid := range cids {
+			if remaining == 0 {
+				break
+			}
+			count := inventory[cid]
+			if count > remaining {
+				count = remaining
+			}
+			deck[cid] += count
+			remaining -= count
+		}
+	}
+
+	for _, card := range allCards {
+		if remaining == 0 {
+			break
+		}
+		deck[card.Cid]++
+		remaining--
+	}
+
+	return deck
 }

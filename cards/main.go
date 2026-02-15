@@ -52,6 +52,10 @@ func main() {
 		log.Printf("Card seed loaded from %s", seedPath)
 	}
 
+	if err := services.FillDecksFromInventories(config.DB); err != nil {
+		log.Printf("Deck fill failed: %v", err)
+	}
+
 	fmt.Println("Connecting to database:", dsn)
 	//db.Exec("CREATE TABLE test_table (id SERIAL PRIMARY KEY, name VARCHAR(100));")  //create table just for testing purposes
 
@@ -70,8 +74,9 @@ func main() {
 	//define routes
 	r.Get("/health", health) // Check health of service
 
-	r.Post("/decks", services.CreateDeck) // Create deck
-	r.Get("/decks", services.ListDecks)   // List all decks
+	r.Post("/decks", services.CreateDeck)       // Create deck
+	r.Post("/decks/fill", services.FillDeckForUser)
+	r.Get("/decks", services.ListDecks)         // List all decks
 	r.Delete("/decks", services.DeleteDeck)
 
 	r.Post("/cards", services.CreateCard) // Create card

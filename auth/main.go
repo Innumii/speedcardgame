@@ -157,7 +157,7 @@ func seedDevUsers(authService *services.AuthService) {
 	}
 
 	for _, user := range devUsers {
-		if _, err := authService.Register(user); err != nil {
+		if _, err := authService.RegisterDevUser(user); err != nil {
 			log.Printf("Dev user seed skipped for %s: %v", user.Email, err)
 		}
 	}

@@ -10,6 +10,7 @@
 #include "render/RenderDeckBuilding.hpp"
 #include "core/Game.hpp"
 #include "core/NetworkClient.hpp"
+#include "utils/JsonUtil.hpp"
 #include "objects/CreatureCard.h"
 #include "objects/SpellCard.h"
 #include <SDL2/SDL.h>
@@ -58,49 +59,6 @@ namespace {
         return configured > 0 ? configured : 30;
     }
 
-    bool readJsonStringField(const std::string& json, const std::string& key, std::string& out) {
-        const std::string needle = "\"" + key + "\"";
-        std::size_t pos = json.find(needle);
-        if (pos == std::string::npos) return false;
-        pos = json.find(':', pos + needle.size());
-        if (pos == std::string::npos) return false;
-        pos = json.find('"', pos);
-        if (pos == std::string::npos) return false;
-        std::size_t end = pos + 1;
-        while (end < json.size()) {
-            if (json[end] == '"' && json[end - 1] != '\\') break;
-            ++end;
-        }
-        if (end >= json.size()) return false;
-        out = json.substr(pos + 1, end - pos - 1);
-        return true;
-    }
-
-    bool readJsonIntField(const std::string& json, const std::string& key, int& out) {
-        const std::string needle = "\"" + key + "\"";
-        std::size_t pos = json.find(needle);
-        if (pos == std::string::npos) return false;
-        pos = json.find(':', pos + needle.size());
-        if (pos == std::string::npos) return false;
-        ++pos;
-        while (pos < json.size() && std::isspace(static_cast<unsigned char>(json[pos]))) {
-            ++pos;
-        }
-        std::size_t end = pos;
-        if (end < json.size() && json[end] == '-') {
-            ++end;
-        }
-        while (end < json.size() && std::isdigit(static_cast<unsigned char>(json[end]))) {
-            ++end;
-        }
-        if (end == pos) return false;
-        try {
-            out = std::stoi(json.substr(pos, end - pos));
-        } catch (...) {
-            return false;
-        }
-        return true;
-    }
 
     bool sendHttpRequest(const std::string& host, int port, const std::string& method, const std::string& path,
                          const std::string& body, std::string& responseBody) {
@@ -172,60 +130,6 @@ namespace {
         return stream.is_open();
     }
 
-    bool findMatchingBrace(const std::string& text, std::size_t openPos, std::size_t& closePos) {
-        if (openPos >= text.size() || text[openPos] != '{') return false;
-        int depth = 0;
-        for (std::size_t i = openPos; i < text.size(); ++i) {
-            if (text[i] == '{') {
-                ++depth;
-            } else if (text[i] == '}') {
-                --depth;
-                if (depth == 0) {
-                    closePos = i;
-                    return true;
-                }
-            }
-        }
-        return false;
-    }
-
-    bool parseJsonIntAt(const std::string& text, std::size_t& pos, int& out) {
-        while (pos < text.size() && std::isspace(static_cast<unsigned char>(text[pos]))) {
-            ++pos;
-        }
-        std::size_t start = pos;
-        if (pos < text.size() && text[pos] == '-') {
-            ++pos;
-        }
-        while (pos < text.size() && std::isdigit(static_cast<unsigned char>(text[pos]))) {
-            ++pos;
-        }
-        if (pos == start) return false;
-        try {
-            out = std::stoi(text.substr(start, pos - start));
-        } catch (...) {
-            return false;
-        }
-        return true;
-    }
-
-    bool parseJsonQuotedStringAt(const std::string& text, std::size_t& pos, std::string& out) {
-        while (pos < text.size() && std::isspace(static_cast<unsigned char>(text[pos]))) {
-            ++pos;
-        }
-        if (pos >= text.size() || text[pos] != '"') return false;
-        ++pos;
-        std::size_t start = pos;
-        while (pos < text.size()) {
-            if (text[pos] == '"' && text[pos - 1] != '\\') {
-                out = text.substr(start, pos - start);
-                ++pos;
-                return true;
-            }
-            ++pos;
-        }
-        return false;
-    }
 
     bool extractCardsObjectForUser(const std::string& json, int userId, std::string& outCards) {
         std::size_t pos = 0;
@@ -236,13 +140,13 @@ namespace {
             }
 
             std::size_t objEnd = 0;
-            if (!findMatchingBrace(json, pos, objEnd)) {
+            if (!JsonUtil::findMatchingBrace(json, pos, objEnd)) {
                 return false;
             }
 
             const std::string obj = json.substr(pos, objEnd - pos + 1);
             int uid = -1;
-            readJsonIntField(obj, "uid", uid);
+            JsonUtil::readJsonIntField(obj, "uid", uid);
             if (uid == userId) {
                 const std::string needle = "\"cards\"";
                 std::size_t cardsPos = obj.find(needle);
@@ -250,7 +154,7 @@ namespace {
                 cardsPos = obj.find('{', cardsPos + needle.size());
                 if (cardsPos == std::string::npos) return false;
                 std::size_t cardsEnd = 0;
-                if (!findMatchingBrace(obj, cardsPos, cardsEnd)) return false;
+                if (!JsonUtil::findMatchingBrace(obj, cardsPos, cardsEnd)) return false;
                 if (cardsEnd <= cardsPos + 1) {
                     outCards.clear();
                     return true;
@@ -276,7 +180,7 @@ namespace {
             if (pos >= cardsJson.size()) break;
 
             std::string key;
-            if (!parseJsonQuotedStringAt(cardsJson, pos, key)) {
+            if (!JsonUtil::parseJsonQuotedStringAt(cardsJson, pos, key)) {
                 ++pos;
                 continue;
             }
@@ -290,7 +194,7 @@ namespace {
             ++pos;
 
             int value = 0;
-            if (!parseJsonIntAt(cardsJson, pos, value)) {
+            if (!JsonUtil::parseJsonIntAt(cardsJson, pos, value)) {
                 return false;
             }
 
@@ -759,14 +663,14 @@ bool DeckBuilding::loadAvailableCardsFromService(Game& game) {
         std::string type;
         std::string effect;
 
-        readJsonIntField(obj, "cid", cid);
-        readJsonStringField(obj, "name", name);
-        readJsonStringField(obj, "type", type);
-        readJsonIntField(obj, "cost", cost);
-        readJsonIntField(obj, "value", value);
-        readJsonIntField(obj, "power", power);
-        readJsonIntField(obj, "toughness", toughness);
-        readJsonStringField(obj, "effect", effect);
+        JsonUtil::readJsonIntField(obj, "cid", cid);
+        JsonUtil::readJsonStringField(obj, "name", name);
+        JsonUtil::readJsonStringField(obj, "type", type);
+        JsonUtil::readJsonIntField(obj, "cost", cost);
+        JsonUtil::readJsonIntField(obj, "value", value);
+        JsonUtil::readJsonIntField(obj, "power", power);
+        JsonUtil::readJsonIntField(obj, "toughness", toughness);
+        JsonUtil::readJsonStringField(obj, "effect", effect);
 
         if (!name.empty()) {
             const std::string typeLower = toLower(type);
