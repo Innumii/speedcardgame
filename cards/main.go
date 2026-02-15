@@ -74,9 +74,9 @@ func main() {
 	//define routes
 	r.Get("/health", health) // Check health of service
 
-	r.Post("/decks", services.CreateDeck)       // Create deck
+	r.Post("/decks", services.CreateDeck) // Create deck
 	r.Post("/decks/fill", services.FillDeckForUser)
-	r.Get("/decks", services.ListDecks)         // List all decks
+	r.Get("/decks", services.ListDecks) // List all decks
 	r.Delete("/decks", services.DeleteDeck)
 
 	r.Post("/cards", services.CreateCard) // Create card
