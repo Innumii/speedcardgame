@@ -19,6 +19,7 @@
 #include "states/Playing.hpp"
 #include "states/DeckBuilding.hpp"
 #include "states/Connecting.hpp"
+#include "render/RenderText.hpp"
 
 #include "objects/Player.h"
 #include "objects/Deck.h"
@@ -73,6 +74,9 @@ public:
     int getHealth(const Player& player) const;
     int getMana(const Player& player) const;
 
+    const RenderText::FontSet& getTitleFonts() const;
+    const RenderText::FontSet& getUIFonts() const;
+
     bool running() const;
 
 
@@ -101,6 +105,10 @@ private:
     //GameState::Title used because Title is not in global scope, only exists within GameState
     GameState state{GameState::Login};
     GameState nextState{GameState::Login};
+
+
+    RenderText::FontSet titleFonts;
+    RenderText::FontSet uiFonts;
 
     Title titleState;
     Login loginState;

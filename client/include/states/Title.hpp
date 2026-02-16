@@ -14,11 +14,16 @@ public:
     void render(Game& game);
 private:
     void updateLayout(SDL_Renderer* renderer);
-    SDL_Rect startButton{300,150,200,80};
-    SDL_Rect quitButton{300,250,200,80};
-    SDL_Rect BuildDeckButton{300,350,200,80};
-    SDL_Rect ConnectButton{300, 450, 200, 80};
-    SDL_Rect titleBanner{180, 40, 440, 70};
+    SDL_Rect startButton{300,150,280,75};
+    SDL_Rect quitButton{300,250,280,75};
+    SDL_Rect BuildDeckButton{300,350,280,75};
+    SDL_Rect ConnectButton{300, 450, 280, 75};
+    SDL_Rect titleBanner{180, 40, 600, 100};
+
+    // animation state
+    Uint32 animStartTick  {0};
+    bool   animInitialized{false};
+    int    hoveredButton  {-1}; // 0=start, 1=quit, 2=build, 3=connect
 };
 
 #endif

@@ -73,6 +73,10 @@ Game::Game(const char *title, int xpos, int ypos, int width, int height, bool fu
     SDL_RaiseWindow(window.get());
     SDL_SetWindowInputFocus(window.get());
 
+    //loading fonts
+    titleFonts = RenderText::loadFonts("assets/Cinzel/Cinzel-VariableFont_wght.ttf",   12, 10, 28);
+    uiFonts    = RenderText::loadFonts("assets/Rajdhani/Rajdhani-SemiBold.ttf", 16, 12, 22);
+
     loginState.enter(*this);
 
     isRunning = true;
@@ -212,6 +216,9 @@ NetworkClient& Game::getNetworkClient() {
     return netClient;
 }
 
+const RenderText::FontSet& Game::getTitleFonts() const { return titleFonts; }
+const RenderText::FontSet& Game::getUIFonts()    const { return uiFonts;    }
+
 
 void Game::handleEvents() {
     SDL_Event event;
@@ -257,6 +264,9 @@ void Game::update() {
     }
 
     switch (state) {
+        case GameState::Title:
+                titleState.update(*this);
+                break;
         case GameState::Playing:
             playingState.update(*this);
             break;
@@ -312,6 +322,8 @@ void Game::render() {
 }
 
 void Game::clean() {
+    RenderText::closeFonts(titleFonts);
+    RenderText::closeFonts(uiFonts);
     SDL_Quit();
     isRunning = false;
 }
