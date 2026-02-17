@@ -11,6 +11,7 @@ public:
     struct FontSet {
         TTF_Font* small = nullptr;
         TTF_Font* tiny = nullptr;
+        TTF_Font* medium = nullptr; 
         TTF_Font* large = nullptr;
     };
 
