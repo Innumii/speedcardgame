@@ -74,7 +74,7 @@ Game::Game(const char *title, int xpos, int ypos, int width, int height, bool fu
     SDL_SetWindowInputFocus(window.get());
 
     //loading fonts
-    titleFonts = RenderText::loadFonts("assets/Cinzel/Cinzel-VariableFont_wght.ttf",   12, 10, 28);
+    titleFonts = RenderText::loadFonts("assets/Cinzel/Cinzel-VariableFont_wght.ttf",   12, 10, 48);
     uiFonts    = RenderText::loadFonts("assets/Rajdhani/Rajdhani-SemiBold.ttf", 16, 12, 22);
 
     loginState.enter(*this);
