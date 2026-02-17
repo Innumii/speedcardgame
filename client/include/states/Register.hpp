@@ -4,6 +4,8 @@
 #include <SDL2/SDL.h>
 #include <string>
 
+#include "render/RenderText.hpp"
+
 class Game;
 
 class Register {
@@ -26,6 +28,7 @@ private:
     };
 
     void updateLayout(SDL_Renderer* renderer);
+    void ensureFonts();
     void setActiveField(Field field);
     bool pointInRect(const SDL_Rect& rect, int x, int y) const;
 
@@ -46,6 +49,9 @@ private:
     bool backPressed{false};
     bool createHover{false};
     bool backHover{false};
+
+    bool fontsReady{false};
+    RenderText::FontSet fonts{};
 };
 
 #endif
