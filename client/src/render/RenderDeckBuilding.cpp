@@ -5,13 +5,14 @@
 #include "objects/Card.h"
 #include "render/RenderCard.hpp"
 #include "render/RenderText.hpp"
+#include "render/RenderButton.hpp"
+#include "render/Theme.hpp"
 
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_ttf.h>
 #include <algorithm>
 #include <string>
 #include <vector>
-#include <render/RenderButton.hpp>
 
 void RenderDeckBuilding::render(DeckBuilding& deckBuilding, Game& game) {
     SDL_Renderer* renderer = game.getRenderer();
@@ -25,58 +26,34 @@ void RenderDeckBuilding::render(DeckBuilding& deckBuilding, Game& game) {
     const SDL_Point mousePoint{mouseX, mouseY};
     const Uint32 now = SDL_GetTicks();
 
-    RenderText::FontSet fonts = RenderText::loadFonts("assets/font.TTF", 14, 12, 18);
+    // ── fonts ────────────────────────────────────────────────────────
+    const RenderText::FontSet& fonts = game.getUIFonts();
     TTF_Font* fontSmall = fonts.small;
-    TTF_Font* fontTiny = fonts.tiny;
+    TTF_Font* fontTiny  = fonts.tiny;
     TTF_Font* fontLarge = fonts.large;
-
     TTF_Font* buttonFont = fontSmall ? fontSmall : fontLarge;
-    const SDL_Color buttonBase{80, 120, 200, 255};
-    const SDL_Color buttonHighlight{100, 150, 250, 255};
-    const SDL_Color buttonPressed{60, 90, 180, 255};
-    const SDL_Color buttonText{255, 255, 255, 255};
 
-    // Menu buttons
+    // ── menu buttons ─────────────────────────────────────────────────
     const bool canPlay = deckBuilding.hasFullDeck();
     const bool canSave = deckBuilding.hasFullDeck();
-    RenderButton::drawButton(
-        renderer,
-        deckBuilding.PlayButton,
-        "Play",
-        false,
-        !canPlay,
-        buttonBase,
-        buttonHighlight,
-        buttonPressed,
-        buttonText,
-        buttonFont
-    );
 
-    RenderButton::drawButton(
-        renderer,
-        deckBuilding.SaveButton,
-        "Save Deck",
-        false,
-        !canSave,
-        buttonBase,
-        buttonHighlight,
-        buttonPressed,
-        buttonText,
-        buttonFont
-    );
+    RenderButton::drawButton(renderer, deckBuilding.PlayButton,
+                              "Play", buttonFont,
+                              canPlay ? Theme::BTN_START     : Theme::BTN_SECONDARY,
+                              Theme::BTN_BORDER, Theme::BTN_TEXT,
+                              false, !canPlay);
 
-    RenderButton::drawButton(
-        renderer,
-        deckBuilding.TitleButton,
-        "Return to Title",
-        false,
-        false,
-        buttonBase,
-        buttonHighlight,
-        buttonPressed,
-        buttonText,
-        buttonFont
-    );
+    RenderButton::drawButton(renderer, deckBuilding.SaveButton,
+                              "Save Deck", buttonFont,
+                              canSave ? Theme::BTN_BUILD     : Theme::BTN_SECONDARY,
+                              Theme::BTN_BORDER, Theme::BTN_TEXT,
+                              false, !canSave);
+
+    RenderButton::drawButton(renderer, deckBuilding.TitleButton,
+                              "Return to Title", buttonFont,
+                              Theme::BTN_CONNECT,
+                              Theme::BTN_BORDER, Theme::BTN_TEXT,
+                              false, false);
 
     if (fontSmall && deckBuilding.isStatusMessageActive(now)) {
         int msgX = layout.collectionArea.x;
@@ -140,31 +117,19 @@ void RenderDeckBuilding::render(DeckBuilding& deckBuilding, Game& game) {
         const bool hoverPrev = canPrev && SDL_PointInRect(&mousePoint, &layout.prevPageButton) == SDL_TRUE;
         const bool hoverNext = canNext && SDL_PointInRect(&mousePoint, &layout.nextPageButton) == SDL_TRUE;
 
-        RenderButton::drawButton(
-            renderer,
-            layout.prevPageButton,
-            "Prev",
-            hoverPrev,
-            false,
-            canPrev ? pagerBase : pagerPressed,
-            canPrev ? pagerHighlight : pagerPressed,
-            pagerPressed,
-            canPrev ? pagerText : pagerDisabled,
-            fontTiny
-        );
+        RenderButton::drawButton(renderer, layout.prevPageButton,
+                                  "Prev", fontTiny,
+                                  canPrev ? Theme::BTN_CONNECT : Theme::BTN_SECONDARY,
+                                  Theme::BTN_BORDER,
+                                  canPrev ? pagerText : pagerDisabled,
+                                  hoverPrev, !canPrev);
 
-        RenderButton::drawButton(
-            renderer,
-            layout.nextPageButton,
-            "Next",
-            hoverNext,
-            false,
-            canNext ? pagerBase : pagerPressed,
-            canNext ? pagerHighlight : pagerPressed,
-            pagerPressed,
-            canNext ? pagerText : pagerDisabled,
-            fontTiny
-        );
+        RenderButton::drawButton(renderer, layout.nextPageButton,
+                                  "Next", fontTiny,
+                                  canNext ? Theme::BTN_CONNECT : Theme::BTN_SECONDARY,
+                                  Theme::BTN_BORDER,
+                                  canNext ? pagerText : pagerDisabled,
+                                  hoverNext, !canNext);
 
         if (fontTiny) {
             const std::string pageText = "Page " + std::to_string(layout.pageIndex + 1) + " / " + std::to_string(layout.pageCount);
@@ -287,6 +252,4 @@ void RenderDeckBuilding::render(DeckBuilding& deckBuilding, Game& game) {
         SDL_Rect panel{previewX, previewY, previewWidth, previewHeight};
         RenderCard::drawCardFace(renderer, textRenderer, *deckBuilding.availableCards[deckBuilding.hoverIndex], panel, fontLarge ? fontLarge : fontSmall, fontSmall, false);
     }
-
-    RenderText::closeFonts(fonts);
 }
