@@ -49,7 +49,6 @@ RenderText::FontSet RenderText::loadFonts(const char* path, int smallSize, int t
 
     fonts.small = TTF_OpenFont(path, smallSize);
     fonts.tiny = TTF_OpenFont(path, tinySize);
-    fonts.medium = TTF_OpenFont(path, (smallSize + largeSize) / 2);
     fonts.large = TTF_OpenFont(path, largeSize);
 
     return fonts;
@@ -63,10 +62,6 @@ void RenderText::closeFonts(FontSet& fonts) {
     if (fonts.tiny) {
         TTF_CloseFont(fonts.tiny);
         fonts.tiny = nullptr;
-    }
-    if (fonts.medium) {
-        TTF_CloseFont(fonts.medium);
-        fonts.medium = nullptr;
     }
     if (fonts.large) {
         TTF_CloseFont(fonts.large);
