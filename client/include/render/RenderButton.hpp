@@ -11,13 +11,12 @@ public:
         SDL_Renderer* renderer,
         const SDL_Rect& rect,
         const std::string& text,
-        bool highlighted,
-        bool pressed,
-        SDL_Color baseColor,
-        SDL_Color highlightColor,
-        SDL_Color pressedColor,
+        TTF_Font* font,
+        SDL_Color fill,
+        SDL_Color border,
         SDL_Color textColor,
-        TTF_Font* font
+        bool hovered = false,
+        bool pressed = false
     );
 };
 
