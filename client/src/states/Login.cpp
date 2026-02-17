@@ -1,229 +1,259 @@
 #include "states/Login.hpp"
-
 #include "core/Game.hpp"
 #include "core/NetworkClient.hpp"
 #include "utils/JsonUtil.hpp"
-#include "render/RenderButton.hpp"
 #include "render/RenderText.hpp"
+#include "render/RenderBanner.hpp"
+#include "render/Theme.hpp"
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_ttf.h>
 #include <algorithm>
-#include <cctype>
 #include <cstdlib>
 #include <iostream>
 #include <sstream>
+#include <cmath>
+
+// ── network helpers ───────────────────────────────────────────────────────────
 
 namespace {
     constexpr std::size_t kMaxUsernameLen = 24;
     constexpr std::size_t kMaxPasswordLen = 32;
 
     std::string getEnvOrDefault(const char* key, const char* fallback) {
-        const char* value = std::getenv(key);
-        return value ? std::string(value) : std::string(fallback);
+        const char* v = std::getenv(key);
+        return v ? std::string(v) : std::string(fallback);
     }
 
     int getEnvIntOrDefault(const char* key, int fallback) {
-        const char* value = std::getenv(key);
-        if (!value) return fallback;
-        try {
-            return std::stoi(value);
-        } catch (...) {
-            return fallback;
-        }
+        const char* v = std::getenv(key);
+        if (!v) return fallback;
+        try { return std::stoi(v); } catch (...) { return fallback; }
     }
 
-    std::string escapeJsonString(const std::string& value) {
+    std::string escapeJson(const std::string& s) {
         std::string out;
-        out.reserve(value.size());
-        for (char c : value) {
+        for (char c : s) {
             switch (c) {
                 case '\\': out += "\\\\"; break;
-                case '"': out += "\\\""; break;
-                case '\n': out += "\\n"; break;
-                case '\r': out += "\\r"; break;
-                case '\t': out += "\\t"; break;
-                default: out += c; break;
+                case '"':  out += "\\\""; break;
+                case '\n': out += "\\n";  break;
+                case '\r': out += "\\r";  break;
+                case '\t': out += "\\t";  break;
+                default:   out += c;
             }
         }
         return out;
     }
 
-
-    bool sendHttpRequest(const std::string& host, int port, const std::string& method, const std::string& path,
-                         const std::string& body, int& statusCode, std::string& responseBody) {
+    bool sendHttp(const std::string& host, int port, const std::string& method,
+                  const std::string& path, const std::string& body,
+                  int& statusCode, std::string& responseBody) {
         statusCode = -1;
         NetworkClient client;
-        if (!client.connectTo(host, port)) {
-            return false;
-        }
+        if (!client.connectTo(host, port)) return false;
 
-        std::ostringstream request;
-        request << method << " " << path << " HTTP/1.1\r\n";
-        request << "Host: " << host << "\r\n";
-        request << "Connection: close\r\n";
+        std::ostringstream req;
+        req << method << " " << path << " HTTP/1.1\r\n"
+            << "Host: " << host << "\r\n"
+            << "Connection: close\r\n";
         if (method == "POST" || method == "PUT" || method == "PATCH") {
-            request << "Content-Type: application/json\r\n";
-            request << "Content-Length: " << body.size() << "\r\n";
+            req << "Content-Type: application/json\r\n"
+                << "Content-Length: " << body.size() << "\r\n";
         }
-        request << "\r\n";
-        request << body;
+        req << "\r\n" << body;
 
-        const std::string requestText = request.str();
-        if (!client.send(requestText.data(), requestText.size())) {
+        const std::string reqText = req.str();
+        if (!client.send(reqText.data(), reqText.size())) {
             client.disconnect();
             return false;
         }
 
         std::string response;
-        char buffer[4096];
+        char buf[4096];
         while (true) {
-            int received = client.receive(buffer, sizeof(buffer));
-            if (received <= 0) break;
-            response.append(buffer, static_cast<std::size_t>(received));
+            int n = client.receive(buf, sizeof(buf));
+            if (n <= 0) break;
+            response.append(buf, static_cast<std::size_t>(n));
         }
         client.disconnect();
 
         const std::size_t headerEnd = response.find("\r\n\r\n");
         if (headerEnd == std::string::npos) return false;
 
-        const std::string header = response.substr(0, headerEnd);
-        std::istringstream headerStream(header);
-        std::string httpVersion;
-        headerStream >> httpVersion >> statusCode;
-
+        std::istringstream hs(response.substr(0, headerEnd));
+        std::string httpVer;
+        hs >> httpVer >> statusCode;
         responseBody = response.substr(headerEnd + 4);
         return true;
     }
 
-    bool parseUserIdFromLoginResponse(const std::string& responseBody, int& outUserId, std::string& error) {
+    bool parseUserId(const std::string& body, int& outId, std::string& error) {
         std::string userJson;
-        if (!JsonUtil::extractJsonObject(responseBody, "user", userJson)) {
+        if (!JsonUtil::extractJsonObject(body, "user", userJson)) {
             error = "missing user object";
             return false;
         }
-        if (JsonUtil::readJsonIntField(userJson, "id", outUserId)) return true;
-        if (JsonUtil::readJsonIntField(userJson, "ID", outUserId)) return true;
+        if (JsonUtil::readJsonIntField(userJson, "id", outId)) return true;
+        if (JsonUtil::readJsonIntField(userJson, "ID", outId)) return true;
         error = "missing user id";
         return false;
     }
 
-    bool authenticateUser(const std::string& email, const std::string& password, int& outUserId, std::string& error) {
+    bool authenticate(const std::string& email, const std::string& password,
+                      int& outId, std::string& error) {
         if (email.empty() || password.empty()) {
             error = "email and password required";
             return false;
         }
-
         const std::string host = getEnvOrDefault("AUTH_SERVICE_HOST", "127.0.0.1");
-        const int port = getEnvIntOrDefault("AUTH_SERVICE_PORT", 8081);
-        const std::string path = "/login";
+        const int         port = getEnvIntOrDefault("AUTH_SERVICE_PORT", 8081);
 
         std::ostringstream payload;
-        payload << "{\"email\":\"" << escapeJsonString(email)
-                << "\",\"password\":\"" << escapeJsonString(password) << "\"}";
+        payload << "{\"email\":\"" << escapeJson(email)
+                << "\",\"password\":\"" << escapeJson(password) << "\"}";
 
         int statusCode = -1;
         std::string responseBody;
-        if (!sendHttpRequest(host, port, "POST", path, payload.str(), statusCode, responseBody)) {
+        if (!sendHttp(host, port, "POST", "/login", payload.str(), statusCode, responseBody)) {
             error = "auth service unreachable";
             return false;
         }
-
         if (statusCode != 200) {
-            std::string responseError;
-            if (JsonUtil::readJsonStringField(responseBody, "error", responseError)) {
-                error = responseError;
-            } else {
+            if (!JsonUtil::readJsonStringField(responseBody, "error", error))
                 error = "login failed";
-            }
             return false;
         }
-
-        if (!parseUserIdFromLoginResponse(responseBody, outUserId, error)) {
-            return false;
-        }
-
-        return true;
+        return parseUserId(responseBody, outId, error);
     }
 }
 
-Login::Login() = default;
+// ── render helpers (file-local) ───────────────────────────────────────────────
 
-Login::~Login() {
-    RenderText::closeFonts(fonts);
+namespace {
+    void fillCircleR(SDL_Renderer* r, int cx, int cy, int rad) {
+        for (int dy = -rad; dy <= rad; dy++) {
+            int dx = (int)sqrt((double)(rad*rad - dy*dy));
+            SDL_RenderDrawLine(r, cx-dx, cy+dy, cx+dx, cy+dy);
+        }
+    }
+
+    void drawRoundedRect(SDL_Renderer* r, const SDL_Rect& rect,
+                          int rad, SDL_Color fill, SDL_Color border) {
+        SDL_SetRenderDrawColor(r, fill.r, fill.g, fill.b, fill.a);
+        SDL_Rect body  = {rect.x + rad,          rect.y,       rect.w - 2*rad, rect.h        };
+        SDL_Rect left  = {rect.x,                 rect.y + rad, rad,            rect.h - 2*rad};
+        SDL_Rect right = {rect.x + rect.w - rad,  rect.y + rad, rad,            rect.h - 2*rad};
+        SDL_RenderFillRect(r, &body);
+        SDL_RenderFillRect(r, &left);
+        SDL_RenderFillRect(r, &right);
+        fillCircleR(r, rect.x + rad,          rect.y + rad,          rad);
+        fillCircleR(r, rect.x + rect.w - rad, rect.y + rad,          rad);
+        fillCircleR(r, rect.x + rad,          rect.y + rect.h - rad, rad);
+        fillCircleR(r, rect.x + rect.w - rad, rect.y + rect.h - rad, rad);
+
+        SDL_SetRenderDrawColor(r, border.r, border.g, border.b, border.a);
+        SDL_RenderDrawLine(r, rect.x + rad,       rect.y,            rect.x + rect.w - rad, rect.y            );
+        SDL_RenderDrawLine(r, rect.x + rad,       rect.y + rect.h,   rect.x + rect.w - rad, rect.y + rect.h   );
+        SDL_RenderDrawLine(r, rect.x,             rect.y + rad,      rect.x,                rect.y + rect.h - rad);
+        SDL_RenderDrawLine(r, rect.x + rect.w,    rect.y + rad,      rect.x + rect.w,       rect.y + rect.h - rad);
+    }
+
+    void drawGlowBorder(SDL_Renderer* r, const SDL_Rect& rect, SDL_Color glow) {
+        SDL_SetRenderDrawBlendMode(r, SDL_BLENDMODE_BLEND);
+        for (int i = 5; i >= 1; i--) {
+            Uint8 alpha = (Uint8)(20 + (5 - i) * 18);
+            SDL_SetRenderDrawColor(r, glow.r, glow.g, glow.b, alpha);
+            SDL_Rect g = {rect.x - i, rect.y - i, rect.w + i*2, rect.h + i*2};
+            SDL_RenderDrawRect(r, &g);
+        }
+    }
+
+    void drawShadow(SDL_Renderer* r, const SDL_Rect& rect, int rad) {
+        SDL_SetRenderDrawBlendMode(r, SDL_BLENDMODE_BLEND);
+        SDL_SetRenderDrawColor(r, 0, 0, 0, 90);
+        SDL_Rect s = {rect.x + 5, rect.y + 5, rect.w, rect.h};
+        SDL_Rect sb = {s.x + rad,        s.y,     s.w - 2*rad, s.h        };
+        SDL_Rect sl = {s.x,              s.y+rad, rad,         s.h - 2*rad};
+        SDL_Rect sr = {s.x + s.w - rad,  s.y+rad, rad,         s.h - 2*rad};
+        SDL_RenderFillRect(r, &sb);
+        SDL_RenderFillRect(r, &sl);
+        SDL_RenderFillRect(r, &sr);
+        fillCircleR(r, s.x + rad,       s.y + rad,       rad);
+        fillCircleR(r, s.x + s.w - rad, s.y + rad,       rad);
+        fillCircleR(r, s.x + rad,       s.y + s.h - rad, rad);
+        fillCircleR(r, s.x + s.w - rad, s.y + s.h - rad, rad);
+    }
+
+    void drawCentered(SDL_Renderer* r, TTF_Font* font,
+                       const std::string& text, const SDL_Rect& rect, SDL_Color color) {
+        if (!font) return;
+        SDL_Surface* s = TTF_RenderUTF8_Blended(font, text.c_str(), color);
+        if (!s) return;
+        SDL_Texture* t = SDL_CreateTextureFromSurface(r, s);
+        if (t) {
+            SDL_Rect dst = {rect.x + (rect.w - s->w)/2,
+                            rect.y + (rect.h - s->h)/2,
+                            s->w, s->h};
+            SDL_RenderCopy(r, t, nullptr, &dst);
+            SDL_DestroyTexture(t);
+        }
+        SDL_FreeSurface(s);
+    }
 }
 
+// ── Login implementation ──────────────────────────────────────────────────────
+
+Login::Login()  = default;
+Login::~Login() = default;
+
 void Login::enter(Game& game) {
-    ensureFonts();
     setActiveField(Field::Username);
     SDL_StartTextInput();
 }
 
 void Login::exit(Game& game) {
     SDL_StopTextInput();
-    loginPressed = false;
+    loginPressed    = false;
     registerPressed = false;
-    loginHover = false;
-    backHover = false;
-}
-
-void Login::ensureFonts() {
-    if (fontsReady) return;
-    if (!RenderText::ensureTtfReady()) return;
-
-    fonts = RenderText::loadFonts("assets/font.TTF", 16, 12, 28);
-    if (!fonts.small || !fonts.large) {
-        RenderText::closeFonts(fonts);
-        fontsReady = false;
-        return;
-    }
-
-    fontsReady = true;
+    loginHover      = false;
+    backHover       = false;
 }
 
 bool Login::pointInRect(const SDL_Rect& rect, int x, int y) const {
-    return x >= rect.x && x <= rect.x + rect.w && y >= rect.y && y <= rect.y + rect.h;
+    return x >= rect.x && x <= rect.x + rect.w &&
+           y >= rect.y && y <= rect.y + rect.h;
 }
 
 void Login::setActiveField(Field field) {
     activeField = field;
-    if (activeField == Field::None) {
-        SDL_StopTextInput();
-    } else {
-        SDL_StartTextInput();
-    }
+    activeField == Field::None ? SDL_StopTextInput() : SDL_StartTextInput();
 }
 
 void Login::updateLayout(SDL_Renderer* renderer) {
-    int screenW = 800;
-    int screenH = 600;
-    if (renderer) {
-        SDL_GetRendererOutputSize(renderer, &screenW, &screenH);
-    }
+    int screenW = 800, screenH = 600;
+    if (renderer) SDL_GetRendererOutputSize(renderer, &screenW, &screenH);
 
-    const int panelW = std::min(560, static_cast<int>(screenW * 0.8f));
-    const int panelH = 360;
-    panelRect = SDL_Rect{
-        (screenW - panelW) / 2,
-        (screenH - panelH) / 2,
-        panelW,
-        panelH
-    };
+    const int panelW  = std::min(520, (int)(screenW * 0.75f));
+    const int panelH  = 420;
+    const int panelX  = (screenW - panelW) / 2;
+    const int panelY  = (screenH - panelH) / 2 + 20;  // pushed down for banner
+    panelRect = {panelX, panelY, panelW, panelH};
 
-    const int inputW = panelW - 120;
-    const int inputH = 44;
-    const int inputX = panelRect.x + 60;
-    int cursorY = panelRect.y + 80;
+    const int inputW  = panelW - 80;
+    const int inputH  = 52;                            // taller inputs
+    const int inputX  = panelX + 40;
+    int       cursorY = panelY + 120;                   // more space for title
 
-    usernameRect = SDL_Rect{inputX, cursorY, inputW, inputH};
-    cursorY += inputH + 24;
+    usernameRect = {inputX, cursorY, inputW, inputH};
+    cursorY += inputH + 40;                            // generous spacing
 
-    passwordRect = SDL_Rect{inputX, cursorY, inputW, inputH};
-    cursorY += inputH + 32;
+    passwordRect = {inputX, cursorY, inputW, inputH};
+    cursorY += inputH + 36;
 
-    const int buttonW = (inputW - 20) / 2;
-    const int buttonH = 46;
-    loginButtonRect = SDL_Rect{inputX, cursorY, buttonW, buttonH};
-    backButtonRect = SDL_Rect{inputX + buttonW + 20, cursorY, buttonW, buttonH};
+    const int btnW = (inputW - 16) / 2;
+    const int btnH = 52;
+    loginButtonRect = {inputX,          cursorY, btnW, btnH};
+    backButtonRect  = {inputX + btnW + 16, cursorY, btnW, btnH};
 }
 
 void Login::handleEvents(Game& game, const SDL_Event& event) {
@@ -233,81 +263,58 @@ void Login::handleEvents(Game& game, const SDL_Event& event) {
         game.setNextState(GameState::Quit);
         return;
     }
-
     if (event.type == SDL_MOUSEMOTION) {
-        const int mouseX = event.motion.x;
-        const int mouseY = event.motion.y;
-        loginHover = pointInRect(loginButtonRect, mouseX, mouseY);
-        backHover = pointInRect(backButtonRect, mouseX, mouseY);
+        loginHover = pointInRect(loginButtonRect, event.motion.x, event.motion.y);
+        backHover  = pointInRect(backButtonRect,  event.motion.x, event.motion.y);
     }
-
     if (event.type == SDL_MOUSEBUTTONDOWN && event.button.button == SDL_BUTTON_LEFT) {
-        const int mouseX = event.button.x;
-        const int mouseY = event.button.y;
-
-        if (pointInRect(usernameRect, mouseX, mouseY)) {
-            setActiveField(Field::Username);
-        } else if (pointInRect(passwordRect, mouseX, mouseY)) {
-            setActiveField(Field::Password);
-        } else {
-            setActiveField(Field::None);
-        }
-
-        if (pointInRect(loginButtonRect, mouseX, mouseY)) {
-            loginPressed = true;
-        } else if (pointInRect(backButtonRect, mouseX, mouseY)) {
-            registerPressed = true;
-        }
+        const int mx = event.button.x, my = event.button.y;
+        if      (pointInRect(usernameRect,    mx, my)) setActiveField(Field::Username);
+        else if (pointInRect(passwordRect,    mx, my)) setActiveField(Field::Password);
+        else                                           setActiveField(Field::None);
+        if      (pointInRect(loginButtonRect, mx, my)) loginPressed    = true;
+        else if (pointInRect(backButtonRect,  mx, my)) registerPressed = true;
     }
-
     if (event.type == SDL_TEXTINPUT) {
-        if (activeField == Field::Username && username.size() < kMaxUsernameLen) {
+        if (activeField == Field::Username && username.size() < kMaxUsernameLen)
             username.append(event.text.text);
-        } else if (activeField == Field::Password && password.size() < kMaxPasswordLen) {
+        else if (activeField == Field::Password && password.size() < kMaxPasswordLen)
             password.append(event.text.text);
-        }
     }
-
     if (event.type == SDL_KEYDOWN) {
-        if (event.key.keysym.sym == SDLK_TAB) {
-            if (activeField == Field::Username) {
-                setActiveField(Field::Password);
-            } else {
-                setActiveField(Field::Username);
-            }
-        } else if (event.key.keysym.sym == SDLK_BACKSPACE) {
-            if (activeField == Field::Username && !username.empty()) {
-                username.pop_back();
-            } else if (activeField == Field::Password && !password.empty()) {
-                password.pop_back();
-            }
-        } else if (event.key.keysym.sym == SDLK_RETURN || event.key.keysym.sym == SDLK_KP_ENTER) {
-            loginPressed = true;
-        } else if (event.key.keysym.sym == SDLK_ESCAPE) {
-            registerPressed = true;
+        switch (event.key.keysym.sym) {
+            case SDLK_TAB:
+                setActiveField(activeField == Field::Username ? Field::Password : Field::Username);
+                break;
+            case SDLK_BACKSPACE:
+                if      (activeField == Field::Username && !username.empty()) username.pop_back();
+                else if (activeField == Field::Password && !password.empty()) password.pop_back();
+                break;
+            case SDLK_RETURN: case SDLK_KP_ENTER:
+                loginPressed = true; break;
+            case SDLK_ESCAPE:
+                registerPressed = true; break;
+            default: break;
         }
     }
 }
 
 void Login::update(Game& game) {
     if (loginPressed) {
-        std::cout << "Login requested for user: " << username << '\n';
         loginPressed = false;
         int userId = -1;
         std::string error;
-        if (!authenticateUser(username, password, userId, error)) {
+        if (!authenticate(username, password, userId, error)) {
             std::cerr << "Login failed: " << error << '\n';
             game.setNextState(GameState::Register);
             return;
         }
         game.setPlayerId(userId);
-        if (!game.refreshPlayerDeckFromService()) {
-            std::cerr << "Failed to refresh deck data after login\n";
-        }
+        if (!game.refreshPlayerDeckFromService())
+            std::cerr << "Failed to refresh deck after login\n";
         game.setNextState(GameState::Title);
         return;
     }
-
     if (registerPressed) {
         registerPressed = false;
         game.setNextState(GameState::Register);
@@ -315,82 +322,96 @@ void Login::update(Game& game) {
 }
 
 void Login::render(Game& game) {
-    SDL_Renderer* renderer = game.getRenderer();
-    updateLayout(renderer);
-    ensureFonts();
+    SDL_Renderer*              r          = game.getRenderer();
+    const RenderText::FontSet& titleFonts = game.getTitleFonts();
+    const RenderText::FontSet& uiFonts    = game.getUIFonts();
+    updateLayout(r);
 
-    SDL_SetRenderDrawColor(renderer, 18, 18, 20, 255);
-    SDL_RenderClear(renderer);
+    int screenW, screenH;
+    SDL_GetRendererOutputSize(r, &screenW, &screenH);
 
-    SDL_SetRenderDrawColor(renderer, 40, 45, 60, 230);
-    SDL_RenderFillRect(renderer, &panelRect);
-    SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
-    SDL_RenderDrawRect(renderer, &panelRect);
-
-    SDL_Color white{245, 245, 245, 255};
-    SDL_Color muted{190, 190, 190, 255};
-    SDL_Color fieldFill{30, 30, 34, 255};
-    SDL_Color fieldActive{45, 45, 55, 255};
-
-    if (fonts.large) {
-        RenderText::drawText(renderer, "Login", fonts.large, white, panelRect.x + 30, panelRect.y + 20);
+    // ── background + vignette ────────────────────────────────────────
+    SDL_SetRenderDrawColor(r, Theme::BG.r, Theme::BG.g, Theme::BG.b, 255);
+    SDL_RenderClear(r);
+    SDL_SetRenderDrawBlendMode(r, SDL_BLENDMODE_BLEND);
+    for (int i = 0; i < 80; i++) {
+        SDL_SetRenderDrawColor(r, 0, 0, 0, (Uint8)(120 - i * 1.5f));
+        SDL_Rect edge = {i, i, screenW - 2*i, screenH - 2*i};
+        SDL_RenderDrawRect(r, &edge);
     }
 
-    if (fonts.small) {
-        RenderText::drawText(renderer, "Username", fonts.small, muted, usernameRect.x, usernameRect.y - 22);
-        RenderText::drawText(renderer, "Password", fonts.small, muted, passwordRect.x, passwordRect.y - 22);
+    // ── banner ───────────────────────────────────────────────────────
+    SDL_Rect bannerRect = {screenW/2 - Theme::BANNER_W/2, 30,
+                           Theme::BANNER_W, Theme::BANNER_H};
+    RenderBanner::drawBanner(r, bannerRect, "Speed Card Game",
+                              titleFonts.large,
+                              Theme::BANNER_FILL,  Theme::BANNER_BORDER,
+                              Theme::BANNER_TEXT,  Theme::BANNER_GLOW);
+
+    // ── panel ────────────────────────────────────────────────────────
+    drawShadow(r, panelRect, Theme::PANEL_RADIUS);
+    drawRoundedRect(r, panelRect, Theme::PANEL_RADIUS,
+                    Theme::PANEL_FILL, Theme::PANEL_BORDER);
+
+    // ── panel title ──────────────────────────────────────────────────
+    if (titleFonts.medium) {
+        RenderText::drawText(r, "Login", titleFonts.medium,
+                             Theme::BANNER_TEXT,
+                             panelRect.x + 30, panelRect.y + 22);
     }
 
-    SDL_Color userFill = activeField == Field::Username ? fieldActive : fieldFill;
-    SDL_Color passFill = activeField == Field::Password ? fieldActive : fieldFill;
+    // ── field labels ─────────────────────────────────────────────────
+    if (uiFonts.large) {
+        RenderText::drawText(r, "Username", uiFonts.large,
+                             Theme::TEXT_MUTED,
+                             usernameRect.x, usernameRect.y - 30);
+        RenderText::drawText(r, "Password", uiFonts.large,
+                             Theme::TEXT_MUTED,
+                             passwordRect.x, passwordRect.y - 30);
+    }
 
-    SDL_SetRenderDrawColor(renderer, userFill.r, userFill.g, userFill.b, userFill.a);
-    SDL_RenderFillRect(renderer, &usernameRect);
-    SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
-    SDL_RenderDrawRect(renderer, &usernameRect);
+    // ── input fields ─────────────────────────────────────────────────
+    const bool userActive = activeField == Field::Username;
+    const bool passActive = activeField == Field::Password;
 
-    SDL_SetRenderDrawColor(renderer, passFill.r, passFill.g, passFill.b, passFill.a);
-    SDL_RenderFillRect(renderer, &passwordRect);
-    SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
-    SDL_RenderDrawRect(renderer, &passwordRect);
+    drawRoundedRect(r, usernameRect, Theme::INPUT_RADIUS,
+                    userActive ? Theme::INPUT_ACTIVE : Theme::INPUT_FILL,
+                    userActive ? Theme::INPUT_BORDER_ACTIVE : Theme::INPUT_BORDER_IDLE);
+    if (userActive) drawGlowBorder(r, usernameRect, Theme::INPUT_BORDER_ACTIVE);
 
-    if (fonts.small) {
-        const int textPad = 10;
-        RenderText::drawText(renderer, username, fonts.small, white, usernameRect.x + textPad, usernameRect.y + 12);
+    drawRoundedRect(r, passwordRect, Theme::INPUT_RADIUS,
+                    passActive ? Theme::INPUT_ACTIVE : Theme::INPUT_FILL,
+                    passActive ? Theme::INPUT_BORDER_ACTIVE : Theme::INPUT_BORDER_IDLE);
+    if (passActive) drawGlowBorder(r, passwordRect, Theme::INPUT_BORDER_ACTIVE);
+
+    // ── input text ───────────────────────────────────────────────────
+    if (uiFonts.large) {
+        const int pad = 16;
+        const int ty  = usernameRect.y + (usernameRect.h - 20) / 2;
+        RenderText::drawText(r, username, uiFonts.large,
+                             Theme::TEXT_PRIMARY, usernameRect.x + pad, ty);
         std::string mask(password.size(), '*');
-        RenderText::drawText(renderer, mask, fonts.small, white, passwordRect.x + textPad, passwordRect.y + 12);
+        RenderText::drawText(r, mask, uiFonts.large,
+                             Theme::TEXT_PRIMARY,
+                             passwordRect.x + pad,
+                             passwordRect.y + (passwordRect.h - 20) / 2);
     }
 
-    SDL_Color baseButton{70, 120, 200, 255};
-    SDL_Color highlightButton{90, 150, 220, 255};
-    SDL_Color pressedButton{60, 100, 180, 255};
-    SDL_Color backBase{70, 70, 70, 255};
-    SDL_Color backHighlight{90, 90, 90, 255};
-    SDL_Color registerPressed{60, 60, 60, 255};
+    // ── buttons ──────────────────────────────────────────────────────
+    auto brighten = [](SDL_Color c, int amt) -> SDL_Color {
+        return {(Uint8)std::min(c.r + amt, 255),
+                (Uint8)std::min(c.g + amt, 255),
+                (Uint8)std::min(c.b + amt, 255), c.a};
+    };
 
-    RenderButton::drawButton(
-        renderer,
-        loginButtonRect,
-        "Login",
-        loginHover,
-        false,
-        baseButton,
-        highlightButton,
-        pressedButton,
-        white,
-        fonts.small
-    );
+    SDL_Color loginFill    = loginHover ? brighten(Theme::BTN_PRIMARY,   40) : Theme::BTN_PRIMARY;
+    SDL_Color registerFill = backHover  ? brighten(Theme::BTN_SECONDARY, 40) : Theme::BTN_SECONDARY;
 
-    RenderButton::drawButton(
-        renderer,
-        backButtonRect,
-        "Register",
-        backHover,
-        false,
-        backBase,
-        backHighlight,
-        registerPressed,
-        white,
-        fonts.small
-    );
+    drawShadow(r, loginButtonRect,  Theme::BTN_RADIUS);
+    drawRoundedRect(r, loginButtonRect,  Theme::BTN_RADIUS, loginFill,    Theme::BTN_BORDER);
+    drawCentered(r, uiFonts.large, "Login",    loginButtonRect,  Theme::BTN_TEXT);
+
+    drawShadow(r, backButtonRect,   Theme::BTN_RADIUS);
+    drawRoundedRect(r, backButtonRect,   Theme::BTN_RADIUS, registerFill, Theme::BTN_BORDER);
+    drawCentered(r, uiFonts.large, "Register", backButtonRect,   Theme::BTN_TEXT);
 }
