@@ -40,6 +40,7 @@ private:
     Field activeField{Field::Username};
     std::string username;
     std::string password;
+    std::string statusMessage; // add auth status msg
 
     bool loginPressed{false};
     bool registerPressed{false};

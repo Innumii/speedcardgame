@@ -276,6 +276,7 @@ void Login::handleEvents(Game& game, const SDL_Event& event) {
         else if (pointInRect(backButtonRect,  mx, my)) registerPressed = true;
     }
     if (event.type == SDL_TEXTINPUT) {
+        statusMessage.clear(); 
         if (activeField == Field::Username && username.size() < kMaxUsernameLen)
             username.append(event.text.text);
         else if (activeField == Field::Password && password.size() < kMaxPasswordLen)
@@ -302,11 +303,37 @@ void Login::handleEvents(Game& game, const SDL_Event& event) {
 void Login::update(Game& game) {
     if (loginPressed) {
         loginPressed = false;
+        statusMessage.clear();
+
+        // input validation checks
+        if (username.empty()) {
+            statusMessage = "Email is required.";
+            return;
+        }
+
+        // basic email check — must have @ and a dot after it
+        const std::size_t atPos = username.find('@');
+        if (atPos == std::string::npos || atPos == 0 || atPos + 1 >= username.size()) {
+            statusMessage = "Enter a valid email address.";
+            return;
+        }
+        const std::size_t dotPos = username.find('.', atPos + 1);
+        if (dotPos == std::string::npos || dotPos + 1 >= username.size()) {
+            statusMessage = "Enter a valid email address.";
+            return;
+        }
+
+        if (password.empty()) {
+            statusMessage = "Password is required.";
+            return;
+        }
+
+        // authentication
         int userId = -1;
         std::string error;
         if (!authenticate(username, password, userId, error)) {
             std::cerr << "Login failed: " << error << '\n';
-            game.setNextState(GameState::Register);
+            statusMessage = error;
             return;
         }
         game.setPlayerId(userId);
@@ -383,6 +410,14 @@ void Login::render(Game& game) {
                     passActive ? Theme::INPUT_ACTIVE : Theme::INPUT_FILL,
                     passActive ? Theme::INPUT_BORDER_ACTIVE : Theme::INPUT_BORDER_IDLE);
     if (passActive) drawGlowBorder(r, passwordRect, Theme::INPUT_BORDER_ACTIVE);
+
+    // ── validation message ───────────────────────────────────────────
+    if (uiFonts.small && !statusMessage.empty()) {
+        RenderText::drawText(r, statusMessage, uiFonts.small,
+                            Theme::ERROR_RED,
+                            passwordRect.x,
+                            passwordRect.y + passwordRect.h + 8);
+    }
 
     // ── input text ───────────────────────────────────────────────────
     if (uiFonts.large) {
