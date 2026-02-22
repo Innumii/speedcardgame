@@ -26,6 +26,7 @@ public:
     void stop();
     //Event callback: called when a new client connects
     std::function<void(std::shared_ptr<PlayerConnection>)> onClientConnected;
+
 private:
     void acceptClients();
 

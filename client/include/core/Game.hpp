@@ -19,6 +19,8 @@
 #include "states/Playing.hpp"
 #include "states/DeckBuilding.hpp"
 #include "states/Connecting.hpp"
+#include "states/Waiting.hpp"
+
 #include "render/RenderText.hpp"
 
 #include "objects/Player.h"
@@ -82,7 +84,7 @@ public:
 
 private:
     bool isRunning{false};
-    NetworkClient netClient;
+    NetworkClient netClient{NetworkClient::SocketMode::NonBlocking};
 
     Player player;
     Player remotePlayer;
@@ -116,6 +118,7 @@ private:
     Playing playingState{drawIntervalSeconds};
     DeckBuilding deckBuildingState;
     std::optional<Connecting> connectingState;
+    std::optional<Waiting> waitingState;
     // Connecting connectingState;
 };
 

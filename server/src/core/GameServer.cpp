@@ -24,10 +24,20 @@ bool GameServer::start() {
 
         // Register callback for new clients
         tcpServer->onClientConnected = [this](std::shared_ptr<PlayerConnection> player) {
+            player->onDisconnected = [player]() {
+                std::cout << "Player disconnected: Socket " << player->getSocket() << "\n";
+            };
+            if (!player->start()) {
+                std::cerr << "Failed to start PlayerConnection for socket " << player->getSocket() << "\n";
+            }
+
+            //matchmake logic
             if (matchmaker) {
                 matchmaker->enqueuePlayer(player);
             }
         };
+
+    
 
         if (!tcpServer->start()) {
             std::cerr << "Failed to start TcpServer\n";

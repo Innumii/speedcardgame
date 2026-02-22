@@ -88,6 +88,7 @@ Game::~Game() {
     std::cout << "Goodbye!~\n";
 }
 
+//check this again ltr
 void Game::commitStateChange() {
     if (nextState != state) {
         const GameState previousState = state;
@@ -109,15 +110,18 @@ void Game::commitStateChange() {
             registerState.exit(*this);
         }
 
-        if (state == GameState::Connecting) {
-            connectingState.reset();
-        }
-
-        state = nextState;
+        // if (state == GameState::Connecting) {
+        //     connectingState.reset();
+        // }
 
         if (state == GameState::Connecting) {
             //hardcoded for now
             connectingState.emplace("127.0.0.1", 4000);
+        }
+
+        if (state == GameState::Waiting) {
+            waitingState.emplace();
+            std::cout << "Waiting now\n";
         }
 
         if (state == GameState::Login && previousState != GameState::Login) {
@@ -251,6 +255,9 @@ void Game::handleEvents() {
                 }
                 break;
             case GameState::Waiting:
+                if (waitingState) {
+                    waitingState->handleEvents(*this, event);
+                }
             default:
                 break;
         }
@@ -284,6 +291,11 @@ void Game::update() {
                 connectingState->update(*this);
             }
             break;
+        case GameState::Waiting:
+            if (waitingState) {
+                waitingState->update(*this);
+            }
+            break;
         default:
             break;
     }
@@ -312,6 +324,11 @@ void Game::render() {
         case GameState::Connecting:
             if (connectingState) {
                 connectingState->render(*this);
+            }
+            break;
+        case GameState::Waiting:
+            if (waitingState) {
+                waitingState->render(*this);
             }
             break;
         default:

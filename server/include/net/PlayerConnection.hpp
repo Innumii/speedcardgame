@@ -32,7 +32,7 @@ public:
 
     // Event: called when a message is received
     std::function<void(const std::vector<char>&)> onMessageReceived;
-
+    std::function<void()> onDisconnected;
 private:
     //reads incoming data from client's socket and stores
     void readLoop();
