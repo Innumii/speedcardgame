@@ -6,13 +6,12 @@
 #include <string>
 #include <vector>
 
-#include "core/GameState.hpp" //need this as we plan to use specific GameState stuff with this class
+#include "core/GameState.hpp"
 #include "objects/Player.h"
 #include "objects/Deck.h"
 #include "core/Board.hpp"
-#include "render/RenderText.hpp"
 
-class Game; // forward declaration to avoid circular include
+class Game;
 
 class Playing {
     friend class RenderPlaying;
@@ -34,14 +33,15 @@ private:
         int y{0};
     };
 
-    SDL_Renderer* renderer{nullptr}; // non-owning, provided by Game
-    RenderText::FontSet fonts{};
+    SDL_Renderer* renderer{nullptr};
     std::vector<SDL_Rect> cardRects;
     std::vector<SDL_Rect> playSlots;
     SDL_Rect discardZone{0, 0, 0, 0};
     DragState drag;
     std::size_t hoverIndex{static_cast<std::size_t>(-1)};
     Uint32 hoverStartTick{0};
+    bool previewLocked{false};
+    int previewScrollOffset{0};
 
     bool pointInRect(const SDL_Rect& rect, int x, int y);
     std::vector<SDL_Rect> computeCardLayout(std::size_t count, int screenW, int screenH) const;
@@ -55,6 +55,7 @@ public:
     Playing& operator=(const Playing&) = delete;
     Playing(Playing&&) noexcept = default;
     Playing& operator=(Playing&&) noexcept = default;
+    
     void setup(Game& game);
     void setDeck(Deck newDeck);
     void handleEvents(Game& game, const SDL_Event& event);
@@ -62,6 +63,5 @@ public:
     void update(Game& game);
     void render(Game&);
 };
-
 
 #endif

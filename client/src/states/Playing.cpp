@@ -24,10 +24,7 @@ bool Playing::pointInRect(const SDL_Rect& rect, int x, int y) {
 Playing::Playing(int drawIntervalSeconds)
     : drawIntervalSeconds(drawIntervalSeconds) {}
 
-Playing::~Playing() {
-    RenderText::closeFonts(fonts);
-    RenderText::shutdownTtf();
-}
+Playing::~Playing() = default;
 
 void Playing::setDeck(Deck newDeck) {
     deck = std::move(newDeck);
@@ -44,21 +41,6 @@ void Playing::setup(Game& game) {
     drag = DragState{};
     hoverIndex = static_cast<std::size_t>(-1);
     hoverStartTick = 0;
-
-    if (!RenderText::ensureTtfReady()) {
-        throw std::runtime_error(std::string("TTF_Init failed: ") + TTF_GetError());
-    }
-
-    fonts = RenderText::loadFonts("assets/font.TTF", 14, 12, 24);
-    if (!fonts.large) {
-        RenderText::closeFonts(fonts);
-        throw std::runtime_error(std::string("Failed to load font (24pt): ") + TTF_GetError());
-    }
-
-    if (!fonts.small) {
-        RenderText::closeFonts(fonts);
-        throw std::runtime_error(std::string("Failed to load font (14pt): ") + TTF_GetError());
-    }
 
     if (deck.size() == 0) {
         for (int i = 0; i < 20; i++) {
@@ -201,6 +183,10 @@ void Playing::handleEvents(Game& game, const SDL_Event& event) {
             if (event.button.button == SDL_BUTTON_LEFT) {
                 const int mx = event.button.x;
                 const int my = event.button.y;
+                
+                // Don't start drag if preview is locked
+                if (previewLocked) return;
+                
                 for (int i = static_cast<int>(cardRects.size()) - 1; i >= 0; --i) {
                     if (pointInRect(cardRects[static_cast<std::size_t>(i)], mx, my)) {
                         drag.active = true;
@@ -284,6 +270,12 @@ void Playing::handleEvents(Game& game, const SDL_Event& event) {
                 
             }
             break;
+        case SDL_MOUSEWHEEL:
+            if (previewLocked) {
+                previewScrollOffset -= event.wheel.y * 20;
+                if (previewScrollOffset < 0) previewScrollOffset = 0;
+            }
+            break;
         default:
             break;
     }
@@ -313,7 +305,7 @@ void Playing::run() {
 }
 
 void Playing::update(Game& /*game*/) {
-    if (!renderer) return; // not yet ready
+    if (!renderer) return;
 
     const Uint32 now = SDL_GetTicks();
     if (now - lastDrawTick >= static_cast<Uint32>(drawIntervalSeconds * 1000)) {
@@ -322,9 +314,65 @@ void Playing::update(Game& /*game*/) {
         }
         lastDrawTick = now;
     }
+
+    int screenW = 0, screenH = 0;
+    SDL_GetRendererOutputSize(renderer, &screenW, &screenH);
+    
+    int mouseX = 0, mouseY = 0;
+    SDL_GetMouseState(&mouseX, &mouseY);
+
+    // Preview card rectangle
+    const int previewW = std::min(360, screenW - 80);
+    const int previewH = static_cast<int>(previewW * 1.5f);
+    const int previewX = (screenW - previewW) / 2;
+    const int previewY = (screenH - previewH) / 2;
+    SDL_Rect previewRect{previewX, previewY, previewW, previewH};
+
+    const bool mouseOverPreview = pointInRect(previewRect, mouseX, mouseY);
+
+    // If mouse is over preview, keep it locked and don't update anything
+    if (mouseOverPreview && previewLocked) {
+        return;
+    }
+
+    // Check if hovering over any hand card
+    const bool draggingCard = drag.active && drag.index < player.hand.size();
+    std::size_t newHoverIndex = static_cast<std::size_t>(-1);
+    
+    if (!draggingCard && !mouseOverPreview) {
+        for (int i = static_cast<int>(cardRects.size()) - 1; i >= 0; --i) {
+            if (pointInRect(cardRects[static_cast<std::size_t>(i)], mouseX, mouseY)) {
+                newHoverIndex = static_cast<std::size_t>(i);
+                break;
+            }
+        }
+    }
+
+    // Update hover index when not over preview
+    if (!mouseOverPreview) {
+        if (newHoverIndex != hoverIndex) {
+            hoverIndex = newHoverIndex;
+            hoverStartTick = now;
+            previewScrollOffset = 0;
+            previewLocked = false;
+        }
+    }
+
+    constexpr Uint32 hoverDelayMs = 1000;
+    
+    const bool hoverTimerReady =
+        hoverIndex != static_cast<std::size_t>(-1) &&
+        hoverIndex < player.hand.size() &&
+        now - hoverStartTick >= hoverDelayMs;
+
+    // Lock preview when timer is ready or mouse is over preview
+    if ((hoverTimerReady || mouseOverPreview) && hoverIndex < player.hand.size()) {
+        previewLocked = true;
+    } else if (!mouseOverPreview && !hoverTimerReady) {
+        previewLocked = false;
+    }
 }
 
 void Playing::render(Game& game) {
     RenderPlaying::render(*this, game);
 }
-
