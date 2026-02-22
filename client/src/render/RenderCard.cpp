@@ -3,205 +3,432 @@
 #include "objects/Card.h"
 #include "objects/CreatureCard.h"
 #include "render/RenderText.hpp"
+#include "render/Theme.hpp"
 
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_ttf.h>
 #include <algorithm>
+#include <cmath>
 #include <string>
 
 namespace {
-    constexpr SDL_Color kCardTextColor{0, 0, 0, 255};
 
-    bool measureText(TTF_Font* font, const std::string& text, int& width, int& height) {
+    bool measureText(TTF_Font* font, const std::string& text, int& w, int& h) {
         if (!font) return false;
-        if (TTF_SizeUTF8(font, text.c_str(), &width, &height) != 0) {
-            width = 0;
-            height = 0;
-            return false;
-        }
+        if (TTF_SizeUTF8(font, text.c_str(), &w, &h) != 0) { w = h = 0; return false; }
         return true;
     }
 
     std::string truncateWithEllipsis(TTF_Font* font, const std::string& text, int maxWidth) {
-        if (!font || maxWidth <= 0) return std::string();
-
-        int width = 0;
-        int height = 0;
-        if (measureText(font, text, width, height) && width <= maxWidth) {
-            return text;
-        }
-
+        if (!font || maxWidth <= 0) return {};
+        int w = 0, h = 0;
+        if (measureText(font, text, w, h) && w <= maxWidth) return text;
         const std::string ellipsis = "...";
-        int ellipsisW = 0;
-        int ellipsisH = 0;
-        if (!measureText(font, ellipsis, ellipsisW, ellipsisH) || ellipsisW > maxWidth) {
-            return std::string();
+        int ew = 0, eh = 0;
+        if (!measureText(font, ellipsis, ew, eh) || ew > maxWidth) return {};
+        std::string t = text;
+        while (!t.empty()) {
+            t.pop_back();
+            std::string c = t + ellipsis;
+            if (measureText(font, c, w, h) && w <= maxWidth) return c;
         }
-
-        std::string trimmed = text;
-        while (!trimmed.empty()) {
-            trimmed.pop_back();
-            std::string candidate = trimmed + ellipsis;
-            if (measureText(font, candidate, width, height) && width <= maxWidth) {
-                return candidate;
-            }
-        }
-
         return ellipsis;
     }
 
-    TTF_Font* chooseFontForWidth(TTF_Font* primary, TTF_Font* fallback, const std::string& text, int maxWidth) {
-        int width = 0;
-        int height = 0;
-        if (primary && measureText(primary, text, width, height) && width <= maxWidth) {
-            return primary;
+    // ── rarity palette from mana cost ────────────────────────────────
+    // 1   → grey   (Common)
+    // 2-3 → orange (Rare)
+    // 4-5 → purple (Epic)
+    // 6+  → gold   (Legendary)
+    struct RarityPalette {
+        SDL_Color border;
+        SDL_Color borderInner;
+        SDL_Color manaGem;
+        SDL_Color nameBg;
+    };
+
+    RarityPalette rarityFromMana(int mana) {
+        if (mana <= 1) return {
+            {160, 160, 170, 255}, {220, 220, 230, 255},
+            {110, 110, 125, 255}, {40,  40,  50,  255}
+        };
+        if (mana <= 3) return {
+            {210, 130,  40, 255}, {255, 200, 100, 255},
+            {180,  90,  20, 255}, {55,  30,   8,  255}
+        };
+        if (mana <= 5) return {
+            {160,  60, 200, 255}, {220, 140, 255, 255},
+            {110,  30, 160, 255}, {38,  12,  55,  255}
+        };
+        return {
+            {220, 180,  40, 255}, {255, 240, 140, 255},
+            {160, 120,  10, 255}, {55,  40,   4,  255}
+        };
+    }
+
+    // ── filled rounded rectangle ──────────────────────────────────────
+    void fillRoundedRect(SDL_Renderer* r, const SDL_Rect& rect, int radius, SDL_Color c) {
+        radius = std::min(radius, std::min(rect.w, rect.h) / 2);
+        SDL_SetRenderDrawBlendMode(r, SDL_BLENDMODE_BLEND);
+        SDL_SetRenderDrawColor(r, c.r, c.g, c.b, c.a);
+        SDL_Rect body {rect.x + radius, rect.y,          rect.w - 2*radius, rect.h};
+        SDL_Rect left {rect.x,          rect.y + radius, radius,            rect.h - 2*radius};
+        SDL_Rect right{rect.x + rect.w - radius, rect.y + radius, radius,   rect.h - 2*radius};
+        SDL_RenderFillRect(r, &body);
+        SDL_RenderFillRect(r, &left);
+        SDL_RenderFillRect(r, &right);
+        for (int dy = -radius; dy <= radius; ++dy) {
+            int dx = (int)std::sqrt((double)(radius*radius - dy*dy));
+            SDL_RenderDrawLine(r, rect.x + radius - dx, rect.y + radius + dy,
+                                  rect.x + radius,      rect.y + radius + dy);
+            SDL_RenderDrawLine(r, rect.x + rect.w - radius,      rect.y + radius + dy,
+                                  rect.x + rect.w - radius + dx, rect.y + radius + dy);
+            SDL_RenderDrawLine(r, rect.x + radius - dx, rect.y + rect.h - radius + dy,
+                                  rect.x + radius,      rect.y + rect.h - radius + dy);
+            SDL_RenderDrawLine(r, rect.x + rect.w - radius,      rect.y + rect.h - radius + dy,
+                                  rect.x + rect.w - radius + dx, rect.y + rect.h - radius + dy);
         }
-        if (fallback && measureText(fallback, text, width, height) && width <= maxWidth) {
-            return fallback;
+    }
+
+    // ── rounded border as a filled ring ───────────────────────────────
+    void drawRoundedBorder(SDL_Renderer* r, const SDL_Rect& rect, int radius, SDL_Color c, int thickness) {
+        radius   = std::min(radius,    std::min(rect.w, rect.h) / 2);
+        thickness = std::min(thickness, radius);
+        SDL_SetRenderDrawBlendMode(r, SDL_BLENDMODE_BLEND);
+        SDL_SetRenderDrawColor(r, c.r, c.g, c.b, c.a);
+
+        const int outerR = radius;
+        const int innerR = outerR - thickness;
+
+        SDL_Rect top  {rect.x + outerR, rect.y,                       rect.w - 2*outerR, thickness};
+        SDL_Rect bot  {rect.x + outerR, rect.y + rect.h - thickness,  rect.w - 2*outerR, thickness};
+        SDL_Rect left {rect.x,                      rect.y + outerR,  thickness, rect.h - 2*outerR};
+        SDL_Rect right{rect.x + rect.w - thickness, rect.y + outerR,  thickness, rect.h - 2*outerR};
+        SDL_RenderFillRect(r, &top);
+        SDL_RenderFillRect(r, &bot);
+        SDL_RenderFillRect(r, &left);
+        SDL_RenderFillRect(r, &right);
+
+        for (int dy = 0; dy <= outerR; ++dy) {
+            int outerDx = (int)std::sqrt(std::max(0.0, (double)(outerR*outerR - dy*dy)));
+            int innerDx = (innerR > 0 && dy < innerR)
+                ? (int)std::sqrt(std::max(0.0, (double)(innerR*innerR - dy*dy)))
+                : 0;
+
+            int row_top = rect.y + outerR - dy;
+            SDL_RenderDrawLine(r, rect.x + outerR - outerDx, row_top,
+                                  rect.x + outerR - innerDx, row_top);
+            SDL_RenderDrawLine(r, rect.x + rect.w - outerR + innerDx, row_top,
+                                  rect.x + rect.w - outerR + outerDx, row_top);
+
+            int row_bot = rect.y + rect.h - outerR + dy;
+            SDL_RenderDrawLine(r, rect.x + outerR - outerDx, row_bot,
+                                  rect.x + outerR - innerDx, row_bot);
+            SDL_RenderDrawLine(r, rect.x + rect.w - outerR + innerDx, row_bot,
+                                  rect.x + rect.w - outerR + outerDx, row_bot);
         }
-        return primary ? primary : fallback;
     }
 
-    void drawInsetRect(SDL_Renderer* renderer, const SDL_Rect& rect, SDL_Color fill, SDL_Color border) {
-        SDL_SetRenderDrawColor(renderer, fill.r, fill.g, fill.b, fill.a);
-        SDL_RenderFillRect(renderer, &rect);
-        SDL_SetRenderDrawColor(renderer, border.r, border.g, border.b, border.a);
-        SDL_RenderDrawRect(renderer, &rect);
-    }
-}
-
-void RenderCard::drawCardFace(SDL_Renderer* renderer, RenderText& textRenderer, const Card& card, const SDL_Rect& rect,
-                              TTF_Font* titleFont, TTF_Font* bodyFont, bool dimmed) {
-    if (!renderer || !titleFont || !bodyFont) return;
-
-    const SDL_Color frame = dimmed ? SDL_Color{120, 120, 120, 255} : SDL_Color{210, 200, 170, 255};
-    const SDL_Color border = dimmed ? SDL_Color{60, 60, 60, 255} : SDL_Color{30, 24, 20, 255};
-    const SDL_Color panel = dimmed ? SDL_Color{135, 135, 135, 255} : SDL_Color{235, 230, 215, 255};
-    const SDL_Color ink = dimmed ? SDL_Color{80, 80, 80, 255} : SDL_Color{20, 18, 16, 255};
-
-    drawInsetRect(renderer, rect, frame, border);
-
-    const int innerPadding = std::max(6, rect.w / 14);
-    const int titleBarHeight = std::max(22, rect.h / 8);
-    const int artBoxHeight = std::max(68, rect.h / 3);
-
-    SDL_Rect titleBar{rect.x + innerPadding, rect.y + innerPadding, rect.w - innerPadding * 2, titleBarHeight};
-    drawInsetRect(renderer, titleBar, panel, border);
-
-    SDL_Rect artBox{rect.x + innerPadding, titleBar.y + titleBar.h + innerPadding, rect.w - innerPadding * 2, artBoxHeight};
-    drawInsetRect(renderer, artBox, dimmed ? SDL_Color{110, 110, 110, 255} : SDL_Color{160, 170, 190, 255}, border);
-
-    SDL_Rect textBox{rect.x + innerPadding, artBox.y + artBox.h + innerPadding, rect.w - innerPadding * 2, rect.y + rect.h - (artBox.y + artBox.h + innerPadding) - innerPadding};
-    drawInsetRect(renderer, textBox, panel, border);
-
-    const std::string manaText = std::to_string(card.getManaCost());
-    TTF_Font* manaFont = bodyFont ? bodyFont : titleFont;
-    int manaTextW = 0;
-    int manaTextH = 0;
-    measureText(manaFont, manaText, manaTextW, manaTextH);
-
-    const int manaPadding = 4;
-    int manaBoxSize = std::max(16, titleBar.h - 4);
-    if (manaTextW > 0 && manaTextH > 0) {
-        manaBoxSize = std::max(manaBoxSize, std::max(manaTextW + manaPadding * 2, manaTextH + manaPadding * 2));
-    }
-    const int maxManaSize = rect.w - innerPadding * 2;
-    if (manaBoxSize > maxManaSize) manaBoxSize = maxManaSize;
-
-    const int manaX = rect.x + rect.w - manaBoxSize - innerPadding;
-    int manaY = titleBar.y + (titleBar.h - manaBoxSize) / 2;
-    if (manaY < rect.y + innerPadding) manaY = rect.y + innerPadding;
-
-    SDL_Rect manaGem{manaX, manaY, manaBoxSize, manaBoxSize};
-    drawInsetRect(renderer, manaGem, dimmed ? SDL_Color{120, 120, 120, 255} : SDL_Color{200, 170, 80, 255}, border);
-
-    const int titleRightEdge = manaGem.x - 6;
-    const int titleMaxWidth = std::max(0, titleRightEdge - (titleBar.x + 6));
-    TTF_Font* titleUse = chooseFontForWidth(titleFont, bodyFont, card.getName(), titleMaxWidth);
-    const std::string titleText = truncateWithEllipsis(titleUse, card.getName(), titleMaxWidth);
-
-    SDL_Rect titleClip{titleBar.x + 4, titleBar.y + 2, titleMaxWidth, titleBar.h - 4};
-    SDL_RenderSetClipRect(renderer, &titleClip);
-    textRenderer.drawText(renderer, titleText, titleUse, ink, titleBar.x + 6, titleBar.y + 4);
-    SDL_RenderSetClipRect(renderer, nullptr);
-
-    if (manaFont) {
-        if (manaTextW == 0 || manaTextH == 0) {
-            measureText(manaFont, manaText, manaTextW, manaTextH);
+    // ── mana gem (filled circle with gradient) ────────────────────────
+    void drawManaGem(SDL_Renderer* r, RenderText& tr, TTF_Font* font,
+                     int mana, int cx, int cy, int radius, const RarityPalette& pal) {
+        SDL_SetRenderDrawBlendMode(r, SDL_BLENDMODE_BLEND);
+        for (int dy = -radius; dy <= radius; ++dy) {
+            int dx = (int)std::sqrt((double)(radius*radius - dy*dy));
+            SDL_SetRenderDrawColor(r, 0, 0, 0, 100);
+            SDL_RenderDrawLine(r, cx - dx + 2, cy + dy + 2, cx + dx + 2, cy + dy + 2);
         }
-        const int manaTextX = manaGem.x + (manaGem.w - manaTextW) / 2;
-        const int manaTextY = manaGem.y + (manaGem.h - manaTextH) / 2;
-        textRenderer.drawText(renderer, manaText, manaFont, ink, manaTextX, manaTextY);
+        SDL_Color gem = pal.manaGem;
+        for (int dy = -radius; dy <= radius; ++dy) {
+            int dx = (int)std::sqrt((double)(radius*radius - dy*dy));
+            float t = (float)(dy + radius) / (2.0f * radius);
+            SDL_Color row{
+                (Uint8)std::min(255, (int)(gem.r + (1.0f - t) * 55)),
+                (Uint8)std::min(255, (int)(gem.g + (1.0f - t) * 55)),
+                (Uint8)std::min(255, (int)(gem.b + (1.0f - t) * 55)),
+                255
+            };
+            SDL_SetRenderDrawColor(r, row.r, row.g, row.b, row.a);
+            SDL_RenderDrawLine(r, cx - dx, cy + dy, cx + dx, cy + dy);
+        }
+        SDL_SetRenderDrawColor(r, 255, 255, 255, 160);
+        for (int dy = -radius; dy <= radius; ++dy) {
+            int dx = (int)std::sqrt((double)(radius*radius - dy*dy));
+            SDL_RenderDrawPoint(r, cx - dx, cy + dy);
+            SDL_RenderDrawPoint(r, cx + dx, cy + dy);
+        }
+        const std::string s = std::to_string(mana);
+        int tw = 0, th = 0;
+        measureText(font, s, tw, th);
+        tr.drawText(r, s, font, SDL_Color{255, 255, 255, 255}, cx - tw/2, cy - th/2);
     }
 
-    textRenderer.drawText(renderer, "Value: " + std::to_string(card.getManaValue()), bodyFont, ink, textBox.x + 4, textBox.y + 4);
+    // ── shared card body draw ─────────────────────────────────────────
+    void drawCardBody(SDL_Renderer* renderer, const SDL_Rect& rect, int cornerRadius,
+                      SDL_Color artColor, SDL_Color infoBg, int artH) {
+        fillRoundedRect(renderer, rect, cornerRadius, infoBg);
+        SDL_Rect artRect{rect.x, rect.y, rect.w, artH};
+        fillRoundedRect(renderer, artRect, cornerRadius, artColor);
+        SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+        for (int y = cornerRadius; y < artH; ++y) {
+            float t = (float)y / artH;
+            Uint8 alpha = (Uint8)(210 * (t * t * t));
+            SDL_SetRenderDrawColor(renderer, 0, 0, 0, alpha);
+            SDL_RenderDrawLine(renderer, rect.x + 2, rect.y + y, rect.x + rect.w - 3, rect.y + y);
+        }
+    }
 
-    const std::string effectText = card.getText();
-    const bool hasEffect = effectText.find_first_not_of(" \t\n\r") != std::string::npos;
-    if (hasEffect) {
-        const int lineSkip = TTF_FontLineSkip(bodyFont);
-        const int effectY = textBox.y + 4 + lineSkip;
-        const int effectW = textBox.w - 8;
-        const int effectH = textBox.h - (effectY - textBox.y) - 4;
+    // ── compact card (hand/board) ──────────────────────────────────────
+    void drawCompact(SDL_Renderer* renderer, RenderText& textRenderer,
+                     const Card& card, const SDL_Rect& rect,
+                     TTF_Font* titleFont, TTF_Font* bodyFont, bool dimmed) {
 
-        SDL_Rect clipRect{textBox.x + 4, effectY, effectW, effectH};
-        SDL_RenderSetClipRect(renderer, &clipRect);
+        const RarityPalette pal = rarityFromMana(card.getManaCost());
+        const int cornerRadius  = std::max(8, rect.w / 7);
+        const int borderThick   = 3;
+        const int bannerH       = std::max(22, rect.h / 5);
+        const int artH          = rect.h - bannerH;
 
-        SDL_Surface* effectSurface = TTF_RenderUTF8_Blended_Wrapped(bodyFont, effectText.c_str(), ink, effectW);
-        if (effectSurface) {
-            SDL_Texture* effectTexture = SDL_CreateTextureFromSurface(renderer, effectSurface);
-            if (effectTexture) {
-                SDL_Rect effectDst{clipRect.x, clipRect.y, effectSurface->w, effectSurface->h};
-                SDL_RenderCopy(renderer, effectTexture, nullptr, &effectDst);
-                SDL_DestroyTexture(effectTexture);
+        const auto* creature = dynamic_cast<const CreatureCard*>(&card);
+        SDL_Color artColor = dimmed ? SDL_Color{70, 60, 85, 255}
+                           : (creature ? SDL_Color{110, 85, 145, 255}
+                                       : SDL_Color{75, 105, 145, 255});
+
+        drawCardBody(renderer, rect, cornerRadius, artColor, pal.nameBg, artH);
+
+        drawRoundedBorder(renderer, rect, cornerRadius, SDL_Color{0,0,0,200}, 1);
+        drawRoundedBorder(renderer, {rect.x+1, rect.y+1, rect.w-2, rect.h-2},
+                          cornerRadius-1, pal.border, borderThick);
+        drawRoundedBorder(renderer, {rect.x+borderThick+1, rect.y+borderThick+1,
+                                     rect.w-2*(borderThick+1), rect.h-2*(borderThick+1)},
+                          std::max(2, cornerRadius-borderThick-1), pal.borderInner, 1);
+
+        SDL_SetRenderDrawColor(renderer, pal.border.r, pal.border.g, pal.border.b, 180);
+        SDL_RenderDrawLine(renderer, rect.x + cornerRadius, rect.y + artH,
+                           rect.x + rect.w - cornerRadius, rect.y + artH);
+
+        const std::string nameText = truncateWithEllipsis(titleFont, card.getName(), rect.w - 8);
+        int nw=0, nh=0;
+        measureText(titleFont, nameText, nw, nh);
+        textRenderer.drawText(renderer, nameText, titleFont,
+                              SDL_Color{255, 245, 210, 255},
+                              rect.x + (rect.w - nw) / 2,
+                              rect.y + artH + (bannerH - nh) / 2);
+
+        if (creature) {
+            const std::string statsText = std::to_string(creature->getPower()) + "/" +
+                                          std::to_string(creature->getToughness());
+            int sw=0, sh=0;
+            measureText(bodyFont, statsText, sw, sh);
+            const int bp = 4;
+            SDL_Rect badge{rect.x + rect.w - sw - bp*2 - 4,
+                           rect.y + artH - sh - bp - 4,
+                           sw + bp*2, sh + bp};
+            fillRoundedRect(renderer, badge, 3, SDL_Color{170, 120, 45, 235});
+            drawRoundedBorder(renderer, badge, 3, SDL_Color{220, 175, 70, 255}, 1);
+            textRenderer.drawText(renderer, statsText, bodyFont,
+                                  SDL_Color{255, 245, 200, 255},
+                                  badge.x + bp, badge.y + bp/2);
+        }
+
+        const int gemR   = std::max(9, rect.w / 7);
+        const int gemOff = borderThick + 3;
+        drawManaGem(renderer, textRenderer, bodyFont,
+                    card.getManaCost(),
+                    rect.x + gemR + gemOff,
+                    rect.y + gemR + gemOff,
+                    gemR, pal);
+    }
+
+    // ── full preview card ──────────────────────────────────────────────
+    void drawFull(SDL_Renderer* renderer, RenderText& textRenderer,
+                  const Card& card, const SDL_Rect& rect,
+                  TTF_Font* titleFont, TTF_Font* bodyFont, bool dimmed, int scrollOffset) {
+
+        const RarityPalette pal = rarityFromMana(card.getManaCost());
+        const int cornerRadius  = std::max(10, rect.w / 8);
+        const int borderThick   = 4;
+        const int infoH         = rect.h * 2 / 5;
+        const int artH          = rect.h - infoH;
+
+        const auto* creature = dynamic_cast<const CreatureCard*>(&card);
+        SDL_Color artColor = dimmed ? SDL_Color{70, 60, 85, 255}
+                           : (creature ? SDL_Color{100, 75, 140, 255}
+                                       : SDL_Color{65,  95, 140, 255});
+
+        SDL_Color glow = pal.border;
+        glow.a = 130;
+        drawRoundedBorder(renderer, {rect.x-3, rect.y-3, rect.w+6, rect.h+6},
+                          cornerRadius+3, glow, 4);
+
+        drawCardBody(renderer, rect, cornerRadius, artColor, pal.nameBg, artH);
+
+        drawRoundedBorder(renderer, rect, cornerRadius, SDL_Color{0,0,0,220}, 1);
+        drawRoundedBorder(renderer, {rect.x+1, rect.y+1, rect.w-2, rect.h-2},
+                          cornerRadius-1, pal.border, borderThick);
+        drawRoundedBorder(renderer, {rect.x+borderThick+1, rect.y+borderThick+1,
+                                     rect.w-2*(borderThick+1), rect.h-2*(borderThick+1)},
+                          std::max(2, cornerRadius-borderThick-1), pal.borderInner, 1);
+
+        SDL_Rect infoRect{rect.x, rect.y + artH, rect.w, infoH};
+        SDL_SetRenderDrawColor(renderer, pal.border.r, pal.border.g, pal.border.b, 180);
+        SDL_RenderDrawLine(renderer, rect.x + cornerRadius, rect.y + artH,
+                           rect.x + rect.w - cornerRadius, rect.y + artH);
+
+        const int pad = std::max(10, rect.w / 12);
+        const int maxNameW = rect.w - pad * 2 - 20;  // 20px extra margin for tighter wrapping
+        const std::string nameText = card.getName();
+
+        int nw = 0, nh = 0;
+        measureText(titleFont, nameText, nw, nh);
+
+        if (nw > maxNameW) {
+            SDL_Surface* nameSurf = TTF_RenderUTF8_Blended_Wrapped(
+                titleFont, nameText.c_str(), 
+                SDL_Color{255, 245, 200, 255}, 
+                maxNameW
+            );
+            if (nameSurf) {
+                SDL_Texture* nameTex = SDL_CreateTextureFromSurface(renderer, nameSurf);
+                if (nameTex) {
+                    SDL_Rect dst{
+                        infoRect.x + (infoRect.w - nameSurf->w) / 2,
+                        infoRect.y + 10,
+                        nameSurf->w,
+                        nameSurf->h
+                    };
+                    SDL_RenderCopy(renderer, nameTex, nullptr, &dst);
+                    SDL_DestroyTexture(nameTex);
+                    nh = nameSurf->h;
+                }
+                SDL_FreeSurface(nameSurf);
             }
-            SDL_FreeSurface(effectSurface);
+        } else {
+            textRenderer.drawText(renderer, nameText, titleFont,
+                                  SDL_Color{255, 245, 200, 255},
+                                  infoRect.x + (infoRect.w - nw) / 2,
+                                  infoRect.y + 10);
         }
 
-        SDL_RenderSetClipRect(renderer, nullptr);
+        const std::string effectText = card.getText();
+        const bool hasEffect = !effectText.empty() &&
+                               effectText.find_first_not_of(" \t\n\r") != std::string::npos;
+        const int effectY    = infoRect.y + nh + 16;
+        const int effectW    = rect.w - pad*2;
+        const int effectMaxH = rect.y + rect.h - effectY - (creature ? 36 : 14);
+
+        if (hasEffect && effectMaxH > 0) {
+            SDL_Surface* surf = TTF_RenderUTF8_Blended_Wrapped(
+                bodyFont, effectText.c_str(), SDL_Color{215, 210, 195, 255}, effectW);
+            
+            if (surf) {
+                SDL_Texture* tex = SDL_CreateTextureFromSurface(renderer, surf);
+                if (tex) {
+                    SDL_Rect clip{infoRect.x + pad, effectY, effectW, effectMaxH};
+                    SDL_RenderSetClipRect(renderer, &clip);
+                    
+                    SDL_Rect dst{clip.x, clip.y - scrollOffset, surf->w, surf->h};
+                    SDL_RenderCopy(renderer, tex, nullptr, &dst);
+                    
+                    SDL_RenderSetClipRect(renderer, nullptr);
+                    
+                    if (surf->h > effectMaxH) {
+                        SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+                        
+                        if (scrollOffset < surf->h - effectMaxH) {
+                            SDL_SetRenderDrawColor(renderer, 255, 245, 200, 200);
+                            int arrowY = clip.y + clip.h - 8;
+                            int arrowX = clip.x + clip.w / 2;
+                            for (int i = 0; i < 5; i++) {
+                                SDL_RenderDrawLine(renderer, arrowX - i, arrowY - i, 
+                                                 arrowX + i, arrowY - i);
+                            }
+                        }
+                        
+                        if (scrollOffset > 0) {
+                            SDL_SetRenderDrawColor(renderer, 255, 245, 200, 200);
+                            int arrowY = clip.y + 8;
+                            int arrowX = clip.x + clip.w / 2;
+                            for (int i = 0; i < 5; i++) {
+                                SDL_RenderDrawLine(renderer, arrowX - i, arrowY + i, 
+                                                 arrowX + i, arrowY + i);
+                            }
+                        }
+                    }
+                    
+                    SDL_DestroyTexture(tex);
+                }
+                SDL_FreeSurface(surf);
+            }
+        }
+
+        if (creature) {
+            const std::string statsText = std::to_string(creature->getPower()) + "/" +
+                                          std::to_string(creature->getToughness());
+            int sw=0, sh=0;
+            measureText(bodyFont, statsText, sw, sh);
+            const int bp = 7;
+            SDL_Rect badge{rect.x + rect.w - sw - bp*2 - pad,
+                           rect.y + rect.h - sh - bp - 10,
+                           sw + bp*2, sh + bp};
+            fillRoundedRect(renderer, badge, 5, SDL_Color{170, 120, 45, 240});
+            drawRoundedBorder(renderer, badge, 5, SDL_Color{225, 180, 70, 255}, 2);
+            textRenderer.drawText(renderer, statsText, bodyFont,
+                                  SDL_Color{255, 245, 200, 255},
+                                  badge.x + bp, badge.y + bp/2);
+        }
+
+        const int gemR   = std::max(12, rect.w / 9);
+        const int gemOff = borderThick + 5;
+        drawManaGem(renderer, textRenderer, titleFont,
+                    card.getManaCost(),
+                    rect.x + gemR + gemOff,
+                    rect.y + gemR + gemOff,
+                    gemR, pal);
     }
 
-    const auto* creature = dynamic_cast<const CreatureCard*>(&card);
-    if (creature) {
-        SDL_Rect statsBox{rect.x + rect.w - 38, rect.y + rect.h - 22, 30, 16};
-        drawInsetRect(renderer, statsBox, panel, border);
-        const std::string statsText = std::to_string(creature->getPower()) + "/" + std::to_string(creature->getToughness());
-        textRenderer.drawText(renderer, statsText, bodyFont, ink, statsBox.x + 4, statsBox.y + 1);
-    }
+} // namespace
+
+// ── public API ───────────────────────────────────────────────────────────────
+
+void RenderCard::drawCardFace(SDL_Renderer* renderer, RenderText& textRenderer, const Card& card,
+                              const SDL_Rect& rect, TTF_Font* titleFont, TTF_Font* bodyFont,
+                              bool dimmed, bool compact, int scrollOffset) {
+    if (!renderer || !titleFont || !bodyFont) return;
+    if (compact)
+        drawCompact(renderer, textRenderer, card, rect, titleFont, bodyFont, dimmed);
+    else
+        drawFull(renderer, textRenderer, card, rect, titleFont, bodyFont, dimmed, scrollOffset);
 }
 
-void RenderCard::drawHandCard(SDL_Renderer* renderer, RenderText& textRenderer, const Card& card, const SDL_Rect& cardRect, TTF_Font* fontSmall) {
-    if (!renderer || !fontSmall) return;
-    drawCardFace(renderer, textRenderer, card, cardRect, fontSmall, fontSmall, false);
+void RenderCard::drawHandCard(SDL_Renderer* renderer, RenderText& textRenderer, const Card& card,
+                              const SDL_Rect& cardRect, TTF_Font* titleFont, TTF_Font* bodyFont) {
+    if (!renderer || !titleFont || !bodyFont) return;
+    drawCardFace(renderer, textRenderer, card, cardRect, titleFont, bodyFont, false, true);
 }
 
-void RenderCard::drawBoardCard(SDL_Renderer* renderer, RenderText& textRenderer, const Card& card, const SDL_Rect& cardRect, TTF_Font* fontSmall) {
-    if (!renderer || !fontSmall) return;
-    drawCardFace(renderer, textRenderer, card, cardRect, fontSmall, fontSmall, false);
+void RenderCard::drawBoardCard(SDL_Renderer* renderer, RenderText& textRenderer, const Card& card,
+                               const SDL_Rect& cardRect, TTF_Font* titleFont, TTF_Font* bodyFont) {
+    if (!renderer || !titleFont || !bodyFont) return;
+    drawCardFace(renderer, textRenderer, card, cardRect, titleFont, bodyFont, false, true);
 }
 
-void RenderCard::drawPreview(SDL_Renderer* renderer, RenderText& textRenderer, const Card& card, const SDL_Rect& previewRect, TTF_Font* fontSmall, TTF_Font* fontLarge) {
-    if (!renderer || !fontSmall || !fontLarge) return;
-    drawCardFace(renderer, textRenderer, card, previewRect, fontLarge, fontSmall, false);
+void RenderCard::drawPreview(SDL_Renderer* renderer, RenderText& textRenderer, const Card& card,
+                             const SDL_Rect& previewRect, TTF_Font* bodyFont, TTF_Font* titleFont, int scrollOffset) {
+    if (!renderer || !bodyFont || !titleFont) return;
+    drawCardFace(renderer, textRenderer, card, previewRect, titleFont, bodyFont, false, false, scrollOffset);
 }
 
 void RenderCard::drawCardBack(SDL_Renderer* renderer, const SDL_Rect& cardRect) {
     if (!renderer) return;
-
-    const SDL_Color border{25, 25, 35, 255};
-    const SDL_Color panel{60, 80, 120, 255};
-    const SDL_Color inner{45, 60, 95, 255};
-
-    SDL_SetRenderDrawColor(renderer, panel.r, panel.g, panel.b, panel.a);
-    SDL_RenderFillRect(renderer, &cardRect);
-    SDL_SetRenderDrawColor(renderer, border.r, border.g, border.b, border.a);
-    SDL_RenderDrawRect(renderer, &cardRect);
-
-    SDL_Rect inset{cardRect.x + 6, cardRect.y + 6, cardRect.w - 12, cardRect.h - 12};
-    if (inset.w > 0 && inset.h > 0) {
-        SDL_SetRenderDrawColor(renderer, inner.r, inner.g, inner.b, inner.a);
-        SDL_RenderFillRect(renderer, &inset);
-        SDL_SetRenderDrawColor(renderer, border.r, border.g, border.b, border.a);
-        SDL_RenderDrawRect(renderer, &inset);
+    const int r = std::max(6, cardRect.w / 7);
+    fillRoundedRect(renderer, cardRect, r, SDL_Color{65, 48, 95, 255});
+    drawRoundedBorder(renderer, cardRect, r, SDL_Color{35, 25, 55, 255}, 1);
+    drawRoundedBorder(renderer, {cardRect.x+1, cardRect.y+1, cardRect.w-2, cardRect.h-2},
+                      r-1, SDL_Color{115, 85, 155, 255}, 2);
+    SDL_Rect inset{cardRect.x+8, cardRect.y+8, cardRect.w-16, cardRect.h-16};
+    if (inset.w > 4 && inset.h > 4) {
+        fillRoundedRect(renderer, inset, std::max(3, r-5), SDL_Color{85, 60, 120, 255});
+        drawRoundedBorder(renderer, inset, std::max(3, r-5), SDL_Color{125, 95, 165, 255}, 1);
     }
 }
