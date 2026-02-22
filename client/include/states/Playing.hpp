@@ -11,6 +11,7 @@
 #include "objects/Deck.h"
 #include "core/Board.hpp"
 #include "render/RenderText.hpp"
+#include "animation/animationQueue.hpp"
 
 class Game; // forward declaration to avoid circular include
 
@@ -47,11 +48,14 @@ private:
     Uint32 hoverStartTick{0};
     bool menuOpen{false};
     bool surrendered{false};
+    AnimationQueue animationQueue;
 
     bool pointInRect(const SDL_Rect& rect, int x, int y);
     std::vector<SDL_Rect> computeCardLayout(std::size_t count, int screenW, int screenH) const;
     void computeZones(int screenW, int screenH);
     void computeUiRects(int screenW, int screenH);
+    SDL_Rect computeSelfDeckRect(int screenW, int screenH) const;
+    bool tryDrawCardWithAnimation(Uint32 now);
 
 public:
     Playing(int drawIntervalSeconds = 3);
