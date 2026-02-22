@@ -62,7 +62,7 @@ namespace {
 
     bool sendHttpRequest(const std::string& host, int port, const std::string& method, const std::string& path,
                          const std::string& body, std::string& responseBody) {
-        NetworkClient client;
+        NetworkClient client(NetworkClient::SocketMode::Blocking); // blocking!
         if (!client.connectTo(host, port)) {
             return false;
         }

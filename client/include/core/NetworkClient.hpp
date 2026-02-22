@@ -3,25 +3,39 @@
 
 #include <string>
 
+#ifdef _WIN32
+#include <Winsock2.h>
+#include <Ws2tcpip.h>
+#pragma comment(lib, "Ws2_32.lib")
+#define CLOSE_SOCKET(s) closesocket(s)
+#else
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <unistd.h>
+#include <fcntl.h>
+#define CLOSE_SOCKET(s) close(s)
+#endif
+
 class NetworkClient {
 public:
-    NetworkClient();
-    ~NetworkClient();
+    enum class SocketMode { Blocking, NonBlocking };
 
-    NetworkClient(const NetworkClient&) = delete;
-    NetworkClient& operator=(const NetworkClient&) = delete;
+    NetworkClient(SocketMode mode = SocketMode::Blocking);
+    ~NetworkClient();
 
     bool connectTo(const std::string& ip, int port);
     void disconnect();
-
     bool isConnected() const;
 
     bool send(const void* data, size_t size);
-    int receive(void* buffer, size_t size);
+    int receive(void* buffer, size_t size); // >0=bytes, 0=no data (non-blocking), -1=error/closed
 
 private:
     int socketFd;
     bool connected;
+    SocketMode mode;
 };
 
 

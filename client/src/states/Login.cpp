@@ -49,7 +49,7 @@ namespace {
                   const std::string& path, const std::string& body,
                   int& statusCode, std::string& responseBody) {
         statusCode = -1;
-        NetworkClient client;
+        NetworkClient client(NetworkClient::SocketMode::Blocking); // blocking!
         if (!client.connectTo(host, port)) return false;
 
         std::ostringstream req;

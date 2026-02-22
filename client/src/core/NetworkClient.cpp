@@ -1,31 +1,13 @@
 #include "core/NetworkClient.hpp"
-
-#ifdef _WIN32
-    #include <Winsock2.h>
-    #include <Ws2tcpip.h>
-    #pragma comment(lib, "Ws2_32.lib")
-    //create alias as Winsock returns int datatype
-    // using ssize_t = int;
-    #define CLOSE_SOCKET(s) closesocket(s)
-
-#else
-    #include <sys/types.h>
-    #include <sys/socket.h>
-    #include <netinet/in.h>
-    #include <arpa/inet.h>
-    #include <unistd.h>
-    #define CLOSE_SOCKET(s) close(s)
-#endif
-
+#include <iostream>
 #include <cstring>
 #include <cerrno>
-#include <iostream>
 
-NetworkClient::NetworkClient():socketFd(-1), connected(false) {
+NetworkClient::NetworkClient(SocketMode m) : socketFd(-1), connected(false), mode(m) {
 #ifdef _WIN32
     WSADATA wsaData;
     if (WSAStartup(MAKEWORD(2,2), &wsaData) != 0) {
-        std::cerr<< "WSAStartup failed\n";
+        std::cerr << "WSAStartup failed\n";
     }
 #endif
 }
@@ -38,9 +20,7 @@ NetworkClient::~NetworkClient() {
 }
 
 bool NetworkClient::connectTo(const std::string& ip, int port) {
-    if (connected) {
-        return false;
-    }
+    if (connected) return false;
 
     socketFd = socket(AF_INET, SOCK_STREAM, 0);
     if (socketFd < 0) {
@@ -60,20 +40,42 @@ bool NetworkClient::connectTo(const std::string& ip, int port) {
     }
 
     if (connect(socketFd, (sockaddr*)&serverAddr, sizeof(serverAddr)) < 0) {
-        perror("connect");
-        CLOSE_SOCKET(socketFd);
-        socketFd = -1;
-        return false;
+#ifdef _WIN32
+        int err = WSAGetLastError();
+        if (!(mode == SocketMode::NonBlocking && err == WSAEWOULDBLOCK)) {
+            perror("connect");
+            CLOSE_SOCKET(socketFd);
+            socketFd = -1;
+            return false;
+        }
+#else
+        if (!(mode == SocketMode::NonBlocking && errno == EINPROGRESS)) {
+            perror("connect");
+            CLOSE_SOCKET(socketFd);
+            socketFd = -1;
+            return false;
+        }
+#endif
     }
+
+    // Set socket mode
+#ifdef _WIN32
+    u_long m = (mode == SocketMode::NonBlocking ? 1 : 0);
+    ioctlsocket(socketFd, FIONBIO, &m);
+#else
+    int flags = fcntl(socketFd, F_GETFL, 0);
+    if (mode == SocketMode::NonBlocking)
+        fcntl(socketFd, F_SETFL, flags | O_NONBLOCK);
+    else
+        fcntl(socketFd, F_SETFL, flags & ~O_NONBLOCK);
+#endif
 
     connected = true;
     return true;
 }
 
 void NetworkClient::disconnect() {
-    if (!connected) {
-        return;
-    }
+    if (!connected) return;
     CLOSE_SOCKET(socketFd);
     socketFd = -1;
     connected = false;
@@ -84,55 +86,52 @@ bool NetworkClient::isConnected() const {
 }
 
 bool NetworkClient::send(const void* data, size_t size) {
-    if (!connected) {
-        return false;
-    }
-
+    if (!connected) return false;
     const char* buffer = static_cast<const char*>(data);
     size_t totalSent = 0;
 
     while (totalSent < size) {
-        ssize_t sent = ::send(
-            socketFd,
-            buffer + totalSent,
-            size - totalSent,
-            0
-        );
-
-        if (sent<=0) {
+#ifdef _WIN32
+        int sent = ::send(socketFd, buffer + totalSent, (int)(size - totalSent), 0);
+        if (sent < 0) {
+            int err = WSAGetLastError();
+            if (mode == SocketMode::NonBlocking && err == WSAEWOULDBLOCK) continue;
+#else
+        ssize_t sent = ::send(socketFd, buffer + totalSent, size - totalSent, 0);
+        if (sent < 0) {
+            if (mode == SocketMode::NonBlocking && (errno == EWOULDBLOCK || errno == EAGAIN)) continue;
+#endif
             perror("send");
             disconnect();
             return false;
         }
-
-        totalSent+=sent;
+        totalSent += sent;
     }
-
     return true;
 }
 
-//2 meaningful return values
-/* >0 -> no. bytes received
-   -1 -> dead connection
-*/
 int NetworkClient::receive(void* buffer, size_t size) {
-    if (!connected) {
-        return -1;
-    }
+    if (!connected) return -1;
 
-    //recv will return 1 of 3 values (>0, 0, <0)
 #ifdef _WIN32
-    int received = ::recv(socketFd, static_cast<char*>(buffer), static_cast<int>(size), 0);
+    int received = ::recv(socketFd, static_cast<char*>(buffer), (int)size, 0);
 #else
     ssize_t received = ::recv(socketFd, buffer, size, 0);
 #endif
 
-    if (received <= 0) { //connection closed by peer gracefully
-        if (received < 0) { // error occurred
-            perror("recv");
-        }
-            disconnect();
-            return -1;
+    if (received == 0) { disconnect(); return -1; }
+
+    if (received < 0) {
+#ifdef _WIN32
+        int err = WSAGetLastError();
+        if (mode == SocketMode::NonBlocking && err == WSAEWOULDBLOCK) return 0;
+#else
+        if (mode == SocketMode::NonBlocking && (errno == EWOULDBLOCK || errno == EAGAIN)) return 0;
+#endif
+        perror("recv");
+        disconnect();
+        return -1;
     }
+
     return static_cast<int>(received);
 }
