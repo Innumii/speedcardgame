@@ -33,6 +33,53 @@ void Playing::setDeck(Deck newDeck) {
     deck = std::move(newDeck);
 }
 
+SDL_Rect Playing::computeSelfDeckRect(int screenW, int screenH) const {
+    if (screenW <= 0 || screenH <= 0 || playSlots.empty()) {
+        return SDL_Rect{0, 0, 0, 0};
+    }
+
+    const int gap = 18;
+    const int margin = 10;
+    const int deckW = discardZone.w > 0 ? discardZone.w : 110;
+    const int deckH = discardZone.h > 0 ? discardZone.h : 130;
+    const int deckY = playSlots.front().y + (playSlots.front().h - deckH) / 2;
+
+    int deckX = playSlots.back().x + playSlots.back().w + gap;
+    if (deckX + deckW > screenW - margin) deckX = std::max(margin, screenW - margin - deckW);
+
+    return SDL_Rect{deckX, deckY, deckW, deckH};
+}
+
+bool Playing::tryDrawCardWithAnimation(Uint32 now) {
+    if (player.handFull()) {
+        return false;
+    }
+
+    const std::size_t handSizeBefore = player.hand.size();
+    player.drawCard(deck);
+
+    if (player.hand.size() <= handSizeBefore || !renderer) {
+        return false;
+    }
+
+    int screenW = 0;
+    int screenH = 0;
+    if (SDL_GetRendererOutputSize(renderer, &screenW, &screenH) != 0) {
+        return false;
+    }
+
+    cardRects = computeCardLayout(player.hand.size(), screenW, screenH);
+    computeZones(screenW, screenH);
+
+    const SDL_Rect fromRect = computeSelfDeckRect(screenW, screenH);
+    const std::size_t handIndex = player.hand.size() - 1;
+    if (handIndex < cardRects.size()) {
+        animationQueue.enqueueDrawCard(fromRect, cardRects[handIndex], handIndex, 320);
+    }
+
+    return true;
+}
+
 void Playing::setup(Game& game) {
     renderer = game.getRenderer();
     if (!renderer) {
@@ -46,6 +93,7 @@ void Playing::setup(Game& game) {
     hoverStartTick = 0;
     menuOpen = false;
     surrendered = false;
+    animationQueue.clear();
 
     if (!RenderText::ensureTtfReady()) {
         throw std::runtime_error(std::string("TTF_Init failed: ") + TTF_GetError());
@@ -178,9 +226,9 @@ void Playing::computeZones(int screenW, int screenH) {
         playZoneBand = SDL_Rect{0,0,0,0};
     }
 
-    int discardX = startX + totalSlotsWidth + gapToDiscard;
-    if (discardX + discardWidth + margin > screenW) {
-        discardX = screenW - discardWidth - margin;
+    int discardX = startX - gapToDiscard - discardWidth;
+    if (discardX < margin) {
+        discardX = margin;
     }
 
     int discardY = slotY + (slotHeight - discardHeight) / 2;
@@ -286,9 +334,16 @@ void Playing::handleEvents(Game& game, const SDL_Event& event) {
                 const bool droppedInDiscard =
                     drag.index < player.hand.size() &&
                     pointInRect(discardZone, releaseX, releaseY);
-                const bool droppedInPlay = 
-                    drag.index < player.hand.size() &&
-                    pointInRect(playZoneBand, releaseX, releaseY);
+                int laneIndex = -1;
+                if (drag.index < player.hand.size()) {
+                    for (std::size_t slot = 0; slot < playSlots.size(); ++slot) {
+                        if (pointInRect(playSlots[slot], releaseX, releaseY)) {
+                            laneIndex = static_cast<int>(slot);
+                            break;
+                        }
+                    }
+                }
+                const bool droppedInPlay = laneIndex >= 0;
                 
                 if (droppedInDiscard) {
                     std::cout << "Discarding " << player.hand[drag.index].get()->getName() << "\n";
@@ -306,16 +361,6 @@ void Playing::handleEvents(Game& game, const SDL_Event& event) {
                     //move card to board object
                     //if succeed, cut mana by cost
                     //erase card from hand
-
-                    //Determine lane
-                    const int laneWidth = playSlots.front().w; // assuming uniform width
-                    const int laneSpacing = (playSlots.size() > 1)
-                        ? playSlots[1].x - (playSlots[0].x + playSlots[0].w)
-                        : 0;
-
-                    const int relativeX = releaseX - playZoneBand.x;
-                    const int bandSegmentWidth = laneWidth + laneSpacing;
-                    int laneIndex = relativeX / bandSegmentWidth;
 
                     if (laneIndex >= 0 && laneIndex < static_cast<int>(playSlots.size())) {
                         std::cout << "Playing " << player.hand[drag.index]->getName()
@@ -361,10 +406,9 @@ void Playing::run() {
         }
 
         const Uint32 now = SDL_GetTicks();
+        animationQueue.update(now);
         if (now - lastDrawTick >= static_cast<Uint32>(drawIntervalSeconds * 1000)) {
-            if (!player.handFull()) {
-                player.drawCard(deck);
-            }
+            tryDrawCardWithAnimation(now);
             lastDrawTick = now;
         }
     }
@@ -375,10 +419,9 @@ void Playing::update(Game& /*game*/) {
     if (surrendered) return;
 
     const Uint32 now = SDL_GetTicks();
+    animationQueue.update(now);
     if (now - lastDrawTick >= static_cast<Uint32>(drawIntervalSeconds * 1000)) {
-        if (!player.handFull()) {
-            player.drawCard(deck);
-        }
+        tryDrawCardWithAnimation(now);
         lastDrawTick = now;
     }
 }

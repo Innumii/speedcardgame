@@ -92,7 +92,7 @@ void RenderBoard::drawDiscardZone(SDL_Renderer* renderer, RenderText& textRender
 	);
 }
 
-void RenderBoard::drawBoardState(SDL_Renderer* renderer, RenderText& textRenderer, const Board& board, const std::vector<SDL_Rect>& playSlots, TTF_Font* fontSmall) {
+void RenderBoard::drawBoardState(SDL_Renderer* renderer, RenderText& textRenderer, const Board& board, const std::vector<SDL_Rect>& playSlots, int localPlayerId, TTF_Font* fontSmall) {
 	if (!renderer || !fontSmall) return;
 	if (playSlots.empty()) return;
 
@@ -104,8 +104,8 @@ void RenderBoard::drawBoardState(SDL_Renderer* renderer, RenderText& textRendere
 				if (!card) continue;
 
 				SDL_Rect rect = playSlots[lane];
-				if (pid == 1) {
-					rect.y -= 50;
+				if (pid != localPlayerId) {
+					rect.y -= 200;
 				}
 
 				RenderCard::drawBoardCard(renderer, textRenderer, *card, rect, fontSmall);

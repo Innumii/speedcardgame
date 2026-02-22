@@ -33,12 +33,12 @@ namespace {
 		const int leftEdge = playSlots.front().x - gap;
 		const int rightEdge = playSlots.back().x + playSlots.back().w + gap;
 
-		int discardX = leftEdge - discardW;
-		if (discardX < margin) discardX = margin;
+		int deckX = leftEdge - discardW;
+		if (deckX < margin) deckX = margin;
 
-		int deckX = rightEdge;
-		if (deckX + discardW > screenW - margin) {
-			deckX = std::max(margin, screenW - margin - discardW);
+		int discardX = rightEdge;
+		if (discardX + discardW > screenW - margin) {
+			discardX = std::max(margin, screenW - margin - discardW);
 		}
 
 		SDL_Rect opponentDiscard{discardX, discardY, discardW, discardH};
@@ -72,7 +72,7 @@ namespace {
 	}
 
 	void drawSelfDeck(SDL_Renderer* renderer, RenderText& textRenderer, const std::vector<SDL_Rect>& playSlots,
-			const SDL_Rect& playerDiscardZone, int deckSize, TTF_Font* fontSmall) {
+			const SDL_Rect& playerDiscardZone, int deckSize, int screenW, TTF_Font* fontSmall) {
 		if (!renderer || !fontSmall) return;
 		if (playSlots.empty()) return;
 
@@ -82,8 +82,8 @@ namespace {
 		const int deckH = playerDiscardZone.h > 0 ? playerDiscardZone.h : 130;
 		const int deckY = playSlots.front().y + (playSlots.front().h - deckH) / 2;
 
-		int deckX = playSlots.front().x - gap - deckW;
-		if (deckX < margin) deckX = margin;
+		int deckX = playSlots.back().x + playSlots.back().w + gap;
+		if (deckX + deckW > screenW - margin) deckX = std::max(margin, screenW - margin - deckW);
 
 		SDL_Rect deckBase{deckX, deckY, deckW, deckH};
 		const int stackCount = static_cast<int>(std::min<int>(deckSize, 5));
@@ -184,6 +184,8 @@ void RenderPlaying::render(Playing& playing, Game& game) {
 	const bool hoveringReturn = playing.surrendered && playing.pointInRect(playing.returnToTitleButton, mouseX, mouseY);
 
 	const bool draggingCard = playing.drag.active && playing.drag.index < playing.player.hand.size();
+	const bool hasActiveDrawCard = playing.animationQueue.hasActiveDrawCard();
+	const std::size_t activeDrawCardIndex = playing.animationQueue.getActiveDrawCardHandIndex();
 
 	std::size_t newHoverIndex = static_cast<std::size_t>(-1);
 	if (!draggingCard) {
@@ -224,6 +226,7 @@ void RenderPlaying::render(Playing& playing, Game& game) {
 		playing.playSlots,
 		playing.discardZone,
 		playing.deck.size(),
+		screenW,
 		playing.fonts.small
 	);
 
@@ -233,12 +236,17 @@ void RenderPlaying::render(Playing& playing, Game& game) {
 
 	for (std::size_t i = 0; i < playing.player.hand.size(); ++i) {
 		if (draggingCard && i == playing.drag.index) continue;
+		if (hasActiveDrawCard && i == activeDrawCardIndex) continue;
 		if (i < playing.cardRects.size() && playing.player.hand[i]) {
 			RenderCard::drawHandCard(renderer, textRenderer, *playing.player.hand[i], playing.cardRects[i], playing.fonts.small);
 		}
 	}
 
-	RenderBoard::drawBoardState(renderer, textRenderer, playing.board, playing.playSlots, playing.fonts.small);
+	if (hasActiveDrawCard) {
+		RenderCard::drawCardBack(renderer, playing.animationQueue.getActiveDrawCardRect());
+	}
+
+	RenderBoard::drawBoardState(renderer, textRenderer, playing.board, playing.playSlots, playing.player.id, playing.fonts.small);
 
 	if (draggingCard && playing.drag.index < playing.cardRects.size()) {
 		SDL_Rect floating = playing.cardRects[playing.drag.index];
