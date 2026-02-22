@@ -44,6 +44,8 @@ void Playing::setup(Game& game) {
     drag = DragState{};
     hoverIndex = static_cast<std::size_t>(-1);
     hoverStartTick = 0;
+    menuOpen = false;
+    surrendered = false;
 
     if (!RenderText::ensureTtfReady()) {
         throw std::runtime_error(std::string("TTF_Init failed: ") + TTF_GetError());
@@ -185,6 +187,27 @@ void Playing::computeZones(int screenW, int screenH) {
     discardZone = SDL_Rect{discardX, discardY, discardWidth, discardHeight};
 }
 
+void Playing::computeUiRects(int screenW, int screenH) {
+    if (screenW <= 0 || screenH <= 0) {
+        menuButton = SDL_Rect{0, 0, 0, 0};
+        exitGameButton = SDL_Rect{0, 0, 0, 0};
+        returnToTitleButton = SDL_Rect{0, 0, 0, 0};
+        return;
+    }
+
+    const int margin = 20;
+    const int menuW = 140;
+    const int menuH = 44;
+    const int exitW = 180;
+    const int exitH = 44;
+    const int returnW = 260;
+    const int returnH = 62;
+
+    menuButton = SDL_Rect{screenW - menuW - margin, margin, menuW, menuH};
+    exitGameButton = SDL_Rect{menuButton.x + (menuButton.w - exitW), menuButton.y + menuButton.h + 12, exitW, exitH};
+    returnToTitleButton = SDL_Rect{(screenW - returnW) / 2, (screenH / 2) + 24, returnW, returnH};
+}
+
 void Playing::handleEvents(Game& game, const SDL_Event& event) {
     if (!renderer) return;
 
@@ -195,6 +218,41 @@ void Playing::handleEvents(Game& game, const SDL_Event& event) {
 
     cardRects = computeCardLayout(player.hand.size(), screenW, screenH);
     computeZones(screenW, screenH);
+    computeUiRects(screenW, screenH);
+
+    if (event.type == SDL_MOUSEBUTTONDOWN && event.button.button == SDL_BUTTON_LEFT) {
+        const int mouseX = event.button.x;
+        const int mouseY = event.button.y;
+
+        if (surrendered) {
+            if (pointInRect(returnToTitleButton, mouseX, mouseY)) {
+                surrendered = false;
+                menuOpen = false;
+                game.setNextState(GameState::Title);
+            }
+            return;
+        }
+
+        if (pointInRect(menuButton, mouseX, mouseY)) {
+            menuOpen = !menuOpen;
+            return;
+        }
+
+        if (menuOpen && pointInRect(exitGameButton, mouseX, mouseY)) {
+            surrendered = true;
+            menuOpen = false;
+            drag.active = false;
+            return;
+        }
+
+        if (menuOpen) {
+            menuOpen = false;
+        }
+    }
+
+    if (surrendered) {
+        return;
+    }
 
     switch (event.type) {
         case SDL_MOUSEBUTTONDOWN:
@@ -314,6 +372,7 @@ void Playing::run() {
 
 void Playing::update(Game& /*game*/) {
     if (!renderer) return; // not yet ready
+    if (surrendered) return;
 
     const Uint32 now = SDL_GetTicks();
     if (now - lastDrawTick >= static_cast<Uint32>(drawIntervalSeconds * 1000)) {

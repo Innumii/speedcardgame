@@ -109,6 +109,10 @@ void Game::commitStateChange() {
             registerState.exit(*this);
         }
 
+        if (previousState == GameState::Playing && state != GameState::Playing) {
+            playingSetup = false;
+        }
+
         if (state == GameState::Connecting) {
             connectingState.reset();
         }

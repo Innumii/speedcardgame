@@ -3,8 +3,10 @@
 #include "core/Game.hpp"
 #include "objects/Card.h"
 #include "render/RenderBoard.hpp"
+#include "render/RenderButton.hpp"
 #include "render/RenderCard.hpp"
 #include "render/RenderText.hpp"
+#include "render/Theme.hpp"
 #include "states/Playing.hpp"
 
 #include <SDL2/SDL.h>
@@ -114,8 +116,10 @@ void RenderPlaying::render(Playing& playing, Game& game) {
 		screenW = 800;
 		screenH = 600;
 	}
+	playing.computeUiRects(screenW, screenH);
 
 	RenderText textRenderer;
+	const RenderText::FontSet& uiFonts = game.getUIFonts();
 
 	textRenderer.drawText(
 		renderer,
@@ -126,40 +130,33 @@ void RenderPlaying::render(Playing& playing, Game& game) {
 		20
 	);
 
+	const std::string manaText = "Mana: " + std::to_string(playing.player.mana);
+	textRenderer.drawText(
+		renderer,
+		manaText,
+		playing.fonts.large,
+		SDL_Color{255, 255, 255, 255},
+		20,
+		50
+	);
+
 	textRenderer.drawText(
 		renderer,
 		"Opponent Health: " + std::to_string(game.getHealth(game.getPlayer(true))),
 		playing.fonts.small,
 		SDL_Color{210, 210, 210, 255},
 		20,
-		50
-	);
-	const std::string manaText = "Mana: " + std::to_string(playing.player.mana);
-	int manaW = 0, manaH = 0;
-	if (playing.fonts.large) {
-		TTF_SizeText(playing.fonts.large, manaText.c_str(), &manaW, &manaH);
-	}
-	textRenderer.drawText(
-		renderer,
-		manaText,
-		playing.fonts.large,
-		SDL_Color{255, 255, 255, 255},
-		screenW - manaW - 20,
-		20
+		80
 	);
 
 	const std::string opponentManaText = "Opponent Mana: " + std::to_string(game.getMana(game.getPlayer(true)));
-	int opponentManaW = 0, opponentManaH = 0;
-	if (playing.fonts.small) {
-		TTF_SizeText(playing.fonts.small, opponentManaText.c_str(), &opponentManaW, &opponentManaH);
-	}
 	textRenderer.drawText(
 		renderer,
 		opponentManaText,
 		playing.fonts.small,
 		SDL_Color{210, 210, 210, 255},
-		screenW - opponentManaW - 20,
-		50
+		20,
+		105
 	);
 
 	playing.cardRects = playing.computeCardLayout(playing.player.hand.size(), screenW, screenH);
@@ -182,6 +179,9 @@ void RenderPlaying::render(Playing& playing, Game& game) {
 	int mouseX = 0, mouseY = 0;
 	SDL_GetMouseState(&mouseX, &mouseY);
 	const bool hoveringDiscard = playing.pointInRect(playing.discardZone, mouseX, mouseY);
+	const bool hoveringMenu = playing.pointInRect(playing.menuButton, mouseX, mouseY);
+	const bool hoveringExit = playing.menuOpen && playing.pointInRect(playing.exitGameButton, mouseX, mouseY);
+	const bool hoveringReturn = playing.surrendered && playing.pointInRect(playing.returnToTitleButton, mouseX, mouseY);
 
 	const bool draggingCard = playing.drag.active && playing.drag.index < playing.player.hand.size();
 
@@ -265,6 +265,65 @@ void RenderPlaying::render(Playing& playing, Game& game) {
 			SDL_Rect panel{previewX, previewY, previewWidth, previewHeight};
 			RenderCard::drawPreview(renderer, textRenderer, *cardPtr, panel, playing.fonts.small, playing.fonts.large);
 		}
+	}
+
+	if (!playing.surrendered) {
+		RenderButton::drawButton(
+			renderer,
+			playing.menuButton,
+			"Menu",
+			uiFonts.medium,
+			Theme::BTN_SECONDARY,
+			Theme::BTN_BORDER,
+			Theme::BTN_TEXT,
+			hoveringMenu
+		);
+
+		if (playing.menuOpen) {
+			RenderButton::drawButton(
+				renderer,
+				playing.exitGameButton,
+				"Exit Game",
+				uiFonts.medium,
+				Theme::BTN_QUIT,
+				Theme::BTN_BORDER,
+				Theme::BTN_TEXT,
+				hoveringExit
+			);
+		}
+	}
+
+	if (playing.surrendered) {
+		SDL_Rect overlay{0, 0, screenW, screenH};
+		SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+		SDL_SetRenderDrawColor(renderer, 0, 0, 0, 190);
+		SDL_RenderFillRect(renderer, &overlay);
+
+		int loseTextW = 0;
+		int loseTextH = 0;
+		if (playing.fonts.large) {
+			TTF_SizeText(playing.fonts.large, "You Lose", &loseTextW, &loseTextH);
+		}
+
+		textRenderer.drawText(
+			renderer,
+			"You Lose",
+			playing.fonts.large,
+			Theme::TEXT_PRIMARY,
+			(screenW - loseTextW) / 2,
+			(screenH / 2) - loseTextH - 26
+		);
+
+		RenderButton::drawButton(
+			renderer,
+			playing.returnToTitleButton,
+			"Return to Title",
+			uiFonts.large,
+			Theme::BTN_PRIMARY,
+			Theme::BTN_BORDER,
+			Theme::BTN_TEXT,
+			hoveringReturn
+		);
 	}
 
 	SDL_RenderPresent(renderer);

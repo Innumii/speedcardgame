@@ -39,13 +39,19 @@ private:
     std::vector<SDL_Rect> cardRects;
     std::vector<SDL_Rect> playSlots;
     SDL_Rect discardZone{0, 0, 0, 0};
+    SDL_Rect menuButton{0, 0, 0, 0};
+    SDL_Rect exitGameButton{0, 0, 0, 0};
+    SDL_Rect returnToTitleButton{0, 0, 0, 0};
     DragState drag;
     std::size_t hoverIndex{static_cast<std::size_t>(-1)};
     Uint32 hoverStartTick{0};
+    bool menuOpen{false};
+    bool surrendered{false};
 
     bool pointInRect(const SDL_Rect& rect, int x, int y);
     std::vector<SDL_Rect> computeCardLayout(std::size_t count, int screenW, int screenH) const;
     void computeZones(int screenW, int screenH);
+    void computeUiRects(int screenW, int screenH);
 
 public:
     Playing(int drawIntervalSeconds = 3);
