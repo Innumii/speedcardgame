@@ -3,6 +3,5 @@ main.exe
 *.dll
 *.pdb
 .vscode/
-.github/
 build/
 .env

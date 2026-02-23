@@ -21,6 +21,9 @@ public:
     void enqueuePlayer(const std::shared_ptr<PlayerConnection>& player);
     void removePlayer(const std::shared_ptr<PlayerConnection>& player);
 
+    //callback
+    std::function<void(std::shared_ptr<PlayerConnection>, std::shared_ptr<PlayerConnection>)> onMatchReady;
+
     
 private:
     void tryCreateMatch();

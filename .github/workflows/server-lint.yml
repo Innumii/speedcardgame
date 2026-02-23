@@ -1,0 +1,43 @@
+name: server-lint
+on:
+  push:
+    branches: [ main, ryan/matchmake ]
+  pull_request:
+    branches: [ main ]
+permissions:
+  contents: read
+jobs:
+  cppcheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install cppcheck
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cppcheck
+
+      - name: Run cppcheck on server
+        run: |
+          cppcheck \
+            --std=c++17 \
+            --language=c++ \
+            --enable=warning,portability \
+            --error-exitcode=1 \
+            --inline-suppr \
+            --suppress=missingIncludeSystem \
+            --template=gcc \
+            -I server/include \
+            server/src server/include
+
+      - name: Run advisory cppcheck style scan
+        run: |
+          cppcheck \
+            --std=c++17 \
+            --language=c++ \
+            --enable=style,performance \
+            --inline-suppr \
+            --suppress=missingIncludeSystem \
+            --template=gcc \
+            -I server/include \
+            server/src server/include || true

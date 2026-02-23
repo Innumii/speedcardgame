@@ -1,7 +1,7 @@
 name: client-lint
 on:
   push:
-    branches: [ main, linus/anim ]
+    branches: [ main, linus/anim, ryan/matchmake ]
   pull_request:
     branches: [ main ]
 permissions:
