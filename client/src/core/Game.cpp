@@ -4,6 +4,7 @@
 #include <iostream>
 #include <stdexcept>
 #include <fstream>
+#include <utility>
 
 namespace {
     int clampPositive(int value, int maxValue) {
@@ -197,6 +198,19 @@ void Game::setPlayerId(int playerId) {
     if (playerId > 0) {
         player.id = playerId;
     }
+}
+
+const std::string& Game::getPlayerUsername() const {
+    return playerUsername;
+}
+
+void Game::setPlayerUsername(std::string username) {
+    if (username.empty()) {
+        playerUsername = "Player";
+        return;
+    }
+
+    playerUsername = std::move(username);
 }
 
 const Deck& Game::getDeck(const Player& player) const {

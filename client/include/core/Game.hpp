@@ -5,6 +5,7 @@
 #include "SDL2/SDL.h"
 #include <stdio.h>
 #include <cstddef>
+#include <string>
 #include <memory> //for smart pointers
 #include <stdexcept> //for signalling fatal init errors
 #include <optional>
@@ -69,6 +70,8 @@ public:
     SDL_Renderer* getRenderer() const;
     int getPlayerId() const;
     void setPlayerId(int playerId);
+    const std::string& getPlayerUsername() const;
+    void setPlayerUsername(std::string username);
 
     const Player& getPlayer(bool isOpponent) const;
     const Deck& getDeck(const Player& player) const;
@@ -88,6 +91,7 @@ private:
 
     Player player;
     Player remotePlayer;
+    std::string playerUsername{"Player"};
 
     int drawIntervalSeconds{3};
     Uint32 lastDrawTick{0};

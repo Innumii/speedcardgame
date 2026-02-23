@@ -1,6 +1,7 @@
 #include "states/Connecting.hpp"
 #include <SDL2/SDL.h>
 #include <iostream>
+#include <sstream>
 #include <thread>
 #include "core/Game.hpp"
 
@@ -38,6 +39,38 @@ void Connecting::update(Game& game) {
     if (finished) {
         if (success) {
             std::cout << "Connection succeeded!\n";
+            // sends player data to server and waits for response in Waiting state
+
+            const int playerId = game.getPlayerId();
+            const std::string& username = game.getPlayerUsername();
+
+            auto escapeJson = [](const std::string& input) {
+                std::string escaped;
+                escaped.reserve(input.size());
+                for (char ch : input) {
+                    switch (ch) {
+                        case '\\': escaped += "\\\\"; break;
+                        case '"': escaped += "\\\""; break;
+                        case '\n': escaped += "\\n"; break;
+                        case '\r': escaped += "\\r"; break;
+                        case '\t': escaped += "\\t"; break;
+                        default: escaped += ch; break;
+                    }
+                }
+                return escaped;
+            };
+
+            std::ostringstream payload;
+            payload << "{\"type\":\"player_info\",\"playerId\":" << playerId
+                    << ",\"username\":\"" << escapeJson(username) << "\"}\n";
+            const std::string message = payload.str();
+
+            if (!game.getNetworkClient().send(message.data(), message.size())) {
+                std::cerr << "Failed to send player info to server\n";
+                game.setNextState(GameState::Title);
+                return;
+            }
+
             game.setNextState(GameState::Waiting);
         } else {
             std::cerr << "Connection failed\n";
