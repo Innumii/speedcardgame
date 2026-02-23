@@ -58,19 +58,19 @@ private:
     bool tryDrawCardWithAnimation(Uint32 now);
 
 public:
-    Playing(int drawIntervalSeconds = 3);
+    explicit Playing(int drawIntervalSeconds = 3);
     ~Playing();
 
     Playing(const Playing&) = delete;
     Playing& operator=(const Playing&) = delete;
     Playing(Playing&&) noexcept = default;
     Playing& operator=(Playing&&) noexcept = default;
-    void setup(Game& game);
+    void setup(const Game& game);
     void setDeck(Deck newDeck);
     void handleEvents(Game& game, const SDL_Event& event);
     void run();
     void update(Game& game);
-    void render(Game&);
+    void render(const Game&);
 };
 
 

@@ -19,6 +19,7 @@
 #include <cctype>
 #include <cstdlib>
 #include <fstream>
+#include <numeric>
 #include <sstream>
 #include <unordered_map>
 
@@ -33,9 +34,9 @@ namespace {
     }
 
     std::string toLower(std::string value) {
-        for (char& c : value) {
-            c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
-        }
+        std::transform(value.begin(), value.end(), value.begin(), [](unsigned char c) {
+            return static_cast<char>(std::tolower(c));
+        });
         return value;
     }
 
@@ -122,7 +123,7 @@ namespace {
             field.push_back(c);
         }
         out.push_back(field);
-        return !out.empty();
+        return true;
     }
 
     bool tryOpenCsv(const std::string& path, std::ifstream& stream) {
@@ -241,7 +242,7 @@ void DeckBuilding::enter(Game& game) {
     statusMessageUntil = 0;
 }
 
-void DeckBuilding::exit(Game& game) {
+void DeckBuilding::exit(const Game& game) {
     (void)game;
 }
 
@@ -391,7 +392,7 @@ void DeckBuilding::render(Game& game) {
     RenderDeckBuilding::render(*this, game);
 }
 
-DeckBuilding::Layout DeckBuilding::buildLayout(Game& game) const {
+DeckBuilding::Layout DeckBuilding::buildLayout(const Game& game) const {
     Layout layout;
 
     int screenW = 800;
@@ -610,11 +611,7 @@ bool DeckBuilding::hasFullDeck() const {
 }
 
 int DeckBuilding::getDeckCardCount() const {
-    int total = 0;
-    for (int copies : deckCopies) {
-        total += copies;
-    }
-    return total;
+    return std::accumulate(deckCopies.begin(), deckCopies.end(), 0);
 }
 
 int DeckBuilding::getDeckSizeLimit() {
@@ -634,7 +631,7 @@ void DeckBuilding::setStatusMessage(const std::string& message, Uint32 durationM
     statusMessageUntil = SDL_GetTicks() + durationMs;
 }
 
-bool DeckBuilding::loadAvailableCardsFromService(Game& game) {
+bool DeckBuilding::loadAvailableCardsFromService(const Game& game) {
     (void)game;
     const std::string host = getEnvOrDefault("CARDS_SERVICE_HOST", "127.0.0.1");
     const int port = getEnvIntOrDefault("CARDS_SERVICE_PORT", 8082);
@@ -694,7 +691,7 @@ bool DeckBuilding::loadAvailableCardsFromService(Game& game) {
     return true;
 }
 
-bool DeckBuilding::loadAvailableCardsFromCsv(Game& game) {
+bool DeckBuilding::loadAvailableCardsFromCsv(const Game& game) {
     (void)game;
     const std::string envPath = getEnvOrDefault("CARDS_CSV_PATH", "");
     std::ifstream file;
@@ -719,7 +716,7 @@ bool DeckBuilding::loadAvailableCardsFromCsv(Game& game) {
     std::vector<std::string> fields;
     while (std::getline(file, line)) {
         if (line.empty()) continue;
-        if (!parseCsvLine(line, fields)) continue;
+        parseCsvLine(line, fields);
         if (fields.size() < 8) continue;
 
         int cid = -1;
@@ -762,7 +759,7 @@ bool DeckBuilding::loadAvailableCardsFromCsv(Game& game) {
     return true;
 }
 
-bool DeckBuilding::saveDeckToService(Game& game) const {
+bool DeckBuilding::saveDeckToService(const Game& game) const {
     if (!hasFullDeck()) {
         return false;
     }
@@ -790,7 +787,7 @@ bool DeckBuilding::saveDeckToService(Game& game) const {
     return sendHttpRequest(host, port, "POST", path, payload.str(), responseBody);
 }
 
-bool DeckBuilding::loadInventoryFromService(Game& game) {
+bool DeckBuilding::loadInventoryFromService(const Game& game) {
     if (availableCards.empty()) return false;
 
     const std::string host = getEnvOrDefault("CARDS_SERVICE_HOST", "127.0.0.1");
@@ -853,7 +850,7 @@ int DeckBuilding::getRemainingCount(int cardIndex) const {
     return remaining > 0 ? remaining : 0;
 }
 
-bool DeckBuilding::loadDeckFromService(Game& game) {
+bool DeckBuilding::loadDeckFromService(const Game& game) {
     if (availableCards.empty()) return false;
 
     const std::string host = getEnvOrDefault("CARDS_SERVICE_HOST", "127.0.0.1");

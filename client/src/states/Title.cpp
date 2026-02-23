@@ -101,7 +101,7 @@ void Title::update(Game& game) {
     }
 }
 
-void Title::render(Game& game) {
+void Title::render(const Game& game) {
     SDL_Renderer*              renderer   = game.getRenderer();
     const RenderText::FontSet& titleFonts = game.getTitleFonts();
     const RenderText::FontSet& uiFonts    = game.getUIFonts();

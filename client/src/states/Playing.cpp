@@ -80,7 +80,7 @@ bool Playing::tryDrawCardWithAnimation(Uint32 now) {
     return true;
 }
 
-void Playing::setup(Game& game) {
+void Playing::setup(const Game& game) {
     renderer = game.getRenderer();
     if (!renderer) {
         throw std::runtime_error("Renderer not available from Game");
@@ -366,7 +366,7 @@ void Playing::handleEvents(Game& game, const SDL_Event& event) {
                     //if succeed, cut mana by cost
                     //erase card from hand
 
-                    if (laneIndex >= 0 && laneIndex < static_cast<int>(playSlots.size())) {
+                    if (laneIndex < static_cast<int>(playSlots.size())) {
                         std::cout << "Playing " << player.hand[drag.index]->getName()
                                 << " into lane " << laneIndex << "\n";
 
@@ -430,7 +430,7 @@ void Playing::update(Game& /*game*/) {
     }
 }
 
-void Playing::render(Game& game) {
+void Playing::render(const Game& game) {
     RenderPlaying::render(*this, game);
 }
 

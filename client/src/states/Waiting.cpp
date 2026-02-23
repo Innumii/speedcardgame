@@ -47,7 +47,7 @@ void Waiting::update(Game& game) {
     // received == 0 → no data available, just keep waiting
 }
 
-void Waiting::render(Game& game) {
+void Waiting::render(const Game& game) {
     SDL_Renderer* renderer = game.getRenderer();
 
     // Background

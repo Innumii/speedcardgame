@@ -11,7 +11,7 @@ public:
 
     void handleEvents(Game& game, const SDL_Event& event);
     void update(Game& game);
-    void render(Game& game);
+    void render(const Game& game);
 
 private:
     std::string recvBuffer; // handles partial TCP messages

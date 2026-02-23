@@ -22,7 +22,7 @@ class NetworkClient {
 public:
     enum class SocketMode { Blocking, NonBlocking };
 
-    NetworkClient(SocketMode mode = SocketMode::Blocking);
+    explicit NetworkClient(SocketMode mode = SocketMode::Blocking);
     ~NetworkClient();
 
     bool connectTo(const std::string& ip, int port);

@@ -5,8 +5,8 @@
 
 class SpellCard : public Card {
 public:
-    SpellCard(std::string name,
-              std::string text,
+    SpellCard(const std::string& name,
+              const std::string& text,
               int manaValue,
               int manaCost,
               int cardId = -1);

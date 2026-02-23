@@ -103,7 +103,7 @@ namespace {
 	}
 }
 
-void RenderPlaying::render(Playing& playing, Game& game) {
+void RenderPlaying::render(Playing& playing, const Game& game) {
 	SDL_Renderer* renderer = game.getRenderer();
 	if (!renderer) return;
 
@@ -260,7 +260,6 @@ void RenderPlaying::render(Playing& playing, Game& game) {
 		if (const auto& cardPtr = playing.player.hand[playing.hoverIndex]) {
 			const int previewWidth = 180;
 			const int previewHeight = 240;
-			const int padding = 12;
 
 			int handY = screenH - 165 - 30;
 			if (!playing.cardRects.empty()) {

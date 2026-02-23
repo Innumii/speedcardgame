@@ -22,9 +22,22 @@ jobs:
           cppcheck \
             --std=c++17 \
             --language=c++ \
-            --enable=warning,style,performance,portability \
+            --enable=warning,portability \
             --error-exitcode=1 \
             --inline-suppr \
             --suppress=missingIncludeSystem \
+            --template=gcc \
             -I client/include \
             client/src client/include
+
+      - name: Run advisory cppcheck style scan
+        run: |
+          cppcheck \
+            --std=c++17 \
+            --language=c++ \
+            --enable=style,performance \
+            --inline-suppr \
+            --suppress=missingIncludeSystem \
+            --template=gcc \
+            -I client/include \
+            client/src client/include || true

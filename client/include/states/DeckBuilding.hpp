@@ -21,7 +21,7 @@ public:
 	void update(Game& game);
 	void render(Game& game);
 	void enter(Game& game);
-	void exit(Game& game);
+	void exit(const Game& game);
 	bool refreshFromService(Game& game);
 	Deck buildDeck() const;
 	bool hasCardsInDeck() const;
@@ -47,16 +47,16 @@ private:
 		int pageIndex{0};
 	};
 
-	Layout buildLayout(Game& game) const;
+	Layout buildLayout(const Game& game) const;
 	void updateMenuButtons(const Layout& layout);
 	std::vector<int> getDeckEntryOrder() const;
 	void tryAddToDeck(int cardIndex);
 	void tryRemoveFromDeck(int cardIndex);
-	bool loadAvailableCardsFromService(Game& game);
-	bool loadAvailableCardsFromCsv(Game& game);
-	bool loadInventoryFromService(Game& game);
-	bool loadDeckFromService(Game& game);
-	bool saveDeckToService(Game& game) const;
+	bool loadAvailableCardsFromService(const Game& game);
+	bool loadAvailableCardsFromCsv(const Game& game);
+	bool loadInventoryFromService(const Game& game);
+	bool loadDeckFromService(const Game& game);
+	bool saveDeckToService(const Game& game) const;
 	int getInventoryCount(int cardIndex) const;
 	int getRemainingCount(int cardIndex) const;
 	void setStatusMessage(const std::string& message, Uint32 durationMs);

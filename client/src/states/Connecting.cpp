@@ -49,7 +49,7 @@ void Connecting::update(Game& game) {
 
 
 
-void Connecting::render(Game& game) {
+void Connecting::render(const Game& game) {
     SDL_Renderer* renderer = game.getRenderer();
 
     // Clear screen

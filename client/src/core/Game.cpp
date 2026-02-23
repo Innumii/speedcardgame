@@ -1,5 +1,6 @@
 #include "core/Game.hpp"
 #include <algorithm>
+#include <cctype>
 #include <iostream>
 #include <stdexcept>
 #include <fstream>
@@ -22,7 +23,9 @@ bool isWSL() {
     if (!f) return false;
     std::string line;
     std::getline(f, line);
-    for (auto &c : line) c = tolower(c);
+    std::transform(line.begin(), line.end(), line.begin(), [](unsigned char c) {
+        return static_cast<char>(std::tolower(c));
+    });
     return line.find("microsoft") != std::string::npos;
 }
 
@@ -41,26 +44,24 @@ Game::Game(const char *title, int xpos, int ypos, int width, int height, bool fu
         throw std::runtime_error(std::string("SDL_CreateWindow Failed: ") + SDL_GetError());
     }
 
-    bool forceSoftware = true;
+    bool useSoftwareRenderer = true;
 #ifdef _WIN32
     // Accelerated is safe on Windows
-    forceSoftware = false;
+    useSoftwareRenderer = false;
 #else
-    // On Linux/WSL: check environment
     if (isWSL()) {
         std::cout << "WSL detected: forcing software renderer\n";
-        forceSoftware = true;
     }
 #endif
 
-    if (!forceSoftware) {
-        renderer.reset(SDL_CreateRenderer(window.get(), -1, SDL_RENDERER_ACCELERATED));
+    if (useSoftwareRenderer) {
+        renderer.reset(SDL_CreateRenderer(window.get(), -1, SDL_RENDERER_SOFTWARE));
         if (!renderer) {
             SDL_Quit();
             throw std::runtime_error(std::string("SDL_CreateRenderer Failed: ") + SDL_GetError());
         }
     } else {
-        renderer.reset(SDL_CreateRenderer(window.get(), -1, SDL_RENDERER_SOFTWARE));
+        renderer.reset(SDL_CreateRenderer(window.get(), -1, SDL_RENDERER_ACCELERATED));
         if (!renderer) {
             SDL_Quit();
             throw std::runtime_error(std::string("SDL_CreateRenderer Failed: ") + SDL_GetError());
@@ -94,11 +95,7 @@ void Game::commitStateChange() {
         const GameState previousState = state;
         state = nextState;
 
-        if (previousState == GameState::DeckBuilding && state != GameState::DeckBuilding) {
-            deckBuildingState.exit(*this);
-        }
-
-        if (previousState == GameState::DeckBuilding && state != GameState::DeckBuilding) {
+        if (previousState == GameState::DeckBuilding) {
             deckBuildingState.exit(*this);
         }
 

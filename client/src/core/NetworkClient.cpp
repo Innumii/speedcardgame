@@ -39,7 +39,7 @@ bool NetworkClient::connectTo(const std::string& ip, int port) {
         return false;
     }
 
-    if (connect(socketFd, (sockaddr*)&serverAddr, sizeof(serverAddr)) < 0) {
+    if (connect(socketFd, reinterpret_cast<sockaddr*>(&serverAddr), sizeof(serverAddr)) < 0) {
 #ifdef _WIN32
         int err = WSAGetLastError();
         if (!(mode == SocketMode::NonBlocking && err == WSAEWOULDBLOCK)) {

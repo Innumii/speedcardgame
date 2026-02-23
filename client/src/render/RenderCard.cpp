@@ -95,7 +95,7 @@ void RenderCard::drawCardFace(SDL_Renderer* renderer, RenderText& textRenderer, 
     drawInsetRect(renderer, textBox, panel, border);
 
     const std::string manaText = std::to_string(card.getManaCost());
-    TTF_Font* manaFont = bodyFont ? bodyFont : titleFont;
+    TTF_Font* manaFont = bodyFont;
     int manaTextW = 0;
     int manaTextH = 0;
     measureText(manaFont, manaText, manaTextW, manaTextH);
@@ -125,14 +125,12 @@ void RenderCard::drawCardFace(SDL_Renderer* renderer, RenderText& textRenderer, 
     textRenderer.drawText(renderer, titleText, titleUse, ink, titleBar.x + 6, titleBar.y + 4);
     SDL_RenderSetClipRect(renderer, nullptr);
 
-    if (manaFont) {
-        if (manaTextW == 0 || manaTextH == 0) {
-            measureText(manaFont, manaText, manaTextW, manaTextH);
-        }
-        const int manaTextX = manaGem.x + (manaGem.w - manaTextW) / 2;
-        const int manaTextY = manaGem.y + (manaGem.h - manaTextH) / 2;
-        textRenderer.drawText(renderer, manaText, manaFont, ink, manaTextX, manaTextY);
+    if (manaTextW == 0 || manaTextH == 0) {
+        measureText(manaFont, manaText, manaTextW, manaTextH);
     }
+    const int manaTextX = manaGem.x + (manaGem.w - manaTextW) / 2;
+    const int manaTextY = manaGem.y + (manaGem.h - manaTextH) / 2;
+    textRenderer.drawText(renderer, manaText, manaFont, ink, manaTextX, manaTextY);
 
     textRenderer.drawText(renderer, "Value: " + std::to_string(card.getManaValue()), bodyFont, ink, textBox.x + 4, textBox.y + 4);
 

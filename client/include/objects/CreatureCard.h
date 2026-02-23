@@ -9,8 +9,8 @@ private:
     int toughness;
 
 public:
-    CreatureCard(std::string name,
-                 std::string text,
+    CreatureCard(const std::string& name,
+                 const std::string& text,
                  int manaValue,
                  int manaCost,
                  int power,
