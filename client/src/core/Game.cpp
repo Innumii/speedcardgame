@@ -1,10 +1,12 @@
 #include "core/Game.hpp"
+#include "render/RenderCard.hpp"
 #include <algorithm>
 #include <cctype>
 #include <iostream>
 #include <stdexcept>
 #include <fstream>
 #include <utility>
+#include <SDL2/SDL_image.h>
 
 namespace {
     int clampPositive(int value, int maxValue) {
@@ -71,6 +73,12 @@ Game::Game(const char *title, int xpos, int ypos, int width, int height, bool fu
     
 
     SDL_SetRenderDrawBlendMode(renderer.get(), SDL_BLENDMODE_BLEND);
+
+    const int imgFlags = IMG_INIT_PNG | IMG_INIT_JPG;
+    if ((IMG_Init(imgFlags) & imgFlags) == 0) {
+        SDL_Quit();
+        throw std::runtime_error(std::string("IMG_Init failed: ") + IMG_GetError());
+    }
 
     SDL_RaiseWindow(window.get());
     SDL_SetWindowInputFocus(window.get());
@@ -356,8 +364,10 @@ void Game::render() {
 }
 
 void Game::clean() {
+    RenderCard::clearImageCache();
     RenderText::closeFonts(titleFonts);
     RenderText::closeFonts(uiFonts);
+    IMG_Quit();
     SDL_Quit();
     isRunning = false;
 }

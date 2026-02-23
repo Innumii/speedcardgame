@@ -580,7 +580,8 @@ Deck DeckBuilding::buildDeck() const {
                         creature->getManaValue(),
                         creature->getManaCost(),
                         creature->getPower(),
-                        creature->getToughness()
+                        creature->getToughness(),
+                        creature->getId()
                     ));
                     break;
                 }
@@ -589,7 +590,8 @@ Deck DeckBuilding::buildDeck() const {
                         base->getName(),
                         base->getText(),
                         base->getManaValue(),
-                        base->getManaCost()
+                        base->getManaCost(),
+                        base->getId()
                     ));
                     break;
                 }

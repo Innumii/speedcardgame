@@ -3,6 +3,8 @@ services:
     build:
       context: .  # Build from the current directory (root)
       dockerfile: Dockerfile  # Uses Dockerfile located in root
+    volumes:
+      - ./assets/cards:/app/assets/cards:ro
     depends_on:
       db:
         condition: service_healthy  # Wait until DB is ready
