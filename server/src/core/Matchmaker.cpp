@@ -32,6 +32,8 @@ void Matchmaker::removePlayer(const std::shared_ptr<PlayerConnection>& player) {
 
     std::swap(playerQueue, tempQueue);
     std::cout << player->getUsername() << " removed from Queue\n";
+    std::cout << "Matchmaker queue size: " << playerQueue.size() << "\n";
+
 }
 
 void Matchmaker::tryCreateMatch() {

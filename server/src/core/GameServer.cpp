@@ -32,12 +32,12 @@ bool GameServer::start() {
 
         // Register callback for new clients
         tcpServer->onClientConnected = [this](std::shared_ptr<PlayerConnection> player) {
-            player->onDisconnected = [this, player]() mutable{
+            player->onDisconnected = [this, player]() {
                 std::cout << "Player disconnected: " << player->getUsername() << "\n";
                 //dequeue
                 if (matchmaker) matchmaker->removePlayer(player);
                 if (matchManager) matchManager->onPlayerDisconnected(player);
-                player.reset(); // object destroyed if no other shared_ptr exists
+
             };
             player->onMessageReceived = [player, this](const std::vector<char>& rawMsg) {
                 std::string msg(rawMsg.begin(), rawMsg.end());
@@ -45,8 +45,6 @@ bool GameServer::start() {
 
                 if (msg == "MATCH_ACCEPT\n") {
                     if (matchManager) matchManager->onAccept(player);
-                } else if (msg == "MATCH_DECLINE\n") {
-                    player->stop();
                 } else if (msg.find("{\"type\":\"player_info\"") != std::string::npos) {
                     auto idPos = msg.find("\"playerId\":");
                     auto namePos = msg.find("\"username\":\"");

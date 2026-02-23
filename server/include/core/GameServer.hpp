@@ -11,7 +11,6 @@
 
 class TcpServer;
 class Matchmaker;
-class PlayerConnection;
 
 class GameServer {
 public:

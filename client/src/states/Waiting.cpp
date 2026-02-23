@@ -50,7 +50,6 @@ void Waiting::handleEvents(Game& game, const SDL_Event& event) {
         }
         //change so that decline -> return to title screen
         if (declinePressed && declineHovered) {
-            game.getNetworkClient().sendString("MATCH_DECLINE\n");
             declined = true;
             matchFound = false;
             waitingForOpponent = false;
