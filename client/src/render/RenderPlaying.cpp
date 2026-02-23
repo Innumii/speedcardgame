@@ -8,6 +8,7 @@
 #include "render/RenderText.hpp"
 #include "render/Theme.hpp"
 #include "states/Playing.hpp"
+#include "states/DeckBuilding.hpp"
 
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_ttf.h>
@@ -214,7 +215,7 @@ void RenderPlaying::render(Playing& playing, Game& game) {
 		textRenderer,
 		playing.playSlots,
 		playing.discardZone,
-		game.getDeck(game.getPlayer(true)).size(),
+		DeckBuilding::getDeckSizeLimit(),
 		screenW,
 		playing.fonts.small
 	);
@@ -225,7 +226,7 @@ void RenderPlaying::render(Playing& playing, Game& game) {
 		textRenderer,
 		playing.playSlots,
 		playing.discardZone,
-		playing.deck.size(),
+		DeckBuilding::getDeckSizeLimit(),
 		screenW,
 		playing.fonts.small
 	);

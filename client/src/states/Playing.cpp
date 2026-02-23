@@ -130,7 +130,11 @@ void Playing::setup(Game& game) {
 
     constexpr int startingHandSize = 6;
     for (int i = 0; i < startingHandSize; ++i) {
+        // get starting player hand
         player.drawCard(deck);
+
+        // get remote player from server and draw their starting hand as well
+        // TODO
     }
 
     lastDrawTick = SDL_GetTicks();

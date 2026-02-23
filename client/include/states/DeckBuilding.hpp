@@ -27,7 +27,7 @@ public:
 	bool hasCardsInDeck() const;
 	bool hasFullDeck() const;
 	int getDeckCardCount() const;
-	int getDeckSizeLimit() const;
+	static int getDeckSizeLimit();
 	const std::string& getStatusMessage() const;
 	bool isStatusMessageActive(Uint32 now) const;
 

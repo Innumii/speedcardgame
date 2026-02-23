@@ -617,7 +617,7 @@ int DeckBuilding::getDeckCardCount() const {
     return total;
 }
 
-int DeckBuilding::getDeckSizeLimit() const {
+int DeckBuilding::getDeckSizeLimit() {
     return getDeckSizeLimitFromEnv();
 }
 
