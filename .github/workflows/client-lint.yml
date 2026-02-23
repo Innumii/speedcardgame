@@ -1,0 +1,30 @@
+name: client-lint
+on:
+  push:
+    branches: [ main, linus/anim ]
+  pull_request:
+    branches: [ main ]
+permissions:
+  contents: read
+jobs:
+  cppcheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install cppcheck
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cppcheck
+
+      - name: Run cppcheck on client
+        run: |
+          cppcheck \
+            --std=c++17 \
+            --language=c++ \
+            --enable=warning,style,performance,portability \
+            --error-exitcode=1 \
+            --inline-suppr \
+            --suppress=missingIncludeSystem \
+            -I client/include \
+            client/src client/include
