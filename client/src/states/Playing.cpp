@@ -7,6 +7,7 @@
 #include "objects/CreatureCard.h"
 #include "objects/SpellCard.h"
 #include <algorithm>
+#include <cctype>
 #include <iostream>
 #include <memory>
 #include <stdexcept>
@@ -19,6 +20,54 @@ namespace {
 
 bool Playing::pointInRect(const SDL_Rect& rect, int x, int y) {
     return x >= rect.x && x < rect.x + rect.w && y >= rect.y && y < rect.y + rect.h;
+}
+
+bool Playing::isTargetedSpell(const Card& card) const {
+    if (card.getType() != CardType::Spell) {
+        return false;
+    }
+
+    std::string text = card.getText();
+    std::transform(text.begin(), text.end(), text.begin(), [](unsigned char ch) {
+        return static_cast<char>(std::tolower(ch));
+    });
+
+    return text.find("target") != std::string::npos;
+}
+
+bool Playing::consumeSpell(std::unique_ptr<Card> spell) {
+    if (!spell) {
+        return false;
+    }
+    return board.addToDiscard(std::move(spell), player.id);
+}
+
+bool Playing::resolvePendingSpellTargetAt(int x, int y) {
+    if (!pendingSpellTarget.active || !pendingSpellTarget.spell) {
+        return false;
+    }
+
+    for (std::size_t lane = 0; lane < playSlots.size(); ++lane) {
+        SDL_Rect localRect = playSlots[lane];
+        if (pointInRect(localRect, x, y)) {
+            std::cout << "Target selected: player " << player.id << ", lane " << lane << "\n";
+            consumeSpell(std::move(pendingSpellTarget.spell));
+            pendingSpellTarget.active = false;
+            return true;
+        }
+
+        SDL_Rect opponentRect = playSlots[lane];
+        opponentRect.y -= 200;
+        const int opponentId = player.id == 0 ? 1 : 0;
+        if (pointInRect(opponentRect, x, y)) {
+            std::cout << "Target selected: player " << opponentId << ", lane " << lane << "\n";
+            consumeSpell(std::move(pendingSpellTarget.spell));
+            pendingSpellTarget.active = false;
+            return true;
+        }
+    }
+
+    return false;
 }
 
 Playing::Playing(int drawIntervalSeconds)
@@ -94,6 +143,7 @@ void Playing::setup(const Game& game) {
     menuOpen = false;
     surrendered = false;
     animationQueue.clear();
+    pendingSpellTarget = PendingSpellTargetState{};
 
     if (!RenderText::ensureTtfReady()) {
         throw std::runtime_error(std::string("TTF_Init failed: ") + TTF_GetError());
@@ -306,6 +356,15 @@ void Playing::handleEvents(Game& game, const SDL_Event& event) {
         return;
     }
 
+    if (pendingSpellTarget.active) {
+        if (event.type == SDL_MOUSEBUTTONDOWN && event.button.button == SDL_BUTTON_LEFT) {
+            if (resolvePendingSpellTargetAt(event.button.x, event.button.y)) {
+                board.displayDiscard(player.id);
+            }
+        }
+        return;
+    }
+
     switch (event.type) {
         case SDL_MOUSEBUTTONDOWN:
             if (event.button.button == SDL_BUTTON_LEFT) {
@@ -360,25 +419,41 @@ void Playing::handleEvents(Game& game, const SDL_Event& event) {
                         std::cout << "Removing card from hand\n";
                         player.hand.erase(player.hand.begin() + static_cast<std::ptrdiff_t>(drag.index));   
                     } 
-                } else if (droppedInPlay) {
-                    std::cout << "Playing " << player.hand[drag.index].get()->getName() << "\n";
-                    //move card to board object
-                    //if succeed, cut mana by cost
-                    //erase card from hand
+                } else if (drag.index < player.hand.size()) {
+                    Card* draggedCard = player.hand[drag.index].get();
+                    if (!draggedCard) {
+                        break;
+                    }
 
-                    if (laneIndex < static_cast<int>(playSlots.size())) {
-                        std::cout << "Playing " << player.hand[drag.index]->getName()
-                                << " into lane " << laneIndex << "\n";
+                    const int cost = draggedCard->getManaCost();
+                    if (player.mana < cost) {
+                        std::cout << "Not enough mana\n";
+                        break;
+                    }
 
-                        const int cost = player.hand[drag.index]->getManaCost();
-                        if (player.mana >= cost && board.isZoneEmpty(laneIndex, player.id)) {
+                    if (draggedCard->getType() == CardType::Spell) {
+                        std::unique_ptr<Card> castSpell = std::move(player.hand[drag.index]);
+                        player.hand.erase(player.hand.begin() + static_cast<std::ptrdiff_t>(drag.index));
+                        player.mana -= cost;
+
+                        if (castSpell && isTargetedSpell(*castSpell)) {
+                            std::cout << "Cast targeted spell: " << castSpell->getName()
+                                      << " (choose a target)\n";
+                            pendingSpellTarget.active = true;
+                            pendingSpellTarget.spell = std::move(castSpell);
+                        } else {
+                            std::cout << "Cast untargeted spell\n";
+                            consumeSpell(std::move(castSpell));
+                        }
+                    } else if (droppedInPlay && laneIndex < static_cast<int>(playSlots.size())) {
+                        std::cout << "Playing " << draggedCard->getName()
+                                  << " into lane " << laneIndex << "\n";
+
+                        if (board.isZoneEmpty(laneIndex, player.id)) {
                             if (board.addToPlay(laneIndex, player.id, std::move(player.hand[drag.index]))) {
                                 player.mana -= cost;
                                 player.hand.erase(player.hand.begin() + static_cast<std::ptrdiff_t>(drag.index));
                             }
-                            
-                        } else {
-                            std::cout << "Not enough mana\n";
                         }
                     }
                 }

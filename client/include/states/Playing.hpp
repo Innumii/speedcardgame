@@ -3,6 +3,7 @@
 
 #include <SDL2/SDL.h>
 #include <cstddef>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -14,6 +15,7 @@
 #include "animation/animationQueue.hpp"
 
 class Game; // forward declaration to avoid circular include
+class Card;
 
 class Playing {
     friend class RenderPlaying;
@@ -49,8 +51,16 @@ private:
     bool menuOpen{false};
     bool surrendered{false};
     AnimationQueue animationQueue;
+    struct PendingSpellTargetState {
+        bool active{false};
+        std::unique_ptr<Card> spell;
+    };
+    PendingSpellTargetState pendingSpellTarget;
 
     bool pointInRect(const SDL_Rect& rect, int x, int y);
+    bool isTargetedSpell(const Card& card) const;
+    bool consumeSpell(std::unique_ptr<Card> spell);
+    bool resolvePendingSpellTargetAt(int x, int y);
     std::vector<SDL_Rect> computeCardLayout(std::size_t count, int screenW, int screenH) const;
     void computeZones(int screenW, int screenH);
     void computeUiRects(int screenW, int screenH);
