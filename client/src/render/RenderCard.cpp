@@ -1,16 +1,142 @@
 #include "render/RenderCard.hpp"
 
 #include "objects/Card.h"
+#include "core/NetworkClient.hpp"
 #include "objects/CreatureCard.h"
 #include "render/RenderText.hpp"
 
 #include <SDL2/SDL.h>
+#include <SDL2/SDL_image.h>
 #include <SDL2/SDL_ttf.h>
 #include <algorithm>
+#include <cstdlib>
+#include <array>
+#include <sstream>
 #include <string>
+#include <unordered_map>
+#include <unordered_set>
 
 namespace {
     constexpr SDL_Color kCardTextColor{0, 0, 0, 255};
+    std::unordered_map<int, SDL_Texture*> gCardImageCache;
+    std::unordered_set<int> gMissingCardImages;
+
+    std::string getEnvOrDefault(const char* key, const char* fallback) {
+        const char* value = std::getenv(key);
+        return value ? std::string(value) : std::string(fallback);
+    }
+
+    int getEnvIntOrDefault(const char* key, int fallback) {
+        const char* value = std::getenv(key);
+        if (!value) return fallback;
+        try {
+            return std::stoi(value);
+        } catch (...) {
+            return fallback;
+        }
+    }
+
+    bool downloadImageBody(const std::string& host, int port, int cardId, const std::string& extension, std::string& responseBody) {
+        NetworkClient client(NetworkClient::SocketMode::Blocking);
+        if (!client.connectTo(host, port)) {
+            return false;
+        }
+
+        std::ostringstream request;
+        request << "GET /cardbase/images/" << cardId << "." << extension << " HTTP/1.1\r\n";
+        request << "Host: " << host << "\r\n";
+        request << "Connection: close\r\n\r\n";
+
+        const std::string requestText = request.str();
+        if (!client.send(requestText.data(), requestText.size())) {
+            client.disconnect();
+            return false;
+        }
+
+        std::string response;
+        char buffer[4096];
+        while (true) {
+            const int received = client.receive(buffer, sizeof(buffer));
+            if (received <= 0) break;
+            response.append(buffer, static_cast<std::size_t>(received));
+        }
+        client.disconnect();
+
+        const std::size_t headerEnd = response.find("\r\n\r\n");
+        if (headerEnd == std::string::npos) return false;
+
+        const std::string headers = response.substr(0, headerEnd);
+        if (headers.find(" 200 ") == std::string::npos) {
+            return false;
+        }
+
+        responseBody = response.substr(headerEnd + 4);
+        return !responseBody.empty();
+    }
+
+    SDL_Texture* getCardImageTexture(SDL_Renderer* renderer, int cardId) {
+        if (!renderer || cardId <= 0) return nullptr;
+
+        const auto cacheIt = gCardImageCache.find(cardId);
+        if (cacheIt != gCardImageCache.end()) {
+            return cacheIt->second;
+        }
+
+        if (gMissingCardImages.find(cardId) != gMissingCardImages.end()) {
+            return nullptr;
+        }
+
+        const std::string host = getEnvOrDefault("CARDS_SERVICE_HOST", "127.0.0.1");
+        const int port = getEnvIntOrDefault("CARDS_SERVICE_PORT", 8082);
+        const std::string preferredExt = getEnvOrDefault("CARD_IMAGE_EXT", "");
+        const std::array<std::string, 4> defaultExts{{"png", "jpg", "jpeg", "bmp"}};
+
+        std::string imageBytes;
+        bool loaded = false;
+
+        if (!preferredExt.empty()) {
+            loaded = downloadImageBody(host, port, cardId, preferredExt, imageBytes);
+        }
+
+        if (!loaded) {
+            for (const std::string& ext : defaultExts) {
+                if (!preferredExt.empty() && preferredExt == ext) {
+                    continue;
+                }
+                if (downloadImageBody(host, port, cardId, ext, imageBytes)) {
+                    loaded = true;
+                    break;
+                }
+            }
+        }
+
+        if (!loaded) {
+            gMissingCardImages.insert(cardId);
+            return nullptr;
+        }
+
+        SDL_RWops* rw = SDL_RWFromConstMem(imageBytes.data(), static_cast<int>(imageBytes.size()));
+        if (!rw) {
+            gMissingCardImages.insert(cardId);
+            return nullptr;
+        }
+
+        SDL_Surface* surface = IMG_Load_RW(rw, 1);
+        if (!surface) {
+            gMissingCardImages.insert(cardId);
+            return nullptr;
+        }
+
+        SDL_Texture* texture = SDL_CreateTextureFromSurface(renderer, surface);
+        SDL_FreeSurface(surface);
+        if (!texture) {
+            gMissingCardImages.insert(cardId);
+            return nullptr;
+        }
+
+        gCardImageCache[cardId] = texture;
+        return texture;
+    }
 
     bool measureText(TTF_Font* font, const std::string& text, int& width, int& height) {
         if (!font) return false;
@@ -90,6 +216,22 @@ void RenderCard::drawCardFace(SDL_Renderer* renderer, RenderText& textRenderer, 
 
     SDL_Rect artBox{rect.x + innerPadding, titleBar.y + titleBar.h + innerPadding, rect.w - innerPadding * 2, artBoxHeight};
     drawInsetRect(renderer, artBox, dimmed ? SDL_Color{110, 110, 110, 255} : SDL_Color{160, 170, 190, 255}, border);
+
+    SDL_Texture* imageTexture = getCardImageTexture(renderer, card.getId());
+    if (imageTexture) {
+        const Uint8 imageAlpha = dimmed ? static_cast<Uint8>(150) : static_cast<Uint8>(255);
+        SDL_SetTextureAlphaMod(imageTexture, imageAlpha);
+        SDL_Rect imageDst{artBox.x + 1, artBox.y + 1, std::max(1, artBox.w - 2), std::max(1, artBox.h - 2)};
+        SDL_RenderCopy(renderer, imageTexture, nullptr, &imageDst);
+        SDL_SetTextureAlphaMod(imageTexture, 255);
+
+        if (dimmed) {
+            SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+            SDL_SetRenderDrawColor(renderer, 120, 120, 120, 95);
+            SDL_RenderFillRect(renderer, &imageDst);
+            SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
+        }
+    }
 
     SDL_Rect textBox{rect.x + innerPadding, artBox.y + artBox.h + innerPadding, rect.w - innerPadding * 2, rect.y + rect.h - (artBox.y + artBox.h + innerPadding) - innerPadding};
     drawInsetRect(renderer, textBox, panel, border);
@@ -202,4 +344,14 @@ void RenderCard::drawCardBack(SDL_Renderer* renderer, const SDL_Rect& cardRect) 
         SDL_SetRenderDrawColor(renderer, border.r, border.g, border.b, border.a);
         SDL_RenderDrawRect(renderer, &inset);
     }
+}
+
+void RenderCard::clearImageCache() {
+    for (auto& pair : gCardImageCache) {
+        if (pair.second) {
+            SDL_DestroyTexture(pair.second);
+        }
+    }
+    gCardImageCache.clear();
+    gMissingCardImages.clear();
 }

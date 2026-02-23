@@ -115,13 +115,13 @@ void Playing::setup(const Game& game) {
             deck.addCard(std::make_unique<CreatureCard>(
                 "Goblin",
                 "A small but angry creature",
-                1, 1, 1, 1
+                1, 1, 1, 1, 2
             ));
 
             deck.addCard(std::make_unique<SpellCard>(
                 "Fireball",
                 "Deal 3 damage",
-                2, 2
+                2, 2, 1
             ));
         }
     }

@@ -5,6 +5,8 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"path/filepath"
+	"strings"
 
 	"github.com/Ryanljk/speedcardgame/cards/config"
 	"github.com/Ryanljk/speedcardgame/cards/models"
@@ -14,6 +16,23 @@ import (
 	"github.com/go-chi/cors"
 	"github.com/joho/godotenv"
 )
+
+func resolveImageDir() string {
+	candidates := []string{
+		"assets/cards",
+		"cards/assets/cards",
+		"./cards/assets/cards",
+		"../cards/assets/cards",
+	}
+
+	for _, candidate := range candidates {
+		if info, err := os.Stat(candidate); err == nil && info.IsDir() {
+			return candidate
+		}
+	}
+
+	return "assets/cards"
+}
 
 func main() {
 	if err := godotenv.Load(".env"); err != nil {
@@ -72,6 +91,23 @@ func main() {
 	r := chi.NewRouter()
 	//define routes
 	r.Get("/health", health) // Check health of service
+	imageDir := resolveImageDir()
+	log.Printf("Serving card images from %s", imageDir)
+	r.Get("/images/{filename}", func(w http.ResponseWriter, req *http.Request) {
+		filename := chi.URLParam(req, "filename")
+		if filename == "" {
+			http.NotFound(w, req)
+			return
+		}
+
+		cleaned := filepath.Clean(filename)
+		if cleaned == "." || strings.Contains(cleaned, "..") || cleaned != filepath.Base(cleaned) {
+			http.NotFound(w, req)
+			return
+		}
+
+		http.ServeFile(w, req, filepath.Join(imageDir, cleaned))
+	})
 
 	r.Post("/decks", services.CreateDeck) // Create deck
 	r.Post("/decks/fill", services.FillDeckForUser)
