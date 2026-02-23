@@ -85,6 +85,10 @@ bool NetworkClient::isConnected() const {
     return connected;
 }
 
+bool NetworkClient::sendString(const std::string& msg) {
+    return send(msg.data(), msg.size());
+}
+
 bool NetworkClient::send(const void* data, size_t size) {
     if (!connected) return false;
     const char* buffer = static_cast<const char*>(data);

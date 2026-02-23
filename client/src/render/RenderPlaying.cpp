@@ -231,6 +231,29 @@ void RenderPlaying::render(Playing& playing, const Game& game) {
 		playing.fonts.small
 	);
 
+	if (playing.pendingSpellTarget.active) {
+		SDL_SetRenderDrawColor(renderer, 250, 220, 90, 255);
+		for (const auto& localSlot : playing.playSlots) {
+			SDL_RenderDrawRect(renderer, &localSlot);
+			SDL_Rect opponentSlot = localSlot;
+			opponentSlot.y -= 200;
+			SDL_RenderDrawRect(renderer, &opponentSlot);
+		}
+
+		std::string targetPrompt = "Choose target";
+		if (playing.pendingSpellTarget.spell) {
+			targetPrompt = "Choose target for " + playing.pendingSpellTarget.spell->getName();
+		}
+		textRenderer.drawText(
+			renderer,
+			targetPrompt,
+			playing.fonts.small,
+			SDL_Color{250, 240, 180, 255},
+			20,
+			130
+		);
+	}
+
 	for (const auto& rect : opponentHandRects) {
 		RenderCard::drawCardBack(renderer, rect);
 	}

@@ -2,6 +2,8 @@
 #define GAMESERVER_HPP
 #include "net/TcpServer.hpp"
 #include "core/Matchmaker.hpp"
+#include "core/MatchManager.hpp"
+
 #include <atomic>
 #include <memory>
 #include <mutex>
@@ -23,6 +25,8 @@ private:
     //Smart ptrs (prevent memory leak fkery)
     std::unique_ptr<TcpServer> tcpServer;
     std::unique_ptr<Matchmaker> matchmaker;
+    std::unique_ptr<MatchManager> matchManager;
+
 
     std::atomic<bool> running;
     std::mutex shutdownMutex;

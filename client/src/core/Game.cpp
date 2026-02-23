@@ -208,6 +208,19 @@ void Game::setPlayerId(int playerId) {
     }
 }
 
+const std::string& Game::getPlayerUsername() const {
+    return playerUsername;
+}
+
+void Game::setPlayerUsername(std::string username) {
+    if (username.empty()) {
+        playerUsername = "Player";
+        return;
+    }
+
+    playerUsername = std::move(username);
+}
+
 const Deck& Game::getDeck(const Player& player) const {
     return player.getDeck();
 }

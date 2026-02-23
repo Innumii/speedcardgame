@@ -30,6 +30,7 @@ public:
     bool isConnected() const;
 
     bool send(const void* data, size_t size);
+    bool sendString(const std::string& msg);
     int receive(void* buffer, size_t size); // >0=bytes, 0=no data (non-blocking), -1=error/closed
 
 private:

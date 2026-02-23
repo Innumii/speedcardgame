@@ -22,10 +22,35 @@ bool GameServer::start() {
         // Initialize Matchmaker (passive)
         matchmaker = std::make_unique<Matchmaker>();
 
+        //Initialise MatchManager and wire callback
+        matchManager = std::make_unique<MatchManager>();
+        matchManager->setMatchmaker(matchmaker.get());
+
+        matchmaker->onMatchReady = [this](auto a, auto b) {
+            matchManager->onPairFound(a, b);
+        };
+
         // Register callback for new clients
         tcpServer->onClientConnected = [this](std::shared_ptr<PlayerConnection> player) {
-            player->onDisconnected = [player]() {
+            player->onDisconnected = [this, player]() {
                 std::cout << "Player disconnected: Socket " << player->getSocket() << "\n";
+                //dequeue
+                if (matchmaker) matchmaker->removePlayer(player);
+                if (matchManager) matchManager->onPlayerDisconnected(player);
+            };
+            player->onMessageReceived = [player, this](const std::vector<char>& rawMsg) {
+                std::string msg(rawMsg.begin(), rawMsg.end());
+
+                if (msg == "MATCH_ACCEPT\n") {
+                    if (matchManager) matchManager->onAccept(player);
+                } 
+                else if (msg == "MATCH_DECLINE\n") {
+                    if (matchManager) matchManager->onDecline(player);
+                } 
+                else {
+                    // Forward to active match sessions if needed
+                    // e.g., matchManager->routeToMatchSession(player, msg);
+                }
             };
             if (!player->start()) {
                 std::cerr << "Failed to start PlayerConnection for socket " << player->getSocket() << "\n";
@@ -43,6 +68,7 @@ bool GameServer::start() {
             std::cerr << "Failed to start TcpServer\n";
             tcpServer.reset(); // cleanup
             matchmaker.reset();
+            matchManager.reset();
             return false;
         }
 
@@ -57,6 +83,7 @@ bool GameServer::start() {
         if (tcpServer) tcpServer->stop();
         tcpServer.reset();
         matchmaker.reset();
+        matchManager.reset();
         running = false;
         return false;
     } catch (...) {
@@ -64,6 +91,7 @@ bool GameServer::start() {
         if (tcpServer) tcpServer->stop();
         tcpServer.reset();
         matchmaker.reset();
+        matchManager.reset();
         running = false;
         return false;
     }
