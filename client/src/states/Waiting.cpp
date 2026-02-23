@@ -1,5 +1,6 @@
 #include "states/Waiting.hpp"
 #include "render/RenderButton.hpp"
+#include "render/RenderCard.hpp"
 #include "core/Game.hpp"
 #include <iostream>
 
@@ -76,6 +77,10 @@ void Waiting::update(Game& game) {
             std::string line = recvBuffer.substr(0, pos);
             recvBuffer.erase(0, pos + 1); // remove processed line
 
+            if (!line.empty() && line.back() == '\r') {
+                line.pop_back();
+            }
+
             if (line == "MATCH_FOUND") {
                 matchFound = true;
                 waitingForOpponent = true;
@@ -88,7 +93,40 @@ void Waiting::update(Game& game) {
                 waitingForOpponent = false;
                 std::cout << "Match cancelled, back to queue\n";
             }
+            else if (line.rfind("OPPONENT_INFO|", 0) == 0) {
+                const std::size_t firstSep = line.find('|');
+                const std::size_t secondSep = line.find('|', firstSep + 1);
+                if (firstSep != std::string::npos && secondSep != std::string::npos) {
+                    const std::string idToken = line.substr(firstSep + 1, secondSep - (firstSep + 1));
+                    const std::string username = line.substr(secondSep + 1);
+
+                    try {
+                        const int opponentId = std::stoi(idToken);
+                        game.setOpponentPlayerInfo(opponentId, username);
+                        std::cout << "Opponent paired: id=" << opponentId << ", username=" << username << "\n";
+                    } catch (...) {
+                        std::cerr << "Failed to parse OPPONENT_INFO message: " << line << "\n";
+                    }
+                }
+            }
+            else if (line.rfind("OPPONENT_COUNTS|", 0) == 0) {
+                const std::size_t firstSep = line.find('|');
+                const std::size_t secondSep = line.find('|', firstSep + 1);
+                if (firstSep != std::string::npos && secondSep != std::string::npos) {
+                    const std::string handToken = line.substr(firstSep + 1, secondSep - (firstSep + 1));
+                    const std::string deckToken = line.substr(secondSep + 1);
+
+                    try {
+                        const std::size_t handCount = static_cast<std::size_t>(std::stoul(handToken));
+                        const std::size_t deckCount = static_cast<std::size_t>(std::stoul(deckToken));
+                        game.setOpponentCounts(handCount, deckCount);
+                    } catch (...) {
+                        std::cerr << "Failed to parse OPPONENT_COUNTS message: " << line << "\n";
+                    }
+                }
+            }
             else if (line == "MATCH_START") {
+                RenderCard::preloadCommonCardImages(game.getRenderer());
                 game.setNextState(GameState::Playing);
                 return;
             }

@@ -66,6 +66,8 @@ private:
     void computeUiRects(int screenW, int screenH);
     SDL_Rect computeSelfDeckRect(int screenW, int screenH) const;
     bool tryDrawCardWithAnimation(Uint32 now);
+    void processServerMessages(Game& game);
+    void handleServerMessage(Game& game, const std::string& line);
 
 public:
     explicit Playing(int drawIntervalSeconds = 3);
@@ -81,6 +83,9 @@ public:
     void run();
     void update(Game& game);
     void render(const Game&);
+
+private:
+    std::string recvBuffer;
 };
 
 

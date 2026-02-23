@@ -221,6 +221,46 @@ void Game::setPlayerUsername(std::string username) {
     playerUsername = std::move(username);
 }
 
+int Game::getOpponentPlayerId() const {
+    return remotePlayer.id;
+}
+
+const std::string& Game::getOpponentPlayerUsername() const {
+    return remotePlayerUsername;
+}
+
+void Game::setOpponentPlayerInfo(int playerId, std::string username) {
+    if (playerId > 0) {
+        remotePlayer.id = playerId;
+    }
+
+    if (username.empty()) {
+        remotePlayerUsername = "Opponent";
+    } else {
+        remotePlayerUsername = std::move(username);
+    }
+}
+
+std::size_t Game::getOpponentHandCount() const {
+    return opponentHandCount;
+}
+
+std::size_t Game::getOpponentDeckCount() const {
+    return opponentDeckCount;
+}
+
+void Game::setOpponentCounts(std::size_t handCount, std::size_t deckCount) {
+    opponentHandCount = handCount;
+    opponentDeckCount = deckCount;
+}
+
+void Game::applyOpponentDraw() {
+    ++opponentHandCount;
+    if (opponentDeckCount > 0) {
+        --opponentDeckCount;
+    }
+}
+
 const Deck& Game::getDeck(const Player& player) const {
     return player.getDeck();
 }

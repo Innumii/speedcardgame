@@ -58,12 +58,32 @@ void MatchSession::gameLoop() {
         std::string msg;
         // Player A → B
         while (playerA->pollMessage(msg)) {
-            playerB->send(msg);
+            std::size_t scanStart = 0;
+            bool handledDrawEvent = false;
+            while ((scanStart = msg.find("DRAW_EVENT", scanStart)) != std::string::npos) {
+                playerB->send("OPPONENT_DRAW\n");
+                scanStart += 10;
+                handledDrawEvent = true;
+            }
+
+            if (!handledDrawEvent) {
+                playerB->send(msg);
+            }
         }
 
         // Player B → A
         while (playerB->pollMessage(msg)) {
-            playerA->send(msg);
+            std::size_t scanStart = 0;
+            bool handledDrawEvent = false;
+            while ((scanStart = msg.find("DRAW_EVENT", scanStart)) != std::string::npos) {
+                playerA->send("OPPONENT_DRAW\n");
+                scanStart += 10;
+                handledDrawEvent = true;
+            }
+
+            if (!handledDrawEvent) {
+                playerA->send(msg);
+            }
         }
 
         std::this_thread::sleep_for(1ms);

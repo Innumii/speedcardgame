@@ -86,6 +86,11 @@ void PlayerConnection::readLoop() {
 
         std::vector<char> message(buffer, buffer + bytesRead);
 
+        {
+            std::lock_guard<std::mutex> lock(queueMutex);
+            messageQueue.push(std::string(message.begin(), message.end()));
+        }
+
         // Fire the callback
         if (onMessageReceived) {
             try {
