@@ -15,6 +15,10 @@ public:
 
 private:
     std::string recvBuffer; // handles partial TCP messages
+    bool matchFound = false;
+    bool waitingForOpponent = false;
+    bool accepted = false;
+    bool declined = false;
 };
 
 #endif

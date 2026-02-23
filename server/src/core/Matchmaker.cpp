@@ -30,6 +30,7 @@ void Matchmaker::removePlayer(const std::shared_ptr<PlayerConnection>& player) {
     }
 
     std::swap(playerQueue, tempQueue);
+    std::cout << "Player removed from Queue\n";
 }
 
 void Matchmaker::tryCreateMatch() {
@@ -41,12 +42,16 @@ void Matchmaker::tryCreateMatch() {
         if (!playerA || !playerB) continue; // safety check
 
         //create MatchSession
-        auto match = std::make_shared<MatchSession>(playerA, playerB);
+        // auto match = std::make_shared<MatchSession>(playerA, playerB);
+
+        if (onMatchReady) {
+            onMatchReady(playerA, playerB);
+        }
 
         //start the match asynchronously
-        match->start();
+        // match->start();
 
-        std::cout << "Match created between players "
+        std::cout << "Match found between players "
                   << playerA->getSocket() << " and "
                   << playerB->getSocket() << "\n";
     }
