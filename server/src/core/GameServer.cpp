@@ -38,6 +38,20 @@ bool GameServer::start() {
                 if (matchmaker) matchmaker->removePlayer(player);
                 if (matchManager) matchManager->onPlayerDisconnected(player);
             };
+            player->onMessageReceived = [player, this](const std::vector<char>& rawMsg) {
+                std::string msg(rawMsg.begin(), rawMsg.end());
+
+                if (msg == "MATCH_ACCEPT\n") {
+                    if (matchManager) matchManager->onAccept(player);
+                } 
+                else if (msg == "MATCH_DECLINE\n") {
+                    if (matchManager) matchManager->onDecline(player);
+                } 
+                else {
+                    // Forward to active match sessions if needed
+                    // e.g., matchManager->routeToMatchSession(player, msg);
+                }
+            };
             if (!player->start()) {
                 std::cerr << "Failed to start PlayerConnection for socket " << player->getSocket() << "\n";
             }

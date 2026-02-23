@@ -19,6 +19,13 @@ private:
     bool waitingForOpponent = false;
     bool accepted = false;
     bool declined = false;
+
+    SDL_Rect acceptRect{220, 250, 150, 50};
+    SDL_Rect declineRect{430, 250, 150, 50};
+    bool acceptHovered = false;
+    bool declineHovered = false;
+    bool acceptPressed = false;
+    bool declinePressed = false;
 };
 
 #endif

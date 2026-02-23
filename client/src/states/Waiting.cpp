@@ -1,4 +1,5 @@
 #include "states/Waiting.hpp"
+#include "render/RenderButton.hpp"
 #include "core/Game.hpp"
 #include <iostream>
 
@@ -13,6 +14,48 @@ void Waiting::handleEvents(Game& game, const SDL_Event& event) {
         std::cout << "Cancelled waiting\n";
         game.setNextState(GameState::Title);
     }
+
+    if (event.type == SDL_MOUSEMOTION) {
+        int x = event.motion.x;
+        int y = event.motion.y;
+        acceptHovered = (x >= acceptRect.x && x <= acceptRect.x + acceptRect.w &&
+                        y >= acceptRect.y && y <= acceptRect.y + acceptRect.h);
+        declineHovered = (x >= declineRect.x && x <= declineRect.x + declineRect.w &&
+                        y >= declineRect.y && y <= declineRect.y + declineRect.h);
+    }
+
+    if (event.type == SDL_MOUSEBUTTONDOWN && matchFound) {
+        int x = event.button.x;
+        int y = event.button.y;
+
+        if (acceptHovered) {
+            acceptPressed = true;
+        }
+        if (declineHovered) {
+            declinePressed = true;
+        }
+    }
+
+    if (event.type == SDL_MOUSEBUTTONUP && matchFound) {
+        int x = event.button.x;
+        int y = event.button.y;
+
+        if (acceptPressed && acceptHovered) {
+            game.getNetworkClient().sendString("MATCH_ACCEPT\n");
+            accepted = true;
+            waitingForOpponent = false;
+        }
+        //change so that decline -> return to title screen
+        if (declinePressed && declineHovered) {
+            game.getNetworkClient().sendString("MATCH_DECLINE\n");
+            declined = true;
+            matchFound = false;
+            waitingForOpponent = false;
+        }
+        acceptPressed = false;
+        declinePressed = false;
+    }
+
 }
 
 void Waiting::update(Game& game) {
@@ -54,40 +97,45 @@ void Waiting::update(Game& game) {
     }
 }
 
-
 void Waiting::render(const Game& game) {
     SDL_Renderer* renderer = game.getRenderer();
+    if (!renderer) return;
 
+    // Background
     SDL_SetRenderDrawColor(renderer, 20, 20, 20, 255);
     SDL_RenderClear(renderer);
 
+    // Center panel
     SDL_Rect panel{200, 200, 400, 100};
-    SDL_SetRenderDrawColor(renderer, 200, 180, 60, 255);
+    SDL_SetRenderDrawColor(renderer, 200, 180, 60, 255); // gold
     SDL_RenderFillRect(renderer, &panel);
     SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
     SDL_RenderDrawRect(renderer, &panel);
 
-    // If match found, draw buttons
+    // If match found, render buttons using RenderButton
     if (matchFound) {
-        SDL_Rect acceptRect{220, 250, 150, 50};
-        SDL_Rect declineRect{430, 250, 150, 50};
+        if (accepted) {
 
-        // Accept button
-        SDL_SetRenderDrawColor(renderer, 0, 200, 0, 255); // green
-        SDL_RenderFillRect(renderer, &acceptRect);
-        SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
-        SDL_RenderDrawRect(renderer, &acceptRect);
+        } else {
+            SDL_Color acceptFill   = {0, 200, 0, 255};   // green
+            SDL_Color declineFill  = {200, 0, 0, 255};   // red
+            SDL_Color borderColor  = {255, 255, 255, 255};
+            SDL_Color textColor    = {255, 255, 255, 255};
 
-        // Decline button
-        SDL_SetRenderDrawColor(renderer, 200, 0, 0, 255); // red
-        SDL_RenderFillRect(renderer, &declineRect);
-        SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
-        SDL_RenderDrawRect(renderer, &declineRect);
+            RenderButton::drawButton(renderer, acceptRect, "Accept",
+                                        game.getUIFonts().large,
+                                        acceptFill, borderColor, textColor,
+                                        acceptHovered, acceptPressed);
 
-        // Optional: render button text using your font system
-        // RenderText::drawCentered(renderer, fonts, "Accept", acceptRect);
-        // RenderText::drawCentered(renderer, fonts, "Decline", declineRect);
+            // Decline button
+            RenderButton::drawButton(renderer, declineRect, "Decline",
+                                        game.getUIFonts().large,
+                                        declineFill, borderColor, textColor,
+                                        declineHovered, declinePressed);
+        }
+
     }
 
+    // Present everything
     SDL_RenderPresent(renderer);
 }
