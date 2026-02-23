@@ -52,7 +52,10 @@ func CreateCard(w http.ResponseWriter, r *http.Request) {
 
 	// Return the created card
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(card)
+	if err := json.NewEncoder(w).Encode(card); err != nil {
+		http.Error(w, fmt.Sprintf("Failed to encode card response: %v", err), http.StatusInternalServerError)
+		return
+	}
 }
 
 // List cards within the page range by Cid order
@@ -67,7 +70,10 @@ func ListCards(w http.ResponseWriter, _ *http.Request) {
 
 	// Respond with the list of decks
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(cards)
+	if err := json.NewEncoder(w).Encode(cards); err != nil {
+		http.Error(w, fmt.Sprintf("Failed to encode cards response: %v", err), http.StatusInternalServerError)
+		return
+	}
 }
 
 // Update Card details, ONLY FOR ADMIN USE
@@ -119,7 +125,10 @@ func UpdateCard(w http.ResponseWriter, r *http.Request) {
 
 	// Return the updated card
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(card)
+	if err := json.NewEncoder(w).Encode(card); err != nil {
+		http.Error(w, fmt.Sprintf("Failed to encode card response: %v", err), http.StatusInternalServerError)
+		return
+	}
 }
 
 func DeleteCard(w http.ResponseWriter, r *http.Request) {
@@ -145,5 +154,8 @@ func DeleteCard(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(card)
+	if err := json.NewEncoder(w).Encode(card); err != nil {
+		http.Error(w, fmt.Sprintf("Failed to encode card response: %v", err), http.StatusInternalServerError)
+		return
+	}
 }

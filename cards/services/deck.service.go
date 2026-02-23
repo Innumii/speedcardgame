@@ -82,7 +82,10 @@ func CreateDeck(w http.ResponseWriter, r *http.Request) {
 
 	// Return the created deck as JSON
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(deck)
+	if err := json.NewEncoder(w).Encode(deck); err != nil {
+		http.Error(w, fmt.Sprintf("Failed to encode deck response: %v", err), http.StatusInternalServerError)
+		return
+	}
 }
 
 func ListDecks(w http.ResponseWriter, _ *http.Request) {
@@ -96,7 +99,10 @@ func ListDecks(w http.ResponseWriter, _ *http.Request) {
 
 	// Return the list of decks
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(decks)
+	if err := json.NewEncoder(w).Encode(decks); err != nil {
+		http.Error(w, fmt.Sprintf("Failed to encode decks response: %v", err), http.StatusInternalServerError)
+		return
+	}
 }
 
 func DeleteDeck(w http.ResponseWriter, r *http.Request) {
@@ -119,7 +125,10 @@ func DeleteDeck(w http.ResponseWriter, r *http.Request) {
 
 	// Return a success message
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{"message": "Deck deleted successfully"})
+	if err := json.NewEncoder(w).Encode(map[string]string{"message": "Deck deleted successfully"}); err != nil {
+		http.Error(w, fmt.Sprintf("Failed to encode delete response: %v", err), http.StatusInternalServerError)
+		return
+	}
 }
 
 func FillDeckForUser(w http.ResponseWriter, r *http.Request) {
@@ -166,7 +175,10 @@ func FillDeckForUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(deck)
+	if err := json.NewEncoder(w).Encode(deck); err != nil {
+		http.Error(w, fmt.Sprintf("Failed to encode deck response: %v", err), http.StatusInternalServerError)
+		return
+	}
 }
 
 func FillDecksFromInventories(db *gorm.DB) error {

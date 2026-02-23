@@ -13,13 +13,12 @@ import (
 	"github.com/go-chi/chi"
 	"github.com/go-chi/cors"
 	"github.com/joho/godotenv"
-	"gorm.io/gorm"
 )
 
-var db *gorm.DB //defining the gorm dependency
-
 func main() {
-	godotenv.Load(".env") //loads data from .env file
+	if err := godotenv.Load(".env"); err != nil {
+		log.Printf(".env not loaded: %v", err)
+	}
 
 	portString := os.Getenv("PORT") //grab port value from .env
 	if portString == "" {

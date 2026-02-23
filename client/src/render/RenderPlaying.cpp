@@ -215,7 +215,7 @@ void RenderPlaying::render(Playing& playing, Game& game) {
 		textRenderer,
 		playing.playSlots,
 		playing.discardZone,
-		DeckBuilding::getDeckSizeLimit(),
+		game.getDeck(game.getPlayer(true)).size(),
 		screenW,
 		playing.fonts.small
 	);
@@ -226,7 +226,7 @@ void RenderPlaying::render(Playing& playing, Game& game) {
 		textRenderer,
 		playing.playSlots,
 		playing.discardZone,
-		DeckBuilding::getDeckSizeLimit(),
+		playing.deck.size(),
 		screenW,
 		playing.fonts.small
 	);
