@@ -12,6 +12,18 @@ PlayerConnection::~PlayerConnection() {
     stop();
 }
 
+void PlayerConnection::setPlayerInfo(int id, const std::string& name) {
+    playerId = id;
+    username = name;
+}
+
+int PlayerConnection::getPlayerId() const {
+    return playerId;
+}
+const std::string& PlayerConnection::getUsername() const{
+    return username;
+}
+
 bool PlayerConnection::start() {
     if (running) return false;
     running = true;

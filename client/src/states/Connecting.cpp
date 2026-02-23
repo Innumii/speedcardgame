@@ -70,7 +70,7 @@ void Connecting::update(Game& game) {
                 game.setNextState(GameState::Title);
                 return;
             }
-
+            std::cout << "sent player info\n";
             game.setNextState(GameState::Waiting);
         } else {
             std::cerr << "Connection failed\n";

@@ -46,7 +46,22 @@ bool GameServer::start() {
                 } 
                 else if (msg == "MATCH_DECLINE\n") {
                     if (matchManager) matchManager->onDecline(player);
-                } 
+                } else if (msg.find("{\"type\":\"player_info\"") != std::string::npos) {
+                    auto idPos = msg.find("\"playerId\":");
+                    auto namePos = msg.find("\"username\":\"");
+                    if (idPos != std::string::npos && namePos != std::string::npos) {
+                        int playerId = std::stoi(msg.substr(idPos + 11, msg.find(',', idPos) - (idPos + 11)));
+                        int nameEnd = msg.find('"', namePos + 12);
+                        std::string username = msg.substr(namePos + 12, nameEnd - (namePos + 12));
+                        player->setPlayerInfo(playerId, username);
+
+                        std::cout << "Player info received: ID=" << playerId
+                                << ", username=" << username << "\n";
+
+                        // Optional: automatically enqueue after info is received
+                        if (matchmaker) matchmaker->enqueuePlayer(player);
+                    }
+                }
                 else {
                     // Forward to active match sessions if needed
                     // e.g., matchManager->routeToMatchSession(player, msg);
@@ -56,10 +71,6 @@ bool GameServer::start() {
                 std::cerr << "Failed to start PlayerConnection for socket " << player->getSocket() << "\n";
             }
 
-            //matchmake logic
-            if (matchmaker) {
-                matchmaker->enqueuePlayer(player);
-            }
         };
 
     
