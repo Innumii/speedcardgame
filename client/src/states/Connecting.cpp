@@ -15,6 +15,7 @@ Connecting::~Connecting() {
     }
 }
 
+
 void Connecting::handleEvents(Game& game, const SDL_Event& event) {
     if (event.type == SDL_QUIT) {
         game.setNextState(GameState::Quit);

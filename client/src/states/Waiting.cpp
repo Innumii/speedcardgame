@@ -1,5 +1,8 @@
 #include "states/Waiting.hpp"
 #include "render/RenderButton.hpp"
+#include "render/RenderText.hpp"
+#include "render/RenderBanner.hpp"
+#include "render/Theme.hpp"
 #include "core/Game.hpp"
 #include <iostream>
 
@@ -51,6 +54,8 @@ void Waiting::handleEvents(Game& game, const SDL_Event& event) {
             declined = true;
             matchFound = false;
             waitingForOpponent = false;
+            //return to title
+            game.setNextState(GameState::Title);
         }
         acceptPressed = false;
         declinePressed = false;
@@ -101,41 +106,99 @@ void Waiting::render(const Game& game) {
     SDL_Renderer* renderer = game.getRenderer();
     if (!renderer) return;
 
-    // Background
-    SDL_SetRenderDrawColor(renderer, 20, 20, 20, 255);
+    const auto& uiFonts = game.getUIFonts();
+
+    int screenW, screenH;
+    SDL_GetRendererOutputSize(renderer, &screenW, &screenH);
+
+    // ── background ─────────────────────────────
+    SDL_SetRenderDrawColor(renderer, Theme::BG.r, Theme::BG.g, Theme::BG.b, 255);
     SDL_RenderClear(renderer);
 
-    // Center panel
-    SDL_Rect panel{200, 200, 400, 100};
-    SDL_SetRenderDrawColor(renderer, 200, 180, 60, 255); // gold
-    SDL_RenderFillRect(renderer, &panel);
-    SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
-    SDL_RenderDrawRect(renderer, &panel);
+    // ── panel layout (centered) ───────────────
+    const int panelW = 420;
+    const int panelH = 140; // taller to fit 2 buttons stacked
 
-    // If match found, render buttons using RenderButton
-    if (matchFound) {
+    SDL_Rect panel{
+        (screenW - panelW) / 2,
+        (screenH - panelH) / 2,
+        panelW,
+        panelH
+    };
+
+    SDL_Color panelFill   = Theme::BANNER_FILL;
+    SDL_Color borderColor = Theme::BANNER_BORDER;
+    SDL_Color textColor   = Theme::BANNER_TEXT;
+
+    if (!matchFound) {
+        RenderBanner::drawBanner(
+            renderer,
+            panel,
+            "Finding Match...",
+            uiFonts.large,
+            panelFill,
+            borderColor,
+            textColor,
+            Theme::BANNER_GLOW
+        );
+    }
+    else {
         if (accepted) {
-
-        } else {
-            SDL_Color acceptFill   = {0, 200, 0, 255};   // green
-            SDL_Color declineFill  = {200, 0, 0, 255};   // red
-            SDL_Color borderColor  = {255, 255, 255, 255};
-            SDL_Color textColor    = {255, 255, 255, 255};
-
-            RenderButton::drawButton(renderer, acceptRect, "Accept",
-                                        game.getUIFonts().large,
-                                        acceptFill, borderColor, textColor,
-                                        acceptHovered, acceptPressed);
-
-            // Decline button
-            RenderButton::drawButton(renderer, declineRect, "Decline",
-                                        game.getUIFonts().large,
-                                        declineFill, borderColor, textColor,
-                                        declineHovered, declinePressed);
+            RenderBanner::drawBanner(
+                renderer,
+                panel,
+                "Waiting for opponent...",
+                uiFonts.large,
+                panelFill,
+                borderColor,
+                textColor,
+                Theme::BANNER_GLOW
+            );
         }
+        else {
+            RenderBanner::drawBanner(
+                renderer,
+                panel,
+                "Match Found!",
+                uiFonts.large,
+                panelFill,
+                borderColor,
+                textColor,
+                Theme::BANNER_GLOW
+            );
 
+            // ── stacked buttons inside panel ──────
+            const int btnW = 180;
+            const int btnH = 45;
+            const int spacing = 15;
+
+            int btnX = panel.x + (panel.w - btnW) / 2;
+            int acceptY  = panel.y + panel.h + spacing + 20; // 20px padding from bottom
+            int declineY = acceptY + btnH + spacing;
+
+            acceptRect  = { btnX, acceptY, btnW, btnH };
+            declineRect = { btnX, declineY, btnW, btnH };
+
+            SDL_Color acceptFill  = Theme::BTN_START;
+            SDL_Color declineFill = Theme::BTN_QUIT;
+            SDL_Color border      = Theme::BTN_BORDER;
+            SDL_Color text        = Theme::BTN_TEXT;
+
+            RenderButton::drawButton(
+                renderer, acceptRect, "Accept",
+                uiFonts.large,
+                acceptFill, border, text,
+                acceptHovered, acceptPressed
+            );
+
+            RenderButton::drawButton(
+                renderer, declineRect, "Back to Title",
+                uiFonts.large,
+                declineFill, border, text,
+                declineHovered, declinePressed
+            );
+        }
     }
 
-    // Present everything
     SDL_RenderPresent(renderer);
 }

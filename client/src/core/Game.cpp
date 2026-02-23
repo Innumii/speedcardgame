@@ -120,9 +120,10 @@ void Game::commitStateChange() {
             playingSetup = false;
         }
 
-        // if (state == GameState::Connecting) {
-        //     connectingState.reset();
-        // }
+        if (previousState == GameState::Waiting && state == GameState::Title) {
+            connectingState.reset();
+            getNetworkClient().disconnect();
+        }
         
         state = nextState;
 

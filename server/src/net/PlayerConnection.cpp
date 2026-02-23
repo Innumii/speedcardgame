@@ -9,6 +9,7 @@ PlayerConnection::PlayerConnection(int socket):clientSocket(socket), running(fal
 }
 
 PlayerConnection::~PlayerConnection() {
+    std::cout << "[DEBUG] PlayerConnection destroyed for: " << username << "\n";
     stop();
 }
 
@@ -72,12 +73,12 @@ bool PlayerConnection::isAlive() const {
     return running.load();
 }
 
+//blocking btw
 void PlayerConnection::readLoop() {
     constexpr size_t bufferSize = 1024;
     char buffer[bufferSize];
 
     while (running) {
-        std::cout << "run!!\n";
         ssize_t bytesRead = recv(clientSocket, buffer, bufferSize, 0);
         if (bytesRead <= 0) {
             running = false;  // client disconnected or error
@@ -85,6 +86,7 @@ void PlayerConnection::readLoop() {
             // Fire disconnect callback
             if (onDisconnected) {
                 try {
+                    std::cout << "BYE BYE\n"; 
                     onDisconnected();
                 } catch (const std::exception& ex) {
                     std::cerr << "Exception in onDisconnected: " << ex.what() << "\n";

@@ -20,10 +20,15 @@ NetworkClient::~NetworkClient() {
 }
 
 bool NetworkClient::connectTo(const std::string& ip, int port) {
-    if (connected) return false;
+    if (connected) {
+        std::cout << "already connected\n";
+        return false;
+    }
 
     socketFd = socket(AF_INET, SOCK_STREAM, 0);
     if (socketFd < 0) {
+        std::cout << "[NetworkClient] socket() failed: " << std::strerror(errno) << "\n";
+
         perror("socket");
         return false;
     }
@@ -33,6 +38,7 @@ bool NetworkClient::connectTo(const std::string& ip, int port) {
     serverAddr.sin_port = htons(port);
 
     if (inet_pton(AF_INET, ip.c_str(), &serverAddr.sin_addr) <= 0) {
+        std::cout << "[NetworkClient] inet_pton() failed: invalid IP address\n";
         perror("inet_pton");
         CLOSE_SOCKET(socketFd);
         socketFd = -1;
@@ -43,6 +49,8 @@ bool NetworkClient::connectTo(const std::string& ip, int port) {
 #ifdef _WIN32
         int err = WSAGetLastError();
         if (!(mode == SocketMode::NonBlocking && err == WSAEWOULDBLOCK)) {
+            std::cout << "[NetworkClient] connect() failed: WSA error " << err << "\n";
+
             perror("connect");
             CLOSE_SOCKET(socketFd);
             socketFd = -1;
