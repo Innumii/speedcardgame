@@ -24,9 +24,9 @@ import (
 
 func main() {
 
-	err := godotenv.Load(".env")
+	err := godotenv.Load(".env", "../.env")
 	if err != nil {
-		log.Fatalf("Error loading .env file")
+		log.Printf("Warning: .env file not found, using existing environment variables")
 	}
 
 	// Construct DSN from environment variables
