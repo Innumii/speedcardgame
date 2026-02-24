@@ -100,7 +100,7 @@ services:
     sysctls:
       - net.core.somaxconn=65535
     volumes:
-      - ./certs:/certs:ro
+      - ./server/certs:/certs:ro
 
 volumes:
   auth-postgres:
