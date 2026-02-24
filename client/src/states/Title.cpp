@@ -158,7 +158,7 @@ void Title::render(const Game& game) {
     SDL_Color animGlow       = {Theme::BANNER_GLOW.r,   Theme::BANNER_GLOW.g,
                                 Theme::BANNER_GLOW.b,   bannerAlpha};
 
-    RenderBanner::drawBanner(renderer, animBanner, "Full Sack",
+    RenderBanner::drawBanner(renderer, animBanner, "Ryan The Gathering",
                               titleFonts.large, animBannerFill, animGold,
                               animText, animGlow);
 
