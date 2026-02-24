@@ -28,7 +28,7 @@ jobs:
             --suppress=missingIncludeSystem \
             --template=gcc \
             -I client/include \
-            -i client/include/httplib
+            -i client/include/httplib \
             client/src client/include
 
       - name: Run advisory cppcheck style scan
