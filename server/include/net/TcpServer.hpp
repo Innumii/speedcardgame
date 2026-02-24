@@ -26,6 +26,7 @@ public:
     void stop();
     //Event callback: called when a new client connects
     std::function<void(std::shared_ptr<PlayerConnection>)> onClientConnected;
+    void removeClient(const std::shared_ptr<PlayerConnection>& player);
 
 private:
     void acceptClients();
@@ -37,7 +38,7 @@ private:
     std::thread acceptThread;
 
     std::mutex clientsMutex;
-    std::vector<int> clientSockets; // raw sockets, wrapped in PlayerConnection later
+    std::vector<std::shared_ptr<PlayerConnection>> clients;
 };
 
 #endif

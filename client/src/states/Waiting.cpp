@@ -27,7 +27,7 @@ void Waiting::handleEvents(Game& game, const SDL_Event& event) {
                         y >= declineRect.y && y <= declineRect.y + declineRect.h);
     }
 
-    if (event.type == SDL_MOUSEBUTTONDOWN && matchFound) {
+    if (event.type == SDL_MOUSEBUTTONDOWN) {
         int x = event.button.x;
         int y = event.button.y;
 
@@ -39,14 +39,16 @@ void Waiting::handleEvents(Game& game, const SDL_Event& event) {
         }
     }
 
-    if (event.type == SDL_MOUSEBUTTONUP && matchFound) {
+    if (event.type == SDL_MOUSEBUTTONUP) {
         int x = event.button.x;
         int y = event.button.y;
 
         if (acceptPressed && acceptHovered) {
-            game.getNetworkClient().sendString("MATCH_ACCEPT\n");
-            accepted = true;
-            waitingForOpponent = false;
+            if (matchFound) {
+                game.getNetworkClient().sendString("MATCH_ACCEPT\n");
+                accepted = true;
+                waitingForOpponent = false;
+            }
         }
         //change so that decline -> return to title screen
         if (declinePressed && declineHovered) {
@@ -129,59 +131,29 @@ void Waiting::render(const Game& game) {
     SDL_Color borderColor = Theme::BANNER_BORDER;
     SDL_Color textColor   = Theme::BANNER_TEXT;
 
-    if (!matchFound) {
-        RenderBanner::drawBanner(
-            renderer,
-            panel,
-            "Finding Match...",
-            uiFonts.large,
-            panelFill,
-            borderColor,
-            textColor,
-            Theme::BANNER_GLOW
-        );
-    }
-    else {
+    const int btnW = 180;
+    const int btnH = 45;
+    const int spacing = 15;
+
+    int btnX = panel.x + (panel.w - btnW) / 2;
+    int firstBtnY  = panel.y + panel.h + spacing + 20; // 20px padding from bottom
+    int secondBtnY = firstBtnY + btnH + spacing;
+    declineRect = { btnX, firstBtnY, btnW, btnH };
+
+    SDL_Color acceptFill  = Theme::BTN_START;
+    SDL_Color declineFill = Theme::BTN_QUIT;
+    SDL_Color border      = Theme::BTN_BORDER;
+    SDL_Color text        = Theme::BTN_TEXT;
+    std::string msg = "Finding Match...";
+
+    if (matchFound) {
+        msg = "Match Found!";
         if (accepted) {
-            RenderBanner::drawBanner(
-                renderer,
-                panel,
-                "Waiting for opponent...",
-                uiFonts.large,
-                panelFill,
-                borderColor,
-                textColor,
-                Theme::BANNER_GLOW
-            );
+            msg = "Waiting for Opponent...";
         }
         else {
-            RenderBanner::drawBanner(
-                renderer,
-                panel,
-                "Match Found!",
-                uiFonts.large,
-                panelFill,
-                borderColor,
-                textColor,
-                Theme::BANNER_GLOW
-            );
-
-            // ── stacked buttons inside panel ──────
-            const int btnW = 180;
-            const int btnH = 45;
-            const int spacing = 15;
-
-            int btnX = panel.x + (panel.w - btnW) / 2;
-            int acceptY  = panel.y + panel.h + spacing + 20; // 20px padding from bottom
-            int declineY = acceptY + btnH + spacing;
-
-            acceptRect  = { btnX, acceptY, btnW, btnH };
-            declineRect = { btnX, declineY, btnW, btnH };
-
-            SDL_Color acceptFill  = Theme::BTN_START;
-            SDL_Color declineFill = Theme::BTN_QUIT;
-            SDL_Color border      = Theme::BTN_BORDER;
-            SDL_Color text        = Theme::BTN_TEXT;
+            acceptRect  = { btnX, firstBtnY, btnW, btnH };
+            declineRect = { btnX, secondBtnY, btnW, btnH };
 
             RenderButton::drawButton(
                 renderer, acceptRect, "Accept",
@@ -190,14 +162,25 @@ void Waiting::render(const Game& game) {
                 acceptHovered, acceptPressed
             );
 
-            RenderButton::drawButton(
-                renderer, declineRect, "Back to Title",
-                uiFonts.large,
-                declineFill, border, text,
-                declineHovered, declinePressed
-            );
+            
         }
     }
+    //draw banner
+    RenderBanner::drawBanner(
+        renderer,
+        panel,
+        msg,
+        uiFonts.large,
+        panelFill,
+        borderColor,
+        textColor,
+        Theme::BANNER_GLOW
+    );
+    RenderButton::drawButton(
+        renderer, declineRect, "Back to Title",
+        uiFonts.large,
+        declineFill, border, text,
+        declineHovered, declinePressed
+    );
 
-    SDL_RenderPresent(renderer);
 }

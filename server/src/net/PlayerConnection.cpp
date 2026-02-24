@@ -10,7 +10,7 @@ PlayerConnection::PlayerConnection(int socket):clientSocket(socket), running(fal
 
 PlayerConnection::~PlayerConnection() {
     std::cout << "[DEBUG] PlayerConnection destroyed for: " << username << "\n";
-    stop();
+    // stop();
 }
 
 void PlayerConnection::setPlayerInfo(int id, const std::string& name) {
@@ -29,7 +29,10 @@ bool PlayerConnection::start() {
     if (running) return false;
     running = true;
     try {
-        readThread = std::thread(&PlayerConnection::readLoop, this);
+        auto self = shared_from_this();
+        readThread = std::thread([self]() {
+            self->readLoop();
+        });
     } catch (const std::system_error& e) {
         std::cerr << "Failed to start read Thread " << e.what() << "\n";
         running = false;
@@ -39,13 +42,33 @@ bool PlayerConnection::start() {
 }
 
 void PlayerConnection::stop() {
-    if (!running) return;
+    std::cout << "[STOP ENTER] " << username
+          << " running=" << running
+          << " hasCallback=" << (onDisconnected ? "YES" : "NO")
+          << "\n";
+    auto self = shared_from_this(); // keep alive
+
+    if (onDisconnected) {
+        std::cout << "onDisconnected triggering\n";
+        auto cb = std::move(onDisconnected);
+        onDisconnected = nullptr;
+
+        try {
+            std::cout << "Disconnecting " << username << "\n";
+            cb();
+        } catch (...) {
+            std::cerr << "Exception in onDisconnected\n";
+        }
+    }
+
     if (clientSocket >= 0) {
+        shutdown(clientSocket, SHUT_RDWR);
         close(clientSocket);
         clientSocket = -1;
     }
 
-    if (readThread.joinable()) {
+    if (readThread.joinable() &&
+        std::this_thread::get_id() != readThread.get_id()) {
         readThread.join();
     }
 }
@@ -82,19 +105,6 @@ void PlayerConnection::readLoop() {
         ssize_t bytesRead = recv(clientSocket, buffer, bufferSize, 0);
         if (bytesRead <= 0) {
             running = false;  // client disconnected or error
-
-            // Fire disconnect callback
-            if (onDisconnected) {
-                try {
-                    std::cout << "BYE BYE\n"; 
-                    onDisconnected();
-                } catch (const std::exception& ex) {
-                    std::cerr << "Exception in onDisconnected: " << ex.what() << "\n";
-                } catch (...) {
-                    std::cerr << "Unknown exception in onDisconnected\n";
-                }
-            }
-
             break;
         }
 
@@ -111,4 +121,6 @@ void PlayerConnection::readLoop() {
             }
         }
     }
+
+    stop();
 }

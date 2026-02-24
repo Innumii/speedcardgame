@@ -1,4 +1,8 @@
 #include "states/Connecting.hpp"
+#include "render/RenderButton.hpp"
+#include "render/RenderText.hpp"
+#include "render/RenderBanner.hpp"
+#include "render/Theme.hpp"
 #include <SDL2/SDL.h>
 #include <iostream>
 #include <sstream>
@@ -80,24 +84,43 @@ void Connecting::update(Game& game) {
     }
 }
 
-
-
-
 void Connecting::render(const Game& game) {
     SDL_Renderer* renderer = game.getRenderer();
+    if (!renderer) return;
 
-    // Clear screen
-    SDL_SetRenderDrawColor(renderer, 25, 25, 25, 255);
+    const auto& uiFonts = game.getUIFonts();
+
+    int screenW, screenH;
+    SDL_GetRendererOutputSize(renderer, &screenW, &screenH);
+
+    // ── background ─────────────────────────────
+    SDL_SetRenderDrawColor(renderer, Theme::BG.r, Theme::BG.g, Theme::BG.b, 255);
     SDL_RenderClear(renderer);
 
-    // Always blue rectangle while connecting
-    SDL_Rect rect{200, 200, 400, 100};
-    SDL_SetRenderDrawColor(renderer, 80, 120, 200, 255); // blue
-    SDL_RenderFillRect(renderer, &rect);
+    // ── panel layout (centered) ───────────────
+    const int panelW = 420;
+    const int panelH = 140; // taller to fit 2 buttons stacked
 
-    // Draw outline
-    SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
-    SDL_RenderDrawRect(renderer, &rect);
+    SDL_Rect panel{
+        (screenW - panelW) / 2,
+        (screenH - panelH) / 2,
+        panelW,
+        panelH
+    };
 
-    SDL_RenderPresent(renderer);
+    SDL_Color panelFill   = Theme::BANNER_FILL;
+    SDL_Color borderColor = Theme::BANNER_BORDER;
+    SDL_Color textColor   = Theme::BANNER_TEXT;
+
+    RenderBanner::drawBanner(
+        renderer,
+        panel,
+        "Connecting to Server...",
+        uiFonts.large,
+        panelFill,
+        borderColor,
+        textColor,
+        Theme::BANNER_GLOW
+    );
+    
 }

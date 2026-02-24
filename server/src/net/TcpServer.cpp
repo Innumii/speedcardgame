@@ -67,23 +67,27 @@ void TcpServer::stop() {
 
     running = false;
 
-    // Close listening socket to unblock accept()
     if (listenSocket >= 0) {
         close(listenSocket);
         listenSocket = -1;
     }
 
-    // Join accept thread
     if (acceptThread.joinable()) {
         acceptThread.join();
     }
 
-    // Close all client sockets
-    std::lock_guard<std::mutex> lock(clientsMutex);
-    for (int sock : clientSockets) {
-        close(sock);
+    std::vector<std::shared_ptr<PlayerConnection>> copy;
+    {
+        std::lock_guard<std::mutex> lock(clientsMutex);
+        copy = clients;   // copy to avoid deadlocks
+        clients.clear();  // release ownership
     }
-    clientSockets.clear();
+
+    for (auto& player : copy) {
+        if (player) {
+            player->stop();  // triggers socket close + read thread join
+        }
+    }
 }
 
 void TcpServer::acceptClients() {
@@ -103,7 +107,7 @@ void TcpServer::acceptClients() {
 
         {
             std::lock_guard<std::mutex> lock(clientsMutex);
-            clientSockets.push_back(clientSock);
+            clients.push_back(player);   // <-- REAL OWNER
         }
 
 
@@ -118,4 +122,13 @@ void TcpServer::acceptClients() {
             }
         }
     }
+}
+
+void TcpServer::removeClient(const std::shared_ptr<PlayerConnection>& player)
+{
+    std::lock_guard<std::mutex> lock(clientsMutex);
+    clients.erase(
+        std::remove(clients.begin(), clients.end(), player),
+        clients.end()
+    );
 }
