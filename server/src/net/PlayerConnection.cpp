@@ -9,7 +9,7 @@ PlayerConnection::PlayerConnection(int socket):clientSocket(socket), running(fal
 }
 
 PlayerConnection::~PlayerConnection() {
-    std::cout << "[DEBUG] PlayerConnection destroyed for: " << username << "\n";
+    std::cout << "[PlayerConnection] Destroyed: " << username << "\n";
     // stop();
 }
 
@@ -34,7 +34,7 @@ bool PlayerConnection::start() {
             self->readLoop();
         });
     } catch (const std::system_error& e) {
-        std::cerr << "Failed to start read Thread " << e.what() << "\n";
+        std::cerr << "[PlayerConnection] Failed to start read Thread " << e.what() << "\n";
         running = false;
     }
 
@@ -42,36 +42,19 @@ bool PlayerConnection::start() {
 }
 
 void PlayerConnection::stop() {
-    std::cout << "[STOP ENTER] " << username
-          << " running=" << running
-          << " hasCallback=" << (onDisconnected ? "YES" : "NO")
-          << "\n";
-    auto self = shared_from_this(); // keep alive
-
-    if (onDisconnected) {
-        std::cout << "onDisconnected triggering\n";
-        auto cb = std::move(onDisconnected);
-        onDisconnected = nullptr;
-
-        try {
-            std::cout << "Disconnecting " << username << "\n";
-            cb();
-        } catch (...) {
-            std::cerr << "Exception in onDisconnected\n";
-        }
-    }
+    bool expected = true;
+    if (!running.compare_exchange_strong(expected, false))
+        return; // already stopped
 
     if (clientSocket >= 0) {
-        std::cout << "Shutting Down Sockets...\n";
         shutdown(clientSocket, SHUT_RDWR);
         close(clientSocket);
         clientSocket = -1;
     }
 
-    //2nd stop() calls this
+    // join thread safely from other threads
     if (readThread.joinable() &&
         std::this_thread::get_id() != readThread.get_id()) {
-        std::cout << "Killing PlayerConnection Threads...\n";
         readThread.join();
     }
 }
@@ -107,7 +90,6 @@ void PlayerConnection::readLoop() {
     while (running) {
         ssize_t bytesRead = recv(clientSocket, buffer, bufferSize, 0);
         if (bytesRead <= 0) {
-            running = false;  // client disconnected or error
             break;
         }
 
@@ -118,12 +100,12 @@ void PlayerConnection::readLoop() {
             try {
                 onMessageReceived(message);
             } catch (const std::exception& ex) {
-                std::cerr << "Exception in onMessageReceived: " << ex.what() << "\n";
+                std::cerr << "[PlayerConnection] Exception in onMessageReceived: " << ex.what() << "\n";
             } catch (...) {
-                std::cerr << "Unknown exception in onMessageReceived\n";
+                std::cerr << "[PlayerConnection] Unknown exception in onMessageReceived\n";
             }
         }
     }
 
-    stop();
+    if (onDisconnected) onDisconnected();
 }

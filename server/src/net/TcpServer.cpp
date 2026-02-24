@@ -55,19 +55,25 @@ bool TcpServer::start() {
 
     running = true;
 
-    // 4️⃣ Start accept thread
+    // 4️⃣ Start accept/disconnect threads
     acceptThread = std::thread(&TcpServer::acceptClients, this);
-    std::cout << "Server listening on port " << listenPort << "\n";
+    disconnectThread = std::thread(&TcpServer::disconnectLoop, this);
+
+    std::cout << "[TcpServer] Server listening on port " << listenPort << "\n";
+
+    
 
     return true;
 }
 
 void TcpServer::stop() {
+    std::cout << "[TcpServer] Stopping...\n";
     if (!running) return;
 
     running = false;
 
     if (listenSocket >= 0) {
+        shutdown(listenSocket, SHUT_RDWR);
         close(listenSocket);
         listenSocket = -1;
     }
@@ -76,18 +82,22 @@ void TcpServer::stop() {
         acceptThread.join();
     }
 
+    {
+        std::lock_guard<std::mutex> lock(disconnectMutex);
+        disconnectRunning = false;
+    }
+    disconnectCv.notify_one();
+    if (disconnectThread.joinable()) disconnectThread.join();
+
+    // Stop all remaining clients
+    std::cout << "[TcpServer] Removing all players...\n";
     std::vector<std::shared_ptr<PlayerConnection>> copy;
     {
         std::lock_guard<std::mutex> lock(clientsMutex);
-        copy = clients;   // copy to avoid deadlocks
-        clients.clear();  // release ownership
+        copy = clients;
+        clients.clear();
     }
-
-    for (auto& player : copy) {
-        if (player) {
-            player->stop();  // triggers socket close + read thread join
-        }
-    }
+    for (auto& player : copy) player->stop();
 }
 
 void TcpServer::acceptClients() {
@@ -115,20 +125,53 @@ void TcpServer::acceptClients() {
             try {
                 onClientConnected(player);
             } catch (const std::exception& ex) {
-                std::cerr << "Exception in onClientConnected callback: " << ex.what() << "\n";
+                std::cerr << "[TcpServer] Exception in onClientConnected callback: " << ex.what() << "\n";
             } catch (...) {
-                std::cerr << "Unknown exception in onClientConnected callback\n";
+                std::cerr << "[TcpServer] Unknown exception in onClientConnected callback\n";
             }
         }
-        
+
     }
 }
 
-void TcpServer::removeClient(const std::shared_ptr<PlayerConnection>& player)
-{
-    std::lock_guard<std::mutex> lock(clientsMutex);
-    clients.erase(
-        std::remove(clients.begin(), clients.end(), player),
-        clients.end()
-    );
+//Disconnect Handling below
+void TcpServer::removeClient(const std::shared_ptr<PlayerConnection>& player){
+    {
+        std::lock_guard<std::mutex> lock(clientsMutex);
+        clients.erase(std::remove(clients.begin(), clients.end(), player), clients.end());
+    }
+
+    player->stop();
+}
+
+void TcpServer::enqueueDisconnect(const std::shared_ptr<PlayerConnection>& player) {
+    {
+        std::lock_guard<std::mutex> lock(disconnectMutex);
+        disconnectQueue.push(player);
+    }
+    disconnectCv.notify_one();  // wake up dc thread
+}
+
+
+void TcpServer::disconnectLoop() {
+    disconnectRunning = true;
+    while (disconnectRunning) {
+        std::shared_ptr<PlayerConnection> player;
+
+        {
+            std::unique_lock<std::mutex> lock(disconnectMutex);
+            disconnectCv.wait(lock, [this]() {
+                return !disconnectQueue.empty() || !disconnectRunning;
+            });
+
+            if (!disconnectRunning) break;
+
+            player = disconnectQueue.front();
+            disconnectQueue.pop();
+        }
+
+        if (player) {
+            removeClient(player);  // stops thread, closes socket, removes from container
+        }
+    }
 }

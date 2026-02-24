@@ -9,6 +9,8 @@
 #include <atomic>
 #include <functional>
 #include <memory>
+#include <condition_variable>
+#include <queue>
 
 class PlayerConnection;
 
@@ -28,6 +30,11 @@ public:
     std::function<void(std::shared_ptr<PlayerConnection>)> onClientConnected;
     void removeClient(const std::shared_ptr<PlayerConnection>& player);
 
+    //handling disconnection of PlayerConnection objects (user dc)
+    void enqueueDisconnect(const std::shared_ptr<PlayerConnection>& player);
+    void disconnectLoop();
+
+
 private:
     void acceptClients();
 
@@ -35,10 +42,19 @@ private:
     int listenSocket;
 
     std::atomic<bool> running;
-    std::thread acceptThread;
 
+    //handle connection created, chuck into clients
+    std::thread acceptThread;
     std::mutex clientsMutex;
     std::vector<std::shared_ptr<PlayerConnection>> clients;
+    
+    //handle disconnecting, constantly dequeue 
+    std::queue<std::shared_ptr<PlayerConnection>> disconnectQueue;
+    std::mutex disconnectMutex;
+    std::condition_variable disconnectCv;
+
+    std::thread disconnectThread;
+    bool disconnectRunning{false};
 };
 
 #endif

@@ -46,12 +46,8 @@ bool GameServer::start() {
                     // Remove from queues / matches
                     if (matchmaker) matchmaker->removePlayer(p);
                     if (matchManager) matchManager->onPlayerDisconnected(p);
+                    if (tcpServer) tcpServer->enqueueDisconnect(p);
                     
-                    std::thread([p, this]() {
-                        p->stop();                  // use this to trigger the thread joining
-                        tcpServer->removeClient(p);
-                        std::cout << "[DEBUG] PlayerConnection removed for: " << p->getUsername() << "\n";
-                    }).detach();
                 }
             };
 
@@ -139,7 +135,7 @@ void GameServer::stop() {
     if (!running) return;
 
     running = false;
-    std::cout << "Stopping GameServer...\n";
+    std::cout << "[GameServer] Stopping...\n";
 
     // Stop TcpServer first
     if (tcpServer) {
@@ -149,7 +145,7 @@ void GameServer::stop() {
 
     // Matchmaker is passive; just destroy
     matchmaker.reset();
-
+    
     // Wake main thread if blocked
     shutdownCv.notify_all();
 }
