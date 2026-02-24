@@ -2,6 +2,8 @@
 #define NETWORKCLIENT_HPP
 
 #include <string>
+#include <openssl/ssl.h>
+#include <openssl/err.h>
 
 #ifdef _WIN32
 #include <Winsock2.h>
@@ -37,6 +39,12 @@ private:
     int socketFd;
     bool connected;
     SocketMode mode;
+
+    //SSL
+    SSL_CTX* sslCtx{nullptr};
+    SSL* ssl{nullptr};
+    bool initOpenSSL();
+    void cleanupSSL();
 };
 
 

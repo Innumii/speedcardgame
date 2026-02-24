@@ -8,6 +8,8 @@
 #include <unistd.h>
 #include <arpa/inet.h>
 #include <cstring>
+#include <openssl/ssl.h>
+#include <openssl/err.h>
 
 TcpServer::TcpServer(int port)
     : listenPort(port), listenSocket(-1), running(false)
@@ -52,6 +54,33 @@ bool TcpServer::start() {
         listenSocket = -1;
         return false;
     }
+
+    SSL_library_init();
+    OpenSSL_add_all_algorithms();
+    SSL_load_error_strings();
+
+    sslCtx = SSL_CTX_new(TLS_server_method());
+    if (!sslCtx) { std::cerr << "[TcpServer] Failed to create SSL context\n"; return false; }
+
+    // Load server certificate and private key
+    if (SSL_CTX_use_certificate_file(sslCtx, "/certs/server.crt", SSL_FILETYPE_PEM) <= 0) {
+        ERR_print_errors_fp(stderr);
+        return false;
+    }
+
+    if (SSL_CTX_use_PrivateKey_file(sslCtx, "/certs/server.key", SSL_FILETYPE_PEM) <= 0) {
+        ERR_print_errors_fp(stderr);
+        return false;
+    }
+
+    // Verify that private key matches the certificate
+    if (!SSL_CTX_check_private_key(sslCtx)) {
+        std::cerr << "[TcpServer] Private key does not match the certificate public key\n";
+        return false;
+    }
+
+    std::cout << "[TcpServer] TLS certificate and key loaded successfully\n";
+
 
     running = true;
 
@@ -113,7 +142,7 @@ void TcpServer::acceptClients() {
         }
 
         // Wrap raw socket in PlayerConnection (future-proof)
-        auto player = std::make_shared<PlayerConnection>(clientSock);
+        auto player = std::make_shared<PlayerConnection>(clientSock, sslCtx);
 
         {
             std::lock_guard<std::mutex> lock(clientsMutex);

@@ -9,13 +9,15 @@
 #include <functional>
 #include <queue>
 #include <string>
+#include <openssl/ssl.h>
+#include <openssl/err.h>
 
 //1 object means 1 player connection from client -> server
 //need callback runs for this
 //can form shared pointer to itself
 class PlayerConnection : public std::enable_shared_from_this<PlayerConnection> {
 public:
-    explicit PlayerConnection(int socket);
+    explicit PlayerConnection(int socket, SSL_CTX* ctx);
     ~PlayerConnection();
 
     //Make non copyable
@@ -49,11 +51,19 @@ private:
 
     //thread to run readLoop() on
     std::thread readThread;
-    std::atomic<bool> running;
-
+    
     //queue and mutex
     std::queue<std::string> messageQueue;
     std::mutex queueMutex;
+
+    //SSL
+    SSL* ssl{nullptr};
+    SSL_CTX* sslCtx;
+
+    std::atomic<bool> running;
+
+    std::mutex stopMutex;
+    bool stopped = false;
 
 };
 

@@ -99,6 +99,8 @@ services:
     restart: unless-stopped
     sysctls:
       - net.core.somaxconn=65535
+    volumes:
+      - ./certs:/certs:ro
 
 volumes:
   auth-postgres:

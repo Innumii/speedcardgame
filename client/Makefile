@@ -1,8 +1,8 @@
 CXX := g++
-STD := -std=c++17
+STD := -std=c++17 -D_WIN32_WINNT=0x0A00
 INCLUDES := -I include
 LIBDIR := -L lib
-LIBS := -lmingw32 -lSDL2main -lSDL2 -lSDL2_ttf -lSDL2_image -lWs2_32
+LIBS := -lmingw32 -lSDL2main -lSDL2 -lSDL2_ttf -lSDL2_image -lWs2_32 -lssl -lcrypto -lcrypt32
 BUILD_DIR := build
 MKDIR_P := powershell -NoProfile -Command "New-Item -ItemType Directory -Force -Path"
 

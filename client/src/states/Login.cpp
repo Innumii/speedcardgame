@@ -12,6 +12,8 @@
 #include <iostream>
 #include <sstream>
 #include <cmath>
+#define CPPHTTPLIB_OPENSSL_SUPPORT
+#include "httplib/httplib.h"
 
 // ── network helpers ───────────────────────────────────────────────────────────
 
@@ -46,44 +48,44 @@ namespace {
     }
 
     bool sendHttp(const std::string& host, int port, const std::string& method,
-                  const std::string& path, const std::string& body,
-                  int& statusCode, std::string& responseBody) {
-        statusCode = -1;
-        NetworkClient client(NetworkClient::SocketMode::Blocking); // blocking!
-        if (!client.connectTo(host, port)) return false;
+              const std::string& path, const std::string& body,
+              int& statusCode, std::string& responseBody) {
 
-        std::ostringstream req;
-        req << method << " " << path << " HTTP/1.1\r\n"
-            << "Host: " << host << "\r\n"
-            << "Connection: close\r\n";
-        if (method == "POST" || method == "PUT" || method == "PATCH") {
-            req << "Content-Type: application/json\r\n"
-                << "Content-Length: " << body.size() << "\r\n";
+        bool useHttps = (port == 443);
+        httplib::Result res;
+
+        if (useHttps) {
+            httplib::SSLClient client(host.c_str(), port);
+            client.enable_server_certificate_verification(false); // for self-signed
+            client.set_follow_location(true);
+
+            if (method == "GET")      res = client.Get(path.c_str());
+            else if (method == "POST") res = client.Post(path.c_str(), body, "application/json");
+            else if (method == "PUT")  res = client.Put(path.c_str(), body, "application/json");
+            else if (method == "PATCH") res = client.Patch(path.c_str(), body, "application/json");
+            else if (method == "DELETE") res = client.Delete(path.c_str());
+            else return false;
+
+        } else {
+            httplib::Client client(host.c_str(), port);
+            client.set_follow_location(true);
+
+            if (method == "GET")      res = client.Get(path.c_str());
+            else if (method == "POST") res = client.Post(path.c_str(), body, "application/json");
+            else if (method == "PUT")  res = client.Put(path.c_str(), body, "application/json");
+            else if (method == "PATCH") res = client.Patch(path.c_str(), body, "application/json");
+            else if (method == "DELETE") res = client.Delete(path.c_str());
+            else return false;
         }
-        req << "\r\n" << body;
 
-        const std::string reqText = req.str();
-        if (!client.send(reqText.data(), reqText.size())) {
-            client.disconnect();
-            return false;
+        if (!res) {
+            statusCode = -1;
+            responseBody.clear();
+            return false; // network error
         }
 
-        std::string response;
-        char buf[4096];
-        while (true) {
-            int n = client.receive(buf, sizeof(buf));
-            if (n <= 0) break;
-            response.append(buf, static_cast<std::size_t>(n));
-        }
-        client.disconnect();
-
-        const std::size_t headerEnd = response.find("\r\n\r\n");
-        if (headerEnd == std::string::npos) return false;
-
-        std::istringstream hs(response.substr(0, headerEnd));
-        std::string httpVer;
-        hs >> httpVer >> statusCode;
-        responseBody = response.substr(headerEnd + 4);
+        statusCode = res->status;
+        responseBody = res->body;
         return true;
     }
 

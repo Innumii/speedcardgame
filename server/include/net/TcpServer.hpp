@@ -11,6 +11,8 @@
 #include <memory>
 #include <condition_variable>
 #include <queue>
+#include <openssl/ssl.h>
+#include <openssl/err.h>
 
 class PlayerConnection;
 
@@ -55,6 +57,9 @@ private:
 
     std::thread disconnectThread;
     bool disconnectRunning{false};
+
+    //SSL
+    SSL_CTX* sslCtx{nullptr};
 };
 
 #endif
