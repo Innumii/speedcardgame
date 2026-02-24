@@ -15,6 +15,9 @@
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
+#define CPPHTTPLIB_OPENSSL_SUPPORT
+#include "httplib/httplib.h"
+
 
 namespace {
     constexpr SDL_Color kCardTextColor{0, 0, 0, 255};
@@ -36,43 +39,45 @@ namespace {
         }
     }
 
-    bool downloadImageBody(const std::string& host, int port, int cardId, const std::string& extension, std::string& responseBody) {
-        NetworkClient client(NetworkClient::SocketMode::Blocking);
-        if (!client.connectTo(host, port)) {
-            return false;
-        }
+    //switch out
+    bool downloadImageBody(const std::string& host, int port, int cardId,
+                       const std::string& extension, std::string& responseBody) {
 
-        std::ostringstream request;
-        request << "GET /cardbase/images/" << cardId << "." << extension << " HTTP/1.1\r\n";
-        request << "Host: " << host << "\r\n";
-        request << "Connection: close\r\n\r\n";
+    // Determine if HTTPS is needed
+    bool useHttps = (port == 443);
 
-        const std::string requestText = request.str();
-        if (!client.send(requestText.data(), requestText.size())) {
-            client.disconnect();
-            return false;
-        }
+    httplib::Result res;
 
-        std::string response;
-        char buffer[4096];
-        while (true) {
-            const int received = client.receive(buffer, sizeof(buffer));
-            if (received <= 0) break;
-            response.append(buffer, static_cast<std::size_t>(received));
-        }
-        client.disconnect();
+    std::string path = "/cardbase/images/" + std::to_string(cardId) + "." + extension;
 
-        const std::size_t headerEnd = response.find("\r\n\r\n");
-        if (headerEnd == std::string::npos) return false;
+    if (useHttps) {
+        httplib::SSLClient client(host.c_str(), port);
+        client.enable_server_certificate_verification(false); // allow self-signed certs
+        client.set_follow_location(true);
 
-        const std::string headers = response.substr(0, headerEnd);
-        if (headers.find(" 200 ") == std::string::npos) {
-            return false;
-        }
+        res = client.Get(path.c_str());
 
-        responseBody = response.substr(headerEnd + 4);
-        return !responseBody.empty();
+    } else {
+        httplib::Client client(host.c_str(), port);
+        client.set_follow_location(true);
+
+        res = client.Get(path.c_str());
     }
+
+    if (!res) {
+        responseBody.clear();
+        return false; // network error
+    }
+
+    // Check HTTP status
+    if (res->status != 200) {
+        responseBody.clear();
+        return false;
+    }
+
+    responseBody = res->body;
+    return !responseBody.empty();
+}
 
     SDL_Texture* getCardImageTexture(SDL_Renderer* renderer, int cardId) {
         if (!renderer || cardId <= 0) return nullptr;
