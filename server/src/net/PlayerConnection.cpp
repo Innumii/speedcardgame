@@ -58,6 +58,15 @@ void PlayerConnection::stop() {
     stopped = true;
 
     running = false;
+    
+    {
+        std::lock_guard<std::mutex> lock(writeMutex); // wait for writes to finish
+        if (ssl) {
+            SSL_shutdown(ssl);
+            SSL_free(ssl);
+            ssl = nullptr;
+        }
+    }
 
     if (clientSocket >= 0) {
         shutdown(clientSocket, SHUT_RDWR);
@@ -82,6 +91,8 @@ int PlayerConnection::getSocket() const {
 //actions
 bool PlayerConnection::send(const std::string& msg) {
     if (!running || !ssl) return false;
+
+    std::lock_guard<std::mutex> lock(writeMutex); // serialize writes
     int n = SSL_write(ssl, msg.c_str(), msg.size());
     return n == static_cast<int>(msg.size());
 }

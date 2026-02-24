@@ -63,6 +63,7 @@ private:
     std::atomic<bool> running;
 
     std::mutex stopMutex;
+    std::mutex writeMutex;
     bool stopped = false;
 
 };
