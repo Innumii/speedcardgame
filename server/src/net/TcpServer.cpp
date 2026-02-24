@@ -110,7 +110,6 @@ void TcpServer::acceptClients() {
             clients.push_back(player);   // <-- REAL OWNER
         }
 
-
         // Fire callback (non-blocking in accept thread)
         if (onClientConnected) {
             try {
@@ -121,6 +120,7 @@ void TcpServer::acceptClients() {
                 std::cerr << "Unknown exception in onClientConnected callback\n";
             }
         }
+        
     }
 }
 

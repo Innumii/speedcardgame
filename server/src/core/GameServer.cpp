@@ -48,8 +48,8 @@ bool GameServer::start() {
                     if (matchManager) matchManager->onPlayerDisconnected(p);
                     
                     std::thread([p, this]() {
-                        p->stop();                  // safely join readThread if needed
-                        tcpServer->removeClient(p); // remove from container safely
+                        p->stop();                  // use this to trigger the thread joining
+                        tcpServer->removeClient(p);
                         std::cout << "[DEBUG] PlayerConnection removed for: " << p->getUsername() << "\n";
                     }).detach();
                 }

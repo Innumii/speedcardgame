@@ -62,13 +62,16 @@ void PlayerConnection::stop() {
     }
 
     if (clientSocket >= 0) {
+        std::cout << "Shutting Down Sockets...\n";
         shutdown(clientSocket, SHUT_RDWR);
         close(clientSocket);
         clientSocket = -1;
     }
 
+    //2nd stop() calls this
     if (readThread.joinable() &&
         std::this_thread::get_id() != readThread.get_id()) {
+        std::cout << "Killing PlayerConnection Threads...\n";
         readThread.join();
     }
 }
