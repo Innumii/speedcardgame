@@ -4,6 +4,8 @@
 #include <string>
 #include <openssl/ssl.h>
 #include <openssl/err.h>
+#include <optional>
+
 
 #ifdef _WIN32
 #include <Winsock2.h>
@@ -34,6 +36,10 @@ public:
     bool send(const void* data, size_t size);
     bool sendString(const std::string& msg);
     int receive(void* buffer, size_t size); // >0=bytes, 0=no data (non-blocking), -1=error/closed
+
+    //game actions
+    bool sendPlayCard(int handIndex, int lane, std::optional<int> targetId);
+    bool sendDiscardCard(int handIndex);
 
 private:
     int socketFd;

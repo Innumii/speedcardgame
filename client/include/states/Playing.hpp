@@ -7,27 +7,37 @@
 #include <string>
 #include <vector>
 
-#include "core/GameState.hpp" //need this as we plan to use specific GameState stuff with this class
-#include "objects/Player.h"
+#include "core/GameState.hpp"
 #include "objects/Deck.h"
+#include "objects/Player.h"
 #include "core/Board.hpp"
-#include "render/RenderText.hpp"
 #include "animation/animationQueue.hpp"
+#include "render/RenderText.hpp"
+#include "gameplay/GameAuthority.hpp" // added for authority pattern
 
 class Game; // forward declaration to avoid circular include
 class Card;
 
 class Playing {
     friend class RenderPlaying;
+
 private:
-    Player player;
-    Deck deck;
-    Board board;
+    // --- Game logic handled via authority ---
+    std::unique_ptr<GameAuthority> authority; 
 
-    int drawIntervalSeconds;
-    Uint32 lastDrawTick{0};
-    bool running{false};
+    // --- Local state for rendering/UI ---
+    Deck deck;                   // deck of the local player
+    SDL_Renderer* renderer{nullptr}; 
+    RenderText::FontSet fonts{};
+    std::vector<SDL_Rect> cardRects;
+    std::vector<SDL_Rect> playSlots;
+    SDL_Rect discardZone{0, 0, 0, 0};
+    SDL_Rect menuButton{0, 0, 0, 0};
+    SDL_Rect exitGameButton{0, 0, 0, 0};
+    SDL_Rect returnToTitleButton{0, 0, 0, 0};
+    AnimationQueue animationQueue;
 
+    // --- Drag state for cards ---
     struct DragState {
         bool active{false};
         std::size_t index{0};
@@ -36,30 +46,29 @@ private:
         int x{0};
         int y{0};
     };
-
-    SDL_Renderer* renderer{nullptr}; // non-owning, provided by Game
-    RenderText::FontSet fonts{};
-    std::vector<SDL_Rect> cardRects;
-    std::vector<SDL_Rect> playSlots;
-    SDL_Rect discardZone{0, 0, 0, 0};
-    SDL_Rect menuButton{0, 0, 0, 0};
-    SDL_Rect exitGameButton{0, 0, 0, 0};
-    SDL_Rect returnToTitleButton{0, 0, 0, 0};
     DragState drag;
+
+    // --- Hover / UI ---
     std::size_t hoverIndex{static_cast<std::size_t>(-1)};
     Uint32 hoverStartTick{0};
     bool menuOpen{false};
     bool surrendered{false};
-    AnimationQueue animationQueue;
+
+    // --- Spell targeting ---
     struct PendingSpellTargetState {
         bool active{false};
         std::unique_ptr<Card> spell;
     };
     PendingSpellTargetState pendingSpellTarget;
 
+    // --- Timing ---
+    int drawIntervalSeconds;
+    Uint32 lastDrawTick{0};
+    bool running{false};
+
+    // --- Private helper methods ---
     bool pointInRect(const SDL_Rect& rect, int x, int y);
     bool isTargetedSpell(const Card& card) const;
-    bool consumeSpell(std::unique_ptr<Card> spell);
     bool resolvePendingSpellTargetAt(int x, int y);
     std::vector<SDL_Rect> computeCardLayout(std::size_t count, int screenW, int screenH) const;
     void computeZones(int screenW, int screenH);
@@ -71,17 +80,23 @@ public:
     explicit Playing(int drawIntervalSeconds = 3);
     ~Playing();
 
+    // --- Disable copy ---
     Playing(const Playing&) = delete;
     Playing& operator=(const Playing&) = delete;
+    // --- Allow move ---
     Playing(Playing&&) noexcept = default;
     Playing& operator=(Playing&&) noexcept = default;
+
+    // --- Setup ---
     void setup(const Game& game);
     void setDeck(Deck newDeck);
+    void setAuthority(std::unique_ptr<GameAuthority> auth); // new: assign LocalAuthority or ServerAuthority
+
+    // --- Main loop / events ---
     void handleEvents(Game& game, const SDL_Event& event);
     void run();
     void update(Game& game);
     void render(const Game&);
 };
-
 
 #endif
