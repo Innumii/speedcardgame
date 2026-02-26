@@ -8,7 +8,6 @@
 
 #include "core/GameState.hpp"
 #include "objects/Player.h"
-#include "objects/Deck.h"
 #include "core/Board.hpp"
 #include "render/RenderText.hpp"
 #include "animation/animationQueue.hpp"
@@ -18,8 +17,9 @@ class Game;
 
 class Playing {
     friend class RenderPlaying;
+
 public:
-    explicit Playing(int drawIntervalSeconds = 3);
+    Playing() = default;
     ~Playing();
 
     Playing(const Playing&) = delete;
@@ -33,27 +33,33 @@ public:
     void update(Game& game);
     void render(const Game& game);
 
+    void setupPlayers(Player&& local, Player&& remote);
+
 private:
     // -------------------------
-    // Members
+    // Game state
     // -------------------------
     Player localPlayer;
     Player remotePlayer;
-
     Board board;
-    int drawIntervalSeconds;
-    Uint32 lastDrawTick{0};
+
     bool running{false};
 
+    // -------------------------
+    // Dragging cards
+    // -------------------------
     struct DragState {
         bool active{false};
-        std::size_t index{0};
+        std::size_t index{0}; // index into localPlayer.hand
         int offsetX{0};
         int offsetY{0};
         int x{0};
         int y{0};
     } drag;
 
+    // -------------------------
+    // Rendering
+    // -------------------------
     SDL_Renderer* renderer{nullptr}; // non-owning
     RenderText::FontSet fonts{};
     std::vector<SDL_Rect> cardRects;
@@ -69,17 +75,21 @@ private:
     AnimationQueue animationQueue;
 
     // -------------------------
-    // Pending action (generalized)
+    // Pending action (targeting system)
     // -------------------------
     struct PendingActionState {
         bool active{false};
-        int handIndex{-1};
-        std::optional<int> targetId; // for targeted spells or creature effects
+        std::size_t handIndex{static_cast<std::size_t>(-1)};
+
+        void clear() {
+            active = false;
+            handIndex = static_cast<std::size_t>(-1);
+        }
     };
     PendingActionState pendingAction;
 
     // -------------------------
-    // Authority
+    // Authority (network bridge)
     // -------------------------
     std::unique_ptr<GameAuthority> authority;
 
@@ -88,6 +98,7 @@ private:
     // -------------------------
     bool pointInRect(const SDL_Rect& rect, int x, int y);
     bool resolvePendingActionAt(int x, int y);
+
     std::vector<SDL_Rect> computeCardLayout(std::size_t count, int screenW, int screenH) const;
     void computeZones(int screenW, int screenH);
     void computeUiRects(int screenW, int screenH);

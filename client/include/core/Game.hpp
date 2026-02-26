@@ -37,8 +37,7 @@ public:
      int ypos,
      int width,
      int height,
-     bool fullscreen,
-     int drawIntervalSeconds = 3);
+     bool fullscreen);
 
     //destructor, uses RAII cleanup
     ~Game(); 
@@ -62,8 +61,12 @@ public:
     void setNextState(GameState newState);
     void commitStateChange();
     void setPlayingDeck(Deck newDeck);
-    bool tryStartPlayingWithBuiltDeck();
     bool refreshPlayerDeckFromService();
+    Playing& getPlayingState();
+
+
+    bool tryStartPlayingWithBuiltDeck();
+
 
     GameState getState() const;
     GameState getNextState() const;
@@ -73,11 +76,11 @@ public:
     const std::string& getPlayerUsername() const;
     void setPlayerUsername(std::string username);
 
-    const Player& getPlayer(bool isOpponent) const;
-    const Deck& getDeck(const Player& player) const;
-    std::size_t getHandSize(const Player& player) const;
-    int getHealth(const Player& player) const;
-    int getMana(const Player& player) const;
+    Player& getPlayer();
+    // const Deck& getDeck(const Player& player) const;
+    // std::size_t getHandSize(const Player& player) const;
+    // int getHealth(const Player& player) const;
+    // int getMana(const Player& player) const;
 
     const RenderText::FontSet& getTitleFonts() const;
     const RenderText::FontSet& getUIFonts() const;
@@ -90,12 +93,9 @@ private:
     NetworkClient netClient{NetworkClient::SocketMode::NonBlocking};
 
     Player player;
-    Player remotePlayer;
+    // Player remotePlayer;
     std::string playerUsername{"Player"};
 
-    int drawIntervalSeconds{3};
-    Uint32 lastDrawTick{0};
-    std::size_t lastLoggedHandSize{0};
     bool playingSetup{false};
 
     //RAII smart pointers, chain their destruction to the Game object's destruction
@@ -119,7 +119,7 @@ private:
     Title titleState;
     Login loginState;
     Register registerState;
-    Playing playingState{drawIntervalSeconds};
+    Playing playingState;
     DeckBuilding deckBuildingState;
     std::optional<Connecting> connectingState;
     std::optional<Waiting> waitingState;

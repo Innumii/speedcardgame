@@ -32,8 +32,7 @@ bool isWSL() {
     return line.find("microsoft") != std::string::npos;
 }
 
-Game::Game(const char *title, int xpos, int ypos, int width, int height, bool fullscreen, int drawIntervalSeconds)
-    : drawIntervalSeconds(drawIntervalSeconds) {
+Game::Game(const char *title, int xpos, int ypos, int width, int height, bool fullscreen) {
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_TIMER | SDL_INIT_GAMECONTROLLER) != 0) {
         throw std::runtime_error(std::string("SDL_Init failed: ") + SDL_GetError());
     }
@@ -164,7 +163,7 @@ void Game::setNextState(GameState newState) {
 }
 
 void Game::setPlayingDeck(Deck newDeck) {
-    playingState.setDeck(std::move(newDeck));
+    player.setDeck(std::move(newDeck));
     playingSetup = false;
 }
 
@@ -174,16 +173,6 @@ bool Game::refreshPlayerDeckFromService() {
     }
 
     setPlayingDeck(deckBuildingState.buildDeck());
-    return true;
-}
-
-bool Game::tryStartPlayingWithBuiltDeck() {
-    if (!deckBuildingState.hasFullDeck()) {
-        return false;
-    }
-
-    setPlayingDeck(deckBuildingState.buildDeck());
-    setNextState(GameState::Playing);
     return true;
 }
 
@@ -222,25 +211,29 @@ void Game::setPlayerUsername(std::string username) {
     playerUsername = std::move(username);
 }
 
-const Deck& Game::getDeck(const Player& player) const {
-    return player.getDeck();
+Playing& Game::getPlayingState() {
+    return playingState;
 }
 
-const Player& Game::getPlayer(bool isOpponent) const {
-    return isOpponent ? remotePlayer : player;
+// const Deck& Game::getDeck(const Player& player) const {
+//     return player.getDeck();
+// }
+
+Player& Game::getPlayer() {
+    return player;
 }
 
-std::size_t Game::getHandSize(const Player& player) const {
-    return player.hand.size();
-}
+// std::size_t Game::getHandSize(const Player& player) const {
+//     return player.handSize();
+// }
 
-int Game::getHealth(const Player& player) const {
-    return player.health;
-}
+// int Game::getHealth(const Player& player) const {
+//     return player.health;
+// }
 
-int Game::getMana(const Player& player) const {
-    return player.mana;
-}
+// int Game::getMana(const Player& player) const {
+//     return player.mana;
+// }
 
 NetworkClient& Game::getNetworkClient() {
     return netClient;
@@ -377,3 +370,13 @@ bool Game::running() const {
     return isRunning;
 }
 
+
+bool Game::tryStartPlayingWithBuiltDeck() {
+    if (!deckBuildingState.hasFullDeck()) {
+        return false;
+    }
+
+    setPlayingDeck(deckBuildingState.buildDeck());
+    setNextState(GameState::Playing);
+    return true;
+}

@@ -1,5 +1,5 @@
 #pragma once
-
+#include <optional>
 //base class
 class GameAuthority {
 public:
