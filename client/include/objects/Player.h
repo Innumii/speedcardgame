@@ -1,31 +1,36 @@
 #ifndef PLAYER_H
 #define PLAYER_H
 
-#include <memory>
 #include <vector>
-#include "Card.h"
-#include "Deck.h"
+#include <cstddef>
 
 class Player {
 public:
-    int id = 1;
-    int health = 100;
-    int fatigueDamage = 1;
-    int mana = 0;
-    std::vector<std::unique_ptr<Card>> hand;
-    Deck deck;
-    int isOpponent = false;
+    Player();
 
+    int id;
+    int health;
+    int mana;
+    int fatigueDamage;
+    bool isOpponent;
+
+    // Runtime card instance IDs (authoritative server assigns these)
+    std::vector<int> handInstanceIds;
+    int deckSize;
+
+    // ---- State Queries ----
     bool handFull() const;
-    void drawCard(Deck& deck);
-    void addMana(int amount);
+    std::size_t handSize() const;
     bool isDead() const;
-    const Deck& getDeck() const;
-    void setDeck(Deck newDeck);
-    
-    void setIsOpponent(bool opponentStatus) {
-        isOpponent = opponentStatus;
-    }
+
+    void setIsOpponent(bool opponentStatus);
+    void setHand(const std::vector<int>& newHand);
+    void addCardToHand(int instanceId);
+    void removeCardFromHand(std::size_t index);
+    void setDeckSize(int size);
+
+private:
+    static constexpr std::size_t MAX_HAND_SIZE = 7;
 };
 
 #endif

@@ -1,30 +1,45 @@
 #include "objects/Player.h"
 
-bool Player::handFull() const {
-    return hand.size() >= 7;
+Player::Player()
+    : id(0),
+      health(100),
+      mana(0),
+      fatigueDamage(1),
+      isOpponent(false),
+      deckSize(0)
+{
 }
 
-void Player::drawCard(Deck& deck) {
-    if (handFull()) return;
+bool Player::handFull() const {
+    return handInstanceIds.size() >= MAX_HAND_SIZE;
+}
 
-    if (!deck.isEmpty()) {
-        hand.push_back(deck.draw());
-        fatigueDamage = 1;
-    } else {
-        health -= fatigueDamage;
-        fatigueDamage++;
-    }
+std::size_t Player::handSize() const {
+    return handInstanceIds.size();
 }
 
 bool Player::isDead() const {
     return health <= 0;
 }
 
-void Player::addMana(int amount) {
-    if (amount <= 0) return;
-    mana += amount;
+void Player::setIsOpponent(bool opponentStatus) {
+    isOpponent = opponentStatus;
 }
 
-const Deck& Player::getDeck() const {
-    return deck;
+void Player::setHand(const std::vector<int>& newHand) {
+    handInstanceIds = newHand;
+}
+
+void Player::addCardToHand(int instanceId) {
+    handInstanceIds.push_back(instanceId);
+}
+
+void Player::removeCardFromHand(std::size_t index) {
+    if (index < handInstanceIds.size()) {
+        handInstanceIds.erase(handInstanceIds.begin() + index);
+    }
+}
+
+void Player::setDeckSize(int size) {
+    deckSize = size;
 }

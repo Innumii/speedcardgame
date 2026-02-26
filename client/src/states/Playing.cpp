@@ -3,20 +3,12 @@
 #include "core/Game.hpp"
 #include "render/RenderPLaying.hpp"
 #include "render/RenderText.hpp"
-#include "objects/Card.h"
-#include "objects/CreatureCard.h"
-#include "objects/SpellCard.h"
-#include "gameplay/GameAuthority.hpp"
 #include "gameplay/LocalAuthority.hpp"
 
 #include <SDL2/SDL.h>
 #include <algorithm>
-#include <cctype>
 #include <iostream>
-#include <memory>
 #include <stdexcept>
-#include <string>
-#include <vector>
 
 namespace {
     SDL_Rect playZoneBand{0, 0, 0, 0};
@@ -29,60 +21,31 @@ bool Playing::pointInRect(const SDL_Rect& rect, int x, int y) {
     return x >= rect.x && x < rect.x + rect.w && y >= rect.y && y < rect.y + rect.h;
 }
 
-bool Playing::isTargetedSpell(const Card& card) const {
-    if (card.getType() != CardType::Spell) return false;
+// Resolves pending action when player clicks a target
+bool Playing::resolvePendingActionAt(int x, int y) {
+    if (!pendingAction.active) return false;
 
-    std::string text = card.getText();
-    std::transform(text.begin(), text.end(), text.begin(),
-                   [](unsigned char ch){ return static_cast<char>(std::tolower(ch)); });
-    return text.find("target") != std::string::npos;
-}
-
-bool Playing::resolvePendingSpellTargetAt(int x, int y) {
-    if (!pendingSpellTarget.active || !pendingSpellTarget.spell) return false;
-
-    for (std::size_t lane = 0; lane < playSlots.size(); ++lane) {
-        SDL_Rect localRect = playSlots[lane];
-        if (pointInRect(localRect, x, y)) {
-            authority->castPendingSpell(player.id, lane);
-            pendingSpellTarget.active = false;
+    // Loop through all play slots to detect target
+    for (std::size_t slot = 0; slot < playSlots.size(); ++slot) {
+        if (pointInRect(playSlots[slot], x, y)) {
+            pendingAction.targetId = static_cast<int>(slot); // target = lane index
+            authority->playCard(pendingAction.handIndex, static_cast<int>(slot), pendingAction.targetId);
+            pendingAction = PendingActionState{};
             return true;
         }
+    }
 
-        SDL_Rect opponentRect = playSlots[lane];
-        opponentRect.y -= 200;
-        int opponentId = player.id == 0 ? 1 : 0;
-        if (pointInRect(opponentRect, x, y)) {
-            authority->castPendingSpell(opponentId, lane);
-            pendingSpellTarget.active = false;
-            return true;
-        }
+    // Optionally handle opponent lanes
+    SDL_Rect opponentRect = playSlots[0];
+    opponentRect.y -= 200; // offset for opponent
+    if (pointInRect(opponentRect, x, y)) {
+        pendingAction.targetId = 0; // example: opponent ID
+        authority->playCard(pendingAction.handIndex, 0, pendingAction.targetId);
+        pendingAction = PendingActionState{};
+        return true;
     }
 
     return false;
-}
-
-bool Playing::tryDrawCardWithAnimation(Uint32 now) {
-    if (!authority || authority->isHandFull(player.id)) return false;
-
-    const std::size_t handSizeBefore = authority->handSize(player.id);
-    authority->drawCard(player.id);
-
-    if (authority->handSize(player.id) <= handSizeBefore || !renderer) return false;
-
-    int screenW = 0, screenH = 0;
-    if (SDL_GetRendererOutputSize(renderer, &screenW, &screenH) != 0) return false;
-
-    cardRects = computeCardLayout(authority->handSize(player.id), screenW, screenH);
-    computeZones(screenW, screenH);
-
-    const SDL_Rect fromRect = computeSelfDeckRect(screenW, screenH);
-    const std::size_t handIndex = authority->handSize(player.id) - 1;
-    if (handIndex < cardRects.size()) {
-        animationQueue.enqueueDrawCard(fromRect, cardRects[handIndex], handIndex, 320);
-    }
-
-    return true;
 }
 
 // -------------------------
@@ -96,7 +59,7 @@ Playing::~Playing() {
     RenderText::shutdownTtf();
 }
 
-void Playing::setup(const Game& game) {
+void Playing::setup(Game& game) {
     renderer = game.getRenderer();
     if (!renderer) throw std::runtime_error("Renderer not available");
 
@@ -106,7 +69,7 @@ void Playing::setup(const Game& game) {
     menuOpen = false;
     surrendered = false;
     animationQueue.clear();
-    pendingSpellTarget = PendingSpellTargetState{};
+    pendingAction = PendingActionState{};
     lastDrawTick = SDL_GetTicks();
     running = true;
 
@@ -122,10 +85,10 @@ void Playing::setup(const Game& game) {
 
     if (!authority) {
         // fallback to local authority if none provided
-        authority = std::make_unique<LocalAuthority>();
+        authority = std::make_unique<LocalAuthority>(game.getNetworkClient());
     }
 
-    authority->setup(player.id, deck); // initializes player hand, board, etc.
+    // Local hand/board initialization will come from server
 }
 
 // -------------------------
@@ -136,8 +99,6 @@ void Playing::handleEvents(Game& game, const SDL_Event& event) {
 
     int screenW = 0, screenH = 0;
     SDL_GetRendererOutputSize(renderer, &screenW, &screenH);
-
-    cardRects = computeCardLayout(authority->handSize(player.id), screenW, screenH);
     computeZones(screenW, screenH);
     computeUiRects(screenW, screenH);
 
@@ -171,10 +132,10 @@ void Playing::handleEvents(Game& game, const SDL_Event& event) {
 
     if (surrendered) return;
 
-    // Pending spell targeting
-    if (pendingSpellTarget.active) {
+    // Pending action targeting
+    if (pendingAction.active) {
         if (event.type == SDL_MOUSEBUTTONDOWN && event.button.button == SDL_BUTTON_LEFT) {
-            resolvePendingSpellTargetAt(mx, my);
+            resolvePendingActionAt(mx, my);
         }
         return;
     }
@@ -182,7 +143,9 @@ void Playing::handleEvents(Game& game, const SDL_Event& event) {
     // Card dragging logic
     switch (event.type) {
         case SDL_MOUSEBUTTONDOWN:
-            for (int i = static_cast<int>(cardRects.size()) - 1; i >= 0; --i) {
+            for (int i = static_cast<int>(localPlayer.handSize()) - 1; i >= 0; --i) {
+                // Compute rects dynamically
+                // cardRects[i] corresponds to localPlayer.handInstanceIds[i]
                 if (pointInRect(cardRects[i], mx, my)) {
                     drag.active = true;
                     drag.index = static_cast<std::size_t>(i);
@@ -214,11 +177,17 @@ void Playing::handleEvents(Game& game, const SDL_Event& event) {
 
                 const bool droppedInDiscard = pointInRect(discardZone, mx, my);
 
-                authority->handleCardDrop(player.id, drag.index, laneIndex, droppedInDiscard, pendingSpellTarget);
+                if (droppedInDiscard) {
+                    authority->discardCard(static_cast<int>(drag.index));
+                }
+                else if (laneIndex >= 0) {
+                    // Request server to play card
+                    pendingAction.active = true;
+                    pendingAction.handIndex = static_cast<int>(drag.index);
+                    pendingAction.targetId = std::nullopt; // resolved on click if needed
+                }
 
                 drag.active = false;
-                cardRects = computeCardLayout(authority->handSize(player.id), screenW, screenH);
-                computeZones(screenW, screenH);
             }
             break;
 
@@ -237,26 +206,15 @@ void Playing::run() {
     while (running) {
         while (SDL_PollEvent(&event)) {
             if (event.type == SDL_QUIT) running = false;
-            handleEvents(*authority, event);
+            handleEvents(*reinterpret_cast<Game*>(&event), event);
         }
 
-        const Uint32 now = SDL_GetTicks();
-        animationQueue.update(now);
-
-        if (now - lastDrawTick >= static_cast<Uint32>(drawIntervalSeconds * 1000)) {
-            tryDrawCardWithAnimation(now);
-            lastDrawTick = now;
-        }
+        animationQueue.update(SDL_GetTicks());
     }
 }
 
 void Playing::update(Game&) {
-    const Uint32 now = SDL_GetTicks();
-    animationQueue.update(now);
-    if (now - lastDrawTick >= static_cast<Uint32>(drawIntervalSeconds * 1000)) {
-        tryDrawCardWithAnimation(now);
-        lastDrawTick = now;
-    }
+    animationQueue.update(SDL_GetTicks());
 }
 
 void Playing::render(const Game& game) {
