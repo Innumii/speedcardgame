@@ -1,0 +1,66 @@
+name: client-release
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+    paths:
+      - 'client/**'
+      - '.github/workflows/client-release.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup MSYS2 (MinGW)
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          update: true
+          install: >-
+            mingw-w64-x86_64-gcc
+            make
+
+      - name: Build client
+        shell: msys2 {0}
+        run: |
+          cd client
+          mingw32-make
+
+      - name: Package build artifact
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          New-Item -ItemType Directory -Force -Path client/dist | Out-Null
+
+          if (Test-Path 'client/main.exe') {
+            Copy-Item 'client/main.exe' 'client/dist/main.exe' -Force
+          } elseif (Test-Path 'client/main') {
+            Copy-Item 'client/main' 'client/dist/main' -Force
+          } else {
+            throw 'Build output not found (expected client/main.exe or client/main).'
+          }
+
+          if (Test-Path 'client/assets') {
+            Copy-Item 'client/assets' 'client/dist/assets' -Recurse -Force
+          }
+
+          Compress-Archive -Path client/dist/* -DestinationPath client/client-latest-windows.zip -Force
+
+      - name: Publish latest client release
+        uses: ncipollo/release-action@v1
+        with:
+          tag: client-latest
+          name: Client Latest Build
+          body: Automated latest client build from GitHub Actions.
+          allowUpdates: true
+          removeArtifacts: true
+          artifactErrorsFailBuild: true
+          artifacts: client/client-latest-windows.zip
+          makeLatest: true
