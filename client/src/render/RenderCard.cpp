@@ -330,15 +330,6 @@ void RenderCard::drawPreview(SDL_Renderer* renderer, RenderText& textRenderer, c
     drawCardFace(renderer, textRenderer, card, previewRect, fontLarge, fontSmall, false);
 }
 
-void RenderCard::preloadCommonCardImages(SDL_Renderer* renderer) {
-    if (!renderer) return;
-
-    constexpr std::array<int, 2> commonCardIds{{1, 2}};
-    for (const int cardId : commonCardIds) {
-        (void)getCardImageTexture(renderer, cardId);
-    }
-}
-
 void RenderCard::drawCardBack(SDL_Renderer* renderer, const SDL_Rect& cardRect) {
     if (!renderer) return;
 

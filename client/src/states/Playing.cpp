@@ -129,49 +129,6 @@ bool Playing::tryDrawCardWithAnimation(Uint32 now) {
     return true;
 }
 
-void Playing::handleServerMessage(Game& game, const std::string& line) {
-    if (line == "OPPONENT_DRAW") {
-        game.applyOpponentDraw();
-        return;
-    }
-
-    if (line.rfind("OPPONENT_COUNTS|", 0) == 0) {
-        const std::size_t firstSep = line.find('|');
-        const std::size_t secondSep = line.find('|', firstSep + 1);
-        if (firstSep == std::string::npos || secondSep == std::string::npos) {
-            return;
-        }
-
-        try {
-            const std::size_t handCount = static_cast<std::size_t>(std::stoul(line.substr(firstSep + 1, secondSep - (firstSep + 1))));
-            const std::size_t deckCount = static_cast<std::size_t>(std::stoul(line.substr(secondSep + 1)));
-            game.setOpponentCounts(handCount, deckCount);
-        } catch (...) {
-        }
-    }
-}
-
-void Playing::processServerMessages(Game& game) {
-    auto& net = game.getNetworkClient();
-    char buffer[1024];
-    const int received = net.receive(buffer, sizeof(buffer));
-
-    if (received <= 0) {
-        return;
-    }
-
-    recvBuffer.append(buffer, static_cast<std::size_t>(received));
-    std::size_t pos = std::string::npos;
-    while ((pos = recvBuffer.find('\n')) != std::string::npos) {
-        std::string line = recvBuffer.substr(0, pos);
-        recvBuffer.erase(0, pos + 1);
-        if (!line.empty() && line.back() == '\r') {
-            line.pop_back();
-        }
-        handleServerMessage(game, line);
-    }
-}
-
 void Playing::setup(const Game& game) {
     renderer = game.getRenderer();
     if (!renderer) {
@@ -536,18 +493,14 @@ void Playing::run() {
     }
 }
 
-void Playing::update(Game& game) {
+void Playing::update(Game& /*game*/) {
     if (!renderer) return; // not yet ready
     if (surrendered) return;
-
-    processServerMessages(game);
 
     const Uint32 now = SDL_GetTicks();
     animationQueue.update(now);
     if (now - lastDrawTick >= static_cast<Uint32>(drawIntervalSeconds * 1000)) {
-        if (tryDrawCardWithAnimation(now)) {
-            game.getNetworkClient().sendString("DRAW_EVENT\n");
-        }
+        tryDrawCardWithAnimation(now);
         lastDrawTick = now;
     }
 }

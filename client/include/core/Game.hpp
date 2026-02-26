@@ -75,13 +75,6 @@ public:
     void setPlayerId(int playerId);
     const std::string& getPlayerUsername() const;
     void setPlayerUsername(std::string username);
-    int getOpponentPlayerId() const;
-    const std::string& getOpponentPlayerUsername() const;
-    void setOpponentPlayerInfo(int playerId, std::string username);
-    std::size_t getOpponentHandCount() const;
-    std::size_t getOpponentDeckCount() const;
-    void setOpponentCounts(std::size_t handCount, std::size_t deckCount);
-    void applyOpponentDraw();
 
     const Player& getPlayer(bool isOpponent) const;
     const Deck& getDeck(const Player& player) const;
@@ -102,9 +95,6 @@ private:
     Player player;
     Player remotePlayer;
     std::string playerUsername{"Player"};
-    std::string remotePlayerUsername{"Opponent"};
-    std::size_t opponentHandCount{0};
-    std::size_t opponentDeckCount{0};
 
     int drawIntervalSeconds{3};
     int packRefundCoins{0};

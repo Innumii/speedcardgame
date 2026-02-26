@@ -51,11 +51,6 @@ private:
     void sendMatchFound(const std::shared_ptr<PlayerConnection>& player);
     void sendMatchCancelled(const std::shared_ptr<PlayerConnection>& player);
     void sendMatchStart(const std::shared_ptr<PlayerConnection>& player);
-    void sendOpponentInfo(const std::shared_ptr<PlayerConnection>& toPlayer,
-                          const std::shared_ptr<PlayerConnection>& opponent);
-    void sendOpponentCounts(const std::shared_ptr<PlayerConnection>& toPlayer,
-                            std::size_t handCount,
-                            std::size_t deckCount);
 };
 
 #endif

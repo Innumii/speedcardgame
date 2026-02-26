@@ -163,7 +163,7 @@ void RenderPlaying::render(Playing& playing, const Game& game) {
 	playing.cardRects = playing.computeCardLayout(playing.player.hand.size(), screenW, screenH);
 	playing.computeZones(screenW, screenH);
 
-	const std::size_t opponentHandSize = game.getOpponentHandCount();
+	const std::size_t opponentHandSize = game.getHandSize(game.getPlayer(true));
 	std::vector<SDL_Rect> opponentHandRects = playing.computeCardLayout(opponentHandSize, screenW, screenH);
 	if (!opponentHandRects.empty()) {
 		const int cardHeight = opponentHandRects.front().h;
@@ -215,7 +215,7 @@ void RenderPlaying::render(Playing& playing, const Game& game) {
 		textRenderer,
 		playing.playSlots,
 		playing.discardZone,
-		game.getOpponentDeckCount(),
+		game.getDeck(game.getPlayer(true)).size(),
 		screenW,
 		playing.fonts.small
 	);

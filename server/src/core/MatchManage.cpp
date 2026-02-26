@@ -1,18 +1,6 @@
 #include "core/MatchManager.hpp"
 #include <algorithm>
 #include <iostream>
-#include <string>
-
-namespace {
-std::string sanitizeLineToken(std::string value) {
-    for (char& ch : value) {
-        if (ch == '\n' || ch == '\r' || ch == '|') {
-            ch = ' ';
-        }
-    }
-    return value;
-}
-}
 
 MatchManager::MatchManager() {}
 
@@ -20,9 +8,6 @@ void MatchManager::onPairFound(std::shared_ptr<PlayerConnection> a,
                               std::shared_ptr<PlayerConnection> b)
 {
     if (!a || !b) return;
-
-    constexpr std::size_t startingHandSize = 6;
-    constexpr std::size_t startingDeckSize = 34;
 
     auto pending = std::make_shared<PendingMatch>();
     pending->a = a;
@@ -37,10 +22,6 @@ void MatchManager::onPairFound(std::shared_ptr<PlayerConnection> a,
 
     sendMatchFound(a);
     sendMatchFound(b);
-    sendOpponentInfo(a, b);
-    sendOpponentInfo(b, a);
-    sendOpponentCounts(a, startingHandSize, startingDeckSize);
-    sendOpponentCounts(b, startingHandSize, startingDeckSize);
 }
 
 void MatchManager::onAccept(std::shared_ptr<PlayerConnection> player)
@@ -146,22 +127,4 @@ void MatchManager::sendMatchStart(const std::shared_ptr<PlayerConnection>& playe
 {
     if (!player) return;
     player->send("MATCH_START\n");
-}
-
-void MatchManager::sendOpponentInfo(const std::shared_ptr<PlayerConnection>& toPlayer,
-                                    const std::shared_ptr<PlayerConnection>& opponent)
-{
-    if (!toPlayer || !opponent) return;
-
-    const int opponentId = opponent->getPlayerId();
-    const std::string opponentName = sanitizeLineToken(opponent->getUsername());
-    toPlayer->send("OPPONENT_INFO|" + std::to_string(opponentId) + "|" + opponentName + "\n");
-}
-
-void MatchManager::sendOpponentCounts(const std::shared_ptr<PlayerConnection>& toPlayer,
-                                      std::size_t handCount,
-                                      std::size_t deckCount)
-{
-    if (!toPlayer) return;
-    toPlayer->send("OPPONENT_COUNTS|" + std::to_string(handCount) + "|" + std::to_string(deckCount) + "\n");
 }
