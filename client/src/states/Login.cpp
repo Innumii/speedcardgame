@@ -14,8 +14,16 @@
 #include <sstream>
 #include <cmath>
 #define CPPHTTPLIB_OPENSSL_SUPPORT
+#if defined(__GNUC__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+#pragma GCC diagnostic ignored "-Wconversion-null"
+#endif
 #include "httplib/httplib.h"
 
+#if defined(__GNUC__)
+#pragma GCC diagnostic pop
+#endif
 // ── network helpers ───────────────────────────────────────────────────────────
 
 namespace {

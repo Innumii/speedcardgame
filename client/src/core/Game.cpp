@@ -152,6 +152,9 @@ void Game::commitStateChange() {
         if (state == GameState::DeckBuilding && previousState != GameState::DeckBuilding) {
             deckBuildingState.enter(*this);
         }
+        if (state == GameState::PackOpening && previousState != GameState::PackOpening) {
+            packOpeningState.enter(*this);
+        }
         if (state == GameState::Quit || state == GameState::GameOver) {
             isRunning = false;
         }
@@ -175,6 +178,15 @@ bool Game::refreshPlayerDeckFromService() {
 
     setPlayingDeck(deckBuildingState.buildDeck());
     return true;
+}
+
+int Game::getPackRefundCoins() const {
+    return packRefundCoins;
+}
+
+void Game::addPackRefundCoins(int delta) {
+    const int next = packRefundCoins + delta;
+    packRefundCoins = next > 0 ? next : 0;
 }
 
 bool Game::tryStartPlayingWithBuiltDeck() {
@@ -220,6 +232,46 @@ void Game::setPlayerUsername(std::string username) {
     }
 
     playerUsername = std::move(username);
+}
+
+int Game::getOpponentPlayerId() const {
+    return remotePlayer.id;
+}
+
+const std::string& Game::getOpponentPlayerUsername() const {
+    return remotePlayerUsername;
+}
+
+void Game::setOpponentPlayerInfo(int playerId, std::string username) {
+    if (playerId > 0) {
+        remotePlayer.id = playerId;
+    }
+
+    if (username.empty()) {
+        remotePlayerUsername = "Opponent";
+    } else {
+        remotePlayerUsername = std::move(username);
+    }
+}
+
+std::size_t Game::getOpponentHandCount() const {
+    return opponentHandCount;
+}
+
+std::size_t Game::getOpponentDeckCount() const {
+    return opponentDeckCount;
+}
+
+void Game::setOpponentCounts(std::size_t handCount, std::size_t deckCount) {
+    opponentHandCount = handCount;
+    opponentDeckCount = deckCount;
+}
+
+void Game::applyOpponentDraw() {
+    ++opponentHandCount;
+    if (opponentDeckCount > 0) {
+        --opponentDeckCount;
+    }
 }
 
 const Deck& Game::getDeck(const Player& player) const {
@@ -271,6 +323,9 @@ void Game::handleEvents() {
             case GameState::DeckBuilding:
                 deckBuildingState.handleEvents(*this, event);
                 break;
+            case GameState::PackOpening:
+                packOpeningState.handleEvents(*this, event);
+                break;
             case GameState::Playing:
                 playingState.handleEvents(*this, event);
                 break;
@@ -305,6 +360,9 @@ void Game::update() {
             break;
         case GameState::DeckBuilding:
             deckBuildingState.update(*this);
+            break;
+        case GameState::PackOpening:
+            packOpeningState.update(*this);
             break;
         case GameState::Login:
             loginState.update(*this);
@@ -343,6 +401,9 @@ void Game::render() {
             break;
         case GameState::DeckBuilding:
             deckBuildingState.render(*this);
+            break;
+        case GameState::PackOpening:
+            packOpeningState.render(*this);
             break;
         case GameState::Playing:
             playingState.render(*this);

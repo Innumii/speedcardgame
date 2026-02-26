@@ -38,7 +38,7 @@ func (service *AuthService) Register(registerDTO dtos.RegisterDTO) (*models.User
 }
 
 func (service *AuthService) RegisterDevUser(registerDTO dtos.RegisterDTO) (*models.User, error) {
-	return service.registerUser(registerDTO, false)
+	return service.registerUser(registerDTO, true)
 }
 
 func (service *AuthService) registerUser(registerDTO dtos.RegisterDTO, createInventory bool) (*models.User, error) {
@@ -92,7 +92,7 @@ func (service *AuthService) createStarterInventory(userID uint) error {
 		port = os.Getenv("CARDS_APP_PORT")
 	}
 	if port == "" {
-		port = "8080"
+		port = "8082"
 	}
 
 	payload, err := json.Marshal(inventoryCreateRequest{Uid: userID})

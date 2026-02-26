@@ -19,6 +19,7 @@
 #include "states/Register.hpp"
 #include "states/Playing.hpp"
 #include "states/DeckBuilding.hpp"
+#include "states/PackOpening.hpp"
 #include "states/Connecting.hpp"
 #include "states/Waiting.hpp"
 
@@ -64,6 +65,8 @@ public:
     void setPlayingDeck(Deck newDeck);
     bool tryStartPlayingWithBuiltDeck();
     bool refreshPlayerDeckFromService();
+    int getPackRefundCoins() const;
+    void addPackRefundCoins(int delta);
 
     GameState getState() const;
     GameState getNextState() const;
@@ -72,6 +75,13 @@ public:
     void setPlayerId(int playerId);
     const std::string& getPlayerUsername() const;
     void setPlayerUsername(std::string username);
+    int getOpponentPlayerId() const;
+    const std::string& getOpponentPlayerUsername() const;
+    void setOpponentPlayerInfo(int playerId, std::string username);
+    std::size_t getOpponentHandCount() const;
+    std::size_t getOpponentDeckCount() const;
+    void setOpponentCounts(std::size_t handCount, std::size_t deckCount);
+    void applyOpponentDraw();
 
     const Player& getPlayer(bool isOpponent) const;
     const Deck& getDeck(const Player& player) const;
@@ -92,8 +102,12 @@ private:
     Player player;
     Player remotePlayer;
     std::string playerUsername{"Player"};
+    std::string remotePlayerUsername{"Opponent"};
+    std::size_t opponentHandCount{0};
+    std::size_t opponentDeckCount{0};
 
     int drawIntervalSeconds{3};
+    int packRefundCoins{0};
     Uint32 lastDrawTick{0};
     std::size_t lastLoggedHandSize{0};
     bool playingSetup{false};
@@ -121,6 +135,7 @@ private:
     Register registerState;
     Playing playingState{drawIntervalSeconds};
     DeckBuilding deckBuildingState;
+    PackOpening packOpeningState;
     std::optional<Connecting> connectingState;
     std::optional<Waiting> waitingState;
     // Connecting connectingState;

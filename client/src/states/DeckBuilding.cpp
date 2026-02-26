@@ -24,7 +24,15 @@
 #include <sstream>
 #include <unordered_map>
 #define CPPHTTPLIB_OPENSSL_SUPPORT
+#if defined(__GNUC__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+#pragma GCC diagnostic ignored "-Wconversion-null"
+#endif
 #include "httplib/httplib.h"
+#if defined(__GNUC__)
+#pragma GCC diagnostic pop
+#endif
 
 namespace {
     SDL_Point getPoint(int x, int y) {
@@ -824,7 +832,7 @@ bool DeckBuilding::loadInventoryFromService(const Game& game) {
         if (copies <= 0) continue;
         auto it = cardIndexById.find(cardId);
         if (it == cardIndexById.end()) continue;
-        inventoryCopies[it->second] = copies;
+        inventoryCopies[it->second] = std::min(copies, 4);
     }
 
     inventoryLoaded = true;

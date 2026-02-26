@@ -6,6 +6,7 @@ enum class GameState {
     Register,
     Title,
     DeckBuilding,
+    PackOpening,
     Connecting,
     Waiting,
     Playing,
