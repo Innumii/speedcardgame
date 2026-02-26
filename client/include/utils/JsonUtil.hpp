@@ -5,6 +5,7 @@
 #include <string>
 
 namespace JsonUtil {
+    std::string escapeJsonString(const std::string& value);
     bool readJsonStringField(const std::string& json, const std::string& key, std::string& out);
     bool readJsonIntField(const std::string& json, const std::string& key, int& out);
     bool findMatchingBrace(const std::string& text, std::size_t openPos, std::size_t& closePos);

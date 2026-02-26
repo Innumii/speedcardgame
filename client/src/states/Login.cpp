@@ -2,6 +2,7 @@
 #include "core/Game.hpp"
 #include "core/NetworkClient.hpp"
 #include "utils/JsonUtil.hpp"
+#include "utils/EnvUtil.hpp"
 #include "render/RenderText.hpp"
 #include "render/RenderBanner.hpp"
 #include "render/Theme.hpp"
@@ -18,19 +19,8 @@
 // ── network helpers ───────────────────────────────────────────────────────────
 
 namespace {
-    constexpr std::size_t kMaxUsernameLen = 24;
+    constexpr std::size_t kMaxUsernameLen = 64;
     constexpr std::size_t kMaxPasswordLen = 32;
-
-    std::string getEnvOrDefault(const char* key, const char* fallback) {
-        const char* v = std::getenv(key);
-        return v ? std::string(v) : std::string(fallback);
-    }
-
-    int getEnvIntOrDefault(const char* key, int fallback) {
-        const char* v = std::getenv(key);
-        if (!v) return fallback;
-        try { return std::stoi(v); } catch (...) { return fallback; }
-    }
 
     std::string escapeJson(const std::string& s) {
         std::string out;
@@ -107,8 +97,8 @@ namespace {
             error = "email and password required";
             return false;
         }
-        const std::string host = getEnvOrDefault("AUTH_SERVICE_HOST", "127.0.0.1");
-        const int         port = getEnvIntOrDefault("AUTH_SERVICE_PORT", 8081);
+        const std::string host = EnvUtil::getEnvOrDefault("AUTH_SERVICE_HOST", "127.0.0.1");
+        const int         port = EnvUtil::getEnvIntOrDefault("AUTH_SERVICE_PORT", 8081);
 
         std::ostringstream payload;
         payload << "{\"email\":\"" << escapeJson(email)

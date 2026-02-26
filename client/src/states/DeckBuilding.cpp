@@ -11,6 +11,7 @@
 #include "core/Game.hpp"
 #include "core/NetworkClient.hpp"
 #include "utils/JsonUtil.hpp"
+#include "utils/EnvUtil.hpp"
 #include "objects/CreatureCard.h"
 #include "objects/SpellCard.h"
 #include <SDL2/SDL.h>
@@ -42,23 +43,9 @@ namespace {
         return value;
     }
 
-    std::string getEnvOrDefault(const char* key, const char* fallback) {
-        const char* value = std::getenv(key);
-        return value ? std::string(value) : std::string(fallback);
-    }
-
-    int getEnvIntOrDefault(const char* key, int fallback) {
-        const char* value = std::getenv(key);
-        if (!value) return fallback;
-        try {
-            return std::stoi(value);
-        } catch (...) {
-            return fallback;
-        }
-    }
-
     int getDeckSizeLimitFromEnv() {
-        const int configured = getEnvIntOrDefault("DECK_SIZE", 30);
+        // const int configured = getEnvIntOrDefault("DECK_SIZE", 30);
+        const int configured = EnvUtil::getEnvIntOrDefault("DECK_SIZE", 30);
         return configured > 0 ? configured : 30;
     }
 
@@ -640,8 +627,8 @@ void DeckBuilding::setStatusMessage(const std::string& message, Uint32 durationM
 
 bool DeckBuilding::loadAvailableCardsFromService(const Game& game) {
     (void)game;
-    const std::string host = getEnvOrDefault("CARDS_SERVICE_HOST", "127.0.0.1");
-    const int port = getEnvIntOrDefault("CARDS_SERVICE_PORT", 8082);
+    const std::string host = EnvUtil::getEnvOrDefault("CARDS_SERVICE_HOST", "127.0.0.1");
+    const int port = EnvUtil::getEnvIntOrDefault("CARDS_SERVICE_PORT", 8082);
     const std::string path = "/cardbase/cards";
     int statusCode = -1;
     std::string responseBody;
@@ -700,7 +687,7 @@ bool DeckBuilding::loadAvailableCardsFromService(const Game& game) {
 
 bool DeckBuilding::loadAvailableCardsFromCsv(const Game& game) {
     (void)game;
-    const std::string envPath = getEnvOrDefault("CARDS_CSV_PATH", "");
+    const std::string envPath = EnvUtil::getEnvOrDefault("CARDS_CSV_PATH", "");
     std::ifstream file;
     if (!envPath.empty() && tryOpenCsv(envPath, file)) {
         // file opened
@@ -771,10 +758,10 @@ bool DeckBuilding::saveDeckToService(const Game& game) const {
         return false;
     }
 
-    const std::string host = getEnvOrDefault("CARDS_SERVICE_HOST", "127.0.0.1");
-    const int port = getEnvIntOrDefault("CARDS_SERVICE_PORT", 8082);
+    const std::string host = EnvUtil::getEnvOrDefault("CARDS_SERVICE_HOST", "127.0.0.1");
+    const int port = EnvUtil::getEnvIntOrDefault("CARDS_SERVICE_PORT", 8082);
     const std::string path = "/cardbase/decks";
-    const int userId = getEnvIntOrDefault("CARDS_SERVICE_UID", game.getPlayerId());
+    const int userId = EnvUtil::getEnvIntOrDefault("CARDS_SERVICE_UID", game.getPlayerId());
 
     std::ostringstream payload;
     payload << "{\"uid\":" << userId << ",\"cards\":{";
@@ -798,10 +785,10 @@ bool DeckBuilding::saveDeckToService(const Game& game) const {
 bool DeckBuilding::loadInventoryFromService(const Game& game) {
     if (availableCards.empty()) return false;
 
-    const std::string host = getEnvOrDefault("CARDS_SERVICE_HOST", "127.0.0.1");
-    const int port = getEnvIntOrDefault("CARDS_SERVICE_PORT", 8082);
+    const std::string host = EnvUtil::getEnvOrDefault("CARDS_SERVICE_HOST", "127.0.0.1");
+    const int port = EnvUtil::getEnvIntOrDefault("CARDS_SERVICE_PORT", 8082);
     const std::string path = "/cardbase/inventories";
-    const int userId = getEnvIntOrDefault("CARDS_SERVICE_UID", game.getPlayerId());
+    const int userId = EnvUtil::getEnvIntOrDefault("CARDS_SERVICE_UID", game.getPlayerId());
     int statusCode = -1;
     std::string responseBody;
     if (!sendHttp(host, port, "GET", path, "", statusCode, responseBody)) {
@@ -861,10 +848,10 @@ int DeckBuilding::getRemainingCount(int cardIndex) const {
 bool DeckBuilding::loadDeckFromService(const Game& game) {
     if (availableCards.empty()) return false;
 
-    const std::string host = getEnvOrDefault("CARDS_SERVICE_HOST", "127.0.0.1");
-    const int port = getEnvIntOrDefault("CARDS_SERVICE_PORT", 8082);
+    const std::string host = EnvUtil::getEnvOrDefault("CARDS_SERVICE_HOST", "127.0.0.1");
+    const int port = EnvUtil::getEnvIntOrDefault("CARDS_SERVICE_PORT", 8082);
     const std::string path = "/cardbase/decks";
-    const int userId = getEnvIntOrDefault("CARDS_SERVICE_UID", game.getPlayerId());
+    const int userId = EnvUtil::getEnvIntOrDefault("CARDS_SERVICE_UID", game.getPlayerId());
     int statusCode = -1;
     std::string responseBody;
     if (!sendHttp(host, port, "GET", path, "", statusCode, responseBody)) {

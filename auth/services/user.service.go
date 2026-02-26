@@ -38,7 +38,7 @@ func (service *AuthService) Register(registerDTO dtos.RegisterDTO) (*models.User
 }
 
 func (service *AuthService) RegisterDevUser(registerDTO dtos.RegisterDTO) (*models.User, error) {
-	return service.registerUser(registerDTO, true)
+	return service.registerUser(registerDTO, false)
 }
 
 func (service *AuthService) registerUser(registerDTO dtos.RegisterDTO, createInventory bool) (*models.User, error) {

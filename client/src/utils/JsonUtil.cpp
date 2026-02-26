@@ -3,6 +3,22 @@
 #include <cctype>
 
 namespace JsonUtil {
+    std::string escapeJsonString(const std::string& value) {
+        std::string out;
+        out.reserve(value.size());
+        for (char c : value) {
+            switch (c) {
+                case '\\': out += "\\\\"; break;
+                case '"':  out += "\\\""; break;
+                case '\n': out += "\\n";  break;
+                case '\r': out += "\\r";  break;
+                case '\t': out += "\\t";  break;
+                default:   out += c;      break;
+            }
+        }
+        return out;
+    }
+
     bool readJsonStringField(const std::string& json, const std::string& key, std::string& out) {
         const std::string needle = "\"" + key + "\"";
         std::size_t pos = json.find(needle);

@@ -5,6 +5,8 @@
 #include "render/RenderBanner.hpp"
 #include "render/RenderText.hpp"
 #include "render/Theme.hpp"
+#include "utils/JsonUtil.hpp"
+#include "utils/EnvUtil.hpp"
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_ttf.h>
 #include <algorithm>
@@ -19,51 +21,6 @@
 namespace {
     constexpr std::size_t kMaxEmailLen    = 64;
     constexpr std::size_t kMaxPasswordLen = 32;
-
-    std::string getEnvOrDefault(const char* key, const char* fallback) {
-        const char* value = std::getenv(key);
-        return value ? std::string(value) : std::string(fallback);
-    }
-
-    int getEnvIntOrDefault(const char* key, int fallback) {
-        const char* value = std::getenv(key);
-        if (!value) return fallback;
-        try { return std::stoi(value); } catch (...) { return fallback; }
-    }
-
-    std::string escapeJsonString(const std::string& value) {
-        std::string out;
-        out.reserve(value.size());
-        for (char c : value) {
-            switch (c) {
-                case '\\': out += "\\\\"; break;
-                case '"':  out += "\\\""; break;
-                case '\n': out += "\\n";  break;
-                case '\r': out += "\\r";  break;
-                case '\t': out += "\\t";  break;
-                default:   out += c;      break;
-            }
-        }
-        return out;
-    }
-
-    bool readJsonStringField(const std::string& json, const std::string& key, std::string& out) {
-        const std::string needle = "\"" + key + "\"";
-        std::size_t pos = json.find(needle);
-        if (pos == std::string::npos) return false;
-        pos = json.find(':', pos + needle.size());
-        if (pos == std::string::npos) return false;
-        pos = json.find('"', pos);
-        if (pos == std::string::npos) return false;
-        std::size_t end = pos + 1;
-        while (end < json.size()) {
-            if (json[end] == '"' && json[end - 1] != '\\') break;
-            ++end;
-        }
-        if (end >= json.size()) return false;
-        out = json.substr(pos + 1, end - pos - 1);
-        return true;
-    }
 
     bool sendHttpRequest(const std::string& host, int port, const std::string& method,
                          const std::string& path, const std::string& body,
@@ -128,14 +85,14 @@ namespace {
             return false;
         }
 
-        const std::string host = getEnvOrDefault("AUTH_SERVICE_HOST", "127.0.0.1");
-        const int         port = getEnvIntOrDefault("AUTH_SERVICE_PORT", 8081);
+        const std::string host = EnvUtil::getEnvOrDefault("AUTH_SERVICE_HOST", "127.0.0.1");
+        const int         port = EnvUtil::getEnvIntOrDefault("AUTH_SERVICE_PORT", 8081);
         const std::string name = deriveNameFromEmail(email);
 
         std::ostringstream payload;
-        payload << "{\"name\":\""       << escapeJsonString(name)
-                << "\",\"email\":\""    << escapeJsonString(email)
-                << "\",\"password\":\"" << escapeJsonString(password) << "\"}";
+        payload << "{\"name\":\""       << JsonUtil::escapeJsonString(name)
+                << "\",\"email\":\""    << JsonUtil::escapeJsonString(email)
+                << "\",\"password\":\"" << JsonUtil::escapeJsonString(password) << "\"}";
 
         int statusCode = -1;
         std::string responseBody;
@@ -146,7 +103,7 @@ namespace {
         }
 
         if (statusCode != 201) {
-            if (!readJsonStringField(responseBody, "error", error))
+            if (!JsonUtil::readJsonStringField(responseBody, "error", error))
                 error = "registration failed";
             return false;
         }
