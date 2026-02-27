@@ -37,14 +37,14 @@ data "terraform_remote_state" "data" {
 }
 
 locals {
-  data_outputs       = var.use_managed_data_stack ? data.terraform_remote_state.data[0].outputs : {}
-  postgres_host      = coalesce(var.postgres_host, try(local.data_outputs.auth_postgres_endpoint, null))
-  postgres_user      = coalesce(var.postgres_user, try(local.data_outputs.auth_postgres_user, null))
-  postgres_password  = coalesce(var.postgres_password, try(local.data_outputs.auth_postgres_password, null))
-  postgres_db        = coalesce(var.postgres_db, try(local.data_outputs.auth_postgres_db, null))
-  postgres_port      = coalesce(var.postgres_port, try(local.data_outputs.auth_postgres_port, null))
-  redis_host         = coalesce(var.redis_host, try(local.data_outputs.auth_redis_endpoint, null))
-  redis_port         = coalesce(var.redis_port, try(local.data_outputs.auth_redis_port, null))
+  data_outputs      = var.use_managed_data_stack ? data.terraform_remote_state.data[0].outputs : {}
+  postgres_host     = coalesce(var.postgres_host, try(local.data_outputs.auth_postgres_endpoint, null))
+  postgres_user     = coalesce(var.postgres_user, try(local.data_outputs.auth_postgres_user, null))
+  postgres_password = coalesce(var.postgres_password, try(local.data_outputs.auth_postgres_password, null))
+  postgres_db       = coalesce(var.postgres_db, try(local.data_outputs.auth_postgres_db, null))
+  postgres_port     = coalesce(var.postgres_port, try(local.data_outputs.auth_postgres_port, null))
+  redis_host        = coalesce(var.redis_host, try(local.data_outputs.auth_redis_endpoint, null))
+  redis_port        = coalesce(var.redis_port, try(local.data_outputs.auth_redis_port, null))
 }
 
 module "service" {

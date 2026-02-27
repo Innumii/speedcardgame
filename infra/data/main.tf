@@ -61,12 +61,12 @@ module "cards_postgres" {
 module "auth_redis" {
   source = "../modules/elasticache-redis"
 
-  cluster_id        = var.auth_redis_cluster_id
-  vpc_id            = data.aws_vpc.default.id
-  subnet_ids        = data.aws_subnets.default.ids
-  allowed_cidr      = data.aws_vpc.default.cidr_block
-  port              = var.auth_redis_port
-  node_type         = var.auth_redis_node_type
-  engine_version    = var.auth_redis_engine_version
+  cluster_id           = var.auth_redis_cluster_id
+  vpc_id               = data.aws_vpc.default.id
+  subnet_ids           = data.aws_subnets.default.ids
+  allowed_cidr         = data.aws_vpc.default.cidr_block
+  port                 = var.auth_redis_port
+  node_type            = var.auth_redis_node_type
+  engine_version       = var.auth_redis_engine_version
   parameter_group_name = var.auth_redis_parameter_group_name
 }
