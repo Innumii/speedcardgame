@@ -214,6 +214,7 @@ void Playing::run() {
 }
 
 void Playing::update(Game&) {
+    
     animationQueue.update(SDL_GetTicks());
 }
 

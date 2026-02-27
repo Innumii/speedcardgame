@@ -6,13 +6,16 @@
 #include <thread>
 
 MatchSession::MatchSession(std::shared_ptr<PlayerConnection> a,
-                            std::shared_ptr<PlayerConnection> b)
-            :playerA(std::move(a)), playerB(std::move(b)) {}
+                           std::shared_ptr<PlayerConnection> b)
+    : playerA(std::move(a)), playerB(std::move(b)), board(5) {}
 
 MatchSession::~MatchSession() {
-    stop(); // Ensure clean shutdown
+    stop();
 }
 
+// --------------------------------------------------
+// Start / Stop
+// --------------------------------------------------
 bool MatchSession::start() {
     if (running.load()) return false;
 
@@ -22,9 +25,6 @@ bool MatchSession::start() {
         std::cerr << "Failed to start match thread: " << e.what() << "\n";
         return false;
     }
-    std::cout << "MatchSession started between "
-              << playerA->getSocket() << " and "
-              << playerB->getSocket() << "\n";
 
     running = true;
     return true;
@@ -36,47 +36,93 @@ void MatchSession::stop() {
     if (gameThread.joinable()) {
         gameThread.join();
     }
-
-    std::cout << "MatchSession stopped\n";
 }
 
+// --------------------------------------------------
+// Setup Phase
+// --------------------------------------------------
+void MatchSession::setupDecks() {
+    // TODO: Replace with real decklists/seeding
+    // for (int i = 0; i < 30; ++i) {
+    //     players[0].deck.addCardById(i);
+    //     players[1].deck.addCardById(i);
+    // }
+
+    players[0].deck.shuffle();
+    players[1].deck.shuffle();
+}
+
+void MatchSession::sendOpeningHands() {
+    for (int i = 0; i < 6; ++i) {
+        drawAndSend(0);
+        drawAndSend(1);
+    }
+}
+
+// --------------------------------------------------
+// Draw logic
+// --------------------------------------------------
+bool MatchSession::drawAndSend(int playerIndex) {
+    auto& player = players[playerIndex];
+    auto& deck = player.deck;
+
+    if (deck.isEmpty())
+        return false;
+
+    int cardId = deck.draw().get()->getId();
+    player.hand.push_back(cardId);
+
+    auto& conn = (playerIndex == 0) ? playerA : playerB;
+
+    conn->send("DRAW " + std::to_string(cardId) + "\n");
+    return true;
+}
+
+// --------------------------------------------------
+// Game Loop
+// --------------------------------------------------
 void MatchSession::gameLoop() {
     using namespace std::chrono_literals;
-    std::cout << " Game loop started\n";
+
+    std::cout << "Game loop started\n";
 
     playerA->send("MATCH_START\n");
     playerB->send("MATCH_START\n");
 
+    setupDecks();
+    sendOpeningHands();
+
     while (running.load()) {
-        //disconnect logic
         if (!playerA->isAlive() || !playerB->isAlive()) {
             handleDisconnect();
             break;
         }
-        // --- Relay messages (simple authoritative server model) ---
 
         std::string msg;
-        // Player A → B
-        while (playerA->pollMessage(msg)) {
-            playerB->send(msg);
+
+        // Relay A → B (TEMPORARY until full authority)
+        while (playerA->pollMessage(msg) || playerB->pollMessage(msg)) {
+            if (playerA->pollMessage(msg)) {
+                playerA->send(msg);
+            }
+            if (playerB->pollMessage(msg)) {
+                playerB->send(msg);
+            }
         }
 
-        // Player B → A
-        while (playerB->pollMessage(msg)) {
-            playerA->send(msg);
-        }
 
         std::this_thread::sleep_for(1ms);
-
     }
-    std::cout << "Game loop exiting\n";
 
+    std::cout << "Game loop exiting\n";
 }
 
+// --------------------------------------------------
+// Disconnect Handling
+// --------------------------------------------------
 void MatchSession::handleDisconnect() {
     std::cout << "MatchSession: player disconnected\n";
 
-    // Notify remaining player
     if (playerA->isAlive()) {
         playerA->send("OPPONENT_DISCONNECTED\n");
     }
