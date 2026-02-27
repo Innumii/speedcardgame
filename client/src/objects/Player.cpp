@@ -1,45 +1,40 @@
 #include "objects/Player.h"
-
-Player::Player()
-    : id(0),
-      health(100),
-      mana(0),
-      fatigueDamage(1),
-      isOpponent(false),
-      deckSize(0)
-{
-}
+#include <cerrno>
 
 bool Player::handFull() const {
-    return handInstanceIds.size() >= MAX_HAND_SIZE;
+    return hand.size() >= 7;
 }
 
-std::size_t Player::handSize() const {
-    return handInstanceIds.size();
+void Player::drawCard(Deck& deck) {
+    if (handFull()) return;
+
+    if (!deck.isEmpty()) {
+        hand.push_back(deck.draw());
+        fatigueDamage = 1;
+    } else {
+        health -= fatigueDamage;
+        fatigueDamage++;
+    }
 }
 
 bool Player::isDead() const {
     return health <= 0;
 }
 
-void Player::setIsOpponent(bool opponentStatus) {
-    isOpponent = opponentStatus;
+void Player::addMana(int amount) {
+    if (amount <= 0) return;
+    mana += amount;
 }
 
-void Player::setHand(const std::vector<int>& newHand) {
-    handInstanceIds = newHand;
+const Deck& Player::getDeck() const {
+    return deck;
 }
 
-void Player::addCardToHand(int instanceId) {
-    handInstanceIds.push_back(instanceId);
+void Player::setDeck(Deck newDeck) {
+    this->deck = std::move(deck); // move the deck instead of copy
 }
 
-void Player::removeCardFromHand(std::size_t index) {
-    if (index < handInstanceIds.size()) {
-        handInstanceIds.erase(handInstanceIds.begin() + index);
-    }
-}
+//take card from deck and add to hand
+void Player::addCardToHand(int cardId) {
 
-void Player::setDeckSize(int size) {
-    deckSize = size;
 }

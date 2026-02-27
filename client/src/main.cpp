@@ -5,14 +5,14 @@
 #include "core/Game.hpp"
 
 namespace {
-    std::optional<int> parseDrawInterval(int argc, char** argv) {
-        if (argc < 2) return std::nullopt;
-        try {
-            return std::stoi(argv[1]);
-        } catch (...) {
-            return std::nullopt;
-        }
-    }
+    // std::optional<int> parseDrawInterval(int argc, char** argv) {
+    //     if (argc < 2) return std::nullopt;
+    //     try {
+    //         return std::stoi(argv[1]);
+    //     } catch (...) {
+    //         return std::nullopt;
+    //     }
+    // }
 
     bool parseFullscreenFlag(int argc, char** argv) {
         if (argc < 3) return false;
@@ -23,11 +23,11 @@ namespace {
 
 int main(int argc, char** argv) {
     try {
-        const int defaultDrawIntervalSeconds = 3;
-        const int drawInterval = parseDrawInterval(argc, argv).value_or(defaultDrawIntervalSeconds);
+        // const int defaultDrawIntervalSeconds = 3;
+        // const int drawInterval = parseDrawInterval(argc, argv).value_or(defaultDrawIntervalSeconds);
         const bool fullscreen = parseFullscreenFlag(argc, argv);
 
-        Game game("SpeedCardGame", 100, 100, 1200, 800, fullscreen, drawInterval);
+        Game game("SpeedCardGame", 100, 100, 1200, 800, fullscreen);
         while (game.running()) {
             game.handleEvents();
             game.commitStateChange();

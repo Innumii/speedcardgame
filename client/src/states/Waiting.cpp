@@ -95,6 +95,11 @@ void Waiting::update(Game& game) {
                 std::cout << "Match cancelled, back to queue\n";
             }
             else if (line == "MATCH_START") {
+                auto& playingState = game.getPlayingState();
+
+                //hardcoded temp Player data 
+                playingState.setupPlayers(std::move(game.getPlayer()), Player());
+                
                 game.setNextState(GameState::Playing);
                 return;
             }
