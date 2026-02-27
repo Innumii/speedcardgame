@@ -33,5 +33,8 @@ jobs:
 
       - name: Build and Push ${{ matrix.service }} Service
         run: |
-          docker build -f backend/api/${{ matrix.service }}/Dockerfile -t ghcr.io/${{ github.repository_owner }}/g4t2-${{ matrix.service }}-service:latest backend/api/${{ matrix.service }}/
-          docker push ghcr.io/${{ github.repository_owner }}/g4t2-${{ matrix.service }}-service:latest
+          OWNER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+          docker build -f backend/api/${{ matrix.service }}/Dockerfile \
+            -t ghcr.io/$OWNER/g4t2-${{ matrix.service }}-service:latest \
+            backend/api/${{ matrix.service }}/
+          docker push ghcr.io/$OWNER/g4t2-${{ matrix.service }}-service:latest
