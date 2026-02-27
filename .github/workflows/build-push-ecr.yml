@@ -19,7 +19,6 @@ jobs:
     strategy:
       matrix:
         service: [auth, cards, server]
-    runs-on: ubuntu-latest
     
     steps:
       - name: Checkout code
