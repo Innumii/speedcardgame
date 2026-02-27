@@ -1,0 +1,35 @@
+variable "aws_region" {
+  description = "AWS region"
+  type        = string
+  default     = "us-east-1"
+}
+
+variable "service_name" {
+  description = "Cards ECS/ECR service name"
+  type        = string
+  default     = "speedcardgame-cards"
+}
+
+variable "image_tag" {
+  description = "Cards image tag in ECR"
+  type        = string
+  default     = "latest"
+}
+
+variable "use_managed_data_stack" {
+  description = "When true, read DATABASE_URL from infra/data stack remote state."
+  type        = bool
+  default     = true
+}
+
+variable "data_stack_state_path" {
+  description = "Path to infra/data terraform state file for auto wiring."
+  type        = string
+  default     = "../../data/terraform.tfstate"
+}
+
+variable "database_url" {
+  description = "Cards DATABASE_URL reachable from cards task"
+  type        = string
+  default     = null
+}

@@ -1,0 +1,8 @@
+aws_region = "us-east-1"
+image_tag  = "latest"
+
+use_managed_data_stack = true
+# data_stack_state_path = "../../data/terraform.tfstate"
+
+# Optional manual override when use_managed_data_stack = false
+# database_url = "postgres://user:password@your-postgres-host:5432/cardsdb?sslmode=disable"

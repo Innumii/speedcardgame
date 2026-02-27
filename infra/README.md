@@ -1,0 +1,103 @@
+# Terraform deployment (AWS, no load balancer)
+
+This folder contains **one shared data stack** and **three isolated AWS service stacks**:
+
+- `infra/data`
+
+- `infra/services/auth`
+- `infra/services/cards`
+- `infra/services/server`
+
+Each stack deploys one ECS Fargate service (`desired_count = 1`) with:
+
+- one ECR repository
+- one ECS cluster/service/task definition
+- one service security group
+- one CloudWatch log group
+
+No ALB/NLB is created in this setup.
+
+## Common modules
+
+- `infra/modules/ecs-public-service`: shared ECS/ECR/service logic
+- `infra/modules/rds-postgres`: shared RDS PostgreSQL logic
+- `infra/modules/elasticache-redis`: shared ElastiCache Redis logic
+
+## Prerequisites
+
+- Terraform `>= 1.5`
+- AWS CLI authenticated to your target account
+- Permissions for ECS, ECR, IAM, EC2 networking, and CloudWatch Logs
+
+## 1) Deploy shared data infrastructure first
+
+```bash
+cd infra/data
+cp terraform.tfvars.example terraform.tfvars
+# set auth_postgres_password and cards_postgres_password
+terraform init
+terraform plan
+terraform apply
+```
+
+This provisions:
+
+- Auth PostgreSQL (RDS)
+- Cards PostgreSQL (RDS)
+- Auth Redis (ElastiCache)
+
+## 2) Deploy Auth service only
+
+```bash
+cd infra/services/auth
+cp terraform.tfvars.example terraform.tfvars
+# set cards_service_host (and optional overrides)
+terraform init
+terraform plan
+terraform apply
+```
+
+By default, auth reads DB/Redis values from `infra/data/terraform.tfstate`.
+
+## 3) Deploy Cards service only
+
+```bash
+cd infra/services/cards
+cp terraform.tfvars.example terraform.tfvars
+# optional: override database_url manually
+terraform init
+terraform plan
+terraform apply
+```
+
+By default, cards reads `DATABASE_URL` from `infra/data/terraform.tfstate`.
+
+## 4) Deploy Game Server only
+
+```bash
+cd infra/services/server
+cp terraform.tfvars.example terraform.tfvars
+terraform init
+terraform plan
+terraform apply
+```
+
+## Notes on overrides
+
+- `use_managed_data_stack = true` (default) makes auth/cards auto-read from the shared data state.
+- Set `use_managed_data_stack = false` to provide manual DB/Redis values directly in each service tfvars.
+- If needed, change `data_stack_state_path` in service stacks to point at a different shared state file.
+
+## Build and push images
+
+After `terraform apply`, use each stack output `ecr_repository_url` to build and push your image.
+
+Example (auth):
+
+```bash
+aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin <account>.dkr.ecr.us-east-1.amazonaws.com
+docker build -t <ecr_repository_url>:latest auth
+docker push <ecr_repository_url>:latest
+```
+
+Re-run `terraform apply` in the service stack if you need to force a redeploy.

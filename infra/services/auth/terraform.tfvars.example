@@ -1,0 +1,17 @@
+aws_region = "us-east-1"
+image_tag  = "latest"
+
+use_managed_data_stack = true
+# data_stack_state_path = "../../data/terraform.tfstate"
+
+# Optional manual overrides when use_managed_data_stack = false
+# postgres_host     = "your-postgres-host"
+# postgres_user     = "authuser"
+# postgres_password = "change-me"
+# postgres_db       = "authdb"
+# postgres_port     = 5432
+# redis_host        = "your-redis-host"
+# redis_port        = 6379
+
+cards_service_host = "your-cards-host"
+cards_service_port = 8080
