@@ -1,0 +1,57 @@
+#!/bin/bash
+set -euo pipefail
+
+yum update -y
+amazon-linux-extras install docker -y || yum install -y docker
+systemctl enable --now docker
+usermod -aG docker ec2-user
+
+if ! rpm -q docker-compose-plugin >/dev/null 2>&1; then
+  yum install -y docker-compose-plugin
+fi
+
+aws ecr get-login-password --region ${region} | docker login --username AWS --password-stdin ${account_id}.dkr.ecr.${region}.amazonaws.com
+
+mkdir -p /opt/speedcardgame-auth
+cat >/opt/speedcardgame-auth/docker-compose.yml <<'EOF'
+services:
+  auth:
+    image: ${auth_image}
+    ports:
+      - "${auth_app_port}:8080"
+    restart: unless-stopped
+    environment:
+      POSTGRES_HOST: auth-db
+      POSTGRES_USER: ${auth_postgres_user}
+      POSTGRES_PASSWORD: ${auth_postgres_pass}
+      POSTGRES_DB: ${auth_postgres_db}
+      POSTGRES_PORT: ${auth_postgres_port}
+      POSTGRES_SSLMODE: ${auth_postgres_ssl}
+      POSTGRES_TIMEZONE: ${auth_postgres_tz}
+      REDIS_HOST: auth-redis
+      REDIS_PORT: ${auth_redis_port}
+    depends_on:
+      - auth-db
+      - auth-redis
+
+  auth-db:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${auth_postgres_user}
+      POSTGRES_PASSWORD: ${auth_postgres_pass}
+      POSTGRES_DB: ${auth_postgres_db}
+    volumes:
+      - auth-postgres:/var/lib/postgresql/data
+
+  auth-redis:
+    image: redis:7
+    restart: unless-stopped
+
+volumes:
+  auth-postgres:
+EOF
+
+cd /opt/speedcardgame-auth
+
+docker compose up -d

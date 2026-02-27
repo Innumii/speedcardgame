@@ -1,0 +1,29 @@
+#!/bin/bash
+set -euo pipefail
+
+yum update -y
+amazon-linux-extras install docker -y || yum install -y docker
+systemctl enable --now docker
+usermod -aG docker ec2-user
+
+if ! rpm -q docker-compose-plugin >/dev/null 2>&1; then
+  yum install -y docker-compose-plugin
+fi
+
+aws ecr get-login-password --region ${region} | docker login --username AWS --password-stdin ${account_id}.dkr.ecr.${region}.amazonaws.com
+
+mkdir -p /opt/speedcardgame-server
+cat >/opt/speedcardgame-server/docker-compose.yml <<'EOF'
+services:
+  game-server:
+    image: ${server_image}
+    ports:
+      - "${server_port}:4000"
+    restart: unless-stopped
+    sysctls:
+      - net.core.somaxconn=65535
+EOF
+
+cd /opt/speedcardgame-server
+
+docker compose up -d
