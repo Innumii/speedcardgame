@@ -1,4 +1,5 @@
-name: Build and Push Docker to ECR
+
+name: Build and Push Docker to GHCR
 
 on:
   push:
@@ -20,24 +21,19 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v2
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ env.AWS_REGION }}
-
-      - name: Get ECR repository URL
-        run: |
-          echo "ECR_URL=$(terraform -chdir=infra/services/auth output -raw ecr_repository_url)" >> $GITHUB_ENV
-
-      - name: Login to Amazon ECR
-        uses: aws-actions/amazon-ecr-login@v2
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build Docker image
         run: |
-          docker build -t $ECR_URL:latest auth
+          IMAGE_NAME=ghcr.io/${{ github.repository_owner }}/speedcardgame-auth:latest
+          docker build -t $IMAGE_NAME auth
+          echo "IMAGE_NAME=$IMAGE_NAME" >> $GITHUB_ENV
 
-      - name: Push Docker image to ECR
+      - name: Push Docker image to GHCR
         run: |
-          docker push $ECR_URL:latest
+          docker push $IMAGE_NAME
