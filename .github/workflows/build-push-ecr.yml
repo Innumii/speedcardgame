@@ -1,0 +1,42 @@
+name: Build and Push Docker to ECR
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'auth/**'
+      - 'cards/**'
+      - 'server/**'
+      - '.github/workflows/build-push-ecr.yml'
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    env:
+      AWS_REGION: us-east-1
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Get ECR repository URL
+        run: |
+          echo "ECR_URL=$(terraform -chdir=infra/services/auth output -raw ecr_repository_url)" >> $GITHUB_ENV
+
+      - name: Login to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build Docker image
+        run: |
+          docker build -t $ECR_URL:latest auth
+
+      - name: Push Docker image to ECR
+        run: |
+          docker push $ECR_URL:latest

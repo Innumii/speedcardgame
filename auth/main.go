@@ -112,6 +112,11 @@ func main() {
 	r.POST("/reset-password/confirm", authController.ConfirmPasswordReset)
 	r.PATCH("/change-password", authController.ChangePassword)
 
+	// Health check endpoint for AWS
+	r.GET("/health", func(c *gin.Context) {
+		c.JSON(200, gin.H{"status": "healthy"})
+	})
+
 	// Start server
 	err = r.Run(":8080")
 	if err != nil {
