@@ -34,7 +34,7 @@ jobs:
       - name: Build and Push ${{ matrix.service }} Service
         run: |
           OWNER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
-          docker build -f backend/api/${{ matrix.service }}/Dockerfile \
+          docker build -f ${{ matrix.service }}/Dockerfile \
             -t ghcr.io/$OWNER/g4t2-${{ matrix.service }}-service:latest \
-            backend/api/${{ matrix.service }}/
+            ${{ matrix.service }}/
           docker push ghcr.io/$OWNER/g4t2-${{ matrix.service }}-service:latest
