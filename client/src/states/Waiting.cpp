@@ -3,6 +3,7 @@
 #include "render/RenderText.hpp"
 #include "render/RenderBanner.hpp"
 #include "render/Theme.hpp"
+#include "render/RenderCard.hpp"
 #include "core/Game.hpp"
 #include <iostream>
 

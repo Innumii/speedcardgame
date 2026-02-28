@@ -151,6 +151,9 @@ void Game::commitStateChange() {
         if (state == GameState::DeckBuilding && previousState != GameState::DeckBuilding) {
             deckBuildingState.enter(*this);
         }
+        if (state == GameState::PackOpening && previousState != GameState::PackOpening) {
+            packOpeningState.enter(*this);
+        }
         if (state == GameState::Quit || state == GameState::GameOver) {
             isRunning = false;
         }
@@ -172,7 +175,26 @@ bool Game::refreshPlayerDeckFromService() {
         return false;
     }
 
-    setPlayingDeck(deckBuildingState.buildDeck()); //returns a Deck object
+    setPlayingDeck(deckBuildingState.buildDeck());
+    return true;
+}
+
+int Game::getPackRefundCoins() const {
+    return packRefundCoins;
+}
+
+void Game::addPackRefundCoins(int delta) {
+    const int next = packRefundCoins + delta;
+    packRefundCoins = next > 0 ? next : 0;
+}
+
+bool Game::tryStartPlayingWithBuiltDeck() {
+    if (!deckBuildingState.hasFullDeck()) {
+        return false;
+    }
+
+    setPlayingDeck(deckBuildingState.buildDeck());
+    setNextState(GameState::Playing);
     return true;
 }
 
@@ -264,6 +286,9 @@ void Game::handleEvents() {
             case GameState::DeckBuilding:
                 deckBuildingState.handleEvents(*this, event);
                 break;
+            case GameState::PackOpening:
+                packOpeningState.handleEvents(*this, event);
+                break;
             case GameState::Playing:
                 playingState.handleEvents(*this, event);
                 break;
@@ -298,6 +323,9 @@ void Game::update() {
             break;
         case GameState::DeckBuilding:
             deckBuildingState.update(*this);
+            break;
+        case GameState::PackOpening:
+            packOpeningState.update(*this);
             break;
         case GameState::Login:
             loginState.update(*this);
@@ -336,6 +364,9 @@ void Game::render() {
             break;
         case GameState::DeckBuilding:
             deckBuildingState.render(*this);
+            break;
+        case GameState::PackOpening:
+            packOpeningState.render(*this);
             break;
         case GameState::Playing:
             playingState.render(*this);

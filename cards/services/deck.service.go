@@ -8,8 +8,10 @@ import (
 	"sort"
 	"strconv"
 
+	"github.com/go-chi/chi"
 	"github.com/Ryanljk/speedcardgame/cards/config"
 	"github.com/Ryanljk/speedcardgame/cards/models"
+	"github.com/Ryanljk/speedcardgame/cards/util"
 	"gorm.io/gorm"
 )
 
@@ -251,4 +253,23 @@ func buildDeckCounts(inventory models.CardCounts, allCards []models.Card, limit 
 	}
 
 	return deck
+}
+
+// GetDeckByUserID handles GET /decks/{uid}
+func GetDeckByUserID(w http.ResponseWriter, r *http.Request) {
+    uidStr := chi.URLParam(r, "uid")
+    uid, err := strconv.Atoi(uidStr)
+    if err != nil {
+        util.RespondWithError(w, http.StatusBadRequest, "Invalid user ID format")
+        return
+    }
+
+    var deck models.Deck
+    if err := config.DB.Where("uid = ?", uid).First(&deck).Error; err != nil {
+        util.RespondWithError(w, http.StatusNotFound, "Deck not found")
+        return
+    }
+
+    w.Header().Set("Content-Type", "application/json")
+    json.NewEncoder(w).Encode(deck)
 }

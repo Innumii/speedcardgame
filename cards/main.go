@@ -109,6 +109,7 @@ func main() {
 		http.ServeFile(w, req, filepath.Join(imageDir, cleaned))
 	})
 
+	r.Get("/decks/{uid}", services.GetDeckByUserID) // Get deck by user ID
 	r.Post("/decks", services.CreateDeck) // Create deck
 	r.Post("/decks/fill", services.FillDeckForUser)
 	r.Get("/decks", services.ListDecks) // List all decks

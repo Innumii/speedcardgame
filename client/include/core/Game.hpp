@@ -19,6 +19,7 @@
 #include "states/Register.hpp"
 #include "states/Playing.hpp"
 #include "states/DeckBuilding.hpp"
+#include "states/PackOpening.hpp"
 #include "states/Connecting.hpp"
 #include "states/Waiting.hpp"
 
@@ -66,7 +67,8 @@ public:
 
 
     bool tryStartPlayingWithBuiltDeck();
-
+    int getPackRefundCoins() const;
+    void addPackRefundCoins(int delta);
 
     GameState getState() const;
     GameState getNextState() const;
@@ -96,6 +98,10 @@ private:
     // Player remotePlayer;
     std::string playerUsername{"Player"};
 
+    int drawIntervalSeconds{3};
+    int packRefundCoins{0};
+    Uint32 lastDrawTick{0};
+    std::size_t lastLoggedHandSize{0};
     bool playingSetup{false};
 
     //RAII smart pointers, chain their destruction to the Game object's destruction
@@ -121,6 +127,7 @@ private:
     Register registerState;
     Playing playingState;
     DeckBuilding deckBuildingState;
+    PackOpening packOpeningState;
     std::optional<Connecting> connectingState;
     std::optional<Waiting> waitingState;
     // Connecting connectingState;
