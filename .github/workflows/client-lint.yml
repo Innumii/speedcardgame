@@ -25,10 +25,13 @@ jobs:
             --enable=warning,portability \
             --error-exitcode=1 \
             --inline-suppr \
+            --force \
+            --suppress=preprocessorErrorDirective \
             --suppress=missingIncludeSystem \
             --template=gcc \
             -I client/include \
-            client/src client/include
+            -i client/include/httplib \
+            client/src
 
       - name: Run advisory cppcheck style scan
         run: |

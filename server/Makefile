@@ -6,11 +6,12 @@ SRCS := $(wildcard src/*.cpp src/*/*.cpp src/*/*/*.cpp)
 OBJS := $(patsubst src/%.cpp,$(BUILD_DIR)/%.o,$(SRCS))
 
 CXXFLAGS := -std=c++17 -Wall -Wextra -pthread
+LDFLAGS := -lssl -lcrypto 
 
 all: server
 
 server: $(OBJS)
-	$(CXX) $(CXXFLAGS) -o $@ $^
+	$(CXX) $(CXXFLAGS) -o $@ $^ $(LDFLAGS)
 
 $(BUILD_DIR)/%.o: src/%.cpp
 	mkdir -p $(@D)

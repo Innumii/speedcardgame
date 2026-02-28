@@ -4,12 +4,24 @@
 #include <cstring>
 #include <sys/socket.h>
 
-PlayerConnection::PlayerConnection(int socket):clientSocket(socket), running(false) {
+PlayerConnection::PlayerConnection(int socket, SSL_CTX* ctx)
+    : clientSocket(socket), sslCtx(ctx), running(false)
+{
+    ssl = SSL_new(sslCtx);
+    SSL_set_fd(ssl, clientSocket);
 
+    if (SSL_accept(ssl) <= 0) {
+        ERR_print_errors_fp(stderr);
+        SSL_free(ssl);
+        ssl = nullptr;
+        std::cerr << "[PlayerConnection] TLS handshake failed\n";
+    }
 }
 
 PlayerConnection::~PlayerConnection() {
     stop();
+    std::cout << "[PlayerConnection] Destroyed: " << username << "\n";
+    // stop();
 }
 
 void PlayerConnection::setPlayerInfo(int id, const std::string& name) {
@@ -25,12 +37,15 @@ const std::string& PlayerConnection::getUsername() const{
 }
 
 bool PlayerConnection::start() {
-    if (running) return false;
+    if (running || !ssl) return false;
     running = true;
     try {
-        readThread = std::thread(&PlayerConnection::readLoop, this);
+        auto self = shared_from_this();
+        readThread = std::thread([self]() {
+            self->readLoop();
+        });
     } catch (const std::system_error& e) {
-        std::cerr << "Failed to start read Thread " << e.what() << "\n";
+        std::cerr << "[PlayerConnection] Failed to start read Thread " << e.what() << "\n";
         running = false;
     }
 
@@ -38,14 +53,34 @@ bool PlayerConnection::start() {
 }
 
 void PlayerConnection::stop() {
-    if (!running) return;
+    std::lock_guard<std::mutex> lock(stopMutex);
+    if (stopped) return;
+    stopped = true;
+
+    running = false;
+    
+    {
+        std::lock_guard<std::mutex> lock(writeMutex); // wait for writes to finish
+        if (ssl) {
+            SSL_shutdown(ssl);
+            SSL_free(ssl);
+            ssl = nullptr;
+        }
+    }
+
     if (clientSocket >= 0) {
+        shutdown(clientSocket, SHUT_RDWR);
         close(clientSocket);
         clientSocket = -1;
     }
 
-    if (readThread.joinable()) {
+    if (readThread.joinable() && std::this_thread::get_id() != readThread.get_id())
         readThread.join();
+
+    if (ssl) {
+        SSL_shutdown(ssl);
+        SSL_free(ssl);
+        ssl = nullptr;
     }
 }
 
@@ -55,9 +90,11 @@ int PlayerConnection::getSocket() const {
 
 //actions
 bool PlayerConnection::send(const std::string& msg) {
-    if (!running) return false;
-    ssize_t n = ::send(clientSocket, msg.c_str(), msg.size(), 0);
-    return n == static_cast<ssize_t>(msg.size());
+    if (!running || !ssl) return false;
+
+    std::lock_guard<std::mutex> lock(writeMutex); // serialize writes
+    int n = SSL_write(ssl, msg.c_str(), msg.size());
+    return n == static_cast<int>(msg.size());
 }
 
 bool PlayerConnection::pollMessage(std::string& outMsg) {
@@ -72,41 +109,35 @@ bool PlayerConnection::isAlive() const {
     return running.load();
 }
 
+//blocking btw
 void PlayerConnection::readLoop() {
     constexpr size_t bufferSize = 1024;
     char buffer[bufferSize];
 
-    while (running) {
-        std::cout << "run!!\n";
-        ssize_t bytesRead = recv(clientSocket, buffer, bufferSize, 0);
-        if (bytesRead <= 0) {
-            running = false;  // client disconnected or error
+    while (running && ssl) {
+        int bytes = SSL_read(ssl, buffer, sizeof(buffer));
+        if (bytes <= 0) {
+            int err = SSL_get_error(ssl, bytes);
+            if (err == SSL_ERROR_WANT_READ || err == SSL_ERROR_WANT_WRITE)
+                continue;
 
-            // Fire disconnect callback
-            if (onDisconnected) {
-                try {
-                    onDisconnected();
-                } catch (const std::exception& ex) {
-                    std::cerr << "Exception in onDisconnected: " << ex.what() << "\n";
-                } catch (...) {
-                    std::cerr << "Unknown exception in onDisconnected\n";
-                }
-            }
-
-            break;
+            break; // disconnected or fatal SSL error
         }
 
-        std::vector<char> message(buffer, buffer + bytesRead);
-
-        // Fire the callback
+        std::vector<char> msg(buffer, buffer + bytes);
         if (onMessageReceived) {
-            try {
-                onMessageReceived(message);
-            } catch (const std::exception& ex) {
-                std::cerr << "Exception in onMessageReceived: " << ex.what() << "\n";
-            } catch (...) {
-                std::cerr << "Unknown exception in onMessageReceived\n";
-            }
+            try { onMessageReceived(msg); }
+            catch (...) { std::cerr << "[PlayerConnection] Exception in callback\n"; }
         }
+    }
+
+    // fire disconnect once
+    if (onDisconnected) onDisconnected();
+
+    // cleanup SSL safely
+    if (ssl) {
+        SSL_shutdown(ssl);
+        SSL_free(ssl);
+        ssl = nullptr;
     }
 }

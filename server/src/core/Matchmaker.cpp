@@ -2,6 +2,7 @@
 #include <algorithm>
 #include <iostream>
 
+//queue is checked when enqueueing a player, immediately try to empty out the queue
 void Matchmaker::enqueuePlayer(const std::shared_ptr<PlayerConnection>& player) {
     if (!player) return;
 
@@ -30,7 +31,9 @@ void Matchmaker::removePlayer(const std::shared_ptr<PlayerConnection>& player) {
     }
 
     std::swap(playerQueue, tempQueue);
-    std::cout << "Player removed from Queue\n";
+    std::cout << player->getUsername() << " removed from Queue\n";
+    std::cout << "Matchmaker queue size: " << playerQueue.size() << "\n";
+
 }
 
 void Matchmaker::tryCreateMatch() {
@@ -52,7 +55,7 @@ void Matchmaker::tryCreateMatch() {
         // match->start();
 
         std::cout << "Match found between players "
-                  << playerA->getSocket() << " and "
-                  << playerB->getSocket() << "\n";
+                  << playerA->getUsername() << " and "
+                  << playerB->getUsername() << "\n";
     }
 }

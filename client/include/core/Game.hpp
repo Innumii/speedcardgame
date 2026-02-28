@@ -19,6 +19,7 @@
 #include "states/Register.hpp"
 #include "states/Playing.hpp"
 #include "states/DeckBuilding.hpp"
+#include "states/PackOpening.hpp"
 #include "states/Connecting.hpp"
 #include "states/Waiting.hpp"
 
@@ -64,6 +65,8 @@ public:
     void setPlayingDeck(Deck newDeck);
     bool tryStartPlayingWithBuiltDeck();
     bool refreshPlayerDeckFromService();
+    int getPackRefundCoins() const;
+    void addPackRefundCoins(int delta);
 
     GameState getState() const;
     GameState getNextState() const;
@@ -94,6 +97,7 @@ private:
     std::string playerUsername{"Player"};
 
     int drawIntervalSeconds{3};
+    int packRefundCoins{0};
     Uint32 lastDrawTick{0};
     std::size_t lastLoggedHandSize{0};
     bool playingSetup{false};
@@ -121,6 +125,7 @@ private:
     Register registerState;
     Playing playingState{drawIntervalSeconds};
     DeckBuilding deckBuildingState;
+    PackOpening packOpeningState;
     std::optional<Connecting> connectingState;
     std::optional<Waiting> waitingState;
     // Connecting connectingState;

@@ -15,6 +15,49 @@ var inputInventory struct {
 	Cards models.CardCounts `json:"cards"` // Map of card ID to quantity
 }
 
+const maxCardCopies = 4
+
+func clampCardCount(value int) int {
+	if value < 0 {
+		return 0
+	}
+	if value > maxCardCopies {
+		return maxCardCopies
+	}
+	return value
+}
+
+func normalizeInventoryCards(cards models.CardCounts) bool {
+	if cards == nil {
+		return false
+	}
+
+	changed := false
+	for cid, qty := range cards {
+		if cid <= 0 {
+			delete(cards, cid)
+			changed = true
+			continue
+		}
+
+		clamped := clampCardCount(qty)
+		if clamped <= 0 {
+			if qty != 0 {
+				changed = true
+			}
+			delete(cards, cid)
+			continue
+		}
+
+		if clamped != qty {
+			cards[cid] = clamped
+			changed = true
+		}
+	}
+
+	return changed
+}
+
 // CreateInventory creates a new inventory for new user
 func CreateInventory(w http.ResponseWriter, r *http.Request) {
 
@@ -44,6 +87,7 @@ func CreateInventory(w http.ResponseWriter, r *http.Request) {
 
 		inventory.Cards = IntroCards
 	}
+	normalizeInventoryCards(inventory.Cards)
 	// Insert into the database
 	if err := config.DB.Create(&inventory).Error; err != nil {
 		http.Error(w, fmt.Sprintf("Failed to create inventory: %v", err), http.StatusInternalServerError)
@@ -67,6 +111,12 @@ func ListInventories(w http.ResponseWriter, _ *http.Request) {
 		return
 	}
 
+	for i := range inventories {
+		if normalizeInventoryCards(inventories[i].Cards) {
+			_ = config.DB.Save(&inventories[i]).Error
+		}
+	}
+
 	// Return the list of inventories
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(inventories); err != nil {
@@ -86,6 +136,13 @@ func GetInventoryByUserID(w http.ResponseWriter, r *http.Request) {
 	if err := config.DB.Where("uid = ?", uidParam).First(&inventory).Error; err != nil {
 		http.Error(w, fmt.Sprintf("Failed to retrieve inventory: %v", err), http.StatusInternalServerError)
 		return
+	}
+
+	if normalizeInventoryCards(inventory.Cards) {
+		if err := config.DB.Save(&inventory).Error; err != nil {
+			http.Error(w, fmt.Sprintf("Failed to normalize inventory: %v", err), http.StatusInternalServerError)
+			return
+		}
 	}
 
 	// Return the inventory as JSON
@@ -119,8 +176,19 @@ func UpdateInventory(w http.ResponseWriter, r *http.Request) {
 		inventory.Cards = make(models.CardCounts)
 	}
 	for cid, qty := range cards {
-		inventory.Cards[cid] += qty
+		if cid <= 0 || qty == 0 {
+			continue
+		}
+		nextQty := inventory.Cards[cid] + qty
+		clamped := clampCardCount(nextQty)
+		if clamped <= 0 {
+			delete(inventory.Cards, cid)
+			continue
+		}
+		inventory.Cards[cid] = clamped
 	}
+
+	normalizeInventoryCards(inventory.Cards)
 
 	// Save the updated inventory
 	if err := config.DB.Save(&inventory).Error; err != nil {

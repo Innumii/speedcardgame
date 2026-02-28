@@ -2,6 +2,7 @@
 #include "core/Game.hpp"
 #include "core/NetworkClient.hpp"
 #include "utils/JsonUtil.hpp"
+#include "utils/EnvUtil.hpp"
 #include "render/RenderText.hpp"
 #include "render/RenderBanner.hpp"
 #include "render/Theme.hpp"
@@ -12,23 +13,22 @@
 #include <iostream>
 #include <sstream>
 #include <cmath>
+#define CPPHTTPLIB_OPENSSL_SUPPORT
+#if defined(__GNUC__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+#pragma GCC diagnostic ignored "-Wconversion-null"
+#endif
+#include "httplib/httplib.h"
 
+#if defined(__GNUC__)
+#pragma GCC diagnostic pop
+#endif
 // ── network helpers ───────────────────────────────────────────────────────────
 
 namespace {
-    constexpr std::size_t kMaxUsernameLen = 24;
+    constexpr std::size_t kMaxUsernameLen = 64;
     constexpr std::size_t kMaxPasswordLen = 32;
-
-    std::string getEnvOrDefault(const char* key, const char* fallback) {
-        const char* v = std::getenv(key);
-        return v ? std::string(v) : std::string(fallback);
-    }
-
-    int getEnvIntOrDefault(const char* key, int fallback) {
-        const char* v = std::getenv(key);
-        if (!v) return fallback;
-        try { return std::stoi(v); } catch (...) { return fallback; }
-    }
 
     std::string escapeJson(const std::string& s) {
         std::string out;
@@ -46,44 +46,44 @@ namespace {
     }
 
     bool sendHttp(const std::string& host, int port, const std::string& method,
-                  const std::string& path, const std::string& body,
-                  int& statusCode, std::string& responseBody) {
-        statusCode = -1;
-        NetworkClient client(NetworkClient::SocketMode::Blocking); // blocking!
-        if (!client.connectTo(host, port)) return false;
+              const std::string& path, const std::string& body,
+              int& statusCode, std::string& responseBody) {
 
-        std::ostringstream req;
-        req << method << " " << path << " HTTP/1.1\r\n"
-            << "Host: " << host << "\r\n"
-            << "Connection: close\r\n";
-        if (method == "POST" || method == "PUT" || method == "PATCH") {
-            req << "Content-Type: application/json\r\n"
-                << "Content-Length: " << body.size() << "\r\n";
+        bool useHttps = (port == 443);
+        httplib::Result res;
+
+        if (useHttps) {
+            httplib::SSLClient client(host.c_str(), port);
+            client.enable_server_certificate_verification(false); // for self-signed
+            client.set_follow_location(true);
+
+            if (method == "GET")      res = client.Get(path.c_str());
+            else if (method == "POST") res = client.Post(path.c_str(), body, "application/json");
+            else if (method == "PUT")  res = client.Put(path.c_str(), body, "application/json");
+            else if (method == "PATCH") res = client.Patch(path.c_str(), body, "application/json");
+            else if (method == "DELETE") res = client.Delete(path.c_str());
+            else return false;
+
+        } else {
+            httplib::Client client(host.c_str(), port);
+            client.set_follow_location(true);
+
+            if (method == "GET")      res = client.Get(path.c_str());
+            else if (method == "POST") res = client.Post(path.c_str(), body, "application/json");
+            else if (method == "PUT")  res = client.Put(path.c_str(), body, "application/json");
+            else if (method == "PATCH") res = client.Patch(path.c_str(), body, "application/json");
+            else if (method == "DELETE") res = client.Delete(path.c_str());
+            else return false;
         }
-        req << "\r\n" << body;
 
-        const std::string reqText = req.str();
-        if (!client.send(reqText.data(), reqText.size())) {
-            client.disconnect();
-            return false;
+        if (!res) {
+            statusCode = -1;
+            responseBody.clear();
+            return false; // network error
         }
 
-        std::string response;
-        char buf[4096];
-        while (true) {
-            int n = client.receive(buf, sizeof(buf));
-            if (n <= 0) break;
-            response.append(buf, static_cast<std::size_t>(n));
-        }
-        client.disconnect();
-
-        const std::size_t headerEnd = response.find("\r\n\r\n");
-        if (headerEnd == std::string::npos) return false;
-
-        std::istringstream hs(response.substr(0, headerEnd));
-        std::string httpVer;
-        hs >> httpVer >> statusCode;
-        responseBody = response.substr(headerEnd + 4);
+        statusCode = res->status;
+        responseBody = res->body;
         return true;
     }
 
@@ -105,8 +105,8 @@ namespace {
             error = "email and password required";
             return false;
         }
-        const std::string host = getEnvOrDefault("AUTH_SERVICE_HOST", "127.0.0.1");
-        const int         port = getEnvIntOrDefault("AUTH_SERVICE_PORT", 8081);
+        const std::string host = EnvUtil::getEnvOrDefault("AUTH_SERVICE_HOST", "127.0.0.1");
+        const int         port = EnvUtil::getEnvIntOrDefault("AUTH_SERVICE_PORT", 8081);
 
         std::ostringstream payload;
         payload << "{\"email\":\"" << escapeJson(email)

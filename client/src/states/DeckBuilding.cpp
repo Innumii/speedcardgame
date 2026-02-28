@@ -11,6 +11,7 @@
 #include "core/Game.hpp"
 #include "core/NetworkClient.hpp"
 #include "utils/JsonUtil.hpp"
+#include "utils/EnvUtil.hpp"
 #include "objects/CreatureCard.h"
 #include "objects/SpellCard.h"
 #include <SDL2/SDL.h>
@@ -22,6 +23,16 @@
 #include <numeric>
 #include <sstream>
 #include <unordered_map>
+#define CPPHTTPLIB_OPENSSL_SUPPORT
+#if defined(__GNUC__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+#pragma GCC diagnostic ignored "-Wconversion-null"
+#endif
+#include "httplib/httplib.h"
+#if defined(__GNUC__)
+#pragma GCC diagnostic pop
+#endif
 
 namespace {
     SDL_Point getPoint(int x, int y) {
@@ -40,63 +51,52 @@ namespace {
         return value;
     }
 
-    std::string getEnvOrDefault(const char* key, const char* fallback) {
-        const char* value = std::getenv(key);
-        return value ? std::string(value) : std::string(fallback);
-    }
-
-    int getEnvIntOrDefault(const char* key, int fallback) {
-        const char* value = std::getenv(key);
-        if (!value) return fallback;
-        try {
-            return std::stoi(value);
-        } catch (...) {
-            return fallback;
-        }
-    }
-
     int getDeckSizeLimitFromEnv() {
-        const int configured = getEnvIntOrDefault("DECK_SIZE", 30);
+        // const int configured = getEnvIntOrDefault("DECK_SIZE", 30);
+        const int configured = EnvUtil::getEnvIntOrDefault("DECK_SIZE", 30);
         return configured > 0 ? configured : 30;
     }
 
 
-    bool sendHttpRequest(const std::string& host, int port, const std::string& method, const std::string& path,
-                         const std::string& body, std::string& responseBody) {
-        NetworkClient client(NetworkClient::SocketMode::Blocking); // blocking!
-        if (!client.connectTo(host, port)) {
-            return false;
+    bool sendHttp(const std::string& host, int port, const std::string& method,
+              const std::string& path, const std::string& body,
+              int& statusCode, std::string& responseBody) {
+
+        bool useHttps = (port == 443);
+        httplib::Result res;
+
+        if (useHttps) {
+            httplib::SSLClient client(host.c_str(), port);
+            client.enable_server_certificate_verification(false); // for self-signed
+            client.set_follow_location(true);
+
+            if (method == "GET")      res = client.Get(path.c_str());
+            else if (method == "POST") res = client.Post(path.c_str(), body, "application/json");
+            else if (method == "PUT")  res = client.Put(path.c_str(), body, "application/json");
+            else if (method == "PATCH") res = client.Patch(path.c_str(), body, "application/json");
+            else if (method == "DELETE") res = client.Delete(path.c_str());
+            else return false;
+
+        } else {
+            httplib::Client client(host.c_str(), port);
+            client.set_follow_location(true);
+
+            if (method == "GET")      res = client.Get(path.c_str());
+            else if (method == "POST") res = client.Post(path.c_str(), body, "application/json");
+            else if (method == "PUT")  res = client.Put(path.c_str(), body, "application/json");
+            else if (method == "PATCH") res = client.Patch(path.c_str(), body, "application/json");
+            else if (method == "DELETE") res = client.Delete(path.c_str());
+            else return false;
         }
 
-        std::ostringstream request;
-        request << method << " " << path << " HTTP/1.1\r\n";
-        request << "Host: " << host << "\r\n";
-        request << "Connection: close\r\n";
-        if (method == "POST" || method == "PUT") {
-            request << "Content-Type: application/json\r\n";
-            request << "Content-Length: " << body.size() << "\r\n";
-        }
-        request << "\r\n";
-        request << body;
-
-        const std::string requestText = request.str();
-        if (!client.send(requestText.data(), requestText.size())) {
-            client.disconnect();
-            return false;
+        if (!res) {
+            statusCode = -1;
+            responseBody.clear();
+            return false; // network error
         }
 
-        std::string response;
-        char buffer[4096];
-        while (true) {
-            int received = client.receive(buffer, sizeof(buffer));
-            if (received <= 0) break;
-            response.append(buffer, static_cast<std::size_t>(received));
-        }
-        client.disconnect();
-
-        const std::size_t headerEnd = response.find("\r\n\r\n");
-        if (headerEnd == std::string::npos) return false;
-        responseBody = response.substr(headerEnd + 4);
+        statusCode = res->status;
+        responseBody = res->body;
         return true;
     }
 
@@ -635,12 +635,12 @@ void DeckBuilding::setStatusMessage(const std::string& message, Uint32 durationM
 
 bool DeckBuilding::loadAvailableCardsFromService(const Game& game) {
     (void)game;
-    const std::string host = getEnvOrDefault("CARDS_SERVICE_HOST", "127.0.0.1");
-    const int port = getEnvIntOrDefault("CARDS_SERVICE_PORT", 8082);
+    const std::string host = EnvUtil::getEnvOrDefault("CARDS_SERVICE_HOST", "127.0.0.1");
+    const int port = EnvUtil::getEnvIntOrDefault("CARDS_SERVICE_PORT", 8082);
     const std::string path = "/cardbase/cards";
-
+    int statusCode = -1;
     std::string responseBody;
-    if (!sendHttpRequest(host, port, "GET", path, "", responseBody)) {
+    if (!sendHttp(host, port, "GET", path, "", statusCode, responseBody)) {
         return false;
     }
 
@@ -695,7 +695,7 @@ bool DeckBuilding::loadAvailableCardsFromService(const Game& game) {
 
 bool DeckBuilding::loadAvailableCardsFromCsv(const Game& game) {
     (void)game;
-    const std::string envPath = getEnvOrDefault("CARDS_CSV_PATH", "");
+    const std::string envPath = EnvUtil::getEnvOrDefault("CARDS_CSV_PATH", "");
     std::ifstream file;
     if (!envPath.empty() && tryOpenCsv(envPath, file)) {
         // file opened
@@ -766,10 +766,10 @@ bool DeckBuilding::saveDeckToService(const Game& game) const {
         return false;
     }
 
-    const std::string host = getEnvOrDefault("CARDS_SERVICE_HOST", "127.0.0.1");
-    const int port = getEnvIntOrDefault("CARDS_SERVICE_PORT", 8082);
+    const std::string host = EnvUtil::getEnvOrDefault("CARDS_SERVICE_HOST", "127.0.0.1");
+    const int port = EnvUtil::getEnvIntOrDefault("CARDS_SERVICE_PORT", 8082);
     const std::string path = "/cardbase/decks";
-    const int userId = getEnvIntOrDefault("CARDS_SERVICE_UID", game.getPlayerId());
+    const int userId = EnvUtil::getEnvIntOrDefault("CARDS_SERVICE_UID", game.getPlayerId());
 
     std::ostringstream payload;
     payload << "{\"uid\":" << userId << ",\"cards\":{";
@@ -785,20 +785,21 @@ bool DeckBuilding::saveDeckToService(const Game& game) const {
     }
     payload << "}}";
 
+    int statusCode = -1;
     std::string responseBody;
-    return sendHttpRequest(host, port, "POST", path, payload.str(), responseBody);
+    return sendHttp(host, port, "POST", path, payload.str(), statusCode, responseBody);
 }
 
 bool DeckBuilding::loadInventoryFromService(const Game& game) {
     if (availableCards.empty()) return false;
 
-    const std::string host = getEnvOrDefault("CARDS_SERVICE_HOST", "127.0.0.1");
-    const int port = getEnvIntOrDefault("CARDS_SERVICE_PORT", 8082);
+    const std::string host = EnvUtil::getEnvOrDefault("CARDS_SERVICE_HOST", "127.0.0.1");
+    const int port = EnvUtil::getEnvIntOrDefault("CARDS_SERVICE_PORT", 8082);
     const std::string path = "/cardbase/inventories";
-    const int userId = getEnvIntOrDefault("CARDS_SERVICE_UID", game.getPlayerId());
-
+    const int userId = EnvUtil::getEnvIntOrDefault("CARDS_SERVICE_UID", game.getPlayerId());
+    int statusCode = -1;
     std::string responseBody;
-    if (!sendHttpRequest(host, port, "GET", path, "", responseBody)) {
+    if (!sendHttp(host, port, "GET", path, "", statusCode, responseBody)) {
         inventoryLoaded = false;
         inventoryCopies.assign(availableCards.size(), 0);
         return false;
@@ -831,7 +832,7 @@ bool DeckBuilding::loadInventoryFromService(const Game& game) {
         if (copies <= 0) continue;
         auto it = cardIndexById.find(cardId);
         if (it == cardIndexById.end()) continue;
-        inventoryCopies[it->second] = copies;
+        inventoryCopies[it->second] = std::min(copies, 4);
     }
 
     inventoryLoaded = true;
@@ -855,13 +856,13 @@ int DeckBuilding::getRemainingCount(int cardIndex) const {
 bool DeckBuilding::loadDeckFromService(const Game& game) {
     if (availableCards.empty()) return false;
 
-    const std::string host = getEnvOrDefault("CARDS_SERVICE_HOST", "127.0.0.1");
-    const int port = getEnvIntOrDefault("CARDS_SERVICE_PORT", 8082);
+    const std::string host = EnvUtil::getEnvOrDefault("CARDS_SERVICE_HOST", "127.0.0.1");
+    const int port = EnvUtil::getEnvIntOrDefault("CARDS_SERVICE_PORT", 8082);
     const std::string path = "/cardbase/decks";
-    const int userId = getEnvIntOrDefault("CARDS_SERVICE_UID", game.getPlayerId());
-
+    const int userId = EnvUtil::getEnvIntOrDefault("CARDS_SERVICE_UID", game.getPlayerId());
+    int statusCode = -1;
     std::string responseBody;
-    if (!sendHttpRequest(host, port, "GET", path, "", responseBody)) {
+    if (!sendHttp(host, port, "GET", path, "", statusCode, responseBody)) {
         return false;
     }
 

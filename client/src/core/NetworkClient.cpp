@@ -10,55 +10,91 @@ NetworkClient::NetworkClient(SocketMode m) : socketFd(-1), connected(false), mod
         std::cerr << "WSAStartup failed\n";
     }
 #endif
+    initOpenSSL();
 }
 
 NetworkClient::~NetworkClient() {
     disconnect();
+    cleanupSSL();
 #ifdef _WIN32
     WSACleanup();
 #endif
 }
 
+bool NetworkClient::initOpenSSL() {
+    SSL_library_init();
+    OpenSSL_add_all_algorithms();
+    SSL_load_error_strings();
+
+    sslCtx = SSL_CTX_new(TLS_client_method());
+    SSL_CTX_load_verify_locations(sslCtx, "./certs/ca.crt", nullptr);
+    if (!sslCtx) {
+        std::cerr << "[NetworkClient] Failed to create SSL_CTX\n";
+        return false;
+    }
+
+    // Optional: verify server certificate
+    SSL_CTX_set_verify(sslCtx, SSL_VERIFY_PEER, nullptr);
+    if (!SSL_CTX_load_verify_locations(sslCtx, "./certs/ca.crt", nullptr)) {
+        std::cerr << "[NetworkClient] Failed to load CA certificate\n";
+        // You can choose to return false if you want strict verification
+    }
+
+    return true;
+}
+
+void NetworkClient::cleanupSSL() {
+    if (ssl) {
+        SSL_shutdown(ssl);
+        SSL_free(ssl);
+        ssl = nullptr;
+    }
+    if (sslCtx) {
+        SSL_CTX_free(sslCtx);
+        sslCtx = nullptr;
+    }
+}
+
 bool NetworkClient::connectTo(const std::string& ip, int port) {
     if (connected) return false;
 
+    // 1️⃣ Create socket
     socketFd = socket(AF_INET, SOCK_STREAM, 0);
     if (socketFd < 0) {
-        perror("socket");
+        std::cerr << "[NetworkClient] socket() failed: " << std::strerror(errno) << "\n";
         return false;
     }
 
     sockaddr_in serverAddr{};
     serverAddr.sin_family = AF_INET;
-    serverAddr.sin_port = htons(port);
+    serverAddr.sin_port   = htons(port);
 
     if (inet_pton(AF_INET, ip.c_str(), &serverAddr.sin_addr) <= 0) {
-        perror("inet_pton");
+        std::cerr << "[NetworkClient] inet_pton() failed: invalid IP\n";
         CLOSE_SOCKET(socketFd);
         socketFd = -1;
         return false;
     }
 
+    // 2️⃣ Connect TCP
     if (connect(socketFd, reinterpret_cast<sockaddr*>(&serverAddr), sizeof(serverAddr)) < 0) {
 #ifdef _WIN32
         int err = WSAGetLastError();
         if (!(mode == SocketMode::NonBlocking && err == WSAEWOULDBLOCK)) {
-            perror("connect");
-            CLOSE_SOCKET(socketFd);
-            socketFd = -1;
+            std::cerr << "[NetworkClient] connect() failed: WSA error " << err << "\n";
+            CLOSE_SOCKET(socketFd); socketFd = -1;
             return false;
         }
 #else
         if (!(mode == SocketMode::NonBlocking && errno == EINPROGRESS)) {
             perror("connect");
-            CLOSE_SOCKET(socketFd);
-            socketFd = -1;
+            CLOSE_SOCKET(socketFd); socketFd = -1;
             return false;
         }
 #endif
     }
 
-    // Set socket mode
+    // 3️⃣ Set socket mode
 #ifdef _WIN32
     u_long m = (mode == SocketMode::NonBlocking ? 1 : 0);
     ioctlsocket(socketFd, FIONBIO, &m);
@@ -70,12 +106,50 @@ bool NetworkClient::connectTo(const std::string& ip, int port) {
         fcntl(socketFd, F_SETFL, flags & ~O_NONBLOCK);
 #endif
 
+    // 4️⃣ Create SSL object
+    ssl = SSL_new(sslCtx);
+    if (!ssl) {
+        std::cerr << "[NetworkClient] SSL_new failed\n";
+        CLOSE_SOCKET(socketFd);
+        socketFd = -1;
+        return false;
+    }
+    SSL_set_fd(ssl, socketFd);
+
+    // 5️⃣ Configure verification
+    SSL_CTX_set_verify(sslCtx, SSL_VERIFY_NONE, nullptr);
+
+    // 6️⃣ Perform TLS handshake
+    int ret = 0;
+    while ((ret = SSL_connect(ssl)) != 1) {
+        int err = SSL_get_error(ssl, ret);
+        if (err == SSL_ERROR_WANT_READ || err == SSL_ERROR_WANT_WRITE) {
+            // retry
+            continue;
+        }
+        std::cerr << "[NetworkClient] TLS handshake failed\n";
+        ERR_print_errors_fp(stderr);
+        SSL_free(ssl);
+        ssl = nullptr;
+        CLOSE_SOCKET(socketFd);
+        socketFd = -1;
+        return false;
+    }
+
+    std::cout << "[NetworkClient] TLS handshake successful\n";
     connected = true;
     return true;
 }
 
 void NetworkClient::disconnect() {
     if (!connected) return;
+
+    if (ssl) {
+        SSL_shutdown(ssl);
+        SSL_free(ssl);
+        ssl = nullptr;
+    }
+
     CLOSE_SOCKET(socketFd);
     socketFd = -1;
     connected = false;
@@ -90,52 +164,37 @@ bool NetworkClient::sendString(const std::string& msg) {
 }
 
 bool NetworkClient::send(const void* data, size_t size) {
-    if (!connected) return false;
+    if (!connected || !ssl) return false;
+
     const char* buffer = static_cast<const char*>(data);
     size_t totalSent = 0;
 
     while (totalSent < size) {
-#ifdef _WIN32
-        int sent = ::send(socketFd, buffer + totalSent, (int)(size - totalSent), 0);
-        if (sent < 0) {
-            int err = WSAGetLastError();
-            if (mode == SocketMode::NonBlocking && err == WSAEWOULDBLOCK) continue;
-#else
-        ssize_t sent = ::send(socketFd, buffer + totalSent, size - totalSent, 0);
-        if (sent < 0) {
-            if (mode == SocketMode::NonBlocking && (errno == EWOULDBLOCK || errno == EAGAIN)) continue;
-#endif
-            perror("send");
+        int sent = SSL_write(ssl, buffer + totalSent, size - totalSent);
+        if (sent <= 0) {
+            int err = SSL_get_error(ssl, sent);
+            if (err == SSL_ERROR_WANT_READ || err == SSL_ERROR_WANT_WRITE) continue;
+
+            std::cerr << "[NetworkClient] SSL_write failed\n";
             disconnect();
             return false;
         }
         totalSent += sent;
     }
+
     return true;
 }
 
 int NetworkClient::receive(void* buffer, size_t size) {
-    if (!connected) return -1;
+    if (!connected || !ssl) return -1;
 
-#ifdef _WIN32
-    int received = ::recv(socketFd, static_cast<char*>(buffer), (int)size, 0);
-#else
-    ssize_t received = ::recv(socketFd, buffer, size, 0);
-#endif
+    int received = SSL_read(ssl, buffer, static_cast<int>(size));
+    if (received <= 0) {
+        int err = SSL_get_error(ssl, received);
+        if (err == SSL_ERROR_WANT_READ || err == SSL_ERROR_WANT_WRITE) return 0;
 
-    if (received == 0) { disconnect(); return -1; }
-
-    if (received < 0) {
-#ifdef _WIN32
-        int err = WSAGetLastError();
-        if (mode == SocketMode::NonBlocking && err == WSAEWOULDBLOCK) return 0;
-#else
-        if (mode == SocketMode::NonBlocking && (errno == EWOULDBLOCK || errno == EAGAIN)) return 0;
-#endif
-        perror("recv");
         disconnect();
         return -1;
     }
-
-    return static_cast<int>(received);
+    return received;
 }

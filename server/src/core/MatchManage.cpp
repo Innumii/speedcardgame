@@ -18,9 +18,7 @@ void MatchManager::onPairFound(std::shared_ptr<PlayerConnection> a,
         pendingMatches.push_back(pending);
     }
 
-    std::cout << "Match found: "
-              << a->getSocket() << " vs "
-              << b->getSocket() << "\n";
+    std::cout << "Notifying players: " << a->getUsername() << " VS " << b->getUsername() << "\n";
 
     sendMatchFound(a);
     sendMatchFound(b);
@@ -43,31 +41,9 @@ void MatchManager::onAccept(std::shared_ptr<PlayerConnection> player)
     }
 }
 
-void MatchManager::onDecline(std::shared_ptr<PlayerConnection> player)
-{
-    auto match = findPending(player);
-    if (!match) return;
-
-    std::shared_ptr<PlayerConnection> other;
-
-    {
-        std::lock_guard<std::mutex> lock(mutex);
-
-        other = (match->a == player) ? match->b : match->a;
-
-        std::cout << "Match declined by "
-                  << player->getSocket() << "\n";
-
-        removePending(match);
-    }
-
-    if (other) {
-        sendMatchCancelled(other);
-        // Requeue externally (GameServer should do this)
-    }
-}
 
 //still have to account for active matches
+//currently broken
 void MatchManager::onPlayerDisconnected(std::shared_ptr<PlayerConnection> player)
 {
     auto match = findPending(player);
@@ -85,7 +61,7 @@ void MatchManager::onPlayerDisconnected(std::shared_ptr<PlayerConnection> player
         sendMatchCancelled(other);
         if (matchmaker) {
             matchmaker->enqueuePlayer(other);
-            std::cout << "Requeued player " << other->getSocket() << " after opponent disconnected\n";
+            std::cout << "Requeued player " << other->getUsername() << " after opponent disconnected\n";
         }
     }
 }
@@ -100,6 +76,7 @@ MatchManager::findPending(const std::shared_ptr<PlayerConnection>& player)
             return m;
         }
     }
+    std::cout << "Nope\n";
     return nullptr;
 }
 

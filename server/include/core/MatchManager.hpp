@@ -21,8 +21,6 @@ public:
 
     // Called by network layer when client responds
     void onAccept(std::shared_ptr<PlayerConnection> player);
-    void onDecline(std::shared_ptr<PlayerConnection> player);
-
     // Optional: handle disconnects safely
     void onPlayerDisconnected(std::shared_ptr<PlayerConnection> player);
 

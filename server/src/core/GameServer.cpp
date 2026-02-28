@@ -31,46 +31,69 @@ bool GameServer::start() {
         };
 
         // Register callback for new clients
-        tcpServer->onClientConnected = [this](std::shared_ptr<PlayerConnection> player) {
-            player->onDisconnected = [this, player]() {
-                std::cout << "Player disconnected: Socket " << player->getSocket() << "\n";
-                //dequeue
-                if (matchmaker) matchmaker->removePlayer(player);
-                if (matchManager) matchManager->onPlayerDisconnected(player);
+        tcpServer->onClientConnected = [this](std::shared_ptr<PlayerConnection> player)
+        {
+            // Use weak_ptr to avoid cycles in lambdas
+            std::weak_ptr<PlayerConnection> weakPlayer = player;
+
+            // Disconnection callback
+            player->onDisconnected = [this, weakPlayer]()
+            {
+                if (auto p = weakPlayer.lock())
+                {
+                    std::cout << "Player disconnected: " << p->getUsername() << "\n";
+
+                    // Remove from queues / matches
+                    if (matchmaker) matchmaker->removePlayer(p);
+                    if (matchManager) matchManager->onPlayerDisconnected(p);
+                    if (tcpServer) tcpServer->enqueueDisconnect(p);
+                    
+                }
             };
-            player->onMessageReceived = [player, this](const std::vector<char>& rawMsg) {
-                std::string msg(rawMsg.begin(), rawMsg.end());
 
-                if (msg == "MATCH_ACCEPT\n") {
-                    if (matchManager) matchManager->onAccept(player);
-                } 
-                else if (msg == "MATCH_DECLINE\n") {
-                    if (matchManager) matchManager->onDecline(player);
-                } else if (msg.find("{\"type\":\"player_info\"") != std::string::npos) {
-                    auto idPos = msg.find("\"playerId\":");
-                    auto namePos = msg.find("\"username\":\"");
-                    if (idPos != std::string::npos && namePos != std::string::npos) {
-                        int playerId = std::stoi(msg.substr(idPos + 11, msg.find(',', idPos) - (idPos + 11)));
-                        int nameEnd = msg.find('"', namePos + 12);
-                        std::string username = msg.substr(namePos + 12, nameEnd - (namePos + 12));
-                        player->setPlayerInfo(playerId, username);
+            // Message-received callback
+            player->onMessageReceived = [this, weakPlayer](const std::vector<char>& rawMsg)
+            {
+                if (auto p = weakPlayer.lock())
+                {
+                    std::string msg(rawMsg.begin(), rawMsg.end());
 
-                        std::cout << "Player info received: ID=" << playerId
-                                << ", username=" << username << "\n";
+                    if (msg == "MATCH_ACCEPT\n")
+                    {
+                        if (matchManager) matchManager->onAccept(p);
+                    }
+                    else if (msg.find("{\"type\":\"player_info\"") != std::string::npos)
+                    {
+                        // Parse player info JSON manually
+                        auto idPos = msg.find("\"playerId\":");
+                        auto namePos = msg.find("\"username\":\"");
+                        if (idPos != std::string::npos && namePos != std::string::npos)
+                        {
+                            int playerId = std::stoi(msg.substr(idPos + 11, msg.find(',', idPos) - (idPos + 11)));
+                            int nameEnd = msg.find('"', namePos + 12);
+                            std::string username = msg.substr(namePos + 12, nameEnd - (namePos + 12));
+                            p->setPlayerInfo(playerId, username);
 
-                        // Optional: automatically enqueue after info is received
-                        if (matchmaker) matchmaker->enqueuePlayer(player);
+                            std::cout << "Player info received: ID=" << playerId
+                                    << ", username=" << username << "\n";
+
+                            // Enqueue for matchmaking
+                            if (matchmaker) matchmaker->enqueuePlayer(p);
+                        }
+                    }
+                    else
+                    {
+                        // Forward to active match sessions if needed
+                        // e.g., matchManager->routeToMatchSession(p, msg);
                     }
                 }
-                else {
-                    // Forward to active match sessions if needed
-                    // e.g., matchManager->routeToMatchSession(player, msg);
-                }
             };
-            if (!player->start()) {
+
+            // Start the read thread
+            if (!player->start())
+            {
                 std::cerr << "Failed to start PlayerConnection for socket " << player->getSocket() << "\n";
             }
-
         };
 
     
@@ -112,7 +135,7 @@ void GameServer::stop() {
     if (!running) return;
 
     running = false;
-    std::cout << "Stopping GameServer...\n";
+    std::cout << "[GameServer] Stopping...\n";
 
     // Stop TcpServer first
     if (tcpServer) {
@@ -122,7 +145,7 @@ void GameServer::stop() {
 
     // Matchmaker is passive; just destroy
     matchmaker.reset();
-
+    
     // Wake main thread if blocked
     shutdownCv.notify_all();
 }

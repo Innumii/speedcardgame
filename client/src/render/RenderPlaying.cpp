@@ -417,5 +417,5 @@ void RenderPlaying::render(Playing& playing, const Game& game) {
 		);
 	}
 
-	SDL_RenderPresent(renderer);
+	// SDL_RenderPresent(renderer);
 }

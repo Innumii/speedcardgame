@@ -120,9 +120,10 @@ void Game::commitStateChange() {
             playingSetup = false;
         }
 
-        // if (state == GameState::Connecting) {
-        //     connectingState.reset();
-        // }
+        if ((previousState == GameState::Waiting || previousState == GameState::Playing) && state == GameState::Title) {
+            connectingState.reset();
+            getNetworkClient().disconnect();
+        }
         
         state = nextState;
 
@@ -151,6 +152,9 @@ void Game::commitStateChange() {
         if (state == GameState::DeckBuilding && previousState != GameState::DeckBuilding) {
             deckBuildingState.enter(*this);
         }
+        if (state == GameState::PackOpening && previousState != GameState::PackOpening) {
+            packOpeningState.enter(*this);
+        }
         if (state == GameState::Quit || state == GameState::GameOver) {
             isRunning = false;
         }
@@ -174,6 +178,15 @@ bool Game::refreshPlayerDeckFromService() {
 
     setPlayingDeck(deckBuildingState.buildDeck());
     return true;
+}
+
+int Game::getPackRefundCoins() const {
+    return packRefundCoins;
+}
+
+void Game::addPackRefundCoins(int delta) {
+    const int next = packRefundCoins + delta;
+    packRefundCoins = next > 0 ? next : 0;
 }
 
 bool Game::tryStartPlayingWithBuiltDeck() {
@@ -270,6 +283,9 @@ void Game::handleEvents() {
             case GameState::DeckBuilding:
                 deckBuildingState.handleEvents(*this, event);
                 break;
+            case GameState::PackOpening:
+                packOpeningState.handleEvents(*this, event);
+                break;
             case GameState::Playing:
                 playingState.handleEvents(*this, event);
                 break;
@@ -304,6 +320,9 @@ void Game::update() {
             break;
         case GameState::DeckBuilding:
             deckBuildingState.update(*this);
+            break;
+        case GameState::PackOpening:
+            packOpeningState.update(*this);
             break;
         case GameState::Login:
             loginState.update(*this);
@@ -342,6 +361,9 @@ void Game::render() {
             break;
         case GameState::DeckBuilding:
             deckBuildingState.render(*this);
+            break;
+        case GameState::PackOpening:
+            packOpeningState.render(*this);
             break;
         case GameState::Playing:
             playingState.render(*this);

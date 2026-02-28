@@ -1,0 +1,82 @@
+name: client-release
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+    paths:
+      - 'client/**'
+      - '.github/workflows/client-release.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup MSYS2 (MinGW)
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          update: true
+          install: >-
+            mingw-w64-x86_64-gcc
+            make
+            mingw-w64-x86_64-SDL2
+            mingw-w64-x86_64-SDL2_ttf
+            mingw-w64-x86_64-SDL2_image
+            mingw-w64-x86_64-openssl
+
+      - name: Build client
+        shell: msys2 {0}
+        run: |
+          cd client
+          make
+
+      - name: Bundle runtime dependencies
+        shell: msys2 {0}
+        run: |
+          set -euo pipefail
+          cd client
+
+          mkdir -p dist
+          cp main.exe dist/main.exe
+
+          if [ -d assets ]; then
+            cp -r assets dist/assets
+          fi
+
+          ldd main.exe \
+            | awk '/=> \/mingw64\/bin\// { print $3 }' \
+            | sort -u \
+            | while read -r dllpath; do
+                if [ -f "$dllpath" ]; then
+                  cp "$dllpath" dist/
+                fi
+              done
+
+      - name: Package build artifact
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if (-not (Test-Path 'client/dist/main.exe')) {
+            throw 'Bundled executable not found at client/dist/main.exe.'
+          }
+
+          Compress-Archive -Path client/dist/* -DestinationPath client/client-latest-windows.zip -Force
+
+      - name: Publish latest client release
+        uses: ncipollo/release-action@v1
+        with:
+          tag: client-latest
+          name: Client Latest Build
+          body: Automated latest client build from GitHub Actions.
+          allowUpdates: true
+          removeArtifacts: true
+          artifactErrorsFailBuild: true
+          artifacts: client/client-latest-windows.zip
+          makeLatest: true

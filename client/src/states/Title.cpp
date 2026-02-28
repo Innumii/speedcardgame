@@ -23,7 +23,7 @@ void Title::updateLayout(SDL_Renderer* renderer) {
     const int bannerGap = 24;
     const int buttonGap = 16;
 
-    const int buttonsTotalH = (buttonH * 4) + (buttonGap * 3);
+    const int buttonsTotalH = (buttonH * 5) + (buttonGap * 4);
     const int totalH        = bannerH + bannerGap + buttonsTotalH;
     int topY = (screenH - totalH) / 2;
     if (topY < 20) topY = 20;
@@ -42,8 +42,11 @@ void Title::updateLayout(SDL_Renderer* renderer) {
     BuildDeckButton.x = startButton.x;
     BuildDeckButton.y = quitButton.y + buttonH + buttonGap;
 
+    OpenPacksButton.x = startButton.x;
+    OpenPacksButton.y = BuildDeckButton.y + buttonH + buttonGap;
+
     ConnectButton.x   = startButton.x;
-    ConnectButton.y   = BuildDeckButton.y + buttonH + buttonGap;
+    ConnectButton.y   = OpenPacksButton.y + buttonH + buttonGap;
 }
 
 void Title::handleEvents(Game& game, const SDL_Event& event) {
@@ -63,6 +66,8 @@ void Title::handleEvents(Game& game, const SDL_Event& event) {
                                  (mouseY >= quitButton.y      && mouseY <= quitButton.y      + quitButton.h);
         const bool inBuildDeck = (mouseX >= BuildDeckButton.x && mouseX <= BuildDeckButton.x + BuildDeckButton.w) &&
                                  (mouseY >= BuildDeckButton.y && mouseY <= BuildDeckButton.y + BuildDeckButton.h);
+        const bool inOpenPacks = (mouseX >= OpenPacksButton.x && mouseX <= OpenPacksButton.x + OpenPacksButton.w) &&
+                     (mouseY >= OpenPacksButton.y && mouseY <= OpenPacksButton.y + OpenPacksButton.h);
         const bool inConnect   = (mouseX >= ConnectButton.x   && mouseX <= ConnectButton.x   + ConnectButton.w) &&
                                  (mouseY >= ConnectButton.y   && mouseY <= ConnectButton.y   + ConnectButton.h);
 
@@ -74,6 +79,8 @@ void Title::handleEvents(Game& game, const SDL_Event& event) {
             game.setNextState(GameState::Quit);
         } else if (inBuildDeck) {
             game.setNextState(GameState::DeckBuilding);
+        } else if (inOpenPacks) {
+            game.setNextState(GameState::PackOpening);
         } else if (inConnect) {
             game.setNextState(GameState::Connecting);
         }
@@ -95,9 +102,12 @@ void Title::update(Game& game) {
     } else if (mouseX >= BuildDeckButton.x && mouseX <= BuildDeckButton.x + BuildDeckButton.w &&
                mouseY >= BuildDeckButton.y && mouseY <= BuildDeckButton.y + BuildDeckButton.h) {
         hoveredButton = 2;
+    } else if (mouseX >= OpenPacksButton.x && mouseX <= OpenPacksButton.x + OpenPacksButton.w &&
+               mouseY >= OpenPacksButton.y && mouseY <= OpenPacksButton.y + OpenPacksButton.h) {
+        hoveredButton = 3;
     } else if (mouseX >= ConnectButton.x && mouseX <= ConnectButton.x + ConnectButton.w &&
                mouseY >= ConnectButton.y && mouseY <= ConnectButton.y + ConnectButton.h) {
-        hoveredButton = 3;
+        hoveredButton = 4;
     }
 }
 
@@ -158,7 +168,7 @@ void Title::render(const Game& game) {
     SDL_Color animGlow       = {Theme::BANNER_GLOW.r,   Theme::BANNER_GLOW.g,
                                 Theme::BANNER_GLOW.b,   bannerAlpha};
 
-    RenderBanner::drawBanner(renderer, animBanner, "Speed Card Game",
+    RenderBanner::drawBanner(renderer, animBanner, "Ryan The Gathering",
                               titleFonts.large, animBannerFill, animGold,
                               animText, animGlow);
 
@@ -180,5 +190,6 @@ void Title::render(const Game& game) {
     drawBtn(startButton,     Theme::BTN_START,   "Start Game", 0);
     drawBtn(quitButton,      Theme::BTN_QUIT,    "Quit Game",  1);
     drawBtn(BuildDeckButton, Theme::BTN_BUILD,   "Build Deck", 2);
-    drawBtn(ConnectButton,   Theme::BTN_CONNECT, "Connect",    3);
+    drawBtn(OpenPacksButton, Theme::BTN_START,   "Open Packs", 3);
+    drawBtn(ConnectButton,   Theme::BTN_CONNECT, "Connect",    4);
 }
