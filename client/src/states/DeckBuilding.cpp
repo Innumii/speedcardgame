@@ -858,19 +858,33 @@ bool DeckBuilding::loadDeckFromService(const Game& game) {
 
     const std::string host = EnvUtil::getEnvOrDefault("CARDS_SERVICE_HOST", "127.0.0.1");
     const int port = EnvUtil::getEnvIntOrDefault("CARDS_SERVICE_PORT", 8082);
-    const std::string path = "/cardbase/decks";
+    
+    // Get the UID from the game state or environment
     const int userId = EnvUtil::getEnvIntOrDefault("CARDS_SERVICE_UID", game.getPlayerId());
+    
+    // Construct the specific endpoint: /cardbase/decks/{uid}
+    std::string endpoint = "/cardbase/decks/" + std::to_string(userId);
+    
     int statusCode = -1;
     std::string responseBody;
-    if (!sendHttp(host, port, "GET", path, "", statusCode, responseBody)) {
-        return false;
-    }
-
-    std::string cardsJson;
-    if (!extractCardsObjectForUser(responseBody, userId, cardsJson)) {
+    
+    if (!sendHttp(host, port, "GET", endpoint, "", statusCode, responseBody) || statusCode != 200) {
         deckCopies.assign(availableCards.size(), 0);
         return false;
     }
+
+    // Extract the "cards" object from the response JSON
+    // The Go backend returns { "uid": 1, "cards": { "101": 2, ... } }
+    std::string cardsJson;
+    size_t cardsKeyPos = responseBody.find("\"cards\"");
+    if (cardsKeyPos == std::string::npos) return false;
+    
+    size_t startBrace = responseBody.find('{', cardsKeyPos);
+    size_t endBrace;
+    if (!JsonUtil::findMatchingBrace(responseBody, startBrace, endBrace)) return false;
+    
+    // Get just the inner content of the "cards" map
+    cardsJson = responseBody.substr(startBrace + 1, endBrace - startBrace - 1);
 
     std::vector<std::pair<int, int>> cardCounts;
     if (!parseCardsMap(cardsJson, cardCounts)) {
@@ -878,23 +892,19 @@ bool DeckBuilding::loadDeckFromService(const Game& game) {
         return false;
     }
 
+    // Map the card IDs from the JSON to our local index array
     std::unordered_map<int, std::size_t> cardIndexById;
-    cardIndexById.reserve(availableCards.size());
     for (std::size_t i = 0; i < availableCards.size(); ++i) {
         cardIndexById.emplace(availableCards[i]->getId(), i);
     }
 
     deckCopies.assign(availableCards.size(), 0);
     for (const auto& pair : cardCounts) {
-        const int cardId = pair.first;
-        const int copies = pair.second;
-        if (copies <= 0) continue;
-        auto it = cardIndexById.find(cardId);
-        if (it == cardIndexById.end()) continue;
-        const int clamped = std::min(copies, MaxDeckCopies);
-        deckCopies[it->second] = clamped;
+        auto it = cardIndexById.find(pair.first);
+        if (it != cardIndexById.end()) {
+            deckCopies[it->second] = std::min(pair.second, MaxDeckCopies);
+        }
     }
 
     return true;
 }
-
