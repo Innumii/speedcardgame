@@ -12,6 +12,9 @@ public:
               int cardId = -1);
 
     void drawExtraInfo() const override;
+    std::unique_ptr<Card> clone() const override {
+        return std::make_unique<SpellCard>(*this);
+    }
 };
 
 #endif

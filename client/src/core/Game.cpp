@@ -145,6 +145,7 @@ void Game::commitStateChange() {
         }
 
         if (state == GameState::Playing && !playingSetup) {
+            std::cout << "Committing state change to Playing...\n";
             playingState.setup(*this);
             playingSetup = true;
         }
@@ -399,15 +400,4 @@ void Game::clean() {
 
 bool Game::running() const {
     return isRunning;
-}
-
-
-bool Game::tryStartPlayingWithBuiltDeck() {
-    if (!deckBuildingState.hasFullDeck()) {
-        return false;
-    }
-
-    setPlayingDeck(deckBuildingState.buildDeck());
-    setNextState(GameState::Playing);
-    return true;
 }

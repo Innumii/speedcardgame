@@ -100,6 +100,7 @@ void Waiting::update(Game& game) {
 
                 //hardcoded temp Player data 
                 playingState.setupPlayers(std::move(game.getPlayer()), Player());
+                std::cout << "Entering Playing state...\n";
                 
                 game.setNextState(GameState::Playing);
                 return;

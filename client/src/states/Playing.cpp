@@ -83,6 +83,7 @@ void Playing::setup(Game& game) {
         authority = std::make_unique<LocalAuthority>(
             &game.getNetworkClient());
     }
+    std::cout << "exiting Playing setup...\n";
 }
 
 void Playing::setupPlayers(Player&& local, Player&& remote) {
@@ -293,6 +294,8 @@ std::cout << cmd << "\n";
         iss >> playerId >> cardId;
         drawCard(playerId, cardId);
     }
+
+    return true;
 }
 
 bool Playing::drawCard(int playerId, int cardId) {

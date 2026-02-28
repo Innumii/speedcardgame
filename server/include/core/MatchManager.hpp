@@ -8,9 +8,9 @@
 
 #include "net/PlayerConnection.hpp"
 #include "game/MatchSession.hpp"
-
+#include "objects/Card.h"
 #include "core/Matchmaker.hpp"
-
+class GameServer;
 class MatchManager {
 public:
     MatchManager();
@@ -25,6 +25,7 @@ public:
     void onPlayerDisconnected(std::shared_ptr<PlayerConnection> player);
 
     void setMatchmaker(Matchmaker* mm) { matchmaker = mm; }
+    void setServer(GameServer* server) { gameServer = server; }
 
 
 private:
@@ -35,6 +36,7 @@ private:
         bool bAccepted = false;
     };
     Matchmaker* matchmaker = nullptr; // non-owning
+    GameServer* gameServer = nullptr; // non-owning pointer
 
     std::mutex mutex;
 
@@ -51,6 +53,7 @@ private:
     void sendMatchFound(const std::shared_ptr<PlayerConnection>& player);
     void sendMatchCancelled(const std::shared_ptr<PlayerConnection>& player);
     void sendMatchStart(const std::shared_ptr<PlayerConnection>& player);
+
 };
 
 #endif

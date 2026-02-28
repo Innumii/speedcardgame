@@ -8,6 +8,7 @@
 #include <optional>
 
 #include "objects/Deck.h"
+#include "objects/Card.h"
 
 class PlayerConnection;
 
@@ -39,7 +40,8 @@ struct PlayerState {
 class MatchSession {
 public:
     MatchSession(std::shared_ptr<PlayerConnection> playerA,
-                 std::shared_ptr<PlayerConnection> playerB);
+                 std::shared_ptr<PlayerConnection> playerB,
+                 const std::vector<std::unique_ptr<Card>>& allCards);
     ~MatchSession();
 
     MatchSession(const MatchSession&) = delete;
@@ -52,9 +54,7 @@ public:
     void setupDecks();
     void sendOpeningHands();
     bool drawAndSend(int playerIndex);
-    bool loadDeckForPlayer(int playerId);
-
-    
+    bool loadDeckForPlayer(int playerId, Deck& outDeck);
 
 
 private:
@@ -71,6 +71,9 @@ private:
     // Authoritative state
     PlayerState players[2];   // 0 = A, 1 = B
     ServerBoard board;
+
+    const std::vector<std::unique_ptr<Card>>& allCards;
+    bool parseDeckJson(const std::string& jsonStr, Deck& outDeck);
 };
 
 #endif
