@@ -28,6 +28,74 @@ data "aws_subnets" "default" {
   }
 }
 
+# Route tables in the VPC (used for S3 gateway endpoint)
+data "aws_route_tables" "vpc" {
+  filter {
+    name   = "vpc-id"
+    values = [data.aws_vpc.default.id]
+  }
+}
+
+# Security group for interface endpoints (allow HTTPS egress)
+resource "aws_security_group" "ecr_endpoint_sg" {
+  name   = "ecr-endpoint-sg"
+  vpc_id = data.aws_vpc.default.id
+
+  # Allow tasks in the VPC to connect to the interface endpoints on HTTPS
+  ingress {
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
+    cidr_blocks = [data.aws_vpc.default.cidr_block]
+  }
+
+  egress {
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = {
+    Name = "ecr-endpoint-sg"
+  }
+}
+
+# Interface endpoints for ECR (API + DKR) so tasks in private subnets can pull images without NAT
+resource "aws_vpc_endpoint" "ecr_api" {
+  vpc_id            = data.aws_vpc.default.id
+  service_name      = "com.amazonaws.${var.aws_region}.ecr.api"
+  vpc_endpoint_type = "Interface"
+  subnet_ids        = data.aws_subnets.default.ids
+  security_group_ids = [aws_security_group.ecr_endpoint_sg.id]
+  private_dns_enabled = true
+
+  tags = {
+    Name = "ecr-api-endpoint"
+  }
+}
+
+resource "aws_vpc_endpoint" "ecr_dkr" {
+  vpc_id            = data.aws_vpc.default.id
+  service_name      = "com.amazonaws.${var.aws_region}.ecr.dkr"
+  vpc_endpoint_type = "Interface"
+  subnet_ids        = data.aws_subnets.default.ids
+  security_group_ids = [aws_security_group.ecr_endpoint_sg.id]
+  private_dns_enabled = true
+
+  tags = {
+    Name = "ecr-dkr-endpoint"
+  }
+}
+
+# Gateway endpoint for S3 (used by ECR for image layers)
+resource "aws_vpc_endpoint" "s3" {
+  vpc_id            = data.aws_vpc.default.id
+  service_name      = "com.amazonaws.${var.aws_region}.s3"
+  vpc_endpoint_type = "Gateway"
+  route_table_ids   = data.aws_route_tables.vpc.ids
+}
+
 module "auth_postgres" {
   source = "../modules/rds-postgres"
 
@@ -69,4 +137,37 @@ module "auth_redis" {
   node_type            = var.auth_redis_node_type
   engine_version       = var.auth_redis_engine_version
   parameter_group_name = var.auth_redis_parameter_group_name
+}
+
+# 3. VPC ENDPOINTS (The Fix for Connection Issues)
+# Endpoint for Secrets Manager (to get GHCR Token)
+resource "aws_vpc_endpoint" "secretsmanager" {
+  vpc_id              = data.aws_vpc.default.id
+  service_name        = "com.amazonaws.${var.aws_region}.secretsmanager"
+  vpc_endpoint_type   = "Interface"
+  private_dns_enabled = true
+  subnet_ids          = data.aws_subnets.default.ids
+  security_group_ids  = [aws_security_group.ecr_endpoint_sg.id]
+}
+
+# Endpoint for CloudWatch Logs (to fix the Logger Args error)
+resource "aws_vpc_endpoint" "logs" {
+  vpc_id              = data.aws_vpc.default.id
+  service_name        = "com.amazonaws.${var.aws_region}.logs"
+  vpc_endpoint_type   = "Interface"
+  private_dns_enabled = true
+  subnet_ids          = data.aws_subnets.default.ids
+  security_group_ids  = [aws_security_group.ecr_endpoint_sg.id]
+}
+
+resource "null_resource" "skip_secrets_manager" {
+  count = var.skip_secrets_manager ? 1 : 0
+}
+
+# Secrets
+module "secrets" {
+  source = "../modules/secrets"
+  github_username = var.github_username
+  github_token    = var.github_token
+  count           = var.skip_secrets_manager ? 0 : 1
 }

@@ -1,7 +1,12 @@
+variable "skip_secrets_manager" {
+  description = "If true, do not create secrets in AWS Secrets Manager."
+  type        = bool
+  default     = false
+}
 variable "aws_region" {
   description = "AWS region"
+  default     = "ap-southeast-1"
   type        = string
-  default     = "us-east-1"
 }
 
 variable "auth_postgres_identifier" {
@@ -116,4 +121,15 @@ variable "auth_redis_parameter_group_name" {
   description = "Redis parameter group name"
   type        = string
   default     = "default.redis7"
+}
+
+variable "github_username" {
+  description = "Name of the secret for auth service"
+  type        = string
+}
+
+variable "github_token" {
+  description = "Secret string for auth service"
+  type        = string
+  sensitive   = true
 }

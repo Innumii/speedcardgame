@@ -50,12 +50,20 @@ locals {
 module "service" {
   source = "../../modules/ecs-public-service"
 
+  # GitHub Container Registry Config
+  github_username     = var.github_username
+  github_repo_name    = var.github_repo_name
+  ghcr_pat_secret_arn = var.ghcr_pat_secret_arn
+
   aws_region     = var.aws_region
   service_name   = var.service_name
   vpc_id         = data.aws_vpc.default.id
   subnet_ids     = data.aws_subnets.default.ids
   container_port = 8080
   image_tag      = var.image_tag
+  image_repo     = var.image_repo
+  cpu            = var.cpu
+  memory         = var.memory
   desired_count  = 1
 
   environment = {

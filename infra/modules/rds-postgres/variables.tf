@@ -55,5 +55,5 @@ variable "allocated_storage" {
 variable "engine_version" {
   description = "Postgres engine version"
   type        = string
-  default     = "16.3"
+  default     = "16"
 }

@@ -1,19 +1,53 @@
 variable "aws_region" {
   description = "AWS region"
+  default     = "ap-southeast-1"
   type        = string
-  default     = "us-east-1"
 }
 
 variable "service_name" {
-  description = "Auth ECS/ECR service name"
+  description = "Auth ECS service name"
   type        = string
   default     = "speedcardgame-auth"
 }
 
+# --- GitHub Container Registry Variables ---
+variable "github_username" {
+  description = "GitHub username or organization (e.g., 'my-org')"
+  type        = string
+}
+
+variable "github_repo_name" {
+  description = "The repository name on GitHub"
+  type        = string
+}
+
+variable "ghcr_pat_secret_arn" {
+  description = "The ARN of the AWS Secret containing the GHCR PAT (username/password)"
+  type        = string
+}
+# -------------------------------------------
+
 variable "image_tag" {
-  description = "Auth image tag in ECR"
+  description = "Image tag for the auth service image"
   type        = string
   default     = "latest"
+}
+
+variable "image_repo" {
+  description = "Image repository for the auth service image"
+  type        = string
+}
+
+variable "cpu" {
+  description = "Fargate CPU units"
+  type        = string
+  default     = "256"
+}
+
+variable "memory" {
+  description = "Fargate memory"
+  type        = string
+  default     = "512"
 }
 
 variable "use_managed_data_stack" {
@@ -29,58 +63,49 @@ variable "data_stack_state_path" {
 }
 
 variable "postgres_host" {
-  description = "Postgres host reachable from auth task"
-  type        = string
-  default     = null
+  type    = string
+  default = null
 }
 
 variable "postgres_user" {
-  description = "Postgres user"
-  type        = string
-  default     = null
+  type    = string
+  default = null
 }
 
 variable "postgres_password" {
-  description = "Postgres password"
-  type        = string
-  sensitive   = true
-  default     = null
+  type      = string
+  sensitive = true
+  default   = null
 }
 
 variable "postgres_db" {
-  description = "Postgres database name"
-  type        = string
-  default     = null
+  type    = string
+  default = null
 }
 
 variable "postgres_port" {
-  description = "Postgres port"
-  type        = number
-  default     = null
+  type    = number
+  default = null
 }
 
 variable "postgres_sslmode" {
-  description = "Postgres SSL mode"
-  type        = string
-  default     = "disable"
+  type    = string
+  default = "disable"
 }
 
 variable "postgres_timezone" {
-  description = "Postgres timezone"
-  type        = string
-  default     = "UTC"
+  type    = string
+  default = "UTC"
 }
 
 variable "redis_host" {
-  description = "Redis host reachable from auth task"
-  type        = string
-  default     = null
+  type    = string
+  default = null
 }
 
 variable "redis_port" {
-  description = "Redis port"
-  type        = number
-  default     = null
+  type    = number
+  default = null
 }
 
 variable "cards_service_host" {

@@ -1,5 +1,6 @@
 aws_region = "us-east-1"
 image_tag  = "latest"
+image_repo = "ryanljk/g4t2-auth-service"
 
 use_managed_data_stack = true
 # data_stack_state_path = "../../data/terraform.tfstate"

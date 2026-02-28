@@ -37,5 +37,7 @@ module "service" {
   subnet_ids     = data.aws_subnets.default.ids
   container_port = 4000
   image_tag      = var.image_tag
+  cpu             = var.cpu
+  memory          = var.memory
   desired_count  = 1
 }

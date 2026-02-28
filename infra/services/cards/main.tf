@@ -50,6 +50,8 @@ module "service" {
   subnet_ids     = data.aws_subnets.default.ids
   container_port = 8080
   image_tag      = var.image_tag
+  cpu             = var.cpu
+  memory          = var.memory
   desired_count  = 1
 
   environment = {
