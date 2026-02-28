@@ -1,8 +1,12 @@
 #include "core/Game.hpp"
+#include "render/RenderCard.hpp"
 #include <algorithm>
+#include <cctype>
 #include <iostream>
 #include <stdexcept>
 #include <fstream>
+#include <utility>
+#include <SDL2/SDL_image.h>
 
 namespace {
     int clampPositive(int value, int maxValue) {
@@ -22,7 +26,9 @@ bool isWSL() {
     if (!f) return false;
     std::string line;
     std::getline(f, line);
-    for (auto &c : line) c = tolower(c);
+    std::transform(line.begin(), line.end(), line.begin(), [](unsigned char c) {
+        return static_cast<char>(std::tolower(c));
+    });
     return line.find("microsoft") != std::string::npos;
 }
 
@@ -41,26 +47,24 @@ Game::Game(const char *title, int xpos, int ypos, int width, int height, bool fu
         throw std::runtime_error(std::string("SDL_CreateWindow Failed: ") + SDL_GetError());
     }
 
-    bool forceSoftware = true;
+    bool useSoftwareRenderer = true;
 #ifdef _WIN32
     // Accelerated is safe on Windows
-    forceSoftware = false;
+    useSoftwareRenderer = false;
 #else
-    // On Linux/WSL: check environment
     if (isWSL()) {
         std::cout << "WSL detected: forcing software renderer\n";
-        forceSoftware = true;
     }
 #endif
 
-    if (!forceSoftware) {
-        renderer.reset(SDL_CreateRenderer(window.get(), -1, SDL_RENDERER_ACCELERATED));
+    if (useSoftwareRenderer) {
+        renderer.reset(SDL_CreateRenderer(window.get(), -1, SDL_RENDERER_SOFTWARE));
         if (!renderer) {
             SDL_Quit();
             throw std::runtime_error(std::string("SDL_CreateRenderer Failed: ") + SDL_GetError());
         }
     } else {
-        renderer.reset(SDL_CreateRenderer(window.get(), -1, SDL_RENDERER_SOFTWARE));
+        renderer.reset(SDL_CreateRenderer(window.get(), -1, SDL_RENDERER_ACCELERATED));
         if (!renderer) {
             SDL_Quit();
             throw std::runtime_error(std::string("SDL_CreateRenderer Failed: ") + SDL_GetError());
@@ -69,6 +73,12 @@ Game::Game(const char *title, int xpos, int ypos, int width, int height, bool fu
     
 
     SDL_SetRenderDrawBlendMode(renderer.get(), SDL_BLENDMODE_BLEND);
+
+    const int imgFlags = IMG_INIT_PNG | IMG_INIT_JPG;
+    if ((IMG_Init(imgFlags) & imgFlags) == 0) {
+        SDL_Quit();
+        throw std::runtime_error(std::string("IMG_Init failed: ") + IMG_GetError());
+    }
 
     SDL_RaiseWindow(window.get());
     SDL_SetWindowInputFocus(window.get());
@@ -88,16 +98,13 @@ Game::~Game() {
     std::cout << "Goodbye!~\n";
 }
 
+//check this again ltr
 void Game::commitStateChange() {
     if (nextState != state) {
         const GameState previousState = state;
         state = nextState;
 
-        if (previousState == GameState::DeckBuilding && state != GameState::DeckBuilding) {
-            deckBuildingState.exit(*this);
-        }
-
-        if (previousState == GameState::DeckBuilding && state != GameState::DeckBuilding) {
+        if (previousState == GameState::DeckBuilding) {
             deckBuildingState.exit(*this);
         }
 
@@ -109,15 +116,24 @@ void Game::commitStateChange() {
             registerState.exit(*this);
         }
 
-        if (state == GameState::Connecting) {
-            connectingState.reset();
+        if (previousState == GameState::Playing && state != GameState::Playing) {
+            playingSetup = false;
         }
 
+        // if (state == GameState::Connecting) {
+        //     connectingState.reset();
+        // }
+        
         state = nextState;
 
         if (state == GameState::Connecting) {
             //hardcoded for now
             connectingState.emplace("127.0.0.1", 4000);
+        }
+
+        if (state == GameState::Waiting) {
+            waitingState.emplace();
+            std::cout << "Waiting now\n";
         }
 
         if (state == GameState::Login && previousState != GameState::Login) {
@@ -192,6 +208,19 @@ void Game::setPlayerId(int playerId) {
     }
 }
 
+const std::string& Game::getPlayerUsername() const {
+    return playerUsername;
+}
+
+void Game::setPlayerUsername(std::string username) {
+    if (username.empty()) {
+        playerUsername = "Player";
+        return;
+    }
+
+    playerUsername = std::move(username);
+}
+
 const Deck& Game::getDeck(const Player& player) const {
     return player.getDeck();
 }
@@ -251,6 +280,9 @@ void Game::handleEvents() {
                 }
                 break;
             case GameState::Waiting:
+                if (waitingState) {
+                    waitingState->handleEvents(*this, event);
+                }
             default:
                 break;
         }
@@ -284,6 +316,11 @@ void Game::update() {
                 connectingState->update(*this);
             }
             break;
+        case GameState::Waiting:
+            if (waitingState) {
+                waitingState->update(*this);
+            }
+            break;
         default:
             break;
     }
@@ -314,6 +351,11 @@ void Game::render() {
                 connectingState->render(*this);
             }
             break;
+        case GameState::Waiting:
+            if (waitingState) {
+                waitingState->render(*this);
+            }
+            break;
         default:
             break;
     }
@@ -322,8 +364,10 @@ void Game::render() {
 }
 
 void Game::clean() {
+    RenderCard::clearImageCache();
     RenderText::closeFonts(titleFonts);
     RenderText::closeFonts(uiFonts);
+    IMG_Quit();
     SDL_Quit();
     isRunning = false;
 }

@@ -21,7 +21,7 @@ void handleSignal(int) {
 int main() {
     //flush buffer
     std::cout.setf(std::ios::unitbuf);
-
+    // std::cout << "Yo\n";
     //allocate on stack
     GameServer server(4000);
     serverPtr = &server;

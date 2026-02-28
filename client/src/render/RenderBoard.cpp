@@ -163,10 +163,8 @@ void RenderBoard::drawDiscardZone(SDL_Renderer* renderer, RenderText& textRender
 	);
 }
 
-void RenderBoard::drawBoardState(SDL_Renderer* renderer, RenderText& textRenderer, 
-                                 const Board& board, const std::vector<SDL_Rect>& playSlots, 
-                                 TTF_Font* fontTitle, TTF_Font* fontBody) {
-	if (!renderer || !fontTitle || !fontBody) return;
+void RenderBoard::drawBoardState(SDL_Renderer* renderer, RenderText& textRenderer, const Board& board, const std::vector<SDL_Rect>& playSlots, int localPlayerId, TTF_Font* fontSmall) {
+	if (!renderer || !fontSmall) return;
 	if (playSlots.empty()) return;
 
 	const int opponentOffset = 230;  // match the increased spacing
@@ -179,8 +177,8 @@ void RenderBoard::drawBoardState(SDL_Renderer* renderer, RenderText& textRendere
 				if (!card) continue;
 
 				SDL_Rect rect = playSlots[lane];
-				if (pid == 1) {
-					rect.y -= opponentOffset;
+				if (pid != localPlayerId) {
+					rect.y -= 200;
 				}
 
 				RenderCard::drawBoardCard(renderer, textRenderer, *card, rect, fontTitle, fontBody);

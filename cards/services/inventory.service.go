@@ -51,7 +51,10 @@ func CreateInventory(w http.ResponseWriter, r *http.Request) {
 	}
 	// Return the created inventory as JSON
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(inventory)
+	if err := json.NewEncoder(w).Encode(inventory); err != nil {
+		http.Error(w, fmt.Sprintf("Failed to encode inventory response: %v", err), http.StatusInternalServerError)
+		return
+	}
 }
 
 // ListInventories lists all inventories
@@ -66,7 +69,10 @@ func ListInventories(w http.ResponseWriter, _ *http.Request) {
 
 	// Return the list of inventories
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(inventories)
+	if err := json.NewEncoder(w).Encode(inventories); err != nil {
+		http.Error(w, fmt.Sprintf("Failed to encode inventories response: %v", err), http.StatusInternalServerError)
+		return
+	}
 }
 
 // GetInventory retrieves a specific inventory by user ID
@@ -84,7 +90,10 @@ func GetInventoryByUserID(w http.ResponseWriter, r *http.Request) {
 
 	// Return the inventory as JSON
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(inventory)
+	if err := json.NewEncoder(w).Encode(inventory); err != nil {
+		http.Error(w, fmt.Sprintf("Failed to encode inventory response: %v", err), http.StatusInternalServerError)
+		return
+	}
 }
 
 func UpdateInventory(w http.ResponseWriter, r *http.Request) {
@@ -121,5 +130,8 @@ func UpdateInventory(w http.ResponseWriter, r *http.Request) {
 
 	// Return the updated inventory
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(inventory)
+	if err := json.NewEncoder(w).Encode(inventory); err != nil {
+		http.Error(w, fmt.Sprintf("Failed to encode inventory response: %v", err), http.StatusInternalServerError)
+		return
+	}
 }

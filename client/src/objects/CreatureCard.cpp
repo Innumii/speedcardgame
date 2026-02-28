@@ -1,8 +1,8 @@
 #include "objects/CreatureCard.h"
 #include <iostream>
 
-CreatureCard::CreatureCard(std::string name,
-                           std::string text,
+CreatureCard::CreatureCard(const std::string& name,
+                           const std::string& text,
                            int manaValue,
                            int manaCost,
                            int power,

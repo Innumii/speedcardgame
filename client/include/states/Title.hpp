@@ -11,7 +11,7 @@ class Title {
 public:
     void handleEvents(Game& game, const SDL_Event& event);
     void update(Game& game);
-    void render(Game& game);
+    void render(const Game& game);
 private:
     void updateLayout(SDL_Renderer* renderer);
     SDL_Rect startButton{300,150,280,75};

@@ -30,4 +30,4 @@
 
         docker-compose up -d --build
 
-- Note: Please copy and fill in the .env located in cards/
+- Note: Please copy and fill in the .env located in cards

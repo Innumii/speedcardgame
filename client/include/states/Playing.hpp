@@ -3,6 +3,7 @@
 
 #include <SDL2/SDL.h>
 #include <cstddef>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -10,8 +11,11 @@
 #include "objects/Player.h"
 #include "objects/Deck.h"
 #include "core/Board.hpp"
+#include "render/RenderText.hpp"
+#include "animation/animationQueue.hpp"
 
-class Game;
+class Game; // forward declaration to avoid circular include
+class Card;
 
 class Playing {
     friend class RenderPlaying;
@@ -37,31 +41,45 @@ private:
     std::vector<SDL_Rect> cardRects;
     std::vector<SDL_Rect> playSlots;
     SDL_Rect discardZone{0, 0, 0, 0};
+    SDL_Rect menuButton{0, 0, 0, 0};
+    SDL_Rect exitGameButton{0, 0, 0, 0};
+    SDL_Rect returnToTitleButton{0, 0, 0, 0};
     DragState drag;
     std::size_t hoverIndex{static_cast<std::size_t>(-1)};
     Uint32 hoverStartTick{0};
-    bool previewLocked{false};
-    int previewScrollOffset{0};
+    bool menuOpen{false};
+    bool surrendered{false};
+    AnimationQueue animationQueue;
+    struct PendingSpellTargetState {
+        bool active{false};
+        std::unique_ptr<Card> spell;
+    };
+    PendingSpellTargetState pendingSpellTarget;
 
     bool pointInRect(const SDL_Rect& rect, int x, int y);
+    bool isTargetedSpell(const Card& card) const;
+    bool consumeSpell(std::unique_ptr<Card> spell);
+    bool resolvePendingSpellTargetAt(int x, int y);
     std::vector<SDL_Rect> computeCardLayout(std::size_t count, int screenW, int screenH) const;
     void computeZones(int screenW, int screenH);
+    void computeUiRects(int screenW, int screenH);
+    SDL_Rect computeSelfDeckRect(int screenW, int screenH) const;
+    bool tryDrawCardWithAnimation(Uint32 now);
 
 public:
-    Playing(int drawIntervalSeconds = 3);
+    explicit Playing(int drawIntervalSeconds = 3);
     ~Playing();
 
     Playing(const Playing&) = delete;
     Playing& operator=(const Playing&) = delete;
     Playing(Playing&&) noexcept = default;
     Playing& operator=(Playing&&) noexcept = default;
-    
-    void setup(Game& game);
+    void setup(const Game& game);
     void setDeck(Deck newDeck);
     void handleEvents(Game& game, const SDL_Event& event);
     void run();
     void update(Game& game);
-    void render(Game&);
+    void render(const Game&);
 };
 
 #endif

@@ -7,6 +7,7 @@
 #include "objects/CreatureCard.h"
 #include "objects/SpellCard.h"
 #include <algorithm>
+#include <cctype>
 #include <iostream>
 #include <memory>
 #include <stdexcept>
@@ -21,6 +22,54 @@ bool Playing::pointInRect(const SDL_Rect& rect, int x, int y) {
     return x >= rect.x && x < rect.x + rect.w && y >= rect.y && y < rect.y + rect.h;
 }
 
+bool Playing::isTargetedSpell(const Card& card) const {
+    if (card.getType() != CardType::Spell) {
+        return false;
+    }
+
+    std::string text = card.getText();
+    std::transform(text.begin(), text.end(), text.begin(), [](unsigned char ch) {
+        return static_cast<char>(std::tolower(ch));
+    });
+
+    return text.find("target") != std::string::npos;
+}
+
+bool Playing::consumeSpell(std::unique_ptr<Card> spell) {
+    if (!spell) {
+        return false;
+    }
+    return board.addToDiscard(std::move(spell), player.id);
+}
+
+bool Playing::resolvePendingSpellTargetAt(int x, int y) {
+    if (!pendingSpellTarget.active || !pendingSpellTarget.spell) {
+        return false;
+    }
+
+    for (std::size_t lane = 0; lane < playSlots.size(); ++lane) {
+        SDL_Rect localRect = playSlots[lane];
+        if (pointInRect(localRect, x, y)) {
+            std::cout << "Target selected: player " << player.id << ", lane " << lane << "\n";
+            consumeSpell(std::move(pendingSpellTarget.spell));
+            pendingSpellTarget.active = false;
+            return true;
+        }
+
+        SDL_Rect opponentRect = playSlots[lane];
+        opponentRect.y -= 200;
+        const int opponentId = player.id == 0 ? 1 : 0;
+        if (pointInRect(opponentRect, x, y)) {
+            std::cout << "Target selected: player " << opponentId << ", lane " << lane << "\n";
+            consumeSpell(std::move(pendingSpellTarget.spell));
+            pendingSpellTarget.active = false;
+            return true;
+        }
+    }
+
+    return false;
+}
+
 Playing::Playing(int drawIntervalSeconds)
     : drawIntervalSeconds(drawIntervalSeconds) {}
 
@@ -30,7 +79,54 @@ void Playing::setDeck(Deck newDeck) {
     deck = std::move(newDeck);
 }
 
-void Playing::setup(Game& game) {
+SDL_Rect Playing::computeSelfDeckRect(int screenW, int screenH) const {
+    if (screenW <= 0 || screenH <= 0 || playSlots.empty()) {
+        return SDL_Rect{0, 0, 0, 0};
+    }
+
+    const int gap = 18;
+    const int margin = 10;
+    const int deckW = discardZone.w > 0 ? discardZone.w : 110;
+    const int deckH = discardZone.h > 0 ? discardZone.h : 130;
+    const int deckY = playSlots.front().y + (playSlots.front().h - deckH) / 2;
+
+    int deckX = playSlots.back().x + playSlots.back().w + gap;
+    if (deckX + deckW > screenW - margin) deckX = std::max(margin, screenW - margin - deckW);
+
+    return SDL_Rect{deckX, deckY, deckW, deckH};
+}
+
+bool Playing::tryDrawCardWithAnimation(Uint32 now) {
+    if (player.handFull()) {
+        return false;
+    }
+
+    const std::size_t handSizeBefore = player.hand.size();
+    player.drawCard(deck);
+
+    if (player.hand.size() <= handSizeBefore || !renderer) {
+        return false;
+    }
+
+    int screenW = 0;
+    int screenH = 0;
+    if (SDL_GetRendererOutputSize(renderer, &screenW, &screenH) != 0) {
+        return false;
+    }
+
+    cardRects = computeCardLayout(player.hand.size(), screenW, screenH);
+    computeZones(screenW, screenH);
+
+    const SDL_Rect fromRect = computeSelfDeckRect(screenW, screenH);
+    const std::size_t handIndex = player.hand.size() - 1;
+    if (handIndex < cardRects.size()) {
+        animationQueue.enqueueDrawCard(fromRect, cardRects[handIndex], handIndex, 320);
+    }
+
+    return true;
+}
+
+void Playing::setup(const Game& game) {
     renderer = game.getRenderer();
     if (!renderer) {
         throw std::runtime_error("Renderer not available from Game");
@@ -41,19 +137,23 @@ void Playing::setup(Game& game) {
     drag = DragState{};
     hoverIndex = static_cast<std::size_t>(-1);
     hoverStartTick = 0;
+    menuOpen = false;
+    surrendered = false;
+    animationQueue.clear();
+    pendingSpellTarget = PendingSpellTargetState{};
 
     if (deck.size() == 0) {
         for (int i = 0; i < 20; i++) {
             deck.addCard(std::make_unique<CreatureCard>(
                 "Goblin",
                 "A small but angry creature",
-                1, 1, 1, 1
+                1, 1, 1, 1, 2
             ));
 
             deck.addCard(std::make_unique<SpellCard>(
                 "Fireball",
                 "Deal 3 damage",
-                2, 2
+                2, 2, 1
             ));
         }
     }
@@ -62,7 +162,11 @@ void Playing::setup(Game& game) {
 
     constexpr int startingHandSize = 6;
     for (int i = 0; i < startingHandSize; ++i) {
+        // get starting player hand
         player.drawCard(deck);
+
+        // get remote player from server and draw their starting hand as well
+        // TODO
     }
 
     lastDrawTick = SDL_GetTicks();
@@ -158,13 +262,34 @@ void Playing::computeZones(int screenW, int screenH) {
         playZoneBand = SDL_Rect{0,0,0,0};
     }
 
-    int discardX = startX + totalSlotsWidth + gapToDiscard;
-    if (discardX + discardWidth + margin > screenW) {
-        discardX = screenW - discardWidth - margin;
+    int discardX = startX - gapToDiscard - discardWidth;
+    if (discardX < margin) {
+        discardX = margin;
     }
 
     int discardY = slotY + (slotHeight - discardHeight) / 2;
     discardZone = SDL_Rect{discardX, discardY, discardWidth, discardHeight};
+}
+
+void Playing::computeUiRects(int screenW, int screenH) {
+    if (screenW <= 0 || screenH <= 0) {
+        menuButton = SDL_Rect{0, 0, 0, 0};
+        exitGameButton = SDL_Rect{0, 0, 0, 0};
+        returnToTitleButton = SDL_Rect{0, 0, 0, 0};
+        return;
+    }
+
+    const int margin = 20;
+    const int menuW = 140;
+    const int menuH = 44;
+    const int exitW = 180;
+    const int exitH = 44;
+    const int returnW = 260;
+    const int returnH = 62;
+
+    menuButton = SDL_Rect{screenW - menuW - margin, margin, menuW, menuH};
+    exitGameButton = SDL_Rect{menuButton.x + (menuButton.w - exitW), menuButton.y + menuButton.h + 12, exitW, exitH};
+    returnToTitleButton = SDL_Rect{(screenW - returnW) / 2, (screenH / 2) + 24, returnW, returnH};
 }
 
 void Playing::handleEvents(Game& game, const SDL_Event& event) {
@@ -177,6 +302,50 @@ void Playing::handleEvents(Game& game, const SDL_Event& event) {
 
     cardRects = computeCardLayout(player.hand.size(), screenW, screenH);
     computeZones(screenW, screenH);
+    computeUiRects(screenW, screenH);
+
+    if (event.type == SDL_MOUSEBUTTONDOWN && event.button.button == SDL_BUTTON_LEFT) {
+        const int mouseX = event.button.x;
+        const int mouseY = event.button.y;
+
+        if (surrendered) {
+            if (pointInRect(returnToTitleButton, mouseX, mouseY)) {
+                surrendered = false;
+                menuOpen = false;
+                game.setNextState(GameState::Title);
+            }
+            return;
+        }
+
+        if (pointInRect(menuButton, mouseX, mouseY)) {
+            menuOpen = !menuOpen;
+            return;
+        }
+
+        if (menuOpen && pointInRect(exitGameButton, mouseX, mouseY)) {
+            surrendered = true;
+            menuOpen = false;
+            drag.active = false;
+            return;
+        }
+
+        if (menuOpen) {
+            menuOpen = false;
+        }
+    }
+
+    if (surrendered) {
+        return;
+    }
+
+    if (pendingSpellTarget.active) {
+        if (event.type == SDL_MOUSEBUTTONDOWN && event.button.button == SDL_BUTTON_LEFT) {
+            if (resolvePendingSpellTargetAt(event.button.x, event.button.y)) {
+                board.displayDiscard(player.id);
+            }
+        }
+        return;
+    }
 
     switch (event.type) {
         case SDL_MOUSEBUTTONDOWN:
@@ -214,9 +383,16 @@ void Playing::handleEvents(Game& game, const SDL_Event& event) {
                 const bool droppedInDiscard =
                     drag.index < player.hand.size() &&
                     pointInRect(discardZone, releaseX, releaseY);
-                const bool droppedInPlay = 
-                    drag.index < player.hand.size() &&
-                    pointInRect(playZoneBand, releaseX, releaseY);
+                int laneIndex = -1;
+                if (drag.index < player.hand.size()) {
+                    for (std::size_t slot = 0; slot < playSlots.size(); ++slot) {
+                        if (pointInRect(playSlots[slot], releaseX, releaseY)) {
+                            laneIndex = static_cast<int>(slot);
+                            break;
+                        }
+                    }
+                }
+                const bool droppedInPlay = laneIndex >= 0;
                 
                 if (droppedInDiscard) {
                     std::cout << "Discarding " << player.hand[drag.index].get()->getName() << "\n";
@@ -229,35 +405,41 @@ void Playing::handleEvents(Game& game, const SDL_Event& event) {
                         std::cout << "Removing card from hand\n";
                         player.hand.erase(player.hand.begin() + static_cast<std::ptrdiff_t>(drag.index));   
                     } 
-                } else if (droppedInPlay) {
-                    std::cout << "Playing " << player.hand[drag.index].get()->getName() << "\n";
-                    //move card to board object
-                    //if succeed, cut mana by cost
-                    //erase card from hand
+                } else if (drag.index < player.hand.size()) {
+                    Card* draggedCard = player.hand[drag.index].get();
+                    if (!draggedCard) {
+                        break;
+                    }
 
-                    //Determine lane
-                    const int laneWidth = playSlots.front().w; // assuming uniform width
-                    const int laneSpacing = (playSlots.size() > 1)
-                        ? playSlots[1].x - (playSlots[0].x + playSlots[0].w)
-                        : 0;
+                    const int cost = draggedCard->getManaCost();
+                    if (player.mana < cost) {
+                        std::cout << "Not enough mana\n";
+                        break;
+                    }
 
-                    const int relativeX = releaseX - playZoneBand.x;
-                    const int bandSegmentWidth = laneWidth + laneSpacing;
-                    int laneIndex = relativeX / bandSegmentWidth;
+                    if (draggedCard->getType() == CardType::Spell) {
+                        std::unique_ptr<Card> castSpell = std::move(player.hand[drag.index]);
+                        player.hand.erase(player.hand.begin() + static_cast<std::ptrdiff_t>(drag.index));
+                        player.mana -= cost;
 
-                    if (laneIndex >= 0 && laneIndex < static_cast<int>(playSlots.size())) {
-                        std::cout << "Playing " << player.hand[drag.index]->getName()
-                                << " into lane " << laneIndex << "\n";
+                        if (castSpell && isTargetedSpell(*castSpell)) {
+                            std::cout << "Cast targeted spell: " << castSpell->getName()
+                                      << " (choose a target)\n";
+                            pendingSpellTarget.active = true;
+                            pendingSpellTarget.spell = std::move(castSpell);
+                        } else {
+                            std::cout << "Cast untargeted spell\n";
+                            consumeSpell(std::move(castSpell));
+                        }
+                    } else if (droppedInPlay && laneIndex < static_cast<int>(playSlots.size())) {
+                        std::cout << "Playing " << draggedCard->getName()
+                                  << " into lane " << laneIndex << "\n";
 
-                        const int cost = player.hand[drag.index]->getManaCost();
-                        if (player.mana >= cost && board.isZoneEmpty(laneIndex, player.id)) {
+                        if (board.isZoneEmpty(laneIndex, player.id)) {
                             if (board.addToPlay(laneIndex, player.id, std::move(player.hand[drag.index]))) {
                                 player.mana -= cost;
                                 player.hand.erase(player.hand.begin() + static_cast<std::ptrdiff_t>(drag.index));
                             }
-                            
-                        } else {
-                            std::cout << "Not enough mana\n";
                         }
                     }
                 }
@@ -295,23 +477,22 @@ void Playing::run() {
         }
 
         const Uint32 now = SDL_GetTicks();
+        animationQueue.update(now);
         if (now - lastDrawTick >= static_cast<Uint32>(drawIntervalSeconds * 1000)) {
-            if (!player.handFull()) {
-                player.drawCard(deck);
-            }
+            tryDrawCardWithAnimation(now);
             lastDrawTick = now;
         }
     }
 }
 
 void Playing::update(Game& /*game*/) {
-    if (!renderer) return;
+    if (!renderer) return; // not yet ready
+    if (surrendered) return;
 
     const Uint32 now = SDL_GetTicks();
+    animationQueue.update(now);
     if (now - lastDrawTick >= static_cast<Uint32>(drawIntervalSeconds * 1000)) {
-        if (!player.handFull()) {
-            player.drawCard(deck);
-        }
+        tryDrawCardWithAnimation(now);
         lastDrawTick = now;
     }
 
@@ -373,6 +554,6 @@ void Playing::update(Game& /*game*/) {
     }
 }
 
-void Playing::render(Game& game) {
+void Playing::render(const Game& game) {
     RenderPlaying::render(*this, game);
 }

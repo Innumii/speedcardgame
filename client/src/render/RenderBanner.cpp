@@ -80,23 +80,23 @@ void RenderBanner::drawBanner(SDL_Renderer* renderer, const SDL_Rect& rect,
         for (int i = 4; i >= 1; i--) {
             Uint8 alpha    = (Uint8)(15 + (4 - i) * 15);
             SDL_Color glow = {glowColor.r, glowColor.g, glowColor.b, alpha};
-            SDL_Surface* s = TTF_RenderUTF8_Blended(font, text.c_str(), glow);
-            if (!s) continue;
-            SDL_Texture* t = SDL_CreateTextureFromSurface(renderer, s);
+            SDL_Surface* glowSurface = TTF_RenderUTF8_Blended(font, text.c_str(), glow);
+            if (!glowSurface) continue;
+            SDL_Texture* t = SDL_CreateTextureFromSurface(renderer, glowSurface);
             if (t) {
-                int cx = rect.x + (rect.w - s->w) / 2;
-                int cy = rect.y + (rect.h - s->h) / 2;
+                int cx = rect.x + (rect.w - glowSurface->w) / 2;
+                int cy = rect.y + (rect.h - glowSurface->h) / 2;
                 for (int dx : {-i, i}) {
-                    SDL_Rect dst = {cx + dx, cy, s->w, s->h};
+                    SDL_Rect dst = {cx + dx, cy, glowSurface->w, glowSurface->h};
                     SDL_RenderCopy(renderer, t, nullptr, &dst);
                 }
                 for (int dy : {-i, i}) {
-                    SDL_Rect dst = {cx, cy + dy, s->w, s->h};
+                    SDL_Rect dst = {cx, cy + dy, glowSurface->w, glowSurface->h};
                     SDL_RenderCopy(renderer, t, nullptr, &dst);
                 }
                 SDL_DestroyTexture(t);
             }
-            SDL_FreeSurface(s);
+            SDL_FreeSurface(glowSurface);
         }
         drawCentered(renderer, font, text, rect, textColor);
     }

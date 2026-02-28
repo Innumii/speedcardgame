@@ -2,7 +2,7 @@ cid,name,type,cost,value,power,toughness,effect
 1,Fireball,Spell,2,1,0,0,Deal 3 damage to any target.
 2,Goblin,Creature,1,1,1,1,
 3,Go,Creature,2,1,2,2,Trample
-4,Jo,Spell,2,2,0,0,"Give a creature +2/+2, if the creature is named 'Go', Give it +4/+4 Instead."
+4,Jo,Spell,2,2,0,0,"Give target creature +2/+2, if the creature is named 'Go', Give it +4/+4 Instead."
 5,"Kirby, The Ceaseless Hunger",Creature,8,3,3,5,"When this creature kills a creature, it gains +1/+1."
 6,LYS,Creature,10,5,8,8,"Trample, Double Strike"
 7,Jew,Creature,3,2,1,1,"When this creature enters the battlefield, Steal 1 mana from your opponent."

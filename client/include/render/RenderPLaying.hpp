@@ -7,7 +7,7 @@ class Playing;
 // Orchestrates rendering for the Playing state (logic lives in Playing)
 class RenderPlaying {
 public:
-	static void render(Playing& playing, Game& game);
+	static void render(Playing& playing, const Game& game);
 };
 
 #endif

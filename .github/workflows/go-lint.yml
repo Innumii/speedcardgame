@@ -1,0 +1,26 @@
+name: golangci-lint
+on:
+  push:
+    branches: [ main, linus/anim ]
+  pull_request:
+    branches: [ main ]
+permissions:
+  contents: read
+  pull-requests: read
+jobs:
+  golangci-lint:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        module: [auth, cards]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: ${{ matrix.module }}/go.mod
+          cache: false
+      - name: golangci-lint (${{ matrix.module }})
+        uses: golangci/golangci-lint-action@v6
+        with:
+          version: latest
+          working-directory: ${{ matrix.module }}

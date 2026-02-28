@@ -8,6 +8,7 @@
 #include <vector>
 #include <functional>
 #include <queue>
+#include <string>
 
 //1 object means 1 player connection from client -> server
 //need callback runs for this
@@ -32,10 +33,17 @@ public:
 
     // Event: called when a message is received
     std::function<void(const std::vector<char>&)> onMessageReceived;
+    std::function<void()> onDisconnected;
 
+    void setPlayerInfo(int id, const std::string& name);
+
+    int getPlayerId() const;
+    const std::string& getUsername() const;
 private:
     //reads incoming data from client's socket and stores
     void readLoop();
+    int playerId = -1;
+    std::string username;
 
     int clientSocket;
 

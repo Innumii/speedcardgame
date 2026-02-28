@@ -106,7 +106,6 @@ void TcpServer::acceptClients() {
             clientSockets.push_back(clientSock);
         }
 
-        std::cout << "Client connected from " << inet_ntoa(clientAddr.sin_addr) << "\n";
 
         // Fire callback (non-blocking in accept thread)
         if (onClientConnected) {

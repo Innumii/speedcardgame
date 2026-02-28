@@ -49,7 +49,7 @@ namespace {
                   const std::string& path, const std::string& body,
                   int& statusCode, std::string& responseBody) {
         statusCode = -1;
-        NetworkClient client;
+        NetworkClient client(NetworkClient::SocketMode::Blocking); // blocking!
         if (!client.connectTo(host, port)) return false;
 
         std::ostringstream req;
@@ -337,6 +337,7 @@ void Login::update(Game& game) {
             return;
         }
         game.setPlayerId(userId);
+        game.setPlayerUsername(username);
         if (!game.refreshPlayerDeckFromService())
             std::cerr << "Failed to refresh deck after login\n";
         game.setNextState(GameState::Title);
@@ -348,7 +349,7 @@ void Login::update(Game& game) {
     }
 }
 
-void Login::render(Game& game) {
+void Login::render(const Game& game) {
     SDL_Renderer*              r          = game.getRenderer();
     const RenderText::FontSet& titleFonts = game.getTitleFonts();
     const RenderText::FontSet& uiFonts    = game.getUIFonts();

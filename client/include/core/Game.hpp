@@ -5,6 +5,7 @@
 #include "SDL2/SDL.h"
 #include <stdio.h>
 #include <cstddef>
+#include <string>
 #include <memory> //for smart pointers
 #include <stdexcept> //for signalling fatal init errors
 #include <optional>
@@ -19,6 +20,8 @@
 #include "states/Playing.hpp"
 #include "states/DeckBuilding.hpp"
 #include "states/Connecting.hpp"
+#include "states/Waiting.hpp"
+
 #include "render/RenderText.hpp"
 
 #include "objects/Player.h"
@@ -67,6 +70,8 @@ public:
     SDL_Renderer* getRenderer() const;
     int getPlayerId() const;
     void setPlayerId(int playerId);
+    const std::string& getPlayerUsername() const;
+    void setPlayerUsername(std::string username);
 
     const Player& getPlayer(bool isOpponent) const;
     const Deck& getDeck(const Player& player) const;
@@ -82,10 +87,11 @@ public:
 
 private:
     bool isRunning{false};
-    NetworkClient netClient;
+    NetworkClient netClient{NetworkClient::SocketMode::NonBlocking};
 
     Player player;
     Player remotePlayer;
+    std::string playerUsername{"Player"};
 
     int drawIntervalSeconds{3};
     Uint32 lastDrawTick{0};
@@ -116,6 +122,7 @@ private:
     Playing playingState{drawIntervalSeconds};
     DeckBuilding deckBuildingState;
     std::optional<Connecting> connectingState;
+    std::optional<Waiting> waitingState;
     // Connecting connectingState;
 };
 
