@@ -172,7 +172,7 @@ bool Game::refreshPlayerDeckFromService() {
         return false;
     }
 
-    setPlayingDeck(deckBuildingState.buildDeck());
+    setPlayingDeck(deckBuildingState.buildDeck()); //returns a Deck object
     return true;
 }
 

@@ -45,6 +45,9 @@ private:
 
     bool running{false};
 
+    std::string recvBuffer; // handles partial TCP messages
+
+
     // -------------------------
     // Dragging cards
     // -------------------------
@@ -103,6 +106,10 @@ private:
     void computeZones(int screenW, int screenH);
     void computeUiRects(int screenW, int screenH);
     SDL_Rect computeSelfDeckRect(int screenW, int screenH) const;
+
+    //Game related
+    bool handleServerMessage(const std::string& msg);
+    bool drawCard(int playerId, int cardId);
 };
 
 #endif

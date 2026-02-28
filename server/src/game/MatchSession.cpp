@@ -1,5 +1,9 @@
 #include "game/MatchSession.hpp"
 #include "net/PlayerConnection.hpp"
+#include "objects/Deck.h"
+#include "objects/CreatureCard.h"
+#include "objects/SpellCard.h"
+#include "httplib/httplib.h"
 
 #include <iostream>
 #include <chrono>
@@ -41,12 +45,26 @@ void MatchSession::stop() {
 // --------------------------------------------------
 // Setup Phase
 // --------------------------------------------------
+bool MatchSession::loadDeckForPlayer(int playerId) {
+    httplib::Client client("127.0.0.1", 8082);
+    client.set_connection_timeout(3);
+    client.set_read_timeout(5);
+
+    std::string path = "/cardbase/decks/" + std::to_string(playerId);
+
+    auto res = client.Get(path.c_str());
+    if (!res || res->status != 200)
+        return false;
+
+    std::cout << res->body << "\n";
+    return true;
+    // return parseDeckJson(res->body, outDeck);
+}
+
 void MatchSession::setupDecks() {
     // TODO: Replace with real decklists/seeding
-    // for (int i = 0; i < 30; ++i) {
-    //     players[0].deck.addCardById(i);
-    //     players[1].deck.addCardById(i);
-    // }
+    loadDeckForPlayer(playerA.get()->getPlayerId());
+    loadDeckForPlayer(playerB.get()->getPlayerId());
 
     players[0].deck.shuffle();
     players[1].deck.shuffle();

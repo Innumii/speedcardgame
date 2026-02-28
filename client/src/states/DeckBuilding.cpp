@@ -223,11 +223,13 @@ namespace {
 DeckBuilding::DeckBuilding() = default;
 
 bool DeckBuilding::refreshFromService(Game& game) {
+    //Get all available cards in the game
     cardsLoadedFromService = loadAvailableCardsFromService(game);
     if (!cardsLoadedFromService) {
         cardsLoadedFromService = loadAvailableCardsFromCsv(game);
     }
 
+    //If no cards pulled, return false
     if (availableCards.empty()) {
         deckCopies.clear();
         inventoryCopies.clear();
@@ -569,18 +571,18 @@ void DeckBuilding::tryRemoveFromDeck(int cardIndex) {
 
 Deck DeckBuilding::buildDeck() const {
     Deck deck;
-    for (std::size_t i = 0; i < availableCards.size(); ++i) {
+    for (std::size_t i = 0; i < availableCards.size(); ++i) { //add mapped card objects
         if (deckCopies[i] <= 0) continue;
 
         const Card* base = availableCards[i].get();
         if (!base) continue;
 
-        for (int copy = 0; copy < deckCopies[i]; ++copy) {
+        for (int copy = 0; copy < deckCopies[i]; ++copy) { // Card objects
             switch (base->getType()) {
-                case CardType::Creature: {
+                case CardType::Creature: { //
                     const auto* creature = dynamic_cast<const CreatureCard*>(base);
                     if (!creature) break;
-                    deck.addCard(std::make_unique<CreatureCard>(
+                    deck.addCard(std::make_unique<CreatureCard>( //duplicate into deck
                         creature->getName(),
                         creature->getText(),
                         creature->getManaValue(),

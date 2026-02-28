@@ -17,12 +17,12 @@ public:
     int isOpponent = false;
 
     bool handFull() const;
-    void drawCard(Deck& deck);
+    // void drawCard(Deck& deck);
     void addMana(int amount);
     bool isDead() const;
-    const Deck& getDeck() const;
+    Deck& getDeck();
     void setDeck(Deck newDeck);
-    void addCardToHand(int cardId);
+    void addCardToHand(std::unique_ptr<Card> card);
     
     void setIsOpponent(bool opponentStatus) {
         isOpponent = opponentStatus;

@@ -52,6 +52,10 @@ public:
     void setupDecks();
     void sendOpeningHands();
     bool drawAndSend(int playerIndex);
+    bool loadDeckForPlayer(int playerId);
+
+    
+
 
 private:
     void gameLoop();

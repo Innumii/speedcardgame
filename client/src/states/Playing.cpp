@@ -9,6 +9,7 @@
 #include <algorithm>
 #include <iostream>
 #include <stdexcept>
+#include <sstream>
 
 namespace {
     SDL_Rect playZoneBand{0, 0, 0, 0};
@@ -253,9 +254,80 @@ void Playing::run() {
     }
 }
 
-void Playing::update(Game&) {
-    
+void Playing::update(Game& game) {
+    auto& net = game.getNetworkClient();
+
+    char buffer[512];
+    int received = net.receive(buffer, sizeof(buffer));
+
+    if (received == -1) {
+        std::cerr << "Server disconnected\n";
+        game.setNextState(GameState::Title);
+        return;
+    }
+
+    if (received > 0) {
+        recvBuffer.append(buffer, received);
+
+        size_t pos;
+        while ((pos = recvBuffer.find('\n')) != std::string::npos) {
+            std::string line = recvBuffer.substr(0, pos);
+            recvBuffer.erase(0, pos + 1);
+
+            handleServerMessage(line);
+        }
+    }
+
     animationQueue.update(SDL_GetTicks());
+}
+
+bool Playing::handleServerMessage(const std::string& msg) {
+    std::istringstream iss(msg);
+    std::string cmd;
+    iss >> cmd;
+
+std::cout << cmd << "\n";
+    
+    if (cmd == "DRAW") {
+        int playerId, cardId;
+        iss >> playerId >> cardId;
+        drawCard(playerId, cardId);
+    }
+}
+
+bool Playing::drawCard(int playerId, int cardId) {
+    Player& player = (playerId == localPlayer.id)
+                     ? localPlayer
+                     : remotePlayer;
+
+    //check if deck has card
+    auto card = player.getDeck().takeCardById(cardId);
+
+    if (!card) {
+        std::cerr << "Missing card id " << cardId << "\n";
+        return false;
+    }
+    
+
+    player.addCardToHand(std::move(card));
+
+    int screenW = 0;
+    int screenH = 0;
+    if (SDL_GetRendererOutputSize(renderer, &screenW, &screenH) != 0) {
+        return false;
+    }
+
+    cardRects = computeCardLayout(player.hand.size(), screenW, screenH);
+    computeZones(screenW, screenH);
+    const SDL_Rect fromRect = computeSelfDeckRect(screenW, screenH);
+    const std::size_t handIndex = player.hand.size() - 1;
+
+    // Animate only local draws
+    if (playerId == localPlayer.id && handIndex < cardRects.size()) {
+        animationQueue.enqueueDrawCard(fromRect, cardRects[handIndex], handIndex, 320);    
+    }
+
+    return true;
 }
 
 void Playing::render(const Game& game) {
@@ -379,4 +451,21 @@ void Playing::computeUiRects(int screenW, int screenH) {
     menuButton = SDL_Rect{screenW - menuW - margin, margin, menuW, menuH};
     exitGameButton = SDL_Rect{menuButton.x + (menuButton.w - exitW), menuButton.y + menuButton.h + 12, exitW, exitH};
     returnToTitleButton = SDL_Rect{(screenW - returnW) / 2, (screenH / 2) + 24, returnW, returnH};
+}
+
+SDL_Rect Playing::computeSelfDeckRect(int screenW, int screenH) const {
+    if (screenW <= 0 || screenH <= 0 || playSlots.empty()) {
+        return SDL_Rect{0, 0, 0, 0};
+    }
+
+    const int gap = 18;
+    const int margin = 10;
+    const int deckW = discardZone.w > 0 ? discardZone.w : 110;
+    const int deckH = discardZone.h > 0 ? discardZone.h : 130;
+    const int deckY = playSlots.front().y + (playSlots.front().h - deckH) / 2;
+
+    int deckX = playSlots.back().x + playSlots.back().w + gap;
+    if (deckX + deckW > screenW - margin) deckX = std::max(margin, screenW - margin - deckW);
+
+    return SDL_Rect{deckX, deckY, deckW, deckH};
 }
