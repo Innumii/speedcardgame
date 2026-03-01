@@ -1,9 +1,9 @@
 #ifndef SPELL_CARD_H
 #define SPELL_CARD_H
 
-#include "Card.h"
+#include "objects/ServerCard.h"
 
-class SpellCard : public Card {
+class SpellCard : public ServerCard {
 public:
     SpellCard(const std::string& name,
               const std::string& text,
@@ -12,8 +12,8 @@ public:
               int cardId = -1);
 
     void drawExtraInfo() const override;
-    std::unique_ptr<Card> clone() const override {
-        return std::make_unique<SpellCard>(*this);
+    std::shared_ptr<ServerCard> clone() const override {
+        return std::make_shared<SpellCard>(*this);
     }
 };
 

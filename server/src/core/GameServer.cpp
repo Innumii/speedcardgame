@@ -23,6 +23,11 @@ bool GameServer::start() {
         return false;
     }
 
+    //Check that youve loaded all available cards
+    // for (int i = 0; i < availableCards.size(); i++) {
+    //     std::cout << availableCards[i]->getName() << "\n";
+    // }
+
     try {
         // -------------------------------
         // 1️⃣ Start TcpServer
@@ -33,7 +38,7 @@ bool GameServer::start() {
         matchmaker = std::make_unique<Matchmaker>();
 
         //Initialise MatchManager and wire callback
-        matchManager = std::make_unique<MatchManager>();
+        matchManager = std::make_unique<MatchManager>(*this);
         matchManager->setMatchmaker(matchmaker.get());
         // matchManager->setServer(this);
 
@@ -179,7 +184,7 @@ bool GameServer::loadAvailableCardsFromService() {
         return false;
     }
 
-    std::vector<std::unique_ptr<Card>> fetchedCards;
+    std::vector<std::shared_ptr<ServerCard>> fetchedCards; // <-- now shared_ptr
     std::size_t pos = 0;
 
     while (true) {
@@ -211,10 +216,15 @@ bool GameServer::loadAvailableCardsFromService() {
             std::string typeLower = type;
             std::transform(typeLower.begin(), typeLower.end(), typeLower.begin(), ::tolower);
             const int manaValue = value > 0 ? value : cost;
+
             if (typeLower == "creature") {
-                fetchedCards.push_back(std::make_unique<CreatureCard>(name, effect, manaValue, cost, power, toughness, cid));
+                fetchedCards.push_back(std::static_pointer_cast<ServerCard>(
+                    std::make_shared<CreatureCard>(name, effect, manaValue, cost, power, toughness, cid)
+                ));            
             } else {
-                fetchedCards.push_back(std::make_unique<SpellCard>(name, effect, manaValue, cost, cid));
+                fetchedCards.push_back(std::static_pointer_cast<ServerCard>(
+                    std::make_shared<SpellCard>(name, effect, manaValue, cost, cid)
+                ));
             }
         }
 
@@ -226,7 +236,7 @@ bool GameServer::loadAvailableCardsFromService() {
         return false;
     }
 
-    availableCards = std::move(fetchedCards);
+    availableCards = std::move(fetchedCards); // ✅ now works
     std::cout << "Loaded " << availableCards.size() << " cards from service\n";
     return true;
 }

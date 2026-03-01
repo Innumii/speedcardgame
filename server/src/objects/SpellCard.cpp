@@ -5,7 +5,7 @@ SpellCard::SpellCard(const std::string& name,
                      int manaValue,
                      int manaCost,
                      int cardId)
-    : Card(name, text, manaValue, manaCost, CardType::Spell, cardId) {}
+    : ServerCard(name, text, manaValue, manaCost, CardType::Spell, cardId) {}
 
 void SpellCard::drawExtraInfo() const {
     // Spells have no extra info

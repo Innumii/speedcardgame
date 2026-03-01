@@ -1,6 +1,5 @@
 #include "game/MatchSession.hpp"
 #include "net/PlayerConnection.hpp"
-#include "objects/Deck.h"
 #include "objects/CreatureCard.h"
 #include "objects/SpellCard.h"
 #include "httplib/httplib.h"
@@ -11,8 +10,8 @@
 #include <thread>
 
 MatchSession::MatchSession(std::shared_ptr<PlayerConnection> a,
-                           std::shared_ptr<PlayerConnection> b)
-    : playerA(std::move(a)), playerB(std::move(b)) {}
+                           std::shared_ptr<PlayerConnection> b, const std::vector<std::shared_ptr<ServerCard>>& cardCatalog)
+    : playerA(std::move(a)), playerB(std::move(b)), availableCards(cardCatalog) {}
 
 MatchSession::~MatchSession() {
     stop();
@@ -46,15 +45,15 @@ void MatchSession::stop() {
 // --------------------------------------------------
 // Setup Phase
 // --------------------------------------------------
-bool MatchSession::loadDeckForPlayer(int playerId, Deck& outDeck) {
-    // std::cout << "[DEBUG] Loading deck for Player " << playerId << "\n";
+bool MatchSession::loadDeckForPlayer(int playerId, ServerDeck& outDeck) {
+    std::cout << "[DEBUG] Loading deck for Player " << playerId << "\n";
 
     httplib::Client client("host.docker.internal", 8082);
     client.set_connection_timeout(3); // seconds
     client.set_read_timeout(5);       // seconds
 
     std::string path = "/cardbase/decks/" + std::to_string(playerId);
-    // std::cout << "[DEBUG] GET " << path << "\n";
+    std::cout << "[DEBUG] GET " << path << "\n";
 
     auto res = client.Get(path.c_str());
 
@@ -63,7 +62,7 @@ bool MatchSession::loadDeckForPlayer(int playerId, Deck& outDeck) {
         return false;
     }
 
-    // std::cout << "[DEBUG] HTTP Status: " << res->status << "\n";
+    std::cout << "[DEBUG] HTTP Status: " << res->status << "\n";
 
     if (res->status != 200) {
         std::cerr << "[ERROR] Unexpected HTTP status: " << res->status << "\n";
@@ -71,7 +70,7 @@ bool MatchSession::loadDeckForPlayer(int playerId, Deck& outDeck) {
         return false;
     }
 
-    // std::cout << "[DEBUG] Response body:\n" << res->body << "\n";
+    std::cout << "[DEBUG] Response body:\n" << res->body << "\n";
 
     // Uncomment and use this when parsing JSON
     return parseDeckJson(res->body, outDeck);
@@ -80,7 +79,8 @@ bool MatchSession::loadDeckForPlayer(int playerId, Deck& outDeck) {
 }
 
 //map the JSON card IDs to create their Card obj version, then feed into deck
-bool MatchSession::parseDeckJson(const std::string& jsonStr, Deck& outDeck) {
+bool MatchSession::parseDeckJson(const std::string& jsonStr, ServerDeck& outDeck) {
+    // Expect JSON like: {"uid":1,"cards":{"1":2,"5":1,...}}
     std::size_t pos = jsonStr.find("\"cards\"");
     if (pos == std::string::npos) {
         std::cerr << "[ERROR] 'cards' field not found in JSON\n";
@@ -96,79 +96,49 @@ bool MatchSession::parseDeckJson(const std::string& jsonStr, Deck& outDeck) {
 
     while (pos < jsonStr.size()) {
         // Skip whitespace
-        while (pos < jsonStr.size() && std::isspace(static_cast<unsigned char>(jsonStr[pos]))) ++pos;
-
+        while (pos < jsonStr.size() && std::isspace(jsonStr[pos])) ++pos;
         if (pos >= jsonStr.size() || jsonStr[pos] == '}') break;
 
-        // Skip starting quote
         if (jsonStr[pos] != '"') {
             std::cerr << "[WARN] Expected '\"' at position " << pos << "\n";
             return false;
         }
         ++pos;
 
-        // Read until ending quote
+        // Read card ID key
         std::size_t keyEnd = jsonStr.find('"', pos);
-        if (keyEnd == std::string::npos) {
-            std::cerr << "[WARN] Missing closing quote for card ID\n";
-            return false;
-        }
-        std::string keyStr = jsonStr.substr(pos, keyEnd - pos);
+        if (keyEnd == std::string::npos) break;
+
+        int cardId = std::stoi(jsonStr.substr(pos, keyEnd - pos));
         pos = keyEnd + 1;
 
-        // Convert to int
-        int cid = 0;
-        try {
-            cid = std::stoi(keyStr);
-        } catch (...) {
-            std::cerr << "[WARN] Invalid card ID string: " << keyStr << "\n";
-            return false;
-        }
-
-        // Skip whitespace and colon
-        while (pos < jsonStr.size() && std::isspace(static_cast<unsigned char>(jsonStr[pos]))) ++pos;
-        if (pos >= jsonStr.size() || jsonStr[pos] != ':') {
-            std::cerr << "[WARN] ':' expected after card ID\n";
-            return false;
-        }
-        ++pos;
-
-        // Skip whitespace before value
-        while (pos < jsonStr.size() && std::isspace(static_cast<unsigned char>(jsonStr[pos]))) ++pos;
+        // Skip colon and whitespace
+        while (pos < jsonStr.size() && (jsonStr[pos] == ':' || std::isspace(jsonStr[pos]))) ++pos;
 
         // Parse count
         int count = 0;
         if (!JsonUtil::parseJsonIntAt(jsonStr, pos, count)) {
-            std::cerr << "[WARN] Failed to parse count for card " << cid << "\n";
-            return false;
-        }
-
-        // Skip optional comma
-        while (pos < jsonStr.size() && (jsonStr[pos] == ',' || std::isspace(static_cast<unsigned char>(jsonStr[pos])))) ++pos;
-
-        // Find card in allCards and add count copies
-        auto it = std::find_if(allCards.begin(), allCards.end(),
-            [cid](const std::unique_ptr<Card>& c){ return c->getId() == cid; });
-        if (it == allCards.end()) {
-            std::cerr << "[WARN] Card ID " << cid << " not found in allCards\n";
+            std::cerr << "[WARN] Failed to parse count for card " << cardId << "\n";
             continue;
         }
 
-        const Card* src = it->get();
+        // Skip comma / whitespace
+        while (pos < jsonStr.size() && (jsonStr[pos] == ',' || std::isspace(jsonStr[pos]))) ++pos;
+
+        // Find the card in the catalog
+        auto it = std::find_if(availableCards.begin(), availableCards.end(),
+            [cardId](const std::shared_ptr<ServerCard>& c) { return c->getId() == cardId; });
+
+        if (it == availableCards.end()) {
+            std::cerr << "[WARN] Card ID " << cardId << " not found in catalog\n";
+            continue;
+        }
+
+        auto catalogCard = *it;
+
+        // Add 'count' clones of the card into the deck
         for (int i = 0; i < count; ++i) {
-            if (src->getType() == CardType::Creature) {
-                const CreatureCard* c = dynamic_cast<const CreatureCard*>(src);
-                outDeck.addCard(std::make_unique<CreatureCard>(
-                    c->getName(), c->getText(), c->getManaValue(),
-                    c->getManaCost(), c->getPower(), c->getToughness(), c->getId()
-                ));
-            } else {
-                const SpellCard* s = dynamic_cast<const SpellCard*>(src);
-                outDeck.addCard(std::make_unique<SpellCard>(
-                    s->getName(), s->getText(), s->getManaValue(),
-                    s->getManaCost(), s->getId()
-                ));
-            }
+            outDeck.addCard(catalogCard->clone()); // each copy is independent
         }
     }
 
@@ -201,15 +171,15 @@ bool MatchSession::drawAndSend(int playerIndex) {
     auto& player = players[playerIndex];
     auto& deck = player.deck;
 
-    if (deck.isEmpty())
-        return false;
+    auto card = deck.draw();
+    if (!card) return false;  // safety check
 
-    int cardId = deck.draw().get()->getId();
-    player.hand.push_back(cardId);
+    int cardId = card->getId();
+    player.hand.push_back(cardId);   // if you only need ID, keep this
 
     auto& conn = (playerIndex == 0) ? playerA : playerB;
-
     conn->send("DRAW " + std::to_string(cardId) + "\n");
+
     return true;
 }
 

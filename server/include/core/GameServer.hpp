@@ -18,7 +18,7 @@ public:
     bool start();
     void stop();
     void waitForShutdown();
-    const std::vector<std::unique_ptr<Card>>& getAllCards() const { return availableCards; }
+    const std::vector<std::shared_ptr<ServerCard>>& getAllCards() const { return availableCards; }
 
 private:
     int port;
@@ -34,7 +34,7 @@ private:
     std::condition_variable shutdownCv;
 
     //all cards in the game, ever
-    std::vector<std::unique_ptr<Card>> availableCards;
+    std::vector<std::shared_ptr<ServerCard>> availableCards;
     bool loadAvailableCardsFromService();
 
     bool sendHttp(const std::string& host, int port, const std::string& method,

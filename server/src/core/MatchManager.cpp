@@ -1,9 +1,13 @@
 #include "core/MatchManager.hpp"
 #include <algorithm>
 #include <iostream>
-#include "objects/Card.h"
+#include "objects/ServerCard.h"
 #include "core/GameServer.hpp"
-MatchManager::MatchManager() {}
+
+
+MatchManager::MatchManager(GameServer& gs) 
+    : server(gs) 
+{}
 
 void MatchManager::onPairFound(std::shared_ptr<PlayerConnection> a,
                               std::shared_ptr<PlayerConnection> b)
@@ -86,7 +90,7 @@ void MatchManager::startMatch(const std::shared_ptr<PendingMatch>& match)
     //This is so fkin stupid
     //clone every card
 
-    auto session = std::make_shared<MatchSession>(match->a, match->b);
+    auto session = std::make_shared<MatchSession>(match->a, match->b, server.getAllCards());
     session->start();
 
     activeMatches.push_back(session);

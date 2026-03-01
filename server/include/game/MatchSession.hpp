@@ -7,8 +7,8 @@
 #include <vector>
 #include <optional>
 
-#include "objects/Deck.h"
-#include "objects/Card.h"
+#include "objects/ServerDeck.h"
+#include "objects/ServerCard.h"
 
 class PlayerConnection;
 
@@ -30,7 +30,8 @@ struct ServerBoard {
 // Player match state
 // ----------------------------
 struct PlayerState {
-    Deck deck;
+
+    ServerDeck deck;
     std::vector<int> hand; // card IDs only
 };
 
@@ -40,7 +41,7 @@ struct PlayerState {
 class MatchSession {
 public:
     MatchSession(std::shared_ptr<PlayerConnection> playerA,
-                 std::shared_ptr<PlayerConnection> playerB);
+                 std::shared_ptr<PlayerConnection> playerB, const std::vector<std::shared_ptr<ServerCard>>& cardCatalog);
     ~MatchSession();
 
     MatchSession(const MatchSession&) = delete;
@@ -53,7 +54,7 @@ public:
     void setupDecks();
     void sendOpeningHands();
     bool drawAndSend(int playerIndex);
-    bool loadDeckForPlayer(int playerId, Deck& outDeck);
+    bool loadDeckForPlayer(int playerId, ServerDeck& outDeck);
 
 
 private:
@@ -63,6 +64,7 @@ private:
     // Players
     std::shared_ptr<PlayerConnection> playerA;
     std::shared_ptr<PlayerConnection> playerB;
+    std::vector<std::shared_ptr<ServerCard>> availableCards;
 
     std::thread gameThread;
     std::atomic<bool> running{false};
@@ -71,7 +73,8 @@ private:
     PlayerState players[2];   // 0 = A, 1 = B
     ServerBoard board;
 
-    bool parseDeckJson(const std::string& jsonStr, Deck& outDeck);
+    bool parseDeckJson(const std::string& jsonStr, ServerDeck& outDeck);
+
 };
 
 #endif

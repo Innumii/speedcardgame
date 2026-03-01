@@ -1,5 +1,5 @@
-#ifndef CARD_H
-#define CARD_H
+#ifndef SERVERCARD_H
+#define SERVERCARD_H
 
 #include <string>
 #include <memory>
@@ -9,7 +9,7 @@ enum class CardType {
     Spell
 };
 
-class Card {
+class ServerCard {
 protected:
     int id;
     std::string name;
@@ -19,15 +19,15 @@ protected:
     CardType type;
 
 public:
-    Card(std::string name,
+    ServerCard(std::string name,
          std::string text,
          int manaValue,
          int manaCost,
             CardType type,
             int cardId = -1);
 
-    virtual ~Card() = default;
-    virtual std::unique_ptr<Card> clone() const = 0;
+    virtual ~ServerCard() = default;
+    virtual std::shared_ptr<ServerCard> clone() const = 0;
     // Getters
     std::string getName() const;
     std::string getText() const;

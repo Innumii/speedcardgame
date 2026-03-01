@@ -1,9 +1,9 @@
 #ifndef CREATURE_CARD_H
 #define CREATURE_CARD_H
 
-#include "Card.h"
+#include "objects/ServerCard.h"
 
-class CreatureCard : public Card {
+class CreatureCard : public ServerCard {
 private:
     int power;
     int toughness;
@@ -21,8 +21,8 @@ public:
     int getToughness() const;
 
     void drawExtraInfo() const override;
-    std::unique_ptr<Card> clone() const override {
-        return std::make_unique<CreatureCard>(*this);
+    std::shared_ptr<ServerCard> clone() const override {
+        return std::make_shared<CreatureCard>(*this);
     }
 };
 

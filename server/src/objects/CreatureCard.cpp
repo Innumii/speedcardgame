@@ -1,4 +1,5 @@
 #include "objects/CreatureCard.h"
+
 #include <iostream>
 
 CreatureCard::CreatureCard(const std::string& name,
@@ -8,7 +9,7 @@ CreatureCard::CreatureCard(const std::string& name,
                            int power,
                            int toughness,
                            int cardId)
-    : Card(name, text, manaValue, manaCost, CardType::Creature, cardId),
+    : ServerCard(name, text, manaValue, manaCost, CardType::Creature, cardId),
       power(power),
       toughness(toughness) {}
 
