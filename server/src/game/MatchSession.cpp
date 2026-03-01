@@ -82,63 +82,80 @@ bool MatchSession::loadDeckForPlayer(int playerId, Deck& outDeck) {
 
 //map the JSON card IDs to create their Card obj version, then feed into deck
 bool MatchSession::parseDeckJson(const std::string& jsonStr, Deck& outDeck) {
-    // Find the "cards" array
+    // Find the "cards" object
     std::size_t pos = jsonStr.find("\"cards\"");
     if (pos == std::string::npos) {
         std::cerr << "[ERROR] 'cards' field not found in JSON\n";
         return false;
     }
 
-    pos = jsonStr.find('[', pos);
+    pos = jsonStr.find('{', pos); // look for '{' instead of '['
     if (pos == std::string::npos) {
-        std::cerr << "[ERROR] '[' not found after 'cards'\n";
+        std::cerr << "[ERROR] '{' not found after 'cards'\n";
         return false;
     }
-    ++pos; // skip '['
+    ++pos; // skip '{'
 
     while (pos < jsonStr.size()) {
         // Skip whitespace
         while (pos < jsonStr.size() && std::isspace(static_cast<unsigned char>(jsonStr[pos]))) ++pos;
 
-        if (pos >= jsonStr.size() || jsonStr[pos] == ']') break; // end of array
+        if (pos >= jsonStr.size() || jsonStr[pos] == '}') break; // end of object
 
+        // Parse card ID
         int cid = 0;
         if (!JsonUtil::parseJsonIntAt(jsonStr, pos, cid)) {
             std::cerr << "[WARN] Failed to parse card ID at position " << pos << "\n";
             return false;
         }
 
+        // Expect ':' after card ID
+        if (pos >= jsonStr.size() || jsonStr[pos] != ':') {
+            std::cerr << "[WARN] ':' expected after card ID\n";
+            return false;
+        }
+        ++pos;
+
+        // Parse count
+        int count = 0;
+        if (!JsonUtil::parseJsonIntAt(jsonStr, pos, count)) {
+            std::cerr << "[WARN] Failed to parse card count for card " << cid << "\n";
+            return false;
+        }
+
         // Skip optional comma
         while (pos < jsonStr.size() && (jsonStr[pos] == ',' || std::isspace(static_cast<unsigned char>(jsonStr[pos])))) ++pos;
 
-        // Find the card in the available cards pool
+        // Find the card in allCards
         auto it = std::find_if(allCards.begin(), allCards.end(),
             [cid](const std::unique_ptr<Card>& c) { return c->getId() == cid; });
 
         if (it == allCards.end()) {
             std::cerr << "[WARN] Card ID " << cid << " not found in allCards\n";
-            continue; // skip invalid IDs
+            continue; // skip unknown IDs
         }
 
         const Card* src = it->get();
-        // Clone card into the deck
-        if (src->getType() == CardType::Creature) {
-            const CreatureCard* c = dynamic_cast<const CreatureCard*>(src);
-            outDeck.addCard(std::make_unique<CreatureCard>(
-                c->getName(), c->getText(), c->getManaValue(),
-                c->getManaCost(), c->getPower(), c->getToughness(), c->getId()
-            ));
-        } else {
-            const SpellCard* s = dynamic_cast<const SpellCard*>(src);
-            outDeck.addCard(std::make_unique<SpellCard>(
-                s->getName(), s->getText(), s->getManaValue(),
-                s->getManaCost(), s->getId()
-            ));
+        for (int i = 0; i < count; ++i) {
+            if (src->getType() == CardType::Creature) {
+                const CreatureCard* c = dynamic_cast<const CreatureCard*>(src);
+                outDeck.addCard(std::make_unique<CreatureCard>(
+                    c->getName(), c->getText(), c->getManaValue(),
+                    c->getManaCost(), c->getPower(), c->getToughness(), c->getId()
+                ));
+            } else {
+                const SpellCard* s = dynamic_cast<const SpellCard*>(src);
+                outDeck.addCard(std::make_unique<SpellCard>(
+                    s->getName(), s->getText(), s->getManaValue(),
+                    s->getManaCost(), s->getId()
+                ));
+            }
         }
     }
 
     return true;
 }
+
 void MatchSession::setupDecks() {
     // TODO: Replace with real decklists/seeding
     std::cout << "Attempting deck setup...\n";

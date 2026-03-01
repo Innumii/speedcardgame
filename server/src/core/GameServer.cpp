@@ -167,7 +167,7 @@ void GameServer::waitForShutdown() {
 }
 
 bool GameServer::loadAvailableCardsFromService() {
-    const std::string host = EnvUtil::getEnvOrDefault("host.docker.internal", "127.0.0.1");
+    const std::string host = EnvUtil::getEnvOrDefault("CARDS_SERVICE_HOST", "host.docker.internal");
     const int port = EnvUtil::getEnvIntOrDefault("CARDS_SERVICE_PORT", 8082);
     const std::string path = "/cardbase/cards";
 
