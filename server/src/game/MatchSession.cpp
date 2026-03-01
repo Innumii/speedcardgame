@@ -9,9 +9,14 @@
 #include <chrono>
 #include <thread>
 
-MatchSession::MatchSession(std::shared_ptr<PlayerConnection> a,
-                           std::shared_ptr<PlayerConnection> b, const std::vector<std::shared_ptr<ServerCard>>& cardCatalog)
-    : playerA(std::move(a)), playerB(std::move(b)), availableCards(cardCatalog) {}
+MatchSession::MatchSession(
+    std::shared_ptr<PlayerConnection> a,
+    std::shared_ptr<PlayerConnection> b,
+    const std::unordered_map<int, std::shared_ptr<ServerCard>>& catalog)
+    : playerA(std::move(a)),
+      playerB(std::move(b)),
+      cardCatalog(catalog)
+{}
 
 MatchSession::~MatchSession() {
     stop();
@@ -126,19 +131,14 @@ bool MatchSession::parseDeckJson(const std::string& jsonStr, ServerDeck& outDeck
         while (pos < jsonStr.size() && (jsonStr[pos] == ',' || std::isspace(jsonStr[pos]))) ++pos;
 
         // Find the card in the catalog
-        auto it = std::find_if(availableCards.begin(), availableCards.end(),
-            [cardId](const std::shared_ptr<ServerCard>& c) { return c->getId() == cardId; });
-
-        if (it == availableCards.end()) {
+        if (cardCatalog.find(cardId) == cardCatalog.end()) {
             std::cerr << "[WARN] Card ID " << cardId << " not found in catalog\n";
             continue;
         }
-
-        auto catalogCard = *it;
-
+        
         // Add 'count' clones of the card into the deck
         for (int i = 0; i < count; ++i) {
-            outDeck.addCard(catalogCard->clone()); // each copy is independent
+            outDeck.addCard(cardId); // each copy is independent
         }
     }
 
@@ -171,10 +171,11 @@ bool MatchSession::drawAndSend(int playerIndex) {
     auto& player = players[playerIndex];
     auto& deck = player.deck;
 
-    auto card = deck.draw();
-    if (!card) return false;  // safety check
+    auto cardIdOpt = deck.draw();
+    if (!cardIdOpt) return false;
 
-    int cardId = card->getId();
+    int cardId = *cardIdOpt;
+
     player.hand.push_back(cardId);   // if you only need ID, keep this
 
     auto& conn = (playerIndex == 0) ? playerA : playerB;
@@ -236,4 +237,12 @@ void MatchSession::handleDisconnect() {
     }
 
     running = false;
+}
+
+const ServerCard* MatchSession::getCard(int id) const {
+    auto it = cardCatalog.find(id);
+    if (it == cardCatalog.end())
+        return nullptr;
+
+    return it->second.get();
 }

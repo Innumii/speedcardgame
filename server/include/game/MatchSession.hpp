@@ -6,6 +6,7 @@
 #include <atomic>
 #include <vector>
 #include <optional>
+#include <unordered_map>
 
 #include "objects/ServerDeck.h"
 #include "objects/ServerCard.h"
@@ -30,7 +31,9 @@ struct ServerBoard {
 // Player match state
 // ----------------------------
 struct PlayerState {
-
+    int health = 100;
+    int fatigueDamage = 1;
+    int mana = 0;
     ServerDeck deck;
     std::vector<int> hand; // card IDs only
 };
@@ -41,7 +44,7 @@ struct PlayerState {
 class MatchSession {
 public:
     MatchSession(std::shared_ptr<PlayerConnection> playerA,
-                 std::shared_ptr<PlayerConnection> playerB, const std::vector<std::shared_ptr<ServerCard>>& cardCatalog);
+                 std::shared_ptr<PlayerConnection> playerB, const std::unordered_map<int, std::shared_ptr<ServerCard>>& cardCatalog);
     ~MatchSession();
 
     MatchSession(const MatchSession&) = delete;
@@ -56,6 +59,7 @@ public:
     bool drawAndSend(int playerIndex);
     bool loadDeckForPlayer(int playerId, ServerDeck& outDeck);
 
+    const ServerCard* getCard(int id) const;
 
 private:
     void gameLoop();
@@ -64,8 +68,7 @@ private:
     // Players
     std::shared_ptr<PlayerConnection> playerA;
     std::shared_ptr<PlayerConnection> playerB;
-    std::vector<std::shared_ptr<ServerCard>> availableCards;
-
+    std::unordered_map<int, std::shared_ptr<ServerCard>> cardCatalog;
     std::thread gameThread;
     std::atomic<bool> running{false};
 

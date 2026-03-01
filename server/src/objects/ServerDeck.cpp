@@ -1,9 +1,7 @@
 #include "objects/ServerDeck.h"
-#include <algorithm>
-#include <random>
 
-void ServerDeck::addCard(std::shared_ptr<ServerCard> card) {
-    cards.push_back(std::move(card));
+void ServerDeck::addCard(int cardId) {
+    cards.push_back(cardId);
 }
 
 void ServerDeck::clear() {
@@ -16,22 +14,21 @@ void ServerDeck::shuffle() {
     std::shuffle(cards.begin(), cards.end(), gen);
 }
 
-std::shared_ptr<ServerCard> ServerDeck::draw() {
-    if (cards.empty()) return nullptr;
-    auto top = cards.back();
+std::optional<int> ServerDeck::draw() {
+    if (cards.empty()) return std::nullopt;
+
+    int top = cards.back();
     cards.pop_back();
     return top;
 }
 
-std::shared_ptr<ServerCard> ServerDeck::takeCardById(int cardId) {
-    auto it = std::find_if(cards.begin(), cards.end(),
-        [cardId](const std::shared_ptr<ServerCard>& c){ return c->getId() == cardId; });
+std::optional<int> ServerDeck::takeCardById(int cardId) {
+    auto it = std::find(cards.begin(), cards.end(), cardId);
+    if (it == cards.end()) return std::nullopt;
 
-    if (it == cards.end()) return nullptr;
-
-    auto card = *it;
+    int id = *it;
     cards.erase(it);
-    return card;
+    return id;
 }
 
 bool ServerDeck::isEmpty() const {

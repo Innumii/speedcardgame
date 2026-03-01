@@ -8,6 +8,7 @@
 #include <memory>
 #include <mutex>
 #include <condition_variable>
+#include <unordered_map>
 
 class TcpServer;
 class Matchmaker;
@@ -18,8 +19,7 @@ public:
     bool start();
     void stop();
     void waitForShutdown();
-    const std::vector<std::shared_ptr<ServerCard>>& getAllCards() const { return availableCards; }
-
+    const std::unordered_map<int, std::shared_ptr<ServerCard>>& getAllCards() const { return availableCards; }
 private:
     int port;
 
@@ -34,7 +34,7 @@ private:
     std::condition_variable shutdownCv;
 
     //all cards in the game, ever
-    std::vector<std::shared_ptr<ServerCard>> availableCards;
+    std::unordered_map<int, std::shared_ptr<ServerCard>> availableCards;
     bool loadAvailableCardsFromService();
 
     bool sendHttp(const std::string& host, int port, const std::string& method,

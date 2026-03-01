@@ -1,22 +1,20 @@
 #ifndef SERVERDECK_H
 #define SERVERDECK_H
 
-#include "objects/ServerCard.h"
-#include <memory>
 #include <vector>
-#include <optional>
 #include <algorithm>
 #include <random>
+#include <optional>
 
 class ServerDeck {
 private:
-    std::vector<std::shared_ptr<ServerCard>> cards;
+    std::vector<int> cards;   // store card IDs only
 
 public:
     ServerDeck() = default;
 
-    // Add a card to the deck
-    void addCard(std::shared_ptr<ServerCard> card);
+    // Add a card by ID
+    void addCard(int cardId);
 
     // Remove all cards
     void clear();
@@ -24,11 +22,11 @@ public:
     // Shuffle the deck
     void shuffle();
 
-    // Draw top card
-    std::shared_ptr<ServerCard> draw();
+    // Draw top card (returns ID)
+    std::optional<int> draw();
 
     // Take a card by its ID (removes it from deck)
-    std::shared_ptr<ServerCard> takeCardById(int cardId);
+    std::optional<int> takeCardById(int cardId);
 
     // Query
     bool isEmpty() const;

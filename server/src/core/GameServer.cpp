@@ -184,7 +184,7 @@ bool GameServer::loadAvailableCardsFromService() {
         return false;
     }
 
-    std::vector<std::shared_ptr<ServerCard>> fetchedCards; // <-- now shared_ptr
+    std::unordered_map<int, std::shared_ptr<ServerCard>> fetchedCards; // <-- now a map
     std::size_t pos = 0;
 
     while (true) {
@@ -217,15 +217,18 @@ bool GameServer::loadAvailableCardsFromService() {
             std::transform(typeLower.begin(), typeLower.end(), typeLower.begin(), ::tolower);
             const int manaValue = value > 0 ? value : cost;
 
+            std::shared_ptr<ServerCard> card;
+
             if (typeLower == "creature") {
-                fetchedCards.push_back(std::static_pointer_cast<ServerCard>(
-                    std::make_shared<CreatureCard>(name, effect, manaValue, cost, power, toughness, cid)
-                ));            
+                std::shared_ptr<ServerCard> card = std::static_pointer_cast<ServerCard>(
+                    std::make_shared<CreatureCard>(name, effect, manaValue, cost, power, toughness, cid));            
             } else {
-                fetchedCards.push_back(std::static_pointer_cast<ServerCard>(
+                card = std::static_pointer_cast<ServerCard>(
                     std::make_shared<SpellCard>(name, effect, manaValue, cost, cid)
-                ));
+                );
             }
+
+            fetchedCards[cid] = card; // <-- store in map by card ID
         }
 
         pos = objEnd + 1;
@@ -236,7 +239,7 @@ bool GameServer::loadAvailableCardsFromService() {
         return false;
     }
 
-    availableCards = std::move(fetchedCards); // ✅ now works
+    availableCards = std::move(fetchedCards); // ✅ map assignment
     std::cout << "Loaded " << availableCards.size() << " cards from service\n";
     return true;
 }
