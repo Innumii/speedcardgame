@@ -11,9 +11,8 @@
 #include <thread>
 
 MatchSession::MatchSession(std::shared_ptr<PlayerConnection> a,
-                           std::shared_ptr<PlayerConnection> b,
-                         const std::vector<std::unique_ptr<Card>>& cards)
-    : playerA(std::move(a)), playerB(std::move(b)), allCards(cards) {}
+                           std::shared_ptr<PlayerConnection> b)
+    : playerA(std::move(a)), playerB(std::move(b)) {}
 
 MatchSession::~MatchSession() {
     stop();
@@ -82,14 +81,13 @@ bool MatchSession::loadDeckForPlayer(int playerId, Deck& outDeck) {
 
 //map the JSON card IDs to create their Card obj version, then feed into deck
 bool MatchSession::parseDeckJson(const std::string& jsonStr, Deck& outDeck) {
-    // Find the "cards" object
     std::size_t pos = jsonStr.find("\"cards\"");
     if (pos == std::string::npos) {
         std::cerr << "[ERROR] 'cards' field not found in JSON\n";
         return false;
     }
 
-    pos = jsonStr.find('{', pos); // look for '{' instead of '['
+    pos = jsonStr.find('{', pos);
     if (pos == std::string::npos) {
         std::cerr << "[ERROR] '{' not found after 'cards'\n";
         return false;
@@ -100,39 +98,60 @@ bool MatchSession::parseDeckJson(const std::string& jsonStr, Deck& outDeck) {
         // Skip whitespace
         while (pos < jsonStr.size() && std::isspace(static_cast<unsigned char>(jsonStr[pos]))) ++pos;
 
-        if (pos >= jsonStr.size() || jsonStr[pos] == '}') break; // end of object
+        if (pos >= jsonStr.size() || jsonStr[pos] == '}') break;
 
-        // Parse card ID
+        // Skip starting quote
+        if (jsonStr[pos] != '"') {
+            std::cerr << "[WARN] Expected '\"' at position " << pos << "\n";
+            return false;
+        }
+        ++pos;
+
+        // Read until ending quote
+        std::size_t keyEnd = jsonStr.find('"', pos);
+        if (keyEnd == std::string::npos) {
+            std::cerr << "[WARN] Missing closing quote for card ID\n";
+            return false;
+        }
+        std::string keyStr = jsonStr.substr(pos, keyEnd - pos);
+        pos = keyEnd + 1;
+
+        // Convert to int
         int cid = 0;
-        if (!JsonUtil::parseJsonIntAt(jsonStr, pos, cid)) {
-            std::cerr << "[WARN] Failed to parse card ID at position " << pos << "\n";
+        try {
+            cid = std::stoi(keyStr);
+        } catch (...) {
+            std::cerr << "[WARN] Invalid card ID string: " << keyStr << "\n";
             return false;
         }
 
-        // Expect ':' after card ID
+        // Skip whitespace and colon
+        while (pos < jsonStr.size() && std::isspace(static_cast<unsigned char>(jsonStr[pos]))) ++pos;
         if (pos >= jsonStr.size() || jsonStr[pos] != ':') {
             std::cerr << "[WARN] ':' expected after card ID\n";
             return false;
         }
         ++pos;
 
+        // Skip whitespace before value
+        while (pos < jsonStr.size() && std::isspace(static_cast<unsigned char>(jsonStr[pos]))) ++pos;
+
         // Parse count
         int count = 0;
         if (!JsonUtil::parseJsonIntAt(jsonStr, pos, count)) {
-            std::cerr << "[WARN] Failed to parse card count for card " << cid << "\n";
+            std::cerr << "[WARN] Failed to parse count for card " << cid << "\n";
             return false;
         }
 
         // Skip optional comma
         while (pos < jsonStr.size() && (jsonStr[pos] == ',' || std::isspace(static_cast<unsigned char>(jsonStr[pos])))) ++pos;
 
-        // Find the card in allCards
+        // Find card in allCards and add count copies
         auto it = std::find_if(allCards.begin(), allCards.end(),
-            [cid](const std::unique_ptr<Card>& c) { return c->getId() == cid; });
-
+            [cid](const std::unique_ptr<Card>& c){ return c->getId() == cid; });
         if (it == allCards.end()) {
             std::cerr << "[WARN] Card ID " << cid << " not found in allCards\n";
-            continue; // skip unknown IDs
+            continue;
         }
 
         const Card* src = it->get();

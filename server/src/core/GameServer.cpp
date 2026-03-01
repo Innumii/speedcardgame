@@ -35,7 +35,7 @@ bool GameServer::start() {
         //Initialise MatchManager and wire callback
         matchManager = std::make_unique<MatchManager>();
         matchManager->setMatchmaker(matchmaker.get());
-        matchManager->setServer(this);
+        // matchManager->setServer(this);
 
         matchmaker->onMatchReady = [this](auto a, auto b) {
             matchManager->onPairFound(a, b);

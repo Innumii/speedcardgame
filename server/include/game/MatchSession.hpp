@@ -40,8 +40,7 @@ struct PlayerState {
 class MatchSession {
 public:
     MatchSession(std::shared_ptr<PlayerConnection> playerA,
-                 std::shared_ptr<PlayerConnection> playerB,
-                 const std::vector<std::unique_ptr<Card>>& allCards);
+                 std::shared_ptr<PlayerConnection> playerB);
     ~MatchSession();
 
     MatchSession(const MatchSession&) = delete;
@@ -72,7 +71,6 @@ private:
     PlayerState players[2];   // 0 = A, 1 = B
     ServerBoard board;
 
-    const std::vector<std::unique_ptr<Card>>& allCards;
     bool parseDeckJson(const std::string& jsonStr, Deck& outDeck);
 };
 

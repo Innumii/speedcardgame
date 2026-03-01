@@ -86,7 +86,7 @@ void MatchManager::startMatch(const std::shared_ptr<PendingMatch>& match)
     //This is so fkin stupid
     //clone every card
 
-    auto session = std::make_shared<MatchSession>(match->a, match->b, gameServer->getAllCards());
+    auto session = std::make_shared<MatchSession>(match->a, match->b);
     session->start();
 
     activeMatches.push_back(session);
