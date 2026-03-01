@@ -1,6 +1,7 @@
 aws_region = "us-east-1"
 image_tag  = "latest"
 image_repo = "ryanljk/g4t2-auth-service"
+assign_public_ip = true
 
 use_managed_data_stack = true
 # data_stack_state_path = "../../data/terraform.tfstate"
@@ -8,7 +9,8 @@ use_managed_data_stack = true
 # Optional manual overrides when use_managed_data_stack = false
 # postgres_host     = "your-postgres-host"
 # postgres_user     = "authuser"
-# postgres_password = "change-me"
+# postgres_password_secret_arn = "arn:aws:secretsmanager:...:secret:speedcardgame-auth-runtime"
+# postgres_password = "change-me" # fallback only when not using Secrets Manager
 # postgres_db       = "authdb"
 # postgres_port     = 5432
 # redis_host        = "your-redis-host"

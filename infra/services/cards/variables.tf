@@ -45,3 +45,9 @@ variable "database_url" {
   type        = string
   default     = null
 }
+
+variable "database_url_secret_arn" {
+  description = "Secrets Manager ARN containing DATABASE_URL JSON key for cards runtime"
+  type        = string
+  default     = null
+}

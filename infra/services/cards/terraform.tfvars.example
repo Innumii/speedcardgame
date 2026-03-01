@@ -5,4 +5,5 @@ use_managed_data_stack = true
 # data_stack_state_path = "../../data/terraform.tfstate"
 
 # Optional manual override when use_managed_data_stack = false
-# database_url = "postgres://user:password@your-postgres-host:5432/cardsdb?sslmode=disable"
+# database_url_secret_arn = "arn:aws:secretsmanager:...:secret:speedcardgame-cards-runtime"
+# database_url = "postgres://user:password@your-postgres-host:5432/cardsdb?sslmode=disable" # fallback only when not using Secrets Manager

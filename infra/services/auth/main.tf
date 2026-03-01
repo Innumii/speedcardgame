@@ -37,14 +37,15 @@ data "terraform_remote_state" "data" {
 }
 
 locals {
-  data_outputs      = var.use_managed_data_stack ? data.terraform_remote_state.data[0].outputs : {}
-  postgres_host     = coalesce(var.postgres_host, try(local.data_outputs.auth_postgres_endpoint, null))
-  postgres_user     = coalesce(var.postgres_user, try(local.data_outputs.auth_postgres_user, null))
-  postgres_password = coalesce(var.postgres_password, try(local.data_outputs.auth_postgres_password, null))
-  postgres_db       = coalesce(var.postgres_db, try(local.data_outputs.auth_postgres_db, null))
-  postgres_port     = coalesce(var.postgres_port, try(local.data_outputs.auth_postgres_port, null))
-  redis_host        = coalesce(var.redis_host, try(local.data_outputs.auth_redis_endpoint, null))
-  redis_port        = coalesce(var.redis_port, try(local.data_outputs.auth_redis_port, null))
+  data_outputs                 = var.use_managed_data_stack ? data.terraform_remote_state.data[0].outputs : {}
+  postgres_host                = coalesce(var.postgres_host, try(local.data_outputs.auth_postgres_endpoint, null))
+  postgres_user                = coalesce(var.postgres_user, try(local.data_outputs.auth_postgres_user, null))
+  postgres_password            = coalesce(var.postgres_password, try(local.data_outputs.auth_postgres_password, null))
+  postgres_password_secret_arn = coalesce(var.postgres_password_secret_arn, try(local.data_outputs.auth_postgres_runtime_secret_arn, null))
+  postgres_db                  = coalesce(var.postgres_db, try(local.data_outputs.auth_postgres_db, null))
+  postgres_port                = coalesce(var.postgres_port, try(local.data_outputs.auth_postgres_port, null))
+  redis_host                   = coalesce(var.redis_host, try(local.data_outputs.auth_redis_endpoint, null))
+  redis_port                   = coalesce(var.redis_port, try(local.data_outputs.auth_redis_port, null))
 }
 
 module "service" {
@@ -64,19 +65,30 @@ module "service" {
   image_repo     = var.image_repo
   cpu            = var.cpu
   memory         = var.memory
+  assign_public_ip = var.assign_public_ip
   desired_count  = 1
 
-  environment = {
-    POSTGRES_HOST      = local.postgres_host
-    POSTGRES_USER      = local.postgres_user
-    POSTGRES_PASSWORD  = local.postgres_password
-    POSTGRES_DB        = local.postgres_db
-    POSTGRES_PORT      = tostring(local.postgres_port)
-    POSTGRES_SSLMODE   = var.postgres_sslmode
-    POSTGRES_TIMEZONE  = var.postgres_timezone
-    REDIS_HOST         = local.redis_host
-    REDIS_PORT         = tostring(local.redis_port)
-    CARDS_SERVICE_HOST = var.cards_service_host
-    CARDS_SERVICE_PORT = tostring(var.cards_service_port)
-  }
+  task_secret_arns = local.postgres_password_secret_arn != null ? toset([local.postgres_password_secret_arn]) : toset([])
+
+  secrets = local.postgres_password_secret_arn != null ? {
+    POSTGRES_PASSWORD = "${local.postgres_password_secret_arn}:POSTGRES_PASSWORD::"
+  } : {}
+
+  environment = merge(
+    {
+      POSTGRES_HOST      = local.postgres_host
+      POSTGRES_USER      = local.postgres_user
+      POSTGRES_DB        = local.postgres_db
+      POSTGRES_PORT      = tostring(local.postgres_port)
+      POSTGRES_SSLMODE   = var.postgres_sslmode
+      POSTGRES_TIMEZONE  = var.postgres_timezone
+      REDIS_HOST         = local.redis_host
+      REDIS_PORT         = tostring(local.redis_port)
+      CARDS_SERVICE_HOST = var.cards_service_host
+      CARDS_SERVICE_PORT = tostring(var.cards_service_port)
+    },
+    local.postgres_password_secret_arn == null && local.postgres_password != null ? {
+      POSTGRES_PASSWORD = local.postgres_password
+    } : {}
+  )
 }

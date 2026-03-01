@@ -18,6 +18,12 @@ variable "ghcr_pat_secret_arn" {
   type        = string
 }
 
+variable "task_secret_arns" {
+  description = "Additional Secrets Manager secret ARNs the task execution role may read"
+  type        = set(string)
+  default     = []
+}
+
 variable "aws_region" {
   description = "AWS region"
   default     = "ap-southeast-1"
@@ -66,6 +72,12 @@ variable "image_repo" {
 
 variable "environment" {
   description = "Environment variables"
+  type        = map(string)
+  default     = {}
+}
+
+variable "secrets" {
+  description = "Container secrets map of env var name to ECS valueFrom ARN reference"
   type        = map(string)
   default     = {}
 }

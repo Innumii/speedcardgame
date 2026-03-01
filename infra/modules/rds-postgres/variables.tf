@@ -13,9 +13,10 @@ variable "subnet_ids" {
   type        = list(string)
 }
 
-variable "allowed_cidr" {
-  description = "CIDR allowed to connect to postgres"
-  type        = string
+variable "vpc_security_group_ids" {
+  description = "List of security group IDs to associate with the RDS instance."
+  type        = list(string)
+  default     = null
 }
 
 variable "db_name" {

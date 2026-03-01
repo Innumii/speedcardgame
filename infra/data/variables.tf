@@ -31,6 +31,7 @@ variable "auth_postgres_password" {
   description = "Auth postgres password"
   type        = string
   sensitive   = true
+  default     = null
 }
 
 variable "auth_postgres_port" {
@@ -73,6 +74,7 @@ variable "cards_postgres_password" {
   description = "Cards postgres password"
   type        = string
   sensitive   = true
+  default     = null
 }
 
 variable "cards_postgres_port" {
@@ -132,4 +134,10 @@ variable "github_token" {
   description = "Secret string for auth service"
   type        = string
   sensitive   = true
+}
+
+variable "existing_ghcr_secret_arn" {
+  description = "Existing GHCR secret ARN to reuse instead of creating ghcr-auth-credentials"
+  type        = string
+  default     = null
 }

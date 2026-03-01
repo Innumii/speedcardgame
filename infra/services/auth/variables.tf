@@ -50,6 +50,12 @@ variable "memory" {
   default     = "512"
 }
 
+variable "assign_public_ip" {
+  description = "Assign public IP to Fargate tasks (needed for ghcr.io pull when no NAT is present)"
+  type        = bool
+  default     = true
+}
+
 variable "use_managed_data_stack" {
   description = "When true, read Postgres/Redis values from infra/data stack remote state."
   type        = bool
@@ -76,6 +82,12 @@ variable "postgres_password" {
   type      = string
   sensitive = true
   default   = null
+}
+
+variable "postgres_password_secret_arn" {
+  description = "Secrets Manager ARN containing POSTGRES_PASSWORD JSON key for auth runtime"
+  type        = string
+  default     = null
 }
 
 variable "postgres_db" {

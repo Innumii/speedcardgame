@@ -50,7 +50,7 @@ resource "aws_iam_role_policy" "read_ghcr_secret" {
       {
         Action   = ["secretsmanager:GetSecretValue"]
         Effect   = "Allow"
-        Resource = [var.ghcr_pat_secret_arn]
+        Resource = distinct(concat([var.ghcr_pat_secret_arn], tolist(var.task_secret_arns)))
       }
     ]
   })
@@ -125,6 +125,13 @@ resource "aws_ecs_task_definition" "this" {
         for key, value in var.environment : {
           name  = key
           value = tostring(value)
+        }
+      ]
+
+      secrets = [
+        for key, value in var.secrets : {
+          name      = key
+          valueFrom = value
         }
       ]
 

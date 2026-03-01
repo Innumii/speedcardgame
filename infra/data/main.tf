@@ -6,6 +6,10 @@ terraform {
       source  = "hashicorp/aws"
       version = "~> 5.0"
     }
+    random = {
+      source  = "hashicorp/random"
+      version = "~> 3.0"
+    }
   }
 
   backend "local" {
@@ -63,11 +67,11 @@ resource "aws_security_group" "ecr_endpoint_sg" {
 
 # Interface endpoints for ECR (API + DKR) so tasks in private subnets can pull images without NAT
 resource "aws_vpc_endpoint" "ecr_api" {
-  vpc_id            = data.aws_vpc.default.id
-  service_name      = "com.amazonaws.${var.aws_region}.ecr.api"
-  vpc_endpoint_type = "Interface"
-  subnet_ids        = data.aws_subnets.default.ids
-  security_group_ids = [aws_security_group.ecr_endpoint_sg.id]
+  vpc_id              = data.aws_vpc.default.id
+  service_name        = "com.amazonaws.${var.aws_region}.ecr.api"
+  vpc_endpoint_type   = "Interface"
+  subnet_ids          = data.aws_subnets.default.ids
+  security_group_ids  = [aws_security_group.ecr_endpoint_sg.id]
   private_dns_enabled = true
 
   tags = {
@@ -76,11 +80,11 @@ resource "aws_vpc_endpoint" "ecr_api" {
 }
 
 resource "aws_vpc_endpoint" "ecr_dkr" {
-  vpc_id            = data.aws_vpc.default.id
-  service_name      = "com.amazonaws.${var.aws_region}.ecr.dkr"
-  vpc_endpoint_type = "Interface"
-  subnet_ids        = data.aws_subnets.default.ids
-  security_group_ids = [aws_security_group.ecr_endpoint_sg.id]
+  vpc_id              = data.aws_vpc.default.id
+  service_name        = "com.amazonaws.${var.aws_region}.ecr.dkr"
+  vpc_endpoint_type   = "Interface"
+  subnet_ids          = data.aws_subnets.default.ids
+  security_group_ids  = [aws_security_group.ecr_endpoint_sg.id]
   private_dns_enabled = true
 
   tags = {
@@ -96,34 +100,95 @@ resource "aws_vpc_endpoint" "s3" {
   route_table_ids   = data.aws_route_tables.vpc.ids
 }
 
-module "auth_postgres" {
-  source = "../modules/rds-postgres"
 
-  identifier        = var.auth_postgres_identifier
-  vpc_id            = data.aws_vpc.default.id
-  subnet_ids        = data.aws_subnets.default.ids
-  allowed_cidr      = data.aws_vpc.default.cidr_block
-  db_name           = var.auth_postgres_db
-  username          = var.auth_postgres_user
-  password          = var.auth_postgres_password
-  port              = var.auth_postgres_port
-  instance_class    = var.auth_postgres_instance_class
-  allocated_storage = var.auth_postgres_allocated_storage
+# Dedicated security groups for services
+resource "aws_security_group" "auth_service" {
+  name   = "auth-service-sg"
+  vpc_id = data.aws_vpc.default.id
+  tags   = { Name = "auth-service-sg" }
+}
+
+resource "aws_security_group" "cards_service" {
+  name   = "cards-service-sg"
+  vpc_id = data.aws_vpc.default.id
+  tags   = { Name = "cards-service-sg" }
+}
+
+# Dedicated security groups for databases
+resource "aws_security_group" "auth_db" {
+  name   = "auth-db-sg"
+  vpc_id = data.aws_vpc.default.id
+  tags   = { Name = "auth-db-sg" }
+}
+
+resource "aws_security_group" "cards_db" {
+  name   = "cards-db-sg"
+  vpc_id = data.aws_vpc.default.id
+  tags   = { Name = "cards-db-sg" }
+}
+
+# Allow only the service to access its DB
+resource "aws_security_group_rule" "allow_auth_service" {
+  type                     = "ingress"
+  from_port                = var.auth_postgres_port
+  to_port                  = var.auth_postgres_port
+  protocol                 = "tcp"
+  security_group_id        = aws_security_group.auth_db.id
+  source_security_group_id = aws_security_group.auth_service.id
+}
+
+resource "aws_security_group_rule" "allow_cards_service" {
+  type                     = "ingress"
+  from_port                = var.cards_postgres_port
+  to_port                  = var.cards_postgres_port
+  protocol                 = "tcp"
+  security_group_id        = aws_security_group.cards_db.id
+  source_security_group_id = aws_security_group.cards_service.id
+}
+
+resource "random_password" "auth_postgres" {
+  count   = var.auth_postgres_password == null ? 1 : 0
+  length  = 24
+  special = true
+}
+
+resource "random_password" "cards_postgres" {
+  count   = var.cards_postgres_password == null ? 1 : 0
+  length  = 24
+  special = true
+}
+
+locals {
+  auth_postgres_password_resolved  = coalesce(var.auth_postgres_password, try(random_password.auth_postgres[0].result, null))
+  cards_postgres_password_resolved = coalesce(var.cards_postgres_password, try(random_password.cards_postgres[0].result, null))
+}
+
+module "auth_postgres" {
+  source                 = "../modules/rds-postgres"
+  identifier             = var.auth_postgres_identifier
+  vpc_id                 = data.aws_vpc.default.id
+  subnet_ids             = data.aws_subnets.default.ids
+  db_name                = var.auth_postgres_db
+  username               = var.auth_postgres_user
+  password               = local.auth_postgres_password_resolved
+  port                   = var.auth_postgres_port
+  instance_class         = var.auth_postgres_instance_class
+  allocated_storage      = var.auth_postgres_allocated_storage
+  vpc_security_group_ids = [aws_security_group.auth_db.id]
 }
 
 module "cards_postgres" {
-  source = "../modules/rds-postgres"
-
-  identifier        = var.cards_postgres_identifier
-  vpc_id            = data.aws_vpc.default.id
-  subnet_ids        = data.aws_subnets.default.ids
-  allowed_cidr      = data.aws_vpc.default.cidr_block
-  db_name           = var.cards_postgres_db
-  username          = var.cards_postgres_user
-  password          = var.cards_postgres_password
-  port              = var.cards_postgres_port
-  instance_class    = var.cards_postgres_instance_class
-  allocated_storage = var.cards_postgres_allocated_storage
+  source                 = "../modules/rds-postgres"
+  identifier             = var.cards_postgres_identifier
+  vpc_id                 = data.aws_vpc.default.id
+  subnet_ids             = data.aws_subnets.default.ids
+  db_name                = var.cards_postgres_db
+  username               = var.cards_postgres_user
+  password               = local.cards_postgres_password_resolved
+  port                   = var.cards_postgres_port
+  instance_class         = var.cards_postgres_instance_class
+  allocated_storage      = var.cards_postgres_allocated_storage
+  vpc_security_group_ids = [aws_security_group.cards_db.id]
 }
 
 module "auth_redis" {
@@ -164,10 +229,17 @@ resource "null_resource" "skip_secrets_manager" {
   count = var.skip_secrets_manager ? 1 : 0
 }
 
+locals {
+  cards_database_url = "postgres://${var.cards_postgres_user}:${local.cards_postgres_password_resolved}@${module.cards_postgres.endpoint}:${module.cards_postgres.port}/${var.cards_postgres_db}?sslmode=disable"
+}
+
 # Secrets
 module "secrets" {
-  source = "../modules/secrets"
-  github_username = var.github_username
-  github_token    = var.github_token
-  count           = var.skip_secrets_manager ? 0 : 1
+  source                   = "../modules/secrets"
+  github_username          = var.github_username
+  github_token             = var.github_token
+  existing_ghcr_secret_arn = var.existing_ghcr_secret_arn
+  auth_postgres_password   = local.auth_postgres_password_resolved
+  cards_database_url       = local.cards_database_url
+  count                    = var.skip_secrets_manager ? 0 : 1
 }

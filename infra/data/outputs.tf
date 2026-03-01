@@ -56,6 +56,21 @@ output "cards_database_url" {
   sensitive   = true
 }
 
+output "ghcr_pat_secret_arn" {
+  description = "Secrets Manager ARN containing GHCR credentials"
+  value       = var.skip_secrets_manager ? null : module.secrets[0].ghcr_secret_arn
+}
+
+output "auth_postgres_runtime_secret_arn" {
+  description = "Secrets Manager ARN containing auth runtime secret values"
+  value       = var.skip_secrets_manager ? null : module.secrets[0].auth_runtime_secret_arn
+}
+
+output "cards_runtime_secret_arn" {
+  description = "Secrets Manager ARN containing cards runtime secret values"
+  value       = var.skip_secrets_manager ? null : module.secrets[0].cards_runtime_secret_arn
+}
+
 output "auth_redis_endpoint" {
   description = "Auth redis endpoint"
   value       = module.auth_redis.endpoint

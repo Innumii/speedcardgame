@@ -34,7 +34,7 @@ No ALB/NLB is created in this setup.
 ```bash
 cd infra/data
 cp terraform.tfvars.example terraform.tfvars
-# set auth_postgres_password and cards_postgres_password
+# optional: set auth_postgres_password and cards_postgres_password
 terraform init
 terraform plan
 terraform apply
@@ -45,6 +45,7 @@ This provisions:
 - Auth PostgreSQL (RDS)
 - Cards PostgreSQL (RDS)
 - Auth Redis (ElastiCache)
+- Runtime secrets in AWS Secrets Manager for auth/cards
 
 ## 2) Deploy Auth service only
 
@@ -58,6 +59,7 @@ terraform apply
 ```
 
 By default, auth reads DB/Redis values from `infra/data/terraform.tfstate`.
+Auth `POSTGRES_PASSWORD` is injected from AWS Secrets Manager when available.
 
 ## 3) Deploy Cards service only
 
@@ -71,6 +73,7 @@ terraform apply
 ```
 
 By default, cards reads `DATABASE_URL` from `infra/data/terraform.tfstate`.
+Cards `DATABASE_URL` is injected from AWS Secrets Manager when available.
 
 ## 4) Deploy Game Server only
 
