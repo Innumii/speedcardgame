@@ -61,16 +61,16 @@ module "service" {
   github_repo_name    = var.github_repo_name
   ghcr_pat_secret_arn = var.ghcr_pat_secret_arn
 
-  aws_region     = var.aws_region
-  service_name   = var.service_name
-  vpc_id         = data.aws_vpc.default.id
-  subnet_ids     = data.aws_subnets.default.ids
-  container_port = 4000
-  image_tag      = var.image_tag
-  image_repo     = var.image_repo
-  cpu            = var.cpu
-  memory         = var.memory
+  aws_region       = var.aws_region
+  service_name     = var.service_name
+  vpc_id           = data.aws_vpc.default.id
+  subnet_ids       = data.aws_subnets.default.ids
+  container_port   = 4000
+  image_tag        = var.image_tag
+  image_repo       = var.image_repo
+  cpu              = var.cpu
+  memory           = var.memory
   assign_public_ip = var.assign_public_ip
-  desired_count  = 1
+  desired_count    = 1
   target_group_arn = aws_lb_target_group.this.arn
 }
