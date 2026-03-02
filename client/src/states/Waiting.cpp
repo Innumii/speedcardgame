@@ -98,8 +98,11 @@ void Waiting::update(Game& game) {
             else if (line == "MATCH_START") {
                 auto& playingState = game.getPlayingState();
 
-                //hardcoded temp Player data 
-                playingState.setupPlayers(std::move(game.getPlayer()), Player());
+                auto& player = game.getPlayer();
+                std::cout << "[Waiting] "; 
+                player.deck.toString();
+                std::cout << "\n";
+                playingState.setupPlayers(std::move(player), Player());
                 std::cout << "Entering Playing state...\n";
                 
                 game.setNextState(GameState::Playing);

@@ -25,6 +25,10 @@ public:
     bool isEmpty() const;
     int size() const;
 
+    //Print cards in deck
+    void toString() const;
+
+
     //Deck resetting
     // std::vector<int> exportCardIds() const;
     // void importFromIds(const std::vector<int>& ids);

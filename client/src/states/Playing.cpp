@@ -89,6 +89,8 @@ void Playing::setup(Game& game) {
 void Playing::setupPlayers(Player&& local, Player&& remote) {
     localPlayer = std::move(local);
     remotePlayer = std::move(remote);
+
+    localPlayer.deck.toString();
 }
 
 // -------------------------
@@ -244,6 +246,10 @@ void Playing::run() {
 
     SDL_Event event;
 
+    //check localplayer deck
+    localPlayer.deck.toString();
+
+
     while (running) {
         while (SDL_PollEvent(&event)) {
             if (event.type == SDL_QUIT) {
@@ -287,7 +293,7 @@ bool Playing::handleServerMessage(const std::string& msg) {
     std::string cmd;
     iss >> cmd;
 
-std::cout << "[PLAYING]: " << msg << "\n";
+std::cout << "[Playing]: " << msg << "\n";
     
     if (cmd == "DRAW") {
         int playerId, cardId;

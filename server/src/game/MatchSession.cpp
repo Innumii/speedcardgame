@@ -181,9 +181,10 @@ bool MatchSession::drawAndSend(int playerIndex) {
 
     player.hand.push_back(cardId);   // if you only need ID, keep this
 
-    auto& conn = (playerIndex == 0) ? playerA : playerB;
-    std::cout << playerIndex << ": DRAW " << std::to_string(cardId) << "\n";
-    conn->send("DRAW " + std::to_string(cardId) + "\n");
+    // auto& conn = (playerIndex == 0) ? playerA : playerB;
+    std::cout << playerIndex << ": DRAW " << playerIndex << " " << std::to_string(cardId) << "\n";
+    playerA->send("DRAW " + std::to_string(playerIndex) + " " + std::to_string(cardId) + "\n");
+    playerB->send("DRAW " + std::to_string(playerIndex) + " " + std::to_string(cardId) + "\n");
 
     return true;
 }
