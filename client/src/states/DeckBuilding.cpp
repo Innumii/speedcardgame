@@ -823,12 +823,6 @@ bool DeckBuilding::loadDeckFromService(const Game& game) {
         return false;
     }
 
-    std::string cardsJson;
-    if (!extractCardsObjectForUser(responseBody, userId, cardsJson)) {
-        deckCopies.assign(availableCards.size(), 0);
-        return false;
-    }
-
     // Extract the "cards" object from the response JSON
     // The Go backend returns { "uid": 1, "cards": { "101": 2, ... } }
     std::string cardsJson;
