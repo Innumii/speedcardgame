@@ -271,5 +271,9 @@ func GetDeckByUserID(w http.ResponseWriter, r *http.Request) {
     }
 
     w.Header().Set("Content-Type", "application/json")
-    json.NewEncoder(w).Encode(deck)
+    err = json.NewEncoder(w).Encode(deck)
+	if err != nil {
+		http.Error(w, "Failed to encode deck", http.StatusInternalServerError)
+		return
+	}
 }
