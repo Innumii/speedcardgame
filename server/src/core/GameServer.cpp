@@ -220,7 +220,7 @@ bool GameServer::loadAvailableCardsFromService() {
             std::shared_ptr<ServerCard> card;
 
             if (typeLower == "creature") {
-                std::shared_ptr<ServerCard> card = std::static_pointer_cast<ServerCard>(
+                card = std::static_pointer_cast<ServerCard>(
                     std::make_shared<CreatureCard>(name, effect, manaValue, cost, power, toughness, cid));            
             } else {
                 card = std::static_pointer_cast<ServerCard>(
@@ -240,6 +240,12 @@ bool GameServer::loadAvailableCardsFromService() {
     }
 
     availableCards = std::move(fetchedCards); // ✅ map assignment
+    for (const auto& [id, card] : availableCards) {
+    if (!card) {
+        std::cerr << "FATAL: Null card in catalog! ID=" << id << "\n";
+        return false;
+    }
+}
     std::cout << "Loaded " << availableCards.size() << " cards from service\n";
     return true;
 }

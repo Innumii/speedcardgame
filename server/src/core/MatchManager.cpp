@@ -99,8 +99,8 @@ void MatchManager::startMatch(const std::shared_ptr<PendingMatch>& match)
               << match->a->getSocket() << " vs "
               << match->b->getSocket() << "\n";
 
-    sendMatchStart(match->a);
-    sendMatchStart(match->b);
+    // sendMatchStart(match->a);
+    // sendMatchStart(match->b);
 
     removePending(match);
 }
@@ -131,8 +131,3 @@ void MatchManager::sendMatchCancelled(const std::shared_ptr<PlayerConnection>& p
     player->send("MATCH_CANCELLED\n");
 }
 
-void MatchManager::sendMatchStart(const std::shared_ptr<PlayerConnection>& player)
-{
-    if (!player) return;
-    player->send("MATCH_START\n");
-}

@@ -51,7 +51,7 @@ private:
     // ---- Networking helpers ----
     void sendMatchFound(const std::shared_ptr<PlayerConnection>& player);
     void sendMatchCancelled(const std::shared_ptr<PlayerConnection>& player);
-    void sendMatchStart(const std::shared_ptr<PlayerConnection>& player);
+    // void sendMatchStart(const std::shared_ptr<PlayerConnection>& player);
 
 
 };

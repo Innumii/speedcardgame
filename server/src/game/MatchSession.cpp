@@ -2,8 +2,10 @@
 #include "net/PlayerConnection.hpp"
 #include "objects/CreatureCard.h"
 #include "objects/SpellCard.h"
+#include "utils/JsonUtil.hpp"
+
+#define CPPHTTPLIB_OPENSSL_SUPPORT
 #include "httplib/httplib.h"
-#include "utils/JsonUtil.hpp" // Make sure this has JSON parsing helpers
 
 #include <iostream>
 #include <chrono>
@@ -146,9 +148,10 @@ bool MatchSession::parseDeckJson(const std::string& jsonStr, ServerDeck& outDeck
 }
 
 void MatchSession::setupDecks() {
-    // TODO: Replace with real decklists/seeding
-    std::cout << "Attempting deck setup...\n";
+    std::cout << "Attempting deck setup for " << playerA.get()->getUsername() << "\n";
     loadDeckForPlayer(playerA.get()->getPlayerId(), players[0].deck);
+
+    std::cout << "Attempting deck setup for " << playerB.get()->getUsername() << "\n";
     loadDeckForPlayer(playerB.get()->getPlayerId(), players[1].deck);
 
     std::cout << "Shuffling decks...\n";
@@ -179,6 +182,7 @@ bool MatchSession::drawAndSend(int playerIndex) {
     player.hand.push_back(cardId);   // if you only need ID, keep this
 
     auto& conn = (playerIndex == 0) ? playerA : playerB;
+    std::cout << playerIndex << ": DRAW " << std::to_string(cardId) << "\n";
     conn->send("DRAW " + std::to_string(cardId) + "\n");
 
     return true;
@@ -241,8 +245,6 @@ void MatchSession::handleDisconnect() {
 
 const ServerCard* MatchSession::getCard(int id) const {
     auto it = cardCatalog.find(id);
-    if (it == cardCatalog.end())
-        return nullptr;
-
-    return it->second.get();
+    if (it != cardCatalog.end()) return it->second.get();
+    return nullptr;
 }
