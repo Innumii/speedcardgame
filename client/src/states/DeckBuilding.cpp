@@ -10,6 +10,7 @@
 #include "render/RenderDeckBuilding.hpp"
 #include "core/Game.hpp"
 #include "core/NetworkClient.hpp"
+#include "utils/HttpUtil.hpp"
 #include "utils/JsonUtil.hpp"
 #include "utils/EnvUtil.hpp"
 #include "objects/CreatureCard.h"
@@ -23,16 +24,6 @@
 #include <numeric>
 #include <sstream>
 #include <unordered_map>
-#define CPPHTTPLIB_OPENSSL_SUPPORT
-#if defined(__GNUC__)
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
-#pragma GCC diagnostic ignored "-Wconversion-null"
-#endif
-#include "httplib/httplib.h"
-#if defined(__GNUC__)
-#pragma GCC diagnostic pop
-#endif
 
 namespace {
     SDL_Point getPoint(int x, int y) {
@@ -57,48 +48,6 @@ namespace {
         return configured > 0 ? configured : 30;
     }
 
-
-    bool sendHttp(const std::string& host, int port, const std::string& method,
-              const std::string& path, const std::string& body,
-              int& statusCode, std::string& responseBody) {
-
-        bool useHttps = (port == 443);
-        httplib::Result res;
-
-        if (useHttps) {
-            httplib::SSLClient client(host.c_str(), port);
-            client.enable_server_certificate_verification(false); // for self-signed
-            client.set_follow_location(true);
-
-            if (method == "GET")      res = client.Get(path.c_str());
-            else if (method == "POST") res = client.Post(path.c_str(), body, "application/json");
-            else if (method == "PUT")  res = client.Put(path.c_str(), body, "application/json");
-            else if (method == "PATCH") res = client.Patch(path.c_str(), body, "application/json");
-            else if (method == "DELETE") res = client.Delete(path.c_str());
-            else return false;
-
-        } else {
-            httplib::Client client(host.c_str(), port);
-            client.set_follow_location(true);
-
-            if (method == "GET")      res = client.Get(path.c_str());
-            else if (method == "POST") res = client.Post(path.c_str(), body, "application/json");
-            else if (method == "PUT")  res = client.Put(path.c_str(), body, "application/json");
-            else if (method == "PATCH") res = client.Patch(path.c_str(), body, "application/json");
-            else if (method == "DELETE") res = client.Delete(path.c_str());
-            else return false;
-        }
-
-        if (!res) {
-            statusCode = -1;
-            responseBody.clear();
-            return false; // network error
-        }
-
-        statusCode = res->status;
-        responseBody = res->body;
-        return true;
-    }
 
     bool parseCsvLine(const std::string& line, std::vector<std::string>& out) {
         out.clear();
@@ -640,7 +589,7 @@ bool DeckBuilding::loadAvailableCardsFromService(const Game& game) {
     const std::string path = "/cardbase/cards";
     int statusCode = -1;
     std::string responseBody;
-    if (!sendHttp(host, port, "GET", path, "", statusCode, responseBody)) {
+    if (!HttpUtil::sendHttp(host, port, "GET", path, "", statusCode, responseBody)) {
         return false;
     }
 
@@ -787,7 +736,7 @@ bool DeckBuilding::saveDeckToService(const Game& game) const {
 
     int statusCode = -1;
     std::string responseBody;
-    return sendHttp(host, port, "POST", path, payload.str(), statusCode, responseBody);
+    return HttpUtil::sendHttp(host, port, "POST", path, payload.str(), statusCode, responseBody);
 }
 
 bool DeckBuilding::loadInventoryFromService(const Game& game) {
@@ -799,7 +748,7 @@ bool DeckBuilding::loadInventoryFromService(const Game& game) {
     const int userId = EnvUtil::getEnvIntOrDefault("CARDS_SERVICE_UID", game.getPlayerId());
     int statusCode = -1;
     std::string responseBody;
-    if (!sendHttp(host, port, "GET", path, "", statusCode, responseBody)) {
+    if (!HttpUtil::sendHttp(host, port, "GET", path, "", statusCode, responseBody)) {
         inventoryLoaded = false;
         inventoryCopies.assign(availableCards.size(), 0);
         return false;
@@ -862,7 +811,7 @@ bool DeckBuilding::loadDeckFromService(const Game& game) {
     const int userId = EnvUtil::getEnvIntOrDefault("CARDS_SERVICE_UID", game.getPlayerId());
     int statusCode = -1;
     std::string responseBody;
-    if (!sendHttp(host, port, "GET", path, "", statusCode, responseBody)) {
+    if (!HttpUtil::sendHttp(host, port, "GET", path, "", statusCode, responseBody)) {
         return false;
     }
 

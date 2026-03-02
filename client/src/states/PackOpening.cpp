@@ -7,6 +7,7 @@
 #include "render/RenderButton.hpp"
 #include "render/RenderText.hpp"
 #include "render/Theme.hpp"
+#include "utils/HttpUtil.hpp"
 #include "utils/JsonUtil.hpp"
 #include "utils/EnvUtil.hpp"
 
@@ -19,60 +20,8 @@
 #include <random>
 #include <sstream>
 #include <unordered_map>
-#define CPPHTTPLIB_OPENSSL_SUPPORT
-#if defined(__GNUC__)
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
-#pragma GCC diagnostic ignored "-Wconversion-null"
-#endif
-#include "httplib/httplib.h"
-#if defined(__GNUC__)
-#pragma GCC diagnostic pop
-#endif
 
 namespace {
-    bool sendHttp(const std::string& host, int port, const std::string& method,
-                  const std::string& path, const std::string& body,
-                  int& statusCode, std::string& responseBody) {
-
-        bool useHttps = (port == 443);
-        httplib::Result res;
-
-        if (useHttps) {
-            httplib::SSLClient client(host.c_str(), port);
-            client.enable_server_certificate_verification(false);
-            client.set_follow_location(true);
-
-            if (method == "GET") res = client.Get(path.c_str());
-            else if (method == "POST") res = client.Post(path.c_str(), body, "application/json");
-            else if (method == "PUT") res = client.Put(path.c_str(), body, "application/json");
-            else if (method == "PATCH") res = client.Patch(path.c_str(), body, "application/json");
-            else if (method == "DELETE") res = client.Delete(path.c_str());
-            else return false;
-
-        } else {
-            httplib::Client client(host.c_str(), port);
-            client.set_follow_location(true);
-
-            if (method == "GET") res = client.Get(path.c_str());
-            else if (method == "POST") res = client.Post(path.c_str(), body, "application/json");
-            else if (method == "PUT") res = client.Put(path.c_str(), body, "application/json");
-            else if (method == "PATCH") res = client.Patch(path.c_str(), body, "application/json");
-            else if (method == "DELETE") res = client.Delete(path.c_str());
-            else return false;
-        }
-
-        if (!res) {
-            statusCode = -1;
-            responseBody.clear();
-            return false;
-        }
-
-        statusCode = res->status;
-        responseBody = res->body;
-        return true;
-    }
-
     std::string toLower(std::string value) {
         std::transform(value.begin(), value.end(), value.begin(), [](unsigned char c) {
             return static_cast<char>(std::tolower(c));
@@ -453,7 +402,7 @@ bool PackOpening::loadAvailableCardsFromService(const Game& game) {
     const std::string path = "/cardbase/cards";
     int statusCode = -1;
     std::string responseBody;
-    if (!sendHttp(host, port, "GET", path, "", statusCode, responseBody)) {
+    if (!HttpUtil::sendHttp(host, port, "GET", path, "", statusCode, responseBody)) {
         return false;
     }
 
@@ -582,7 +531,7 @@ bool PackOpening::loadInventoryFromService(const Game& game) {
     const std::string path = "/cardbase/inventories/" + std::to_string(userId);
     int statusCode = -1;
     std::string responseBody;
-    if (!sendHttp(host, port, "GET", path, "", statusCode, responseBody) || statusCode < 200 || statusCode >= 300) {
+    if (!HttpUtil::sendHttp(host, port, "GET", path, "", statusCode, responseBody) || statusCode < 200 || statusCode >= 300) {
         inventoryCopies.assign(availableCards.size(), 0);
         return false;
     }
@@ -649,7 +598,7 @@ bool PackOpening::applyInventoryDelta(const Game& game, const std::unordered_map
 
     int statusCode = -1;
     std::string responseBody;
-    if (!sendHttp(host, port, "PUT", path, payload.str(), statusCode, responseBody)) {
+    if (!HttpUtil::sendHttp(host, port, "PUT", path, payload.str(), statusCode, responseBody)) {
         return false;
     }
 

@@ -127,6 +127,14 @@ namespace EnvUtil {
         return getEnvBoolOrDefault("USE_AWS_SERVICES", true);
     }
 
+    std::string getAuthServiceHost() {
+        return getServiceHost("AUTH_SERVICE", "127.0.0.1", "auth.speedcardgame.aws");
+    }
+
+    int getAuthServicePort() {
+        return getServicePort("AUTH_SERVICE", 8081, 443);
+    }
+
     std::string getServiceHost(const char* servicePrefix, const char* localFallback, const char* awsFallback) {
         if (useAwsServices()) {
             const std::string awsKey = buildAwsServiceKey(servicePrefix, "_HOST");
