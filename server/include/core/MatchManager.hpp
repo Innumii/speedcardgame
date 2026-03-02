@@ -37,7 +37,7 @@ private:
     };
     Matchmaker* matchmaker = nullptr; // non-owning
     GameServer& server; // non-owning reference to the authoritative server
-    std::mutex mutex;
+    std::mutex mutex; //for pendingMatches and activeMatches
 
     std::vector<std::shared_ptr<PendingMatch>> pendingMatches;
     std::vector<std::shared_ptr<MatchSession>> activeMatches;

@@ -8,6 +8,7 @@ void Matchmaker::enqueuePlayer(const std::shared_ptr<PlayerConnection>& player) 
 
     //lock the mutex so subsequent code below is protected
     std::lock_guard<std::mutex> lock(queueMutex);
+    std::cout << "[Matchmaker]: Queueing " << player.get()->getUsername() << "\n";
     playerQueue.push(player);
 
     tryCreateMatch();
@@ -16,26 +17,30 @@ void Matchmaker::enqueuePlayer(const std::shared_ptr<PlayerConnection>& player) 
 }
 
 void Matchmaker::removePlayer(const std::shared_ptr<PlayerConnection>& player) {
+    // std::cout << "[Matchmaker]: Removing " << player.get()->getUsername() << "\n";
+
     std::lock_guard<std::mutex> lock(queueMutex);
 
     //std::queue does not support removing arbitrarily, this is a workaround
     //change this later to a better implementation
     std::queue<std::shared_ptr<PlayerConnection>> tempQueue;
-
+    
     while (!playerQueue.empty()) {
         auto p = playerQueue.front();
         playerQueue.pop();
         if (p != player) {
+            std::cout << "keep\n";
             tempQueue.push(p);
         }
     }
 
     std::swap(playerQueue, tempQueue);
-    std::cout << player->getUsername() << " removed from Queue\n";
-    std::cout << "Matchmaker queue size: " << playerQueue.size() << "\n";
+    std::cout << "[Matchmaker]" << player->getUsername() << " removed from Queue\n";
+    std::cout << "[Matchmaker] Updated queue size: " << playerQueue.size() << "\n";
 
 }
 
+//Assume already locked by enqueue
 void Matchmaker::tryCreateMatch() {
     // Keep pairing players while we have at least 2 in queue
     while (playerQueue.size() >= 2) {

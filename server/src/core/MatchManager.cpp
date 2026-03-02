@@ -14,6 +14,9 @@ void MatchManager::onPairFound(std::shared_ptr<PlayerConnection> a,
 {
     if (!a || !b) return;
 
+    std::cout << "[MatchManager] Found a Pair!\n";
+    std::cout << "[MatchManager] Creating Pending Match...\n";
+
     auto pending = std::make_shared<PendingMatch>();
     pending->a = a;
     pending->b = b;
@@ -31,6 +34,7 @@ void MatchManager::onPairFound(std::shared_ptr<PlayerConnection> a,
 
 void MatchManager::onAccept(std::shared_ptr<PlayerConnection> player)
 {
+    std::cout << "[MatchManager] " << player.get()->getUsername() << " accepted\n";
     auto match = findPending(player);
     if (!match) return;
 
@@ -55,10 +59,10 @@ void MatchManager::onPlayerDisconnected(std::shared_ptr<PlayerConnection> player
     if (!match) return;
 
     std::shared_ptr<PlayerConnection> other;
+    other = (match->a == player) ? match->b : match->a;
 
     {
         std::lock_guard<std::mutex> lock(mutex);
-        other = (match->a == player) ? match->b : match->a;
         removePending(match);
     }
 
@@ -96,8 +100,8 @@ void MatchManager::startMatch(const std::shared_ptr<PendingMatch>& match)
     activeMatches.push_back(session);
 
     std::cout << "Match started: "
-              << match->a->getSocket() << " vs "
-              << match->b->getSocket() << "\n";
+              << match->a->getUsername() << " vs "
+              << match->b->getUsername() << "\n";
 
     // sendMatchStart(match->a);
     // sendMatchStart(match->b);
@@ -111,6 +115,8 @@ void MatchManager::removePending(const std::shared_ptr<PendingMatch>& match)
         std::remove(pendingMatches.begin(), pendingMatches.end(), match),
         pendingMatches.end()
     );
+
+    std::cout << "[MatchManager] Pending Matches left: " << pendingMatches.size() << "\n";
 }
 
 //

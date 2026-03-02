@@ -287,7 +287,7 @@ bool Playing::handleServerMessage(const std::string& msg) {
     std::string cmd;
     iss >> cmd;
 
-std::cout << cmd << "\n";
+std::cout << "[PLAYING]: " << msg << "\n";
     
     if (cmd == "DRAW") {
         int playerId, cardId;
