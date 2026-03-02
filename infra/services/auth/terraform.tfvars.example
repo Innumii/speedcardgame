@@ -7,6 +7,9 @@ use_managed_data_stack = true
 postgres_sslmode = "require"
 # data_stack_state_path = "../../data/terraform.tfstate"
 
+use_managed_alb_stack = true
+# alb_stack_state_path = "../alb/terraform.tfstate"
+
 # Optional manual overrides when use_managed_data_stack = false
 # postgres_host     = "your-postgres-host"
 # postgres_user     = "authuser"
@@ -17,5 +20,10 @@ postgres_sslmode = "require"
 # redis_host        = "your-redis-host"
 # redis_port        = 6379
 
-cards_service_host = "your-cards-host"
-cards_service_port = 8080
+# Optional manual ALB wiring when use_managed_alb_stack = false
+# alb_security_group_id = "sg-xxxxxxxx"
+# target_group_arn      = "arn:aws:elasticloadbalancing:...:targetgroup/speedcard-auth-tg/xxxxxxxx"
+
+# Optional override. By default this comes from shared ALB output (https://api.myapp.com)
+# cards_service_base_url = "https://api.myapp.com"
+cards_service_port = 443

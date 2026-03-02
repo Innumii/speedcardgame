@@ -4,6 +4,7 @@
 #include <iostream>
 #include <memory>
 #include <stdexcept>
+#include "utils/HttpUtil.hpp"
 #include "utils/EnvUtil.hpp"
 #include "utils/JsonUtil.hpp"
 #include "objects/CreatureCard.h"
@@ -172,18 +173,16 @@ void GameServer::waitForShutdown() {
 }
 
 bool GameServer::loadAvailableCardsFromService() {
-    const std::string host = EnvUtil::getEnvOrDefault("CARDS_SERVICE_HOST", "host.docker.internal");
-    const int port = EnvUtil::getEnvIntOrDefault("CARDS_SERVICE_PORT", 8082);
-    const std::string path = "/cardbase/cards";
-
+    const std::string host = EnvUtil::getServiceHost("CARDS_SERVICE", "127.0.0.1", "api.myapp.com");
+    const int port = EnvUtil::getServicePort("CARDS_SERVICE", 8082, 443);
+    const std::string path = "/cards/cards";
     int statusCode = -1;
     std::string responseBody;
-
-    if (!sendHttp(host, port, "GET", path, "", statusCode, responseBody)) {
+    
+    if (!HttpUtil::sendHttp(host, port, "GET", path, "", statusCode, responseBody)) {
         std::cerr << "Failed to fetch cards from service\n";
         return false;
     }
-
     std::unordered_map<int, std::shared_ptr<ServerCard>> fetchedCards; // <-- now a map
     std::size_t pos = 0;
 
@@ -249,45 +248,3 @@ bool GameServer::loadAvailableCardsFromService() {
     std::cout << "Loaded " << availableCards.size() << " cards from service\n";
     return true;
 }
-
-bool GameServer::sendHttp(const std::string& host, int port, const std::string& method,
-              const std::string& path, const std::string& body,
-              int& statusCode, std::string& responseBody) {
-
-        bool useHttps = (port == 443);
-        httplib::Result res;
-
-        if (useHttps) {
-            httplib::SSLClient client(host.c_str(), port);
-            client.enable_server_certificate_verification(false); // for self-signed
-            client.set_follow_location(true);
-
-            if (method == "GET")      res = client.Get(path.c_str());
-            else if (method == "POST") res = client.Post(path.c_str(), body, "application/json");
-            else if (method == "PUT")  res = client.Put(path.c_str(), body, "application/json");
-            else if (method == "PATCH") res = client.Patch(path.c_str(), body, "application/json");
-            else if (method == "DELETE") res = client.Delete(path.c_str());
-            else return false;
-
-        } else {
-            httplib::Client client(host.c_str(), port);
-            client.set_follow_location(true);
-
-            if (method == "GET")      res = client.Get(path.c_str());
-            else if (method == "POST") res = client.Post(path.c_str(), body, "application/json");
-            else if (method == "PUT")  res = client.Put(path.c_str(), body, "application/json");
-            else if (method == "PATCH") res = client.Patch(path.c_str(), body, "application/json");
-            else if (method == "DELETE") res = client.Delete(path.c_str());
-            else return false;
-        }
-
-        if (!res) {
-            statusCode = -1;
-            responseBody.clear();
-            return false; // network error
-        }
-
-        statusCode = res->status;
-        responseBody = res->body;
-        return true;
-    }

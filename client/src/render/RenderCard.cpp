@@ -34,7 +34,7 @@ namespace {
 
     httplib::Result res;
 
-    std::string path = "/cardbase/images/" + std::to_string(cardId) + "." + extension;
+    std::string path = "/cards/images/" + std::to_string(cardId) + "." + extension;
 
     if (useHttps) {
         httplib::SSLClient client(host.c_str(), port);
@@ -77,7 +77,7 @@ namespace {
             return nullptr;
         }
 
-        const std::string host = EnvUtil::getServiceHost("CARDS_SERVICE", "127.0.0.1", "cards.speedcardgame.aws");
+        const std::string host = EnvUtil::getServiceHost("CARDS_SERVICE", "127.0.0.1", "api.myapp.com");
         const int port = EnvUtil::getServicePort("CARDS_SERVICE", 8082, 443);
         const std::string preferredExt = EnvUtil::getEnvOrDefault("CARD_IMAGE_EXT", "");
         const std::array<std::string, 4> defaultExts{{"png", "jpg", "jpeg", "bmp"}};

@@ -29,8 +29,8 @@ Example (PowerShell):
 
 ```powershell
 $env:USE_AWS_SERVICES = "true"
-$env:AWS_AUTH_SERVICE_HOST = "<your-auth-host>"
-$env:AWS_CARDS_SERVICE_HOST = "<your-cards-host>"
+$env:AWS_AUTH_SERVICE_HOST = "api.myapp.com"
+$env:AWS_CARDS_SERVICE_HOST = "api.myapp.com"
 $env:AWS_GAME_SERVER_SERVICE_HOST = "<your-server-host>"
 ./main
 ```

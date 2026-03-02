@@ -128,7 +128,7 @@ namespace EnvUtil {
     }
 
     std::string getAuthServiceHost() {
-        return getServiceHost("AUTH_SERVICE", "127.0.0.1", "auth.speedcardgame.aws");
+        return getServiceHost("AUTH_SERVICE", "127.0.0.1", "api.myapp.com");
     }
 
     int getAuthServicePort() {

@@ -110,7 +110,7 @@ func main() {
 	})
 
 	r.Get("/decks/{uid}", services.GetDeckByUserID) // Get deck by user ID
-	r.Post("/decks", services.CreateDeck) // Create deck
+	r.Post("/decks", services.CreateDeck)           // Create deck
 	r.Post("/decks/fill", services.FillDeckForUser)
 	r.Get("/decks", services.ListDecks) // List all decks
 	r.Delete("/decks", services.DeleteDeck)
@@ -126,6 +126,7 @@ func main() {
 	r.Put("/inventories", services.UpdateInventory)            // Update inventory by user ID
 
 	router.Mount("/cardbase", r) //api prefix
+	router.Mount("/cards", r)
 
 	srv := &http.Server{
 		Handler: router,

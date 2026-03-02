@@ -6,6 +6,9 @@ assign_public_ip = true
 use_managed_data_stack = true
 # data_stack_state_path = "../../data/terraform.tfstate"
 
+use_managed_alb_stack = true
+# alb_stack_state_path = "../alb/terraform.tfstate"
+
 github_username     = "Ryanljk"
 github_repo_name    = "speedcardgame"
 ghcr_pat_secret_arn = "arn:aws:secretsmanager:us-east-1:123456789012:secret:ghcr-auth-credentials-xxxxxx"
@@ -13,3 +16,7 @@ ghcr_pat_secret_arn = "arn:aws:secretsmanager:us-east-1:123456789012:secret:ghcr
 # Optional manual override when use_managed_data_stack = false
 # database_url_secret_arn = "arn:aws:secretsmanager:...:secret:speedcardgame-cards-runtime"
 # database_url = "postgres://user:password@your-postgres-host:5432/cardsdb?sslmode=disable" # fallback only when not using Secrets Manager
+
+# Optional manual ALB wiring when use_managed_alb_stack = false
+# alb_security_group_id = "sg-xxxxxxxx"
+# target_group_arn      = "arn:aws:elasticloadbalancing:...:targetgroup/speedcard-cards-tg/xxxxxxxx"

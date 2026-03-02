@@ -13,7 +13,7 @@ output "ecs_service_name" {
   value       = module.service.service_name
 }
 
-output "alb_dns_name" {
-  description = "Cards ALB DNS name"
-  value       = aws_lb.this.dns_name
+output "ecs_service_security_group_id" {
+  description = "Cards ECS service security group ID"
+  value       = module.service.security_group_id
 }

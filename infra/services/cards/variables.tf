@@ -56,6 +56,30 @@ variable "assign_public_ip" {
   default     = true
 }
 
+variable "use_managed_alb_stack" {
+  description = "When true, read ALB target groups/security group/API URL from infra/services/alb remote state."
+  type        = bool
+  default     = true
+}
+
+variable "alb_stack_state_path" {
+  description = "Path to infra/services/alb terraform state file for shared ALB wiring."
+  type        = string
+  default     = "../alb/terraform.tfstate"
+}
+
+variable "alb_security_group_id" {
+  description = "Shared ALB security group ID override when not using remote state"
+  type        = string
+  default     = null
+}
+
+variable "target_group_arn" {
+  description = "Cards target group ARN override when not using remote state"
+  type        = string
+  default     = null
+}
+
 variable "use_managed_data_stack" {
   description = "When true, read Postgres/Redis values from infra/data stack remote state."
   type        = bool

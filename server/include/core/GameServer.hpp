@@ -37,10 +37,6 @@ private:
     std::unordered_map<int, std::shared_ptr<ServerCard>> availableCards;
     bool loadAvailableCardsFromService();
 
-    bool sendHttp(const std::string& host, int port, const std::string& method,
-              const std::string& path, const std::string& body,
-              int& statusCode, std::string& responseBody);
-
 };
 
 #endif

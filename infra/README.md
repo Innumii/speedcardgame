@@ -1,21 +1,19 @@
-# Terraform deployment (AWS, no load balancer)
+# Terraform deployment (AWS, shared ALB + Route53)
 
-This folder contains **one shared data stack** and **three isolated AWS service stacks**:
+This folder contains **one shared data stack**, **one shared ALB stack**, and **three isolated AWS service stacks**:
 
 - `infra/data`
+- `infra/services/alb`
 
 - `infra/services/auth`
 - `infra/services/cards`
 - `infra/services/server`
 
-Each stack deploys one ECS Fargate service (`desired_count = 1`) with:
+`infra/services/alb` provisions one internet-facing shared ALB, HTTPS listener, path rules, and Route53 alias:
 
-- one ECR repository
-- one ECS cluster/service/task definition
-- one service security group
-- one CloudWatch log group
-
-No ALB/NLB is created in this setup.
+- `/auth/*` -> auth target group
+- `/cards/*` -> cards target group
+- `api.myapp.com` -> ALB alias A record
 
 ## Common modules
 
@@ -47,12 +45,23 @@ This provisions:
 - Auth Redis (ElastiCache)
 - Runtime secrets in AWS Secrets Manager for auth/cards
 
-## 2) Deploy Auth service only
+## 2) Deploy shared ALB + Route53 endpoint
+
+```bash
+cd infra/services/alb
+cp terraform.tfvars.example terraform.tfvars
+# set acm_certificate_arn and your Route53 zone/domain
+terraform init
+terraform plan
+terraform apply
+```
+
+## 3) Deploy Auth service only
 
 ```bash
 cd infra/services/auth
 cp terraform.tfvars.example terraform.tfvars
-# set cards_service_host (and optional overrides)
+# optional: override cards_service_base_url
 terraform init
 terraform plan
 terraform apply
@@ -61,7 +70,7 @@ terraform apply
 By default, auth reads DB/Redis values from `infra/data/terraform.tfstate`.
 Auth `POSTGRES_PASSWORD` is injected from AWS Secrets Manager when available.
 
-## 3) Deploy Cards service only
+## 4) Deploy Cards service only
 
 ```bash
 cd infra/services/cards
@@ -75,7 +84,7 @@ terraform apply
 By default, cards reads `DATABASE_URL` from `infra/data/terraform.tfstate`.
 Cards `DATABASE_URL` is injected from AWS Secrets Manager when available.
 
-## 4) Deploy Game Server only
+## 5) Deploy Game Server only
 
 ```bash
 cd infra/services/server
@@ -85,10 +94,12 @@ terraform plan
 terraform apply
 ```
 
-## Notes on overrides
+## Notes on wiring and overrides
 
 - `use_managed_data_stack = true` (default) makes auth/cards auto-read from the shared data state.
+- `use_managed_alb_stack = true` (default) makes auth/cards auto-read ALB target groups and ALB security group from `infra/services/alb/terraform.tfstate`.
 - Set `use_managed_data_stack = false` to provide manual DB/Redis values directly in each service tfvars.
+- Set `use_managed_alb_stack = false` to provide manual `target_group_arn` and `alb_security_group_id` in each service tfvars.
 - If needed, change `data_stack_state_path` in service stacks to point at a different shared state file.
 
 ## Build and push images

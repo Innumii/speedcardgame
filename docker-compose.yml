@@ -94,9 +94,15 @@ services:
     build: ./server
     env_file:
       - ./.env
+    environment:
+      CARDS_SERVICE_HOST: cards
+      CARDS_SERVICE_PORT: ${CARDS_PORT}
     ports:
       - "4000:4000"
     restart: unless-stopped
+    depends_on:
+      cards:
+        condition: service_started
     sysctls:
       - net.core.somaxconn=65535
     volumes:
