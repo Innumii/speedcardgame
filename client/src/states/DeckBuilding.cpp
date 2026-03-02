@@ -635,8 +635,8 @@ void DeckBuilding::setStatusMessage(const std::string& message, Uint32 durationM
 
 bool DeckBuilding::loadAvailableCardsFromService(const Game& game) {
     (void)game;
-    const std::string host = EnvUtil::getEnvOrDefault("CARDS_SERVICE_HOST", "127.0.0.1");
-    const int port = EnvUtil::getEnvIntOrDefault("CARDS_SERVICE_PORT", 8082);
+    const std::string host = EnvUtil::getServiceHost("CARDS_SERVICE", "127.0.0.1", "cards.speedcardgame.aws");
+    const int port = EnvUtil::getServicePort("CARDS_SERVICE", 8082, 443);
     const std::string path = "/cardbase/cards";
     int statusCode = -1;
     std::string responseBody;
@@ -766,8 +766,8 @@ bool DeckBuilding::saveDeckToService(const Game& game) const {
         return false;
     }
 
-    const std::string host = EnvUtil::getEnvOrDefault("CARDS_SERVICE_HOST", "127.0.0.1");
-    const int port = EnvUtil::getEnvIntOrDefault("CARDS_SERVICE_PORT", 8082);
+    const std::string host = EnvUtil::getServiceHost("CARDS_SERVICE", "127.0.0.1", "cards.speedcardgame.aws");
+    const int port = EnvUtil::getServicePort("CARDS_SERVICE", 8082, 443);
     const std::string path = "/cardbase/decks";
     const int userId = EnvUtil::getEnvIntOrDefault("CARDS_SERVICE_UID", game.getPlayerId());
 
@@ -793,8 +793,8 @@ bool DeckBuilding::saveDeckToService(const Game& game) const {
 bool DeckBuilding::loadInventoryFromService(const Game& game) {
     if (availableCards.empty()) return false;
 
-    const std::string host = EnvUtil::getEnvOrDefault("CARDS_SERVICE_HOST", "127.0.0.1");
-    const int port = EnvUtil::getEnvIntOrDefault("CARDS_SERVICE_PORT", 8082);
+    const std::string host = EnvUtil::getServiceHost("CARDS_SERVICE", "127.0.0.1", "cards.speedcardgame.aws");
+    const int port = EnvUtil::getServicePort("CARDS_SERVICE", 8082, 443);
     const std::string path = "/cardbase/inventories";
     const int userId = EnvUtil::getEnvIntOrDefault("CARDS_SERVICE_UID", game.getPlayerId());
     int statusCode = -1;
@@ -856,8 +856,8 @@ int DeckBuilding::getRemainingCount(int cardIndex) const {
 bool DeckBuilding::loadDeckFromService(const Game& game) {
     if (availableCards.empty()) return false;
 
-    const std::string host = EnvUtil::getEnvOrDefault("CARDS_SERVICE_HOST", "127.0.0.1");
-    const int port = EnvUtil::getEnvIntOrDefault("CARDS_SERVICE_PORT", 8082);
+    const std::string host = EnvUtil::getServiceHost("CARDS_SERVICE", "127.0.0.1", "cards.speedcardgame.aws");
+    const int port = EnvUtil::getServicePort("CARDS_SERVICE", 8082, 443);
     const std::string path = "/cardbase/decks";
     const int userId = EnvUtil::getEnvIntOrDefault("CARDS_SERVICE_UID", game.getPlayerId());
     int statusCode = -1;

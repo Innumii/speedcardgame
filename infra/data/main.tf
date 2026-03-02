@@ -127,23 +127,23 @@ resource "aws_security_group" "cards_db" {
   tags   = { Name = "cards-db-sg" }
 }
 
-# Allow only the service to access its DB
+# Allow ECS tasks in this VPC to access each DB port
 resource "aws_security_group_rule" "allow_auth_service" {
-  type                     = "ingress"
-  from_port                = var.auth_postgres_port
-  to_port                  = var.auth_postgres_port
-  protocol                 = "tcp"
-  security_group_id        = aws_security_group.auth_db.id
-  source_security_group_id = aws_security_group.auth_service.id
+  type              = "ingress"
+  from_port         = var.auth_postgres_port
+  to_port           = var.auth_postgres_port
+  protocol          = "tcp"
+  security_group_id = aws_security_group.auth_db.id
+  cidr_blocks       = [data.aws_vpc.default.cidr_block]
 }
 
 resource "aws_security_group_rule" "allow_cards_service" {
-  type                     = "ingress"
-  from_port                = var.cards_postgres_port
-  to_port                  = var.cards_postgres_port
-  protocol                 = "tcp"
-  security_group_id        = aws_security_group.cards_db.id
-  source_security_group_id = aws_security_group.cards_service.id
+  type              = "ingress"
+  from_port         = var.cards_postgres_port
+  to_port           = var.cards_postgres_port
+  protocol          = "tcp"
+  security_group_id = aws_security_group.cards_db.id
+  cidr_blocks       = [data.aws_vpc.default.cidr_block]
 }
 
 resource "random_password" "auth_postgres" {

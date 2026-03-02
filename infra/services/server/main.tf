@@ -28,8 +28,38 @@ data "aws_subnets" "default" {
   }
 }
 
+resource "aws_lb" "this" {
+  name               = "${var.service_name}-nlb"
+  internal           = false
+  load_balancer_type = "network"
+  subnets            = data.aws_subnets.default.ids
+}
+
+resource "aws_lb_target_group" "this" {
+  name        = "${var.service_name}-tg"
+  port        = 4000
+  protocol    = "TCP"
+  vpc_id      = data.aws_vpc.default.id
+  target_type = "ip"
+}
+
+resource "aws_lb_listener" "tcp" {
+  load_balancer_arn = aws_lb.this.arn
+  port              = 4000
+  protocol          = "TCP"
+
+  default_action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.this.arn
+  }
+}
+
 module "service" {
   source = "../../modules/ecs-public-service"
+
+  github_username     = var.github_username
+  github_repo_name    = var.github_repo_name
+  ghcr_pat_secret_arn = var.ghcr_pat_secret_arn
 
   aws_region     = var.aws_region
   service_name   = var.service_name
@@ -37,7 +67,10 @@ module "service" {
   subnet_ids     = data.aws_subnets.default.ids
   container_port = 4000
   image_tag      = var.image_tag
-  cpu             = var.cpu
-  memory          = var.memory
+  image_repo     = var.image_repo
+  cpu            = var.cpu
+  memory         = var.memory
+  assign_public_ip = var.assign_public_ip
   desired_count  = 1
+  target_group_arn = aws_lb_target_group.this.arn
 }

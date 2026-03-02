@@ -4,6 +4,7 @@
 #include "core/NetworkClient.hpp"
 #include "objects/CreatureCard.h"
 #include "render/RenderText.hpp"
+#include "utils/EnvUtil.hpp"
 
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_image.h>
@@ -23,21 +24,6 @@ namespace {
     constexpr SDL_Color kCardTextColor{0, 0, 0, 255};
     std::unordered_map<int, SDL_Texture*> gCardImageCache;
     std::unordered_set<int> gMissingCardImages;
-
-    std::string getEnvOrDefault(const char* key, const char* fallback) {
-        const char* value = std::getenv(key);
-        return value ? std::string(value) : std::string(fallback);
-    }
-
-    int getEnvIntOrDefault(const char* key, int fallback) {
-        const char* value = std::getenv(key);
-        if (!value) return fallback;
-        try {
-            return std::stoi(value);
-        } catch (...) {
-            return fallback;
-        }
-    }
 
     //switch out
     bool downloadImageBody(const std::string& host, int port, int cardId,
@@ -91,9 +77,9 @@ namespace {
             return nullptr;
         }
 
-        const std::string host = getEnvOrDefault("CARDS_SERVICE_HOST", "127.0.0.1");
-        const int port = getEnvIntOrDefault("CARDS_SERVICE_PORT", 8082);
-        const std::string preferredExt = getEnvOrDefault("CARD_IMAGE_EXT", "");
+        const std::string host = EnvUtil::getServiceHost("CARDS_SERVICE", "127.0.0.1", "cards.speedcardgame.aws");
+        const int port = EnvUtil::getServicePort("CARDS_SERVICE", 8082, 443);
+        const std::string preferredExt = EnvUtil::getEnvOrDefault("CARD_IMAGE_EXT", "");
         const std::array<std::string, 4> defaultExts{{"png", "jpg", "jpeg", "bmp"}};
 
         std::string imageBytes;

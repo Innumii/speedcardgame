@@ -1,8 +1,14 @@
 aws_region = "us-east-1"
 image_tag  = "latest"
+image_repo = "ryanljk/g4t2-cards-service"
+assign_public_ip = true
 
 use_managed_data_stack = true
 # data_stack_state_path = "../../data/terraform.tfstate"
+
+github_username     = "Ryanljk"
+github_repo_name    = "speedcardgame"
+ghcr_pat_secret_arn = "arn:aws:secretsmanager:us-east-1:123456789012:secret:ghcr-auth-credentials-xxxxxx"
 
 # Optional manual override when use_managed_data_stack = false
 # database_url_secret_arn = "arn:aws:secretsmanager:...:secret:speedcardgame-cards-runtime"

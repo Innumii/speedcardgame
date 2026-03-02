@@ -7,3 +7,8 @@ output "service_name" {
   description = "Auth ECS service name"
   value       = module.service.service_name
 }
+
+output "alb_dns_name" {
+  description = "Auth ALB DNS name"
+  value       = aws_lb.this.dns_name
+}

@@ -85,8 +85,8 @@ namespace {
             return false;
         }
 
-        const std::string host = EnvUtil::getEnvOrDefault("AUTH_SERVICE_HOST", "127.0.0.1");
-        const int         port = EnvUtil::getEnvIntOrDefault("AUTH_SERVICE_PORT", 8081);
+        const std::string host = EnvUtil::getServiceHost("AUTH_SERVICE", "127.0.0.1", "auth.speedcardgame.aws");
+        const int         port = EnvUtil::getServicePort("AUTH_SERVICE", 8081, 443);
         const std::string name = deriveNameFromEmail(email);
 
         std::ostringstream payload;

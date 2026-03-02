@@ -7,6 +7,7 @@
 #include <fstream>
 #include <utility>
 #include <SDL2/SDL_image.h>
+#include "utils/EnvUtil.hpp"
 
 namespace {
     int clampPositive(int value, int maxValue) {
@@ -128,8 +129,9 @@ void Game::commitStateChange() {
         state = nextState;
 
         if (state == GameState::Connecting) {
-            //hardcoded for now
-            connectingState.emplace("127.0.0.1", 4000);
+            const std::string host = EnvUtil::getServiceHost("GAME_SERVER_SERVICE", "127.0.0.1", "server.speedcardgame.aws");
+            const int port = EnvUtil::getServicePort("GAME_SERVER_SERVICE", 4000, 4000);
+            connectingState.emplace(host, port);
         }
 
         if (state == GameState::Waiting) {

@@ -8,6 +8,7 @@
 #include "render/RenderText.hpp"
 #include "render/Theme.hpp"
 #include "utils/JsonUtil.hpp"
+#include "utils/EnvUtil.hpp"
 
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_ttf.h>
@@ -30,21 +31,6 @@
 #endif
 
 namespace {
-    std::string getEnvOrDefault(const char* key, const char* fallback) {
-        const char* value = std::getenv(key);
-        return value ? std::string(value) : std::string(fallback);
-    }
-
-    int getEnvIntOrDefault(const char* key, int fallback) {
-        const char* value = std::getenv(key);
-        if (!value) return fallback;
-        try {
-            return std::stoi(value);
-        } catch (...) {
-            return fallback;
-        }
-    }
-
     bool sendHttp(const std::string& host, int port, const std::string& method,
                   const std::string& path, const std::string& body,
                   int& statusCode, std::string& responseBody) {
@@ -212,7 +198,7 @@ namespace {
         if (playerId > 0) {
             return playerId;
         }
-        return getEnvIntOrDefault("CARDS_SERVICE_UID", -1);
+        return EnvUtil::getEnvIntOrDefault("CARDS_SERVICE_UID", -1);
     }
 
     void drawCenteredText(SDL_Renderer* renderer, const std::string& text, TTF_Font* font, SDL_Color color, const SDL_Rect& box) {
@@ -462,8 +448,8 @@ bool PackOpening::loadAvailableCards(const Game& game) {
 
 bool PackOpening::loadAvailableCardsFromService(const Game& game) {
     (void)game;
-    const std::string host = getEnvOrDefault("CARDS_SERVICE_HOST", "127.0.0.1");
-    const int port = getEnvIntOrDefault("CARDS_SERVICE_PORT", 8082);
+    const std::string host = EnvUtil::getServiceHost("CARDS_SERVICE", "127.0.0.1", "cards.speedcardgame.aws");
+    const int port = EnvUtil::getServicePort("CARDS_SERVICE", 8082, 443);
     const std::string path = "/cardbase/cards";
     int statusCode = -1;
     std::string responseBody;
@@ -521,7 +507,7 @@ bool PackOpening::loadAvailableCardsFromService(const Game& game) {
 
 bool PackOpening::loadAvailableCardsFromCsv(const Game& game) {
     (void)game;
-    const std::string envPath = getEnvOrDefault("CARDS_CSV_PATH", "");
+    const std::string envPath = EnvUtil::getEnvOrDefault("CARDS_CSV_PATH", "");
     std::ifstream file;
     if (!envPath.empty() && tryOpenCsv(envPath, file)) {
     } else if (tryOpenCsv("cards/cards.csv", file)) {
@@ -585,8 +571,8 @@ bool PackOpening::loadAvailableCardsFromCsv(const Game& game) {
 bool PackOpening::loadInventoryFromService(const Game& game) {
     if (availableCards.empty()) return false;
 
-    const std::string host = getEnvOrDefault("CARDS_SERVICE_HOST", "127.0.0.1");
-    const int port = getEnvIntOrDefault("CARDS_SERVICE_PORT", 8082);
+    const std::string host = EnvUtil::getServiceHost("CARDS_SERVICE", "127.0.0.1", "cards.speedcardgame.aws");
+    const int port = EnvUtil::getServicePort("CARDS_SERVICE", 8082, 443);
     const int userId = resolveUserId(game);
     if (userId <= 0) {
         inventoryCopies.assign(availableCards.size(), 0);
@@ -642,8 +628,8 @@ bool PackOpening::loadInventoryFromService(const Game& game) {
 bool PackOpening::applyInventoryDelta(const Game& game, const std::unordered_map<int, int>& deltaByCardId) {
     if (deltaByCardId.empty()) return true;
 
-    const std::string host = getEnvOrDefault("CARDS_SERVICE_HOST", "127.0.0.1");
-    const int port = getEnvIntOrDefault("CARDS_SERVICE_PORT", 8082);
+    const std::string host = EnvUtil::getServiceHost("CARDS_SERVICE", "127.0.0.1", "cards.speedcardgame.aws");
+    const int port = EnvUtil::getServicePort("CARDS_SERVICE", 8082, 443);
     const std::string path = "/cardbase/inventories";
     const int userId = resolveUserId(game);
     if (userId <= 0) {

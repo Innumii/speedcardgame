@@ -4,6 +4,7 @@ image_repo = "ryanljk/g4t2-auth-service"
 assign_public_ip = true
 
 use_managed_data_stack = true
+postgres_sslmode = "require"
 # data_stack_state_path = "../../data/terraform.tfstate"
 
 # Optional manual overrides when use_managed_data_stack = false
