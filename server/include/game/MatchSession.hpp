@@ -31,6 +31,7 @@ struct ServerBoard {
 // Player match state
 // ----------------------------
 struct PlayerState {
+    int id = -1;
     int health = 100;
     int fatigueDamage = 1;
     int mana = 0;

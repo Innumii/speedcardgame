@@ -232,7 +232,7 @@ bool DeckBuilding::refreshFromService(Game& game) {
         return false;
     }
 
-    const bool deckLoaded = loadDeckFromService(game);
+    const bool deckLoaded = loadDeckFromService(game); //get user deck from db
     loadInventoryFromService(game);
     return deckLoaded;
 }
@@ -603,7 +603,8 @@ Deck DeckBuilding::buildDeck() const {
             }
         }
     }
-
+    // std::cout<< "[DeckBuilding]: ";
+    // deck.toString();
     return deck;
 }
 

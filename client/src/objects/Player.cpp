@@ -31,7 +31,7 @@ Deck& Player::getDeck() {
 }
 
 void Player::setDeck(Deck newDeck) {
-    this->deck = std::move(deck); // move the deck instead of copy
+    this->deck = std::move(newDeck); // move the deck instead of copy
 }
 
 //take card from deck and add to hand

@@ -65,7 +65,7 @@ private:
 	SDL_Rect SaveButton{20, 80, 140, 50};
 	SDL_Rect PlayButton{20, 140, 140, 50};
 	std::vector<std::unique_ptr<Card>> availableCards; //stores card templates owned by the user
-	std::vector<int> deckCopies;
+	std::vector<int> deckCopies; //st
 	std::vector<int> inventoryCopies;
 
 	bool dragging{false};

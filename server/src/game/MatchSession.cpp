@@ -18,7 +18,10 @@ MatchSession::MatchSession(
     : playerA(std::move(a)),
       playerB(std::move(b)),
       cardCatalog(catalog)
-{}
+{
+    players[0].id = playerA->getPlayerId();
+    players[1].id = playerB->getPlayerId();
+}
 
 MatchSession::~MatchSession() {
     stop();
@@ -182,9 +185,9 @@ bool MatchSession::drawAndSend(int playerIndex) {
     player.hand.push_back(cardId);   // if you only need ID, keep this
 
     // auto& conn = (playerIndex == 0) ? playerA : playerB;
-    std::cout << playerIndex << ": DRAW " << playerIndex << " " << std::to_string(cardId) << "\n";
-    playerA->send("DRAW " + std::to_string(playerIndex) + " " + std::to_string(cardId) + "\n");
-    playerB->send("DRAW " + std::to_string(playerIndex) + " " + std::to_string(cardId) + "\n");
+    std::cout << player.id << ": DRAW " << player.id << " " << std::to_string(cardId) << "\n";
+    playerA->send("DRAW " + std::to_string(player.id) + " " + std::to_string(cardId) + "\n");
+    playerB->send("DRAW " + std::to_string(player.id) + " " + std::to_string(cardId) + "\n");
 
     return true;
 }

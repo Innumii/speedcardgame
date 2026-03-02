@@ -40,6 +40,7 @@ func main() {
 		os.Getenv("POSTGRES_SSLMODE"),
 		os.Getenv("POSTGRES_TIMEZONE"),
 	)
+	// fmt.Println(dsn)
 
 	// Database connection setup
 	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})

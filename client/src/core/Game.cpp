@@ -167,7 +167,9 @@ void Game::setNextState(GameState newState) {
 }
 
 void Game::setPlayingDeck(Deck newDeck) {
+// newDeck.toString();
     player.setDeck(std::move(newDeck));
+// player.deck.toString();
     playingSetup = false;
 }
 
