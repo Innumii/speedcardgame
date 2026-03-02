@@ -76,12 +76,6 @@ void PlayerConnection::stop() {
 
     if (readThread.joinable() && std::this_thread::get_id() != readThread.get_id())
         readThread.join();
-
-    if (ssl) {
-        SSL_shutdown(ssl);
-        SSL_free(ssl);
-        ssl = nullptr;
-    }
 }
 
 int PlayerConnection::getSocket() const {
@@ -133,11 +127,4 @@ void PlayerConnection::readLoop() {
 
     // fire disconnect once
     if (onDisconnected) onDisconnected();
-
-    // cleanup SSL safely
-    if (ssl) {
-        SSL_shutdown(ssl);
-        SSL_free(ssl);
-        ssl = nullptr;
-    }
 }

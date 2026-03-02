@@ -19,6 +19,10 @@ void handleSignal(int) {
 
 //local vars in C++ CANNOT be accessed outside the block they are declared in
 int main() {
+    std::set_terminate([]{
+        std::cerr << "💥 std::terminate called\n";
+        std::abort();
+    });
     //flush buffer
     std::cout.setf(std::ios::unitbuf);
     // std::cout << "Yo\n";

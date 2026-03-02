@@ -60,9 +60,9 @@ bool GameServer::start() {
                     std::cout << "Player disconnected: " << p->getUsername() << "\n";
 
                     // Remove from queues / matches
-                    if (matchmaker) matchmaker->removePlayer(p);
-                    if (matchManager) matchManager->onPlayerDisconnected(p);
-                    if (tcpServer) tcpServer->enqueueDisconnect(p);
+                    if (tcpServer) tcpServer->enqueueDisconnect(p); //push disconnect action into queue, to drop the socket
+                    if (matchmaker) matchmaker->removePlayer(p); //remove from queue if queueing
+                    if (matchManager) matchManager->onPlayerDisconnected(p); //remove PendingMatch obj if any
                     
                 }
             };

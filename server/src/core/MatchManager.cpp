@@ -67,8 +67,10 @@ void MatchManager::onPlayerDisconnected(std::shared_ptr<PlayerConnection> player
     }
 
     if (other) {
+        // std::cout << "[MatchManager/before sendMatchCancelled] other.use_count() = " << other.use_count() << "\n";
         sendMatchCancelled(other);
         if (matchmaker) {
+            // std::cout << "[MatchManager/before enqueuePlayer] other.use_count() = " << other.use_count() << "\n";
             matchmaker->enqueuePlayer(other);
             std::cout << "Requeued player " << other->getUsername() << " after opponent disconnected\n";
         }
