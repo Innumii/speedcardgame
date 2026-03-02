@@ -1,7 +1,9 @@
+//This class is used for creation/handling of the Client connection to the server
 #include "core/NetworkClient.hpp"
 #include <iostream>
 #include <cstring>
 #include <cerrno>
+#include <sstream>
 
 NetworkClient::NetworkClient(SocketMode m) : socketFd(-1), connected(false), mode(m) {
 #ifdef _WIN32
@@ -198,3 +200,37 @@ int NetworkClient::receive(void* buffer, size_t size) {
     }
     return received;
 }
+
+//GAME ACTIONS (send data as JSON)
+bool NetworkClient::sendPlayCard(int handIndex, int lane, std::optional<int> targetId) {
+    if (!connected) return false;
+
+    //JSON
+    std::ostringstream ss;
+    ss << "{";
+    ss << "\"type\":\"PLAY_CARD\",";
+    ss << "\"handIndex\":" << handIndex << ",";
+    ss << "\"lane\":" << lane;
+
+    if (targetId.has_value()) {
+        ss << ",\"targetId\":" << *targetId;
+    }
+
+    ss << "}\n"; // newline = message delimiter
+
+    return sendString(ss.str());
+}
+
+bool NetworkClient::sendDiscardCard(int handIndex) {
+    if (!connected) return false;
+
+    //JSON
+    std::ostringstream ss;
+    ss << "{";
+    ss << "\"type\":\"DISCARD_CARD\",";
+    ss << "\"handIndex\":" << handIndex;
+    ss << "}\n";
+
+    return sendString(ss.str());
+}
+

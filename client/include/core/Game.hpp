@@ -38,8 +38,7 @@ public:
      int ypos,
      int width,
      int height,
-     bool fullscreen,
-     int drawIntervalSeconds = 3);
+     bool fullscreen);
 
     //destructor, uses RAII cleanup
     ~Game(); 
@@ -63,8 +62,11 @@ public:
     void setNextState(GameState newState);
     void commitStateChange();
     void setPlayingDeck(Deck newDeck);
-    bool tryStartPlayingWithBuiltDeck();
     bool refreshPlayerDeckFromService();
+    Playing& getPlayingState();
+
+
+    bool tryStartPlayingWithBuiltDeck();
     int getPackRefundCoins() const;
     void addPackRefundCoins(int delta);
 
@@ -76,11 +78,11 @@ public:
     const std::string& getPlayerUsername() const;
     void setPlayerUsername(std::string username);
 
-    const Player& getPlayer(bool isOpponent) const;
-    const Deck& getDeck(const Player& player) const;
-    std::size_t getHandSize(const Player& player) const;
-    int getHealth(const Player& player) const;
-    int getMana(const Player& player) const;
+    Player& getPlayer();
+    // const Deck& getDeck(const Player& player) const;
+    // std::size_t getHandSize(const Player& player) const;
+    // int getHealth(const Player& player) const;
+    // int getMana(const Player& player) const;
 
     const RenderText::FontSet& getTitleFonts() const;
     const RenderText::FontSet& getUIFonts() const;
@@ -93,7 +95,7 @@ private:
     NetworkClient netClient{NetworkClient::SocketMode::NonBlocking};
 
     Player player;
-    Player remotePlayer;
+    // Player remotePlayer;
     std::string playerUsername{"Player"};
 
     int drawIntervalSeconds{3};
@@ -123,7 +125,7 @@ private:
     Title titleState;
     Login loginState;
     Register registerState;
-    Playing playingState{drawIntervalSeconds};
+    Playing playingState;
     DeckBuilding deckBuildingState;
     PackOpening packOpeningState;
     std::optional<Connecting> connectingState;

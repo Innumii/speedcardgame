@@ -167,11 +167,13 @@ namespace {
 DeckBuilding::DeckBuilding() = default;
 
 bool DeckBuilding::refreshFromService(Game& game) {
+    //Get all available cards in the game
     cardsLoadedFromService = loadAvailableCardsFromService(game);
     if (!cardsLoadedFromService) {
         cardsLoadedFromService = loadAvailableCardsFromCsv(game);
     }
 
+    //If no cards pulled, return false
     if (availableCards.empty()) {
         deckCopies.clear();
         inventoryCopies.clear();
@@ -179,7 +181,7 @@ bool DeckBuilding::refreshFromService(Game& game) {
         return false;
     }
 
-    const bool deckLoaded = loadDeckFromService(game);
+    const bool deckLoaded = loadDeckFromService(game); //get user deck from db
     loadInventoryFromService(game);
     return deckLoaded;
 }
@@ -235,24 +237,25 @@ void DeckBuilding::handleEvents(Game& game, const SDL_Event& event) {
         return;
     }
 
+    //Dead Button, remove later
     const bool inPlay = (event.type == SDL_MOUSEBUTTONDOWN) &&
                     (event.button.button == SDL_BUTTON_LEFT) &&
                     (event.button.x >= PlayButton.x && event.button.x <= (PlayButton.x + PlayButton.w)) &&
                     (event.button.y >= PlayButton.y && event.button.y <= (PlayButton.y + PlayButton.h));
-    if (inPlay) {
-        if (!hasFullDeck()) {
-            const int deckCount = getDeckCardCount();
-            const int deckLimit = getDeckSizeLimit();
-            setStatusMessage(
-                "Deck size too small (" + std::to_string(deckCount) + "/" + std::to_string(deckLimit) + ").",
-                2500
-            );
-            return;
-        }
-        game.setPlayingDeck(buildDeck());
-        game.setNextState(GameState::Playing);
-        return;
-    }
+    // if (inPlay) {
+    //     if (!hasFullDeck()) {
+    //         const int deckCount = getDeckCardCount();
+    //         const int deckLimit = getDeckSizeLimit();
+    //         setStatusMessage(
+    //             "Deck size too small (" + std::to_string(deckCount) + "/" + std::to_string(deckLimit) + ").",
+    //             2500
+    //         );
+    //         return;
+    //     }
+    //     game.setPlayingDeck(buildDeck());
+    //     game.setNextState(GameState::Playing);
+    //     return;
+    // }
 
     if (event.type == SDL_MOUSEBUTTONDOWN && event.button.button == SDL_BUTTON_LEFT) {
         const SDL_Point point = getPoint(event.button.x, event.button.y);
@@ -512,18 +515,18 @@ void DeckBuilding::tryRemoveFromDeck(int cardIndex) {
 
 Deck DeckBuilding::buildDeck() const {
     Deck deck;
-    for (std::size_t i = 0; i < availableCards.size(); ++i) {
+    for (std::size_t i = 0; i < availableCards.size(); ++i) { //add mapped card objects
         if (deckCopies[i] <= 0) continue;
 
         const Card* base = availableCards[i].get();
         if (!base) continue;
 
-        for (int copy = 0; copy < deckCopies[i]; ++copy) {
+        for (int copy = 0; copy < deckCopies[i]; ++copy) { // Card objects
             switch (base->getType()) {
-                case CardType::Creature: {
+                case CardType::Creature: { //
                     const auto* creature = dynamic_cast<const CreatureCard*>(base);
                     if (!creature) break;
-                    deck.addCard(std::make_unique<CreatureCard>(
+                    deck.addCard(std::make_unique<CreatureCard>( //duplicate into deck
                         creature->getName(),
                         creature->getText(),
                         creature->getManaValue(),
@@ -549,7 +552,8 @@ Deck DeckBuilding::buildDeck() const {
             }
         }
     }
-
+    // std::cout<< "[DeckBuilding]: ";
+    // deck.toString();
     return deck;
 }
 
@@ -809,6 +813,10 @@ bool DeckBuilding::loadDeckFromService(const Game& game) {
     const int port = EnvUtil::getServicePort("CARDS_SERVICE", 8082, 443);
     const std::string path = "/cardbase/decks";
     const int userId = EnvUtil::getEnvIntOrDefault("CARDS_SERVICE_UID", game.getPlayerId());
+    
+    // Construct the specific endpoint: /cardbase/decks/{uid}
+    std::string endpoint = "/cardbase/decks/" + std::to_string(userId);
+    
     int statusCode = -1;
     std::string responseBody;
     if (!HttpUtil::sendHttp(host, port, "GET", path, "", statusCode, responseBody)) {
@@ -821,29 +829,38 @@ bool DeckBuilding::loadDeckFromService(const Game& game) {
         return false;
     }
 
+    // Extract the "cards" object from the response JSON
+    // The Go backend returns { "uid": 1, "cards": { "101": 2, ... } }
+    std::string cardsJson;
+    size_t cardsKeyPos = responseBody.find("\"cards\"");
+    if (cardsKeyPos == std::string::npos) return false;
+    
+    size_t startBrace = responseBody.find('{', cardsKeyPos);
+    size_t endBrace;
+    if (!JsonUtil::findMatchingBrace(responseBody, startBrace, endBrace)) return false;
+    
+    // Get just the inner content of the "cards" map
+    cardsJson = responseBody.substr(startBrace + 1, endBrace - startBrace - 1);
+
     std::vector<std::pair<int, int>> cardCounts;
     if (!parseCardsMap(cardsJson, cardCounts)) {
         deckCopies.assign(availableCards.size(), 0);
         return false;
     }
 
+    // Map the card IDs from the JSON to our local index array
     std::unordered_map<int, std::size_t> cardIndexById;
-    cardIndexById.reserve(availableCards.size());
     for (std::size_t i = 0; i < availableCards.size(); ++i) {
         cardIndexById.emplace(availableCards[i]->getId(), i);
     }
 
     deckCopies.assign(availableCards.size(), 0);
     for (const auto& pair : cardCounts) {
-        const int cardId = pair.first;
-        const int copies = pair.second;
-        if (copies <= 0) continue;
-        auto it = cardIndexById.find(cardId);
-        if (it == cardIndexById.end()) continue;
-        const int clamped = std::min(copies, MaxDeckCopies);
-        deckCopies[it->second] = clamped;
+        auto it = cardIndexById.find(pair.first);
+        if (it != cardIndexById.end()) {
+            deckCopies[it->second] = std::min(pair.second, MaxDeckCopies);
+        }
     }
 
     return true;
 }
-

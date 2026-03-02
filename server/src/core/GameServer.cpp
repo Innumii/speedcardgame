@@ -4,6 +4,12 @@
 #include <iostream>
 #include <memory>
 #include <stdexcept>
+#include "utils/EnvUtil.hpp"
+#include "utils/JsonUtil.hpp"
+#include "objects/CreatureCard.h"
+#include "objects/SpellCard.h"
+#define CPPHTTPLIB_OPENSSL_SUPPORT
+#include "httplib/httplib.h"
 
 GameServer::GameServer(int port)
     : port(port), running(false)
@@ -12,6 +18,15 @@ GameServer::GameServer(int port)
 
 bool GameServer::start() {
     running = false;
+    if (!loadAvailableCardsFromService()) {
+        std::cerr << "Failed to load cards, cannot start server\n";
+        return false;
+    }
+
+    //Check that youve loaded all available cards
+    // for (int i = 0; i < availableCards.size(); i++) {
+    //     std::cout << availableCards[i]->getName() << "\n";
+    // }
 
     try {
         // -------------------------------
@@ -23,8 +38,9 @@ bool GameServer::start() {
         matchmaker = std::make_unique<Matchmaker>();
 
         //Initialise MatchManager and wire callback
-        matchManager = std::make_unique<MatchManager>();
+        matchManager = std::make_unique<MatchManager>(*this);
         matchManager->setMatchmaker(matchmaker.get());
+        // matchManager->setServer(this);
 
         matchmaker->onMatchReady = [this](auto a, auto b) {
             matchManager->onPairFound(a, b);
@@ -44,9 +60,9 @@ bool GameServer::start() {
                     std::cout << "Player disconnected: " << p->getUsername() << "\n";
 
                     // Remove from queues / matches
-                    if (matchmaker) matchmaker->removePlayer(p);
-                    if (matchManager) matchManager->onPlayerDisconnected(p);
-                    if (tcpServer) tcpServer->enqueueDisconnect(p);
+                    if (tcpServer) tcpServer->enqueueDisconnect(p); //push disconnect action into queue, to drop the socket
+                    if (matchmaker) matchmaker->removePlayer(p); //remove from queue if queueing
+                    if (matchManager) matchManager->onPlayerDisconnected(p); //remove PendingMatch obj if any
                     
                 }
             };
@@ -154,3 +170,124 @@ void GameServer::waitForShutdown() {
     std::unique_lock<std::mutex> lock(shutdownMutex);
     shutdownCv.wait(lock, [this]() { return !running.load(); });
 }
+
+bool GameServer::loadAvailableCardsFromService() {
+    const std::string host = EnvUtil::getEnvOrDefault("CARDS_SERVICE_HOST", "host.docker.internal");
+    const int port = EnvUtil::getEnvIntOrDefault("CARDS_SERVICE_PORT", 8082);
+    const std::string path = "/cardbase/cards";
+
+    int statusCode = -1;
+    std::string responseBody;
+
+    if (!sendHttp(host, port, "GET", path, "", statusCode, responseBody)) {
+        std::cerr << "Failed to fetch cards from service\n";
+        return false;
+    }
+
+    std::unordered_map<int, std::shared_ptr<ServerCard>> fetchedCards; // <-- now a map
+    std::size_t pos = 0;
+
+    while (true) {
+        const std::size_t objStart = responseBody.find('{', pos);
+        if (objStart == std::string::npos) break;
+        const std::size_t objEnd = responseBody.find('}', objStart);
+        if (objEnd == std::string::npos) break;
+        const std::string obj = responseBody.substr(objStart, objEnd - objStart + 1);
+
+        int cid = -1;
+        int cost = 0;
+        int value = 0;
+        int power = 0;
+        int toughness = 0;
+        std::string name;
+        std::string type;
+        std::string effect;
+
+        JsonUtil::readJsonIntField(obj, "cid", cid);
+        JsonUtil::readJsonStringField(obj, "name", name);
+        JsonUtil::readJsonStringField(obj, "type", type);
+        JsonUtil::readJsonIntField(obj, "cost", cost);
+        JsonUtil::readJsonIntField(obj, "value", value);
+        JsonUtil::readJsonIntField(obj, "power", power);
+        JsonUtil::readJsonIntField(obj, "toughness", toughness);
+        JsonUtil::readJsonStringField(obj, "effect", effect);
+
+        if (!name.empty()) {
+            std::string typeLower = type;
+            std::transform(typeLower.begin(), typeLower.end(), typeLower.begin(), ::tolower);
+            const int manaValue = value > 0 ? value : cost;
+
+            std::shared_ptr<ServerCard> card;
+
+            if (typeLower == "creature") {
+                card = std::static_pointer_cast<ServerCard>(
+                    std::make_shared<CreatureCard>(name, effect, manaValue, cost, power, toughness, cid));            
+            } else {
+                card = std::static_pointer_cast<ServerCard>(
+                    std::make_shared<SpellCard>(name, effect, manaValue, cost, cid)
+                );
+            }
+
+            fetchedCards[cid] = card; // <-- store in map by card ID
+        }
+
+        pos = objEnd + 1;
+    }
+
+    if (fetchedCards.empty()) {
+        std::cerr << "No cards fetched from service\n";
+        return false;
+    }
+
+    availableCards = std::move(fetchedCards); // ✅ map assignment
+    for (const auto& [id, card] : availableCards) {
+    if (!card) {
+        std::cerr << "FATAL: Null card in catalog! ID=" << id << "\n";
+        return false;
+    }
+}
+    std::cout << "Loaded " << availableCards.size() << " cards from service\n";
+    return true;
+}
+
+bool GameServer::sendHttp(const std::string& host, int port, const std::string& method,
+              const std::string& path, const std::string& body,
+              int& statusCode, std::string& responseBody) {
+
+        bool useHttps = (port == 443);
+        httplib::Result res;
+
+        if (useHttps) {
+            httplib::SSLClient client(host.c_str(), port);
+            client.enable_server_certificate_verification(false); // for self-signed
+            client.set_follow_location(true);
+
+            if (method == "GET")      res = client.Get(path.c_str());
+            else if (method == "POST") res = client.Post(path.c_str(), body, "application/json");
+            else if (method == "PUT")  res = client.Put(path.c_str(), body, "application/json");
+            else if (method == "PATCH") res = client.Patch(path.c_str(), body, "application/json");
+            else if (method == "DELETE") res = client.Delete(path.c_str());
+            else return false;
+
+        } else {
+            httplib::Client client(host.c_str(), port);
+            client.set_follow_location(true);
+
+            if (method == "GET")      res = client.Get(path.c_str());
+            else if (method == "POST") res = client.Post(path.c_str(), body, "application/json");
+            else if (method == "PUT")  res = client.Put(path.c_str(), body, "application/json");
+            else if (method == "PATCH") res = client.Patch(path.c_str(), body, "application/json");
+            else if (method == "DELETE") res = client.Delete(path.c_str());
+            else return false;
+        }
+
+        if (!res) {
+            statusCode = -1;
+            responseBody.clear();
+            return false; // network error
+        }
+
+        statusCode = res->status;
+        responseBody = res->body;
+        return true;
+    }

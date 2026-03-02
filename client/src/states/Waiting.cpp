@@ -96,6 +96,15 @@ void Waiting::update(Game& game) {
                 std::cout << "Match cancelled, back to queue\n";
             }
             else if (line == "MATCH_START") {
+                auto& playingState = game.getPlayingState();
+
+                auto& player = game.getPlayer();
+                std::cout << "[Waiting] "; 
+                player.deck.toString();
+                std::cout << "\n";
+                playingState.setupPlayers(std::move(player), Player());
+                std::cout << "Entering Playing state...\n";
+                
                 game.setNextState(GameState::Playing);
                 return;
             }

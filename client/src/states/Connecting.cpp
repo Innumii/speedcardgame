@@ -47,6 +47,7 @@ void Connecting::update(Game& game) {
             // sends player data to server and waits for response in Waiting state
 
             const int playerId = game.getPlayerId();
+            // std::cout << "[Connecting] " << playerId;
             const std::string& username = game.getPlayerUsername();
 
             auto escapeJson = [](const std::string& input) {

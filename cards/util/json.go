@@ -19,3 +19,7 @@ func RespondWithJSON(w http.ResponseWriter, code int, payload interface{}) {
 		log.Printf("Failed to write JSON response: %v", err)
 	}
 }
+
+func RespondWithError(w http.ResponseWriter, code int, message string) {
+	RespondWithJSON(w, code, map[string]string{"error": message})
+}
