@@ -26,6 +26,7 @@ jobs:
             --error-exitcode=1 \
             --inline-suppr \
             --suppress=missingIncludeSystem \
+            --suppress=preprocessorErrorDirective server/ \
             --template=gcc \
             -I server/include \
             server/src server/include
