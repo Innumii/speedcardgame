@@ -140,13 +140,13 @@ void RenderBoard::drawDiscardZone(SDL_Renderer* renderer, RenderText& textRender
 	fillRoundedRect(renderer, discardZone, 10, fill);
 	drawRoundedBorder(renderer, discardZone, 10, border, hovering ? 3 : 2);
 
-	// Use wrapped text with proper width constraint
-	const int textPadding = 8;
+	const int textPadding = 6;
 	const int maxTextWidth = discardZone.w - (textPadding * 2);
 
+	// Title
 	textRenderer.drawWrappedText(
 		renderer,
-		"Discard Zone",
+		"Discard",
 		fontSmall,
 		SDL_Color{220, 230, 255, 255},
 		discardZone.x + textPadding,
@@ -154,13 +154,14 @@ void RenderBoard::drawDiscardZone(SDL_Renderer* renderer, RenderText& textRender
 		maxTextWidth
 	);
 
+	// Description
 	textRenderer.drawWrappedText(
 		renderer,
-		"Drop cards here to gain mana",
+		"Drop cards to gain mana",
 		fontSmall,
 		SDL_Color{180, 200, 230, 255},
 		discardZone.x + textPadding,
-		discardZone.y + 32,  // Lower position
+		discardZone.y + 26,
 		maxTextWidth
 	);
 }

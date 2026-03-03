@@ -619,9 +619,10 @@ void Playing::computeUiRects(int screenW, int screenH) {
 
     const int margin = 20;
     
+    // Menu button - TOP RIGHT
     const int menuW = 120;
     const int menuH = 50;
-    menuButton = SDL_Rect{margin, margin, menuW, menuH};
+    menuButton = SDL_Rect{screenW - menuW - margin, margin, menuW, menuH};
     
     const int pauseModalW = 400;
     const int pauseModalH = 280;
