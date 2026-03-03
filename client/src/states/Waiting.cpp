@@ -174,6 +174,9 @@ void Waiting::update(Game& game) {
                         }
                         //move deck into opponent Player obj
                         opponent.setDeck(std::move(opponentDeck));
+                    } else {
+                        std::cerr << "[Waiting] Failed to load opponent deck\n";
+                        return;
                     }
                     
                     auto& playingState = game.getPlayingState();

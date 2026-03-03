@@ -10,6 +10,7 @@
 #include <iostream>
 #include <chrono>
 #include <thread>
+#include <mutex>
 
 MatchSession::MatchSession(
     std::shared_ptr<PlayerConnection> a,
@@ -32,6 +33,18 @@ MatchSession::~MatchSession() {
 // --------------------------------------------------
 bool MatchSession::start() {
     if (running.load()) return false;
+
+    auto weakSelf = std::weak_ptr<MatchSession>(shared_from_this());
+    playerA->onMessageReceived = [weakSelf](const std::vector<char>& raw) {
+        if (auto self = weakSelf.lock()) {
+            self->handlePlayerMessage(0, raw);
+        }
+    };
+    playerB->onMessageReceived = [weakSelf](const std::vector<char>& raw) {
+        if (auto self = weakSelf.lock()) {
+            self->handlePlayerMessage(1, raw);
+        }
+    };
 
     try {
         gameThread = std::thread(&MatchSession::gameLoop, this);
@@ -177,6 +190,11 @@ bool MatchSession::drawAndSend(int playerIndex) {
     auto& player = players[playerIndex];
     auto& deck = player.deck;
 
+    int handSize = player.hand.size();
+    if (handSize >= handLimit) {
+        return false;
+    }
+
     auto cardIdOpt = deck.draw();
     if (!cardIdOpt) return false;
 
@@ -196,9 +214,10 @@ bool MatchSession::drawAndSend(int playerIndex) {
 // Game Loop
 // --------------------------------------------------
 void MatchSession::gameLoop() {
-    using namespace std::chrono_literals;
+    using namespace std::chrono;
 
-    std::cout << "Game loop started\n";
+    auto lastDrawTime = steady_clock::now();
+    std::cout << "[MatchSession] Game loop started\n";
     std::string msgA = "MATCH_START " + std::to_string(playerB->getPlayerId()) + "\n";
     std::string msgB = "MATCH_START " + std::to_string(playerA->getPlayerId()) + "\n";
 
@@ -209,28 +228,40 @@ void MatchSession::gameLoop() {
     sendOpeningHands();
 
     while (running.load()) {
+        // Disconnect check (optional)
         if (!playerA->isAlive() || !playerB->isAlive()) {
             handleDisconnect();
             break;
         }
 
-        std::string msg;
+        auto now = steady_clock::now();
 
-        // Relay A → B (TEMPORARY until full authority)
-        while (playerA->pollMessage(msg) || playerB->pollMessage(msg)) {
-            if (playerA->pollMessage(msg)) {
-                playerA->send(msg);
+        // Draw a card every 5 seconds
+        if (duration_cast<seconds>(now - lastDrawTime).count() >= 5) {
+            {
+                std::lock_guard<std::mutex> lock(stateMutex);
+                drawAndSend(0); // draw for player a
+                drawAndSend(1); // draw for player b
             }
-            if (playerB->pollMessage(msg)) {
-                playerB->send(msg);
-            }
+            lastDrawTime = now;
         }
 
-
-        std::this_thread::sleep_for(1ms);
+        // Small sleep to avoid busy loop
+        std::this_thread::sleep_for(10ms);
     }
+    std::cout << "[MatchSession] Exiting Match Game Loop...\n";
+}
 
-    std::cout << "Game loop exiting\n";
+void MatchSession::handlePlayerMessage(int playerIndex, const std::vector<char>& raw) {
+    std::string msg(raw.begin(), raw.end());
+
+    std::cout << "[Match] Player " << players[playerIndex].id << " -> " << msg;
+
+    // TODO:
+    // - Validate command
+    // - Check legality
+    // - Mutate authoritative state
+    // - Broadcast result
 }
 
 // --------------------------------------------------

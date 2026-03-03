@@ -30,7 +30,7 @@ public:
 
     //actions
     bool send(const std::string& msg);        // send message to client
-    bool pollMessage(std::string& outMsg);    // check if messages received
+    // bool pollMessage(std::string& outMsg);    // check if messages received
     bool isAlive() const;   
 
     // Event: called when a message is received
@@ -53,8 +53,8 @@ private:
     std::thread readThread;
     
     //queue and mutex
-    std::queue<std::string> messageQueue;
-    std::mutex queueMutex;
+    // std::queue<std::string> messageQueue;
+    // std::mutex queueMutex;
 
     //SSL
     SSL* ssl{nullptr};

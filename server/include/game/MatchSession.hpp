@@ -7,6 +7,7 @@
 #include <vector>
 #include <optional>
 #include <unordered_map>
+#include <mutex>
 
 #include "objects/ServerDeck.h"
 #include "objects/ServerCard.h"
@@ -42,7 +43,7 @@ struct PlayerState {
 // ----------------------------
 // MatchSession
 // ----------------------------
-class MatchSession {
+class MatchSession : public std::enable_shared_from_this<MatchSession>{
 public:
     MatchSession(std::shared_ptr<PlayerConnection> playerA,
                  std::shared_ptr<PlayerConnection> playerB, const std::unordered_map<int, std::shared_ptr<ServerCard>>& cardCatalog);
@@ -53,6 +54,8 @@ public:
 
     bool start();
     void stop();
+    void handlePlayerMessage(int playerIndex, const std::vector<char>& raw);
+
 
     // Setup phase
     void setupDecks();
@@ -63,6 +66,8 @@ public:
     const ServerCard* getCard(int id) const;
 
 private:
+    const int handLimit = 7;
+
     void gameLoop();
     void handleDisconnect();
 
@@ -72,6 +77,8 @@ private:
     std::unordered_map<int, std::shared_ptr<ServerCard>> cardCatalog;
     std::thread gameThread;
     std::atomic<bool> running{false};
+    std::mutex stateMutex; // prevent deadlock for Player actions
+
 
     // Authoritative state
     PlayerState players[2];   // 0 = A, 1 = B
