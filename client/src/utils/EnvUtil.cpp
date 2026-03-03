@@ -65,8 +65,8 @@ namespace EnvUtil {
             envLoaded = true;
 
             const std::vector<std::string> candidatePaths = {
-                ".env",
-                "../.env"
+                ".env"
+                // "../.env"
             };
 
             for (const std::string& path : candidatePaths) {

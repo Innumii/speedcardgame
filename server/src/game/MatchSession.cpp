@@ -199,9 +199,11 @@ void MatchSession::gameLoop() {
     using namespace std::chrono_literals;
 
     std::cout << "Game loop started\n";
+    std::string msgA = "MATCH_START " + std::to_string(playerB->getPlayerId()) + "\n";
+    std::string msgB = "MATCH_START " + std::to_string(playerA->getPlayerId()) + "\n";
 
-    playerA->send("MATCH_START\n");
-    playerB->send("MATCH_START\n");
+    playerA->send(msgA);
+    playerB->send(msgB);
 
     setupDecks();
     sendOpeningHands();
