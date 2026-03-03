@@ -280,32 +280,65 @@ namespace {
         tr.drawText(r, s, font, SDL_Color{255, 255, 255, 255}, cx - tw/2, cy - th/2);
     }
 
-    // ── shared card body draw ─────────────────────────────────────────
-    void drawCardBody(SDL_Renderer* renderer, const SDL_Rect& rect, int cornerRadius,
-                      SDL_Color artColor, SDL_Color infoBg, int artH, int cardId) {
-        fillRoundedRect(renderer, rect, cornerRadius, infoBg);
+// ── shared card body draw ─────────────────────────────────────────
+void drawCardBody(SDL_Renderer* renderer, const SDL_Rect& rect, int cornerRadius,
+                  SDL_Color artColor, SDL_Color infoBg, int artH, int cardId) {
+    fillRoundedRect(renderer, rect, cornerRadius, infoBg);
+    
+    SDL_Rect artRect{rect.x, rect.y, rect.w, artH};
+    
+    // Try to load and render card image
+    SDL_Texture* cardImage = getCardImageTexture(renderer, cardId);
+    
+    if (cardImage) {
+        // Create a clipping region with rounded corners to contain the image
+        SDL_Rect clipRect{rect.x + 2, rect.y + 2, rect.w - 4, artH - 4};
         
-        SDL_Rect artRect{rect.x, rect.y, rect.w, artH};
+        // Set clipping region
+        SDL_RenderSetClipRect(renderer, &clipRect);
         
-        // Try to load and render card image
-        SDL_Texture* cardImage = getCardImageTexture(renderer, cardId);
+        // Get image dimensions
+        int imgW = 0, imgH = 0;
+        SDL_QueryTexture(cardImage, nullptr, nullptr, &imgW, &imgH);
         
-        if (cardImage) {
-            // Card image exists - render it in the art area
-            SDL_RenderCopy(renderer, cardImage, nullptr, &artRect);
-        } else {
-            // No image - use gradient background as fallback
-            fillRoundedRect(renderer, artRect, cornerRadius, artColor);
-            SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
-            for (int y = cornerRadius; y < artH; ++y) {
-                float t = (float)y / artH;
-                Uint8 alpha = (Uint8)(210 * (t * t * t));
-                SDL_SetRenderDrawColor(renderer, 0, 0, 0, alpha);
-                SDL_RenderDrawLine(renderer, rect.x + 2, rect.y + y, rect.x + rect.w - 3, rect.y + y);
-            }
+        // Calculate scaling to fit width while maintaining aspect ratio
+        float scale = (float)clipRect.w / (float)imgW;
+        int scaledH = (int)(imgH * scale);
+        
+        // Center vertically if needed
+        int renderY = clipRect.y;
+        if (scaledH < clipRect.h) {
+            renderY += (clipRect.h - scaledH) / 2;
+        }
+        
+        SDL_Rect imgRect{clipRect.x, renderY, clipRect.w, scaledH};
+        
+        // Render the image
+        SDL_RenderCopy(renderer, cardImage, nullptr, &imgRect);
+        
+        // Clear clipping region
+        SDL_RenderSetClipRect(renderer, nullptr);
+        
+        // Add a subtle gradient overlay to blend with card style
+        SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+        for (int y = cornerRadius; y < artH; ++y) {
+            float t = (float)y / artH;
+            Uint8 alpha = (Uint8)(80 * (t * t * t)); // Lighter overlay
+            SDL_SetRenderDrawColor(renderer, 0, 0, 0, alpha);
+            SDL_RenderDrawLine(renderer, rect.x + 2, rect.y + y, rect.x + rect.w - 3, rect.y + y);
+        }
+    } else {
+        // No image - use gradient background as fallback
+        fillRoundedRect(renderer, artRect, cornerRadius, artColor);
+        SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+        for (int y = cornerRadius; y < artH; ++y) {
+            float t = (float)y / artH;
+            Uint8 alpha = (Uint8)(210 * (t * t * t));
+            SDL_SetRenderDrawColor(renderer, 0, 0, 0, alpha);
+            SDL_RenderDrawLine(renderer, rect.x + 2, rect.y + y, rect.x + rect.w - 3, rect.y + y);
         }
     }
-
+}
     // ── compact card (hand/board) ──────────────────────────────────────
     void drawCompact(SDL_Renderer* renderer, RenderText& textRenderer,
                      const Card& card, const SDL_Rect& rect,
