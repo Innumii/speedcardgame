@@ -67,6 +67,7 @@ public:
 
 private:
     const int handLimit = 7;
+    const int drawInterval = 5;
 
     void gameLoop();
     void handleDisconnect();

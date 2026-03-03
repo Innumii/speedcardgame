@@ -163,6 +163,7 @@ bool MatchSession::parseDeckJson(const std::string& jsonStr, ServerDeck& outDeck
     return true;
 }
 
+//Sets up decks for both players at start of game (shuffle + draw 6)
 void MatchSession::setupDecks() {
     std::cout << "Attempting deck setup for " << playerA.get()->getUsername() << "\n";
     loadDeckForPlayer(playerA.get()->getPlayerId(), players[0].deck);
@@ -183,9 +184,8 @@ void MatchSession::sendOpeningHands() {
     }
 }
 
-// --------------------------------------------------
-// Draw logic
-// --------------------------------------------------
+
+//Draw function: playerIndex player draws 1 card, other player will also receive instruction that their opponent drew 1 card
 bool MatchSession::drawAndSend(int playerIndex) {
     auto& player = players[playerIndex];
     auto& deck = player.deck;
@@ -236,8 +236,8 @@ void MatchSession::gameLoop() {
 
         auto now = steady_clock::now();
 
-        // Draw a card every 5 seconds
-        if (duration_cast<seconds>(now - lastDrawTime).count() >= 5) {
+        //draw 1 every 5 seconds
+        if (duration_cast<seconds>(now - lastDrawTime).count() >= drawInterval) {
             {
                 std::lock_guard<std::mutex> lock(stateMutex);
                 drawAndSend(0); // draw for player a
@@ -246,7 +246,6 @@ void MatchSession::gameLoop() {
             lastDrawTime = now;
         }
 
-        // Small sleep to avoid busy loop
         std::this_thread::sleep_for(10ms);
     }
     std::cout << "[MatchSession] Exiting Match Game Loop...\n";
@@ -255,7 +254,7 @@ void MatchSession::gameLoop() {
 void MatchSession::handlePlayerMessage(int playerIndex, const std::vector<char>& raw) {
     std::string msg(raw.begin(), raw.end());
 
-    std::cout << "[Match] Player " << players[playerIndex].id << " -> " << msg;
+    std::cout << "[MatchSession] Player " << players[playerIndex].id << " -> " << msg;
 
     // TODO:
     // - Validate command
@@ -268,7 +267,7 @@ void MatchSession::handlePlayerMessage(int playerIndex, const std::vector<char>&
 // Disconnect Handling
 // --------------------------------------------------
 void MatchSession::handleDisconnect() {
-    std::cout << "MatchSession: player disconnected\n";
+    std::cout << "[MatchSession]: Player disconnected\n";
 
     if (playerA->isAlive()) {
         playerA->send("OPPONENT_DISCONNECTED\n");
