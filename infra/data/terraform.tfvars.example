@@ -1,0 +1,8 @@
+aws_region = "us-east-1"
+# Optional: set explicit DB passwords. If omitted, Terraform generates strong passwords
+# and stores runtime secrets in AWS Secrets Manager.
+# auth_postgres_password  = "change-me"
+# cards_postgres_password = "change-me"
+
+# Optional: reuse an existing GHCR secret to avoid creating ghcr-auth-credentials
+# existing_ghcr_secret_arn = "arn:aws:secretsmanager:ap-southeast-1:123456789012:secret:ghcr-auth-credentials-xxxxx"

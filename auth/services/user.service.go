@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/Ryanljk/speedcardgame/auth/dtos"
@@ -80,6 +81,8 @@ func (service *AuthService) registerUser(registerDTO dtos.RegisterDTO, createInv
 }
 
 func (service *AuthService) createStarterInventory(userID uint) error {
+	baseURL := os.Getenv("CARDS_SERVICE_BASE_URL")
+
 	host := os.Getenv("CARDS_SERVICE_HOST")
 	if host == "" {
 		host = "127.0.0.1"
@@ -95,46 +98,80 @@ func (service *AuthService) createStarterInventory(userID uint) error {
 		port = "8082"
 	}
 
+	if baseURL == "" {
+		baseURL = fmt.Sprintf("http://%s:%s", host, port)
+	}
+	baseURL = strings.TrimRight(baseURL, "/")
+
 	payload, err := json.Marshal(inventoryCreateRequest{Uid: userID})
 	if err != nil {
 		return err
 	}
 
-	url := fmt.Sprintf("http://%s:%s/cardbase/inventories", host, port)
-	req, err := http.NewRequest(http.MethodPost, url, bytes.NewReader(payload))
-	if err != nil {
-		return err
-	}
-	req.Header.Set("Content-Type", "application/json")
-
 	client := &http.Client{Timeout: 5 * time.Second}
-	resp, err := client.Do(req)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
+	inventoryPaths := []string{"/cards/inventories", "/cardbase/inventories"}
+	var inventoryErr error
+	for _, path := range inventoryPaths {
+		url := fmt.Sprintf("%s%s", baseURL, path)
+		req, reqErr := http.NewRequest(http.MethodPost, url, bytes.NewReader(payload))
+		if reqErr != nil {
+			return reqErr
+		}
+		req.Header.Set("Content-Type", "application/json")
+
+		resp, doErr := client.Do(req)
+		if doErr != nil {
+			return doErr
+		}
+
 		body, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("cards service returned %d: %s", resp.StatusCode, string(body))
+		resp.Body.Close()
+
+		if resp.StatusCode == http.StatusOK || resp.StatusCode == http.StatusCreated {
+			inventoryErr = nil
+			break
+		}
+
+		inventoryErr = fmt.Errorf("cards service returned %d: %s", resp.StatusCode, string(body))
+		if resp.StatusCode != http.StatusNotFound {
+			break
+		}
+	}
+	if inventoryErr != nil {
+		return inventoryErr
 	}
 
-	deckUrl := fmt.Sprintf("http://%s:%s/cardbase/decks/fill", host, port)
-	deckReq, err := http.NewRequest(http.MethodPost, deckUrl, bytes.NewReader(payload))
-	if err != nil {
-		return err
-	}
-	deckReq.Header.Set("Content-Type", "application/json")
+	deckPaths := []string{"/cards/decks/fill", "/cardbase/decks/fill"}
+	var deckErr error
+	for _, path := range deckPaths {
+		deckURL := fmt.Sprintf("%s%s", baseURL, path)
+		deckReq, reqErr := http.NewRequest(http.MethodPost, deckURL, bytes.NewReader(payload))
+		if reqErr != nil {
+			return reqErr
+		}
+		deckReq.Header.Set("Content-Type", "application/json")
 
-	deckResp, err := client.Do(deckReq)
-	if err != nil {
-		return err
-	}
-	defer deckResp.Body.Close()
+		deckResp, doErr := client.Do(deckReq)
+		if doErr != nil {
+			return doErr
+		}
 
-	if deckResp.StatusCode != http.StatusOK && deckResp.StatusCode != http.StatusCreated {
 		body, _ := io.ReadAll(deckResp.Body)
-		return fmt.Errorf("deck fill returned %d: %s", deckResp.StatusCode, string(body))
+		deckResp.Body.Close()
+
+		if deckResp.StatusCode == http.StatusOK || deckResp.StatusCode == http.StatusCreated {
+			deckErr = nil
+			break
+		}
+
+		deckErr = fmt.Errorf("deck fill returned %d: %s", deckResp.StatusCode, string(body))
+		if deckResp.StatusCode != http.StatusNotFound {
+			break
+		}
+	}
+	if deckErr != nil {
+		return deckErr
 	}
 
 	return nil

@@ -4,40 +4,68 @@
 #include <SDL2/SDL.h>
 #include <cstddef>
 #include <memory>
-#include <string>
 #include <vector>
 
 #include "core/GameState.hpp"
 #include "objects/Player.h"
-#include "objects/Deck.h"
 #include "core/Board.hpp"
 #include "render/RenderText.hpp"
 #include "animation/animationQueue.hpp"
+#include "gameplay/GameAuthority.hpp"
 
 class Game;
 class Card;
 
 class Playing {
     friend class RenderPlaying;
+
+public:
+    Playing() = default;
+    ~Playing();
+
+    Playing(const Playing&) = delete;
+    Playing& operator=(const Playing&) = delete;
+    Playing(Playing&&) noexcept = default;
+    Playing& operator=(Playing&&) noexcept = default;
+
+    void setup(Game& game);
+    void handleEvents(Game& game, const SDL_Event& event);
+    void run();
+    void update(Game& game);
+    void render(const Game& game);
+
+    void setupPlayers(Player&& local, Player&& remote);
+
 private:
-    Player player;
-    Deck deck;
+    // -------------------------
+    // Game state
+    // -------------------------
+    Player localPlayer;
+    Player remotePlayer;
     Board board;
 
-    int drawIntervalSeconds;
-    Uint32 lastDrawTick{0};
     bool running{false};
 
+    std::string recvBuffer; // handles partial TCP messages
+
+
+    // -------------------------
+    // Dragging cards
+    // -------------------------
     struct DragState {
         bool active{false};
-        std::size_t index{0};
+        std::size_t index{0}; // index into localPlayer.hand
         int offsetX{0};
         int offsetY{0};
         int x{0};
         int y{0};
-    };
+    } drag;
 
-    SDL_Renderer* renderer{nullptr};
+    // -------------------------
+    // Rendering
+    // -------------------------
+    SDL_Renderer* renderer{nullptr}; // non-owning
+    RenderText::FontSet fonts{};
     std::vector<SDL_Rect> cardRects;
     std::vector<SDL_Rect> playSlots;
     SDL_Rect discardZone{0, 0, 0, 0};
@@ -67,15 +95,35 @@ private:
     };
     PendingSpellTargetState pendingSpellTarget;
 
+    // -------------------------
+    // Pending action (targeting system)
+    // -------------------------
+    struct PendingActionState {
+        bool active{false};
+        std::size_t handIndex{static_cast<std::size_t>(-1)};
+
+        void clear() {
+            active = false;
+            handIndex = static_cast<std::size_t>(-1);
+        }
+    };
+    PendingActionState pendingAction;
+
+    // -------------------------
+    // Authority (network bridge)
+    // -------------------------
+    std::unique_ptr<GameAuthority> authority;
+
+    // -------------------------
+    // Helpers
+    // -------------------------
     bool pointInRect(const SDL_Rect& rect, int x, int y);
-    bool isTargetedSpell(const Card& card) const;
-    bool consumeSpell(std::unique_ptr<Card> spell);
-    bool resolvePendingSpellTargetAt(int x, int y);
+    bool resolvePendingActionAt(int x, int y);
+
     std::vector<SDL_Rect> computeCardLayout(std::size_t count, int screenW, int screenH) const;
     void computeZones(int screenW, int screenH);
     void computeUiRects(int screenW, int screenH);
     SDL_Rect computeSelfDeckRect(int screenW, int screenH) const;
-    bool tryDrawCardWithAnimation(Uint32 now);
 
 public:
     explicit Playing(int drawIntervalSeconds = 3);
@@ -92,6 +140,9 @@ public:
     void run();
     void update(Game& game);
     void render(const Game&);
+    //Game related
+    bool handleServerMessage(const std::string& msg);
+    bool drawCard(int playerId, int cardId);
 };
 
 #endif

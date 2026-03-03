@@ -8,12 +8,13 @@
 
 #include "net/PlayerConnection.hpp"
 #include "game/MatchSession.hpp"
-
+#include "objects/ServerCard.h"
 #include "core/Matchmaker.hpp"
 
+class GameServer;
 class MatchManager {
 public:
-    MatchManager();
+    MatchManager(GameServer& server);
 
     // Called by Matchmaker when a pair is found
     void onPairFound(std::shared_ptr<PlayerConnection> a,
@@ -35,8 +36,8 @@ private:
         bool bAccepted = false;
     };
     Matchmaker* matchmaker = nullptr; // non-owning
-
-    std::mutex mutex;
+    GameServer& server; // non-owning reference to the authoritative server
+    std::mutex mutex; //for pendingMatches and activeMatches
 
     std::vector<std::shared_ptr<PendingMatch>> pendingMatches;
     std::vector<std::shared_ptr<MatchSession>> activeMatches;
@@ -50,7 +51,9 @@ private:
     // ---- Networking helpers ----
     void sendMatchFound(const std::shared_ptr<PlayerConnection>& player);
     void sendMatchCancelled(const std::shared_ptr<PlayerConnection>& player);
-    void sendMatchStart(const std::shared_ptr<PlayerConnection>& player);
+    // void sendMatchStart(const std::shared_ptr<PlayerConnection>& player);
+
+
 };
 
 #endif

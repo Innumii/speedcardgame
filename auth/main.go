@@ -40,6 +40,7 @@ func main() {
 		os.Getenv("POSTGRES_SSLMODE"),
 		os.Getenv("POSTGRES_TIMEZONE"),
 	)
+	// fmt.Println(dsn)
 
 	// Database connection setup
 	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
@@ -103,14 +104,23 @@ func main() {
 		MaxAge:           12 * time.Hour,
 	}))
 
-	// Auth routes
-	r.POST("/register", authController.Register)
-	r.POST("/login", authController.Login)
-	r.POST("/logout", authController.Logout)
-	r.GET("/me", authController.GetMe)
-	r.POST("/reset-password", authController.RequestPasswordReset)
-	r.POST("/reset-password/confirm", authController.ConfirmPasswordReset)
-	r.PATCH("/change-password", authController.ChangePassword)
+	registerAuthRoutes := func(group gin.IRoutes) {
+		group.POST("/register", authController.Register)
+		group.POST("/login", authController.Login)
+		group.POST("/logout", authController.Logout)
+		group.GET("/me", authController.GetMe)
+		group.POST("/reset-password", authController.RequestPasswordReset)
+		group.POST("/reset-password/confirm", authController.ConfirmPasswordReset)
+		group.PATCH("/change-password", authController.ChangePassword)
+	}
+
+	registerAuthRoutes(r)
+	registerAuthRoutes(r.Group("/auth"))
+
+	// Health check endpoint for AWS
+	r.GET("/health", func(c *gin.Context) {
+		c.JSON(200, gin.H{"status": "healthy"})
+	})
 
 	// Start server
 	err = r.Run(":8080")

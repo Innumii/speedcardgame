@@ -1,0 +1,10 @@
+aws_region = "us-east-1"
+
+# Must exist and be validated in ACM in the same region as ALB
+acm_certificate_arn = "arn:aws:acm:us-east-1:123456789012:certificate/xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+
+# Public hosted zone to use for alias record
+route53_zone_name = "myapp.com."
+
+# Stable endpoint clients and services call
+api_domain_name = "api.myapp.com"

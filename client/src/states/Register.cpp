@@ -1,10 +1,10 @@
 #include "states/Register.hpp"
 #include "core/Game.hpp"
-#include "core/NetworkClient.hpp"
 #include "render/RenderButton.hpp"
 #include "render/RenderBanner.hpp"
 #include "render/RenderText.hpp"
 #include "render/Theme.hpp"
+#include "utils/HttpUtil.hpp"
 #include "utils/JsonUtil.hpp"
 #include "utils/EnvUtil.hpp"
 #include <SDL2/SDL.h>
@@ -21,49 +21,6 @@
 namespace {
     constexpr std::size_t kMaxEmailLen    = 64;
     constexpr std::size_t kMaxPasswordLen = 32;
-
-    bool sendHttpRequest(const std::string& host, int port, const std::string& method,
-                         const std::string& path, const std::string& body,
-                         int& statusCode, std::string& responseBody) {
-        statusCode = -1;
-        NetworkClient client(NetworkClient::SocketMode::Blocking); // blocking!
-        if (!client.connectTo(host, port)) return false;
-
-        std::ostringstream request;
-        request << method << " " << path << " HTTP/1.1\r\n"
-                << "Host: " << host << "\r\n"
-                << "Connection: close\r\n";
-        if (method == "POST" || method == "PUT" || method == "PATCH") {
-            request << "Content-Type: application/json\r\n"
-                    << "Content-Length: " << body.size() << "\r\n";
-        }
-        request << "\r\n" << body;
-
-        const std::string requestText = request.str();
-        if (!client.send(requestText.data(), requestText.size())) {
-            client.disconnect();
-            return false;
-        }
-
-        std::string response;
-        char buffer[4096];
-        while (true) {
-            int received = client.receive(buffer, sizeof(buffer));
-            if (received <= 0) break;
-            response.append(buffer, static_cast<std::size_t>(received));
-        }
-        client.disconnect();
-
-        const std::size_t headerEnd = response.find("\r\n\r\n");
-        if (headerEnd == std::string::npos) return false;
-
-        std::istringstream headerStream(response.substr(0, headerEnd));
-        std::string httpVersion;
-        headerStream >> httpVersion >> statusCode;
-
-        responseBody = response.substr(headerEnd + 4);
-        return true;
-    }
 
     std::string deriveNameFromEmail(const std::string& email) {
         std::size_t atPos = email.find('@');
@@ -85,8 +42,8 @@ namespace {
             return false;
         }
 
-        const std::string host = EnvUtil::getEnvOrDefault("AUTH_SERVICE_HOST", "127.0.0.1");
-        const int         port = EnvUtil::getEnvIntOrDefault("AUTH_SERVICE_PORT", 8081);
+        const std::string host = EnvUtil::getAuthServiceHost();
+        const int         port = EnvUtil::getAuthServicePort();
         const std::string name = deriveNameFromEmail(email);
 
         std::ostringstream payload;
@@ -96,8 +53,8 @@ namespace {
 
         int statusCode = -1;
         std::string responseBody;
-        if (!sendHttpRequest(host, port, "POST", "/register",
-                             payload.str(), statusCode, responseBody)) {
+        if (!HttpUtil::sendHttp(host, port, "POST", "/auth/register",
+                                payload.str(), statusCode, responseBody)) {
             error = "auth service unreachable";
             return false;
         }

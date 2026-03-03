@@ -12,6 +12,29 @@
 
         ./main
 
+### Client service endpoint toggle
+
+The client now defaults to AWS service endpoints.
+
+- `USE_AWS_SERVICES=true` (default): use AWS endpoint env vars
+        - `AWS_AUTH_SERVICE_HOST` / `AWS_AUTH_SERVICE_PORT` (default port `443`)
+        - `AWS_CARDS_SERVICE_HOST` / `AWS_CARDS_SERVICE_PORT` (default port `443`)
+        - `AWS_GAME_SERVER_SERVICE_HOST` / `AWS_GAME_SERVER_SERVICE_PORT` (default port `4000`)
+- `USE_AWS_SERVICES=false`: use local endpoint env vars
+        - `AUTH_SERVICE_HOST` / `AUTH_SERVICE_PORT` (defaults `127.0.0.1:8081`)
+        - `CARDS_SERVICE_HOST` / `CARDS_SERVICE_PORT` (defaults `127.0.0.1:8082`)
+        - `GAME_SERVER_SERVICE_HOST` / `GAME_SERVER_SERVICE_PORT` (defaults `127.0.0.1:4000`)
+
+Example (PowerShell):
+
+```powershell
+$env:USE_AWS_SERVICES = "true"
+$env:AWS_AUTH_SERVICE_HOST = "api.myapp.com"
+$env:AWS_CARDS_SERVICE_HOST = "api.myapp.com"
+$env:AWS_GAME_SERVER_SERVICE_HOST = "<your-server-host>"
+./main
+```
+
 2. Note that with each new .cpp added to the repo, it must also be added to the Makefile (will eventually switch to a better compiling process but for now just use this)
 
 ## How to Run Server

@@ -1,4 +1,4 @@
-#include "render/RenderPLaying.hpp"
+#include "render/RenderPlaying.hpp"
 
 #include "core/Game.hpp"
 #include "objects/Card.h"
@@ -163,7 +163,7 @@ void RenderPlaying::render(Playing& playing, const Game& game) {
 	playing.computeZones(screenW, screenH);
 	playing.computeUiRects(screenW, screenH);
 
-	const std::size_t opponentHandSize = game.getHandSize(game.getPlayer(true));
+	const std::size_t opponentHandSize = playing.remotePlayer.hand.size();
 	std::vector<SDL_Rect> opponentHandRects = playing.computeCardLayout(opponentHandSize, screenW, screenH);
 	if (!opponentHandRects.empty()) {
 		const int cardHeight = opponentHandRects.front().h;
@@ -182,7 +182,7 @@ void RenderPlaying::render(Playing& playing, const Game& game) {
 	const bool hoveringDiscard = playing.pointInRect(playing.discardZone, mouseX, mouseY);
 	const bool hoveringMenu = playing.pointInRect(playing.menuButton, mouseX, mouseY);
 
-	const bool draggingCard = playing.drag.active && playing.drag.index < playing.player.hand.size();
+	const bool draggingCard = playing.drag.active && playing.drag.index < playing.localPlayer.hand.size();
 	const bool hasActiveDrawCard = playing.animationQueue.hasActiveDrawCard();
 	const std::size_t activeDrawCardIndex = playing.animationQueue.getActiveDrawCardHandIndex();
 
@@ -203,9 +203,9 @@ void RenderPlaying::render(Playing& playing, const Game& game) {
 
 	constexpr Uint32 hoverDelayMs = 1000;
 	const bool showPreview =
-		(playing.hoverIndex != static_cast<std::size_t>(-1) &&
-		 playing.hoverIndex < playing.player.hand.size() &&
-		 now - playing.hoverStartTick >= hoverDelayMs) || playing.previewLocked;
+		playing.hoverIndex != static_cast<std::size_t>(-1) &&
+		playing.hoverIndex < playing.localPlayer.hand.size() &&
+		now - playing.hoverStartTick >= hoverDelayMs;
 
 	// ── draw zones ───────────────────────────────────────────────────
 	RenderBoard::drawOpponentPlayZones(renderer, textRenderer, playing.playSlots, uiFonts.small);
@@ -214,7 +214,7 @@ void RenderPlaying::render(Playing& playing, const Game& game) {
 		textRenderer,
 		playing.playSlots,
 		playing.discardZone,
-		game.getDeck(game.getPlayer(true)).size(),
+		playing.remotePlayer.getDeck().size(),
 		screenW,
 		uiFonts.small
 	);
@@ -225,7 +225,7 @@ void RenderPlaying::render(Playing& playing, const Game& game) {
 		textRenderer,
 		playing.playSlots,
 		playing.discardZone,
-		playing.deck.size(),
+		playing.localPlayer.deck.size(),
 		screenW,
 		uiFonts.small
 	);
@@ -343,8 +343,8 @@ SDL_RenderDrawLine(renderer, playerBarX + playerBarW / 2, playerBarY + 10,
 		}
 
 		std::string targetPrompt = "Choose target";
-		if (playing.pendingSpellTarget.spell) {
-			targetPrompt = "Choose target for " + playing.pendingSpellTarget.spell->getName();
+		if (playing.pendingAction.handIndex != -1) {
+			targetPrompt = "Choose target for " + playing.localPlayer.hand[playing.pendingAction.handIndex].get()->getName();
 		}
 		textRenderer.drawText(
 			renderer,
@@ -360,12 +360,11 @@ SDL_RenderDrawLine(renderer, playerBarX + playerBarW / 2, playerBarY + 10,
 		RenderCard::drawCardBack(renderer, rect);
 	}
 
-	for (std::size_t i = 0; i < playing.player.hand.size(); ++i) {
+	for (std::size_t i = 0; i < playing.localPlayer.hand.size(); ++i) {
 		if (draggingCard && i == playing.drag.index) continue;
 		if (hasActiveDrawCard && i == activeDrawCardIndex) continue;
-		if (i < playing.cardRects.size() && playing.player.hand[i]) {
-			RenderCard::drawHandCard(renderer, textRenderer, *playing.player.hand[i], 
-			                         playing.cardRects[i], uiFonts.tiny, uiFonts.small);
+		if (i < playing.cardRects.size() && playing.localPlayer.hand[i]) {
+			RenderCard::drawHandCard(renderer, textRenderer, *playing.localPlayer.hand[i], playing.cardRects[i], playing.fonts.small);
 		}
 	}
 

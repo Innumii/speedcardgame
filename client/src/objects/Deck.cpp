@@ -1,6 +1,7 @@
 #include "objects/Deck.h"
 #include <algorithm>
 #include <random>
+#include <iostream>
 
 void Deck::addCard(std::unique_ptr<Card> card) {
     cards.push_back(std::move(card));
@@ -24,5 +25,24 @@ bool Deck::isEmpty() const {
 }
 
 int Deck::size() const {
-    return cards.size();
+    return cards.size(); 
+}
+
+std::unique_ptr<Card> Deck::takeCardById(int cardId) {
+    for (auto it = cards.begin(); it != cards.end(); ++it) {
+        if ((*it)->getId() == cardId) {
+            std::unique_ptr<Card> card = std::move(*it);
+            cards.erase(it);
+            return card;
+        }
+    }
+
+    return nullptr;
+}
+
+void Deck::toString() const {
+    std::cout << "Deck contains " << cards.size() << " cards:\n";
+    for (const auto& c : cards) {
+        if (c) std::cout << "  Card id: " << c->getId() << "\n";
+    }
 }
