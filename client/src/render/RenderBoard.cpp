@@ -84,7 +84,7 @@ void RenderBoard::drawOpponentPlayZones(SDL_Renderer* renderer, RenderText& text
 	if (playSlots.empty()) return;
 
 	const int areaX = playSlots.front().x;
-	const int opponentOffset = 230;
+	const int opponentOffset = 210;
 	const int areaY = playSlots.front().y - opponentOffset;
 
 	const int labelY = std::max(10, areaY - 22);
@@ -140,13 +140,18 @@ void RenderBoard::drawDiscardZone(SDL_Renderer* renderer, RenderText& textRender
 	fillRoundedRect(renderer, discardZone, 10, fill);
 	drawRoundedBorder(renderer, discardZone, 10, border, hovering ? 3 : 2);
 
-	textRenderer.drawText(
+	// Use wrapped text with proper width constraint
+	const int textPadding = 8;
+	const int maxTextWidth = discardZone.w - (textPadding * 2);
+
+	textRenderer.drawWrappedText(
 		renderer,
 		"Discard Zone",
 		fontSmall,
 		SDL_Color{220, 230, 255, 255},
-		discardZone.x + 12,
-		discardZone.y + 12
+		discardZone.x + textPadding,
+		discardZone.y + textPadding,
+		maxTextWidth
 	);
 
 	textRenderer.drawWrappedText(
@@ -154,9 +159,9 @@ void RenderBoard::drawDiscardZone(SDL_Renderer* renderer, RenderText& textRender
 		"Drop cards here to gain mana",
 		fontSmall,
 		SDL_Color{180, 200, 230, 255},
-		discardZone.x + 12,
-		discardZone.y + 36,
-		20
+		discardZone.x + textPadding,
+		discardZone.y + 32,  // Lower position
+		maxTextWidth
 	);
 }
 

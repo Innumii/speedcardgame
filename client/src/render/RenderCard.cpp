@@ -280,19 +280,29 @@ namespace {
         tr.drawText(r, s, font, SDL_Color{255, 255, 255, 255}, cx - tw/2, cy - th/2);
     }
 
-
     // ── shared card body draw ─────────────────────────────────────────
     void drawCardBody(SDL_Renderer* renderer, const SDL_Rect& rect, int cornerRadius,
-                      SDL_Color artColor, SDL_Color infoBg, int artH) {
+                      SDL_Color artColor, SDL_Color infoBg, int artH, int cardId) {
         fillRoundedRect(renderer, rect, cornerRadius, infoBg);
+        
         SDL_Rect artRect{rect.x, rect.y, rect.w, artH};
-        fillRoundedRect(renderer, artRect, cornerRadius, artColor);
-        SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
-        for (int y = cornerRadius; y < artH; ++y) {
-            float t = (float)y / artH;
-            Uint8 alpha = (Uint8)(210 * (t * t * t));
-            SDL_SetRenderDrawColor(renderer, 0, 0, 0, alpha);
-            SDL_RenderDrawLine(renderer, rect.x + 2, rect.y + y, rect.x + rect.w - 3, rect.y + y);
+        
+        // Try to load and render card image
+        SDL_Texture* cardImage = getCardImageTexture(renderer, cardId);
+        
+        if (cardImage) {
+            // Card image exists - render it in the art area
+            SDL_RenderCopy(renderer, cardImage, nullptr, &artRect);
+        } else {
+            // No image - use gradient background as fallback
+            fillRoundedRect(renderer, artRect, cornerRadius, artColor);
+            SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+            for (int y = cornerRadius; y < artH; ++y) {
+                float t = (float)y / artH;
+                Uint8 alpha = (Uint8)(210 * (t * t * t));
+                SDL_SetRenderDrawColor(renderer, 0, 0, 0, alpha);
+                SDL_RenderDrawLine(renderer, rect.x + 2, rect.y + y, rect.x + rect.w - 3, rect.y + y);
+            }
         }
     }
 
@@ -312,7 +322,7 @@ namespace {
                            : (creature ? SDL_Color{110, 85, 145, 255}
                                        : SDL_Color{75, 105, 145, 255});
 
-        drawCardBody(renderer, rect, cornerRadius, artColor, pal.nameBg, artH);
+        drawCardBody(renderer, rect, cornerRadius, artColor, pal.nameBg, artH, card.getId());
 
         drawRoundedBorder(renderer, rect, cornerRadius, SDL_Color{0,0,0,200}, 1);
         drawRoundedBorder(renderer, {rect.x+1, rect.y+1, rect.w-2, rect.h-2},
@@ -379,7 +389,7 @@ namespace {
         drawRoundedBorder(renderer, {rect.x-3, rect.y-3, rect.w+6, rect.h+6},
                           cornerRadius+3, glow, 4);
 
-        drawCardBody(renderer, rect, cornerRadius, artColor, pal.nameBg, artH);
+        drawCardBody(renderer, rect, cornerRadius, artColor, pal.nameBg, artH, card.getId());
 
         drawRoundedBorder(renderer, rect, cornerRadius, SDL_Color{0,0,0,220}, 1);
         drawRoundedBorder(renderer, {rect.x+1, rect.y+1, rect.w-2, rect.h-2},
@@ -394,7 +404,7 @@ namespace {
                            rect.x + rect.w - cornerRadius, rect.y + artH);
 
         const int pad = std::max(10, rect.w / 12);
-        const int maxNameW = rect.w - pad * 2 - 20;  // 20px extra margin for tighter wrapping
+        const int maxNameW = rect.w - pad * 2 - 20;
         const std::string nameText = card.getName();
 
         int nw = 0, nh = 0;

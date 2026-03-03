@@ -4,10 +4,12 @@
 #include <SDL2/SDL.h>
 #include <cstddef>
 #include <memory>
+#include <string>
 #include <vector>
 
 #include "core/GameState.hpp"
 #include "objects/Player.h"
+#include "objects/Deck.h"
 #include "core/Board.hpp"
 #include "render/RenderText.hpp"
 #include "animation/animationQueue.hpp"
@@ -20,21 +22,25 @@ class Playing {
     friend class RenderPlaying;
 
 public:
-    Playing() = default;
+    explicit Playing(int drawIntervalSeconds = 3);
     ~Playing();
 
     Playing(const Playing&) = delete;
     Playing& operator=(const Playing&) = delete;
     Playing(Playing&&) noexcept = default;
     Playing& operator=(Playing&&) noexcept = default;
-
-    void setup(Game& game);
+    
+    void setup(const Game& game);
+    void setDeck(Deck newDeck);
+    void setupPlayers(Player&& local, Player&& remote);
     void handleEvents(Game& game, const SDL_Event& event);
     void run();
     void update(Game& game);
-    void render(const Game& game);
-
-    void setupPlayers(Player&& local, Player&& remote);
+    void render(const Game&);
+    
+    // Game related
+    bool handleServerMessage(const std::string& msg);
+    bool drawCard(int playerId, int cardId);
 
 private:
     // -------------------------
@@ -42,12 +48,13 @@ private:
     // -------------------------
     Player localPlayer;
     Player remotePlayer;
+    Deck deck;
     Board board;
-
+    
+    int drawIntervalSeconds;
+    Uint32 lastDrawTick{0};
     bool running{false};
-
     std::string recvBuffer; // handles partial TCP messages
-
 
     // -------------------------
     // Dragging cards
@@ -59,13 +66,13 @@ private:
         int offsetY{0};
         int x{0};
         int y{0};
-    } drag;
+    };
+    DragState drag;
 
     // -------------------------
     // Rendering
     // -------------------------
     SDL_Renderer* renderer{nullptr}; // non-owning
-    RenderText::FontSet fonts{};
     std::vector<SDL_Rect> cardRects;
     std::vector<SDL_Rect> playSlots;
     SDL_Rect discardZone{0, 0, 0, 0};
@@ -78,7 +85,6 @@ private:
     SDL_Rect noSaveExitButton{0, 0, 0, 0};
     SDL_Rect returnToTitleButton{0, 0, 0, 0};
     
-    DragState drag;
     std::size_t hoverIndex{static_cast<std::size_t>(-1)};
     Uint32 hoverStartTick{0};
     bool previewLocked{false};
@@ -118,31 +124,16 @@ private:
     // Helpers
     // -------------------------
     bool pointInRect(const SDL_Rect& rect, int x, int y);
+    bool isTargetedSpell(const Card& card) const;
+    bool consumeSpell(std::unique_ptr<Card> spell);
+    bool resolvePendingSpellTargetAt(int x, int y);
     bool resolvePendingActionAt(int x, int y);
 
     std::vector<SDL_Rect> computeCardLayout(std::size_t count, int screenW, int screenH) const;
     void computeZones(int screenW, int screenH);
     void computeUiRects(int screenW, int screenH);
     SDL_Rect computeSelfDeckRect(int screenW, int screenH) const;
-
-public:
-    explicit Playing(int drawIntervalSeconds = 3);
-    ~Playing();
-
-    Playing(const Playing&) = delete;
-    Playing& operator=(const Playing&) = delete;
-    Playing(Playing&&) noexcept = default;
-    Playing& operator=(Playing&&) noexcept = default;
-    
-    void setup(const Game& game);
-    void setDeck(Deck newDeck);
-    void handleEvents(Game& game, const SDL_Event& event);
-    void run();
-    void update(Game& game);
-    void render(const Game&);
-    //Game related
-    bool handleServerMessage(const std::string& msg);
-    bool drawCard(int playerId, int cardId);
+    bool tryDrawCardWithAnimation(Uint32 now);
 };
 
 #endif

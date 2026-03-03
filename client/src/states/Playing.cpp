@@ -14,6 +14,7 @@
 namespace {
     SDL_Rect playZoneBand{0, 0, 0, 0};
 }
+
 // -------------------------
 // Helpers
 // -------------------------
@@ -22,21 +23,65 @@ bool Playing::pointInRect(const SDL_Rect& rect, int x, int y) {
            y >= rect.y && y < rect.y + rect.h;
 }
 
-// Resolve targeting click
+bool Playing::isTargetedSpell(const Card& card) const {
+    if (card.getType() != CardType::Spell) {
+        return false;
+    }
+
+    std::string text = card.getText();
+    std::transform(text.begin(), text.end(), text.begin(), [](unsigned char ch) {
+        return static_cast<char>(std::tolower(ch));
+    });
+
+    return text.find("target") != std::string::npos;
+}
+
+bool Playing::consumeSpell(std::unique_ptr<Card> spell) {
+    if (!spell) {
+        return false;
+    }
+    return board.addToDiscard(std::move(spell), localPlayer.id);
+}
+
+bool Playing::resolvePendingSpellTargetAt(int x, int y) {
+    if (!pendingSpellTarget.active || !pendingSpellTarget.spell) {
+        return false;
+    }
+
+    for (std::size_t lane = 0; lane < playSlots.size(); ++lane) {
+        SDL_Rect localRect = playSlots[lane];
+        if (pointInRect(localRect, x, y)) {
+            std::cout << "Target selected: player " << localPlayer.id << ", lane " << lane << "\n";
+            consumeSpell(std::move(pendingSpellTarget.spell));
+            pendingSpellTarget.active = false;
+            return true;
+        }
+
+        SDL_Rect opponentRect = playSlots[lane];
+        opponentRect.y -= 210;
+        const int opponentId = localPlayer.id == 0 ? 1 : 0;
+        if (pointInRect(opponentRect, x, y)) {
+            std::cout << "Target selected: player " << opponentId << ", lane " << lane << "\n";
+            consumeSpell(std::move(pendingSpellTarget.spell));
+            pendingSpellTarget.active = false;
+            return true;
+        }
+    }
+
+    return false;
+}
+
 bool Playing::resolvePendingActionAt(int x, int y) {
     if (!pendingAction.active)
         return false;
 
     for (std::size_t slot = 0; slot < playSlots.size(); ++slot) {
         if (pointInRect(playSlots[slot], x, y)) {
-
-            // Play card into selected lane
             authority->playCard(
                 static_cast<int>(pendingAction.handIndex),
                 static_cast<int>(slot),
-                static_cast<int>(slot) // targetId = lane index
+                static_cast<int>(slot)
             );
-
             pendingAction.clear();
             return true;
         }
@@ -46,12 +91,17 @@ bool Playing::resolvePendingActionAt(int x, int y) {
 }
 
 // -------------------------
-// Setup
+// Constructor/Destructor
 // -------------------------
+Playing::Playing(int drawIntervalSeconds)
+    : drawIntervalSeconds(drawIntervalSeconds) {}
 
 Playing::~Playing() = default;
 
-void Playing::setup(Game& game) {
+// -------------------------
+// Setup
+// -------------------------
+void Playing::setup(const Game& game) {
     renderer = game.getRenderer();
     if (!renderer)
         throw std::runtime_error("Renderer not available");
@@ -60,47 +110,85 @@ void Playing::setup(Game& game) {
     hoverIndex = static_cast<std::size_t>(-1);
     hoverStartTick = 0;
     menuOpen = false;
+    pauseModalOpen = false;
+    exitModalOpen = false;
     surrendered = false;
     animationQueue.clear();
     pendingAction.clear();
+    pendingSpellTarget = PendingSpellTargetState{};
     running = true;
-
-    if (!RenderText::ensureTtfReady()) {
-        throw std::runtime_error(
-            std::string("TTF_Init failed: ") + TTF_GetError());
-    }
-
-    fonts = RenderText::loadFonts("assets/font.TTF", 14, 12, 24);
-    if (!fonts.large || !fonts.small) {
-        RenderText::closeFonts(fonts);
-        throw std::runtime_error("Failed to load fonts");
-    }
+    lastDrawTick = SDL_GetTicks();
 
     if (!authority) {
         authority = std::make_unique<LocalAuthority>(
-            &game.getNetworkClient());
+            &const_cast<Game&>(game).getNetworkClient());
     }
-    std::cout << "exiting Playing setup...\n";
+}
+
+void Playing::setDeck(Deck newDeck) {
+    deck = std::move(newDeck);
 }
 
 void Playing::setupPlayers(Player&& local, Player&& remote) {
     localPlayer = std::move(local);
     remotePlayer = std::move(remote);
+}
 
-    const int gap = 18;
-    const int margin = 10;
-    const int deckW = discardZone.w > 0 ? discardZone.w : 110;
-    const int deckH = discardZone.h > 0 ? discardZone.h : 130;
-    const int deckY = playSlots.front().y + (playSlots.front().h - deckH) / 2;
-
-    // Position deck on RIGHT side of play zones
-    int deckX = playSlots.back().x + playSlots.back().w + gap;
-    if (deckX + deckW > screenW - margin) {
-        deckX = std::max(margin, screenW - margin - deckW);
+SDL_Rect Playing::computeSelfDeckRect(int screenW, int screenH) const {
+    if (screenW <= 0 || screenH <= 0 || playSlots.empty()) {
+        return SDL_Rect{0, 0, 0, 0};
     }
 
-    return SDL_Rect{deckX, deckY, deckW, deckH};
-    localPlayer.deck.toString();
+    const int gap = 20;
+    const int margin = 10;
+    const int deckSize = 120;  // Match new size
+    const int deckY = playSlots.front().y + (playSlots.front().h - deckSize) / 2;
+
+    int deckX = playSlots.back().x + playSlots.back().w + gap;
+    if (deckX + deckSize > screenW - margin) {
+        deckX = std::max(margin, screenW - margin - deckSize);
+    }
+
+    return SDL_Rect{deckX, deckY, deckSize, deckSize};
+}
+
+bool Playing::tryDrawCardWithAnimation(Uint32 now) {
+    if (localPlayer.hand.size() >= 10) {
+        return false;
+    }
+
+    if (deck.size() == 0) {
+        return false;
+    }
+
+    const std::size_t handSizeBefore = localPlayer.hand.size();
+    
+    auto card = deck.draw();
+    if (!card) {
+        return false;
+    }
+    localPlayer.addCardToHand(std::move(card));
+
+    if (localPlayer.hand.size() <= handSizeBefore || !renderer) {
+        return false;
+    }
+
+    int screenW = 0;
+    int screenH = 0;
+    if (SDL_GetRendererOutputSize(renderer, &screenW, &screenH) != 0) {
+        return false;
+    }
+
+    cardRects = computeCardLayout(localPlayer.hand.size(), screenW, screenH);
+    computeZones(screenW, screenH);
+
+    const SDL_Rect fromRect = computeSelfDeckRect(screenW, screenH);
+    const std::size_t handIndex = localPlayer.hand.size() - 1;
+    if (handIndex < cardRects.size()) {
+        animationQueue.enqueueDrawCard(fromRect, cardRects[handIndex], handIndex, 320);
+    }
+
+    return true;
 }
 
 // -------------------------
@@ -112,52 +200,63 @@ void Playing::handleEvents(Game& game, const SDL_Event& event) {
     int screenW = 0, screenH = 0;
     SDL_GetRendererOutputSize(renderer, &screenW, &screenH);
 
+    cardRects = computeCardLayout(localPlayer.hand.size(), screenW, screenH);
     computeZones(screenW, screenH);
     computeUiRects(screenW, screenH);
 
-    cardRects = computeCardLayout(
-        localPlayer.hand.size(),
-        screenW,
-        screenH
-    );
-
-    int mx = 0;
-    int my = 0;
-
-    if (event.type == SDL_MOUSEBUTTONDOWN ||
-        event.type == SDL_MOUSEBUTTONUP) {
-        mx = event.button.x;
-        my = event.button.y;
-    }
-    else if (event.type == SDL_MOUSEMOTION) {
-        mx = event.motion.x;
-        my = event.motion.y;
-    }
-
-    // -------------------------
-    // UI Buttons
-    // -------------------------
-    if (event.type == SDL_MOUSEBUTTONDOWN &&
-        event.button.button == SDL_BUTTON_LEFT) {
+    if (event.type == SDL_MOUSEBUTTONDOWN && event.button.button == SDL_BUTTON_LEFT) {
+        const int mouseX = event.button.x;
+        const int mouseY = event.button.y;
 
         if (surrendered) {
-            if (pointInRect(returnToTitleButton, mx, my)) {
+            if (pointInRect(returnToTitleButton, mouseX, mouseY)) {
                 surrendered = false;
-                menuOpen = false;
+                pauseModalOpen = false;
+                exitModalOpen = false;
                 game.setNextState(GameState::Title);
             }
             return;
         }
 
-        if (pointInRect(menuButton, mx, my)) {
-            menuOpen = !menuOpen;
+        if (exitModalOpen) {
+            if (pointInRect(saveExitButton, mouseX, mouseY)) {
+                surrendered = false;
+                pauseModalOpen = false;
+                exitModalOpen = false;
+                game.setNextState(GameState::Title);
+                return;
+            }
+            if (pointInRect(noSaveExitButton, mouseX, mouseY)) {
+                surrendered = false;
+                pauseModalOpen = false;
+                exitModalOpen = false;
+                game.setNextState(GameState::Title);
+                return;
+            }
+            if (!pointInRect(exitModal, mouseX, mouseY)) {
+                exitModalOpen = false;
+            }
             return;
         }
 
-        if (menuOpen && pointInRect(exitGameButton, mx, my)) {
-            surrendered = true;
-            menuOpen = false;
-            drag.active = false;
+        if (pauseModalOpen) {
+            if (pointInRect(resumeButton, mouseX, mouseY)) {
+                pauseModalOpen = false;
+                return;
+            }
+            if (pointInRect(pauseExitButton, mouseX, mouseY)) {
+                pauseModalOpen = false;
+                exitModalOpen = true;
+                return;
+            }
+            if (!pointInRect(pauseModal, mouseX, mouseY)) {
+                pauseModalOpen = false;
+            }
+            return;
+        }
+
+        if (pointInRect(menuButton, mouseX, mouseY)) {
+            pauseModalOpen = true;
             return;
         }
 
@@ -168,69 +267,70 @@ void Playing::handleEvents(Game& game, const SDL_Event& event) {
 
     if (surrendered) return;
 
-    // -------------------------
-    // Targeting mode
-    // -------------------------
-    if (pendingAction.active) {
-        if (event.type == SDL_MOUSEBUTTONDOWN &&
-            event.button.button == SDL_BUTTON_LEFT) {
-            resolvePendingActionAt(mx, my);
+    if (pendingSpellTarget.active) {
+        if (event.type == SDL_MOUSEBUTTONDOWN && event.button.button == SDL_BUTTON_LEFT) {
+            if (resolvePendingSpellTargetAt(event.button.x, event.button.y)) {
+                board.displayDiscard(localPlayer.id);
+            }
         }
         return;
     }
 
-    // -------------------------
-    // Card Dragging
-    // -------------------------
-    switch (event.type) {
+    if (pendingAction.active) {
+        if (event.type == SDL_MOUSEBUTTONDOWN && event.button.button == SDL_BUTTON_LEFT) {
+            resolvePendingActionAt(event.button.x, event.button.y);
+        }
+        return;
+    }
 
+    switch (event.type) {
         case SDL_MOUSEBUTTONDOWN:
             if (event.button.button == SDL_BUTTON_LEFT) {
-                for (int i = static_cast<int>(localPlayer.hand.size()) - 1;
-                     i >= 0; --i) {
-
-                    if (pointInRect(cardRects[i], mx, my)) {
+                const int mx = event.button.x;
+                const int my = event.button.y;
+                
+                if (previewLocked) return;
+                
+                for (int i = static_cast<int>(cardRects.size()) - 1; i >= 0; --i) {
+                    if (pointInRect(cardRects[static_cast<std::size_t>(i)], mx, my)) {
                         drag.active = true;
                         drag.index = static_cast<std::size_t>(i);
-                        drag.offsetX = mx - cardRects[i].x;
-                        drag.offsetY = my - cardRects[i].y;
-                        drag.x = cardRects[i].x;
-                        drag.y = cardRects[i].y;
+                        drag.offsetX = mx - cardRects[drag.index].x;
+                        drag.offsetY = my - cardRects[drag.index].y;
+                        drag.x = cardRects[drag.index].x;
+                        drag.y = cardRects[drag.index].y;
                         break;
                     }
                 }
             }
             break;
-
+            
         case SDL_MOUSEMOTION:
             if (drag.active) {
-                drag.x = mx - drag.offsetX;
-                drag.y = my - drag.offsetY;
+                drag.x = event.motion.x - drag.offsetX;
+                drag.y = event.motion.y - drag.offsetY;
             }
             break;
-
+            
         case SDL_MOUSEBUTTONUP:
-            if (drag.active &&
-                event.button.button == SDL_BUTTON_LEFT) {
+            if (drag.active && event.button.button == SDL_BUTTON_LEFT) {
+                const int releaseX = event.button.x;
+                const int releaseY = event.button.y;
 
                 int laneIndex = -1;
-                for (std::size_t slot = 0;
-                     slot < playSlots.size(); ++slot) {
-
-                    if (pointInRect(playSlots[slot], mx, my)) {
+                for (std::size_t slot = 0; slot < playSlots.size(); ++slot) {
+                    if (pointInRect(playSlots[slot], releaseX, releaseY)) {
                         laneIndex = static_cast<int>(slot);
                         break;
                     }
                 }
 
-                bool droppedInDiscard =
-                    pointInRect(discardZone, mx, my);
+                bool droppedInDiscard = pointInRect(discardZone, releaseX, releaseY);
 
-                if (droppedInDiscard) {
-                    authority->discardCard(
-                        static_cast<int>(drag.index));
+                if (droppedInDiscard && authority) {
+                    authority->discardCard(static_cast<int>(drag.index));
                 }
-                else if (laneIndex >= 0) {
+                else if (laneIndex >= 0 && authority) {
                     authority->playCard(
                         static_cast<int>(drag.index),
                         laneIndex,
@@ -241,24 +341,27 @@ void Playing::handleEvents(Game& game, const SDL_Event& event) {
                 drag.active = false;
             }
             break;
-
+            
+        case SDL_MOUSEWHEEL:
+            if (previewLocked) {
+                previewScrollOffset -= event.wheel.y * 20;
+                if (previewScrollOffset < 0) previewScrollOffset = 0;
+            }
+            break;
+            
         default:
             break;
     }
 }
 
 // -------------------------
-// Main loop
+// Main loop & Update
 // -------------------------
 void Playing::run() {
     if (!renderer)
         throw std::runtime_error("Call setup() first");
 
     SDL_Event event;
-
-    //check localplayer deck
-    localPlayer.deck.toString();
-
 
     while (running) {
         while (SDL_PollEvent(&event)) {
@@ -272,6 +375,9 @@ void Playing::run() {
 }
 
 void Playing::update(Game& game) {
+    if (!renderer) return;
+    if (surrendered) return;
+
     auto& net = game.getNetworkClient();
 
     char buffer[512];
@@ -290,12 +396,64 @@ void Playing::update(Game& game) {
         while ((pos = recvBuffer.find('\n')) != std::string::npos) {
             std::string line = recvBuffer.substr(0, pos);
             recvBuffer.erase(0, pos + 1);
-
             handleServerMessage(line);
         }
     }
 
-    animationQueue.update(SDL_GetTicks());
+    const Uint32 now = SDL_GetTicks();
+    animationQueue.update(now);
+
+    int screenW = 0, screenH = 0;
+    SDL_GetRendererOutputSize(renderer, &screenW, &screenH);
+    
+    int mouseX = 0, mouseY = 0;
+    SDL_GetMouseState(&mouseX, &mouseY);
+
+    const int previewW = std::min(360, screenW - 80);
+    const int previewH = static_cast<int>(previewW * 1.5f);
+    const int previewX = (screenW - previewW) / 2;
+    const int previewY = (screenH - previewH) / 2;
+    SDL_Rect previewRect{previewX, previewY, previewW, previewH};
+
+    const bool mouseOverPreview = pointInRect(previewRect, mouseX, mouseY);
+
+    if (mouseOverPreview && previewLocked) {
+        return;
+    }
+
+    const bool draggingCard = drag.active && drag.index < localPlayer.hand.size();
+    std::size_t newHoverIndex = static_cast<std::size_t>(-1);
+    
+    if (!draggingCard && !mouseOverPreview) {
+        for (int i = static_cast<int>(cardRects.size()) - 1; i >= 0; --i) {
+            if (pointInRect(cardRects[static_cast<std::size_t>(i)], mouseX, mouseY)) {
+                newHoverIndex = static_cast<std::size_t>(i);
+                break;
+            }
+        }
+    }
+
+    if (!mouseOverPreview) {
+        if (newHoverIndex != hoverIndex) {
+            hoverIndex = newHoverIndex;
+            hoverStartTick = now;
+            previewScrollOffset = 0;
+            previewLocked = false;
+        }
+    }
+
+    constexpr Uint32 hoverDelayMs = 1000;
+    
+    const bool hoverTimerReady =
+        hoverIndex != static_cast<std::size_t>(-1) &&
+        hoverIndex < localPlayer.hand.size() &&
+        now - hoverStartTick >= hoverDelayMs;
+
+    if ((hoverTimerReady || mouseOverPreview) && hoverIndex < localPlayer.hand.size()) {
+        previewLocked = true;
+    } else if (!mouseOverPreview && !hoverTimerReady) {
+        previewLocked = false;
+    }
 }
 
 bool Playing::handleServerMessage(const std::string& msg) {
@@ -303,7 +461,7 @@ bool Playing::handleServerMessage(const std::string& msg) {
     std::string cmd;
     iss >> cmd;
 
-std::cout << "[Playing]: " << msg << "\n";
+    std::cout << "[Playing]: " << msg << "\n";
     
     if (cmd == "DRAW") {
         int playerId, cardId;
@@ -319,14 +477,12 @@ bool Playing::drawCard(int playerId, int cardId) {
                      ? localPlayer
                      : remotePlayer;
 
-    //check if deck has card
     auto card = player.getDeck().takeCardById(cardId);
 
     if (!card) {
         std::cerr << "Missing card id " << cardId << "\n";
         return false;
     }
-    
 
     player.addCardToHand(std::move(card));
 
@@ -341,7 +497,6 @@ bool Playing::drawCard(int playerId, int cardId) {
     const SDL_Rect fromRect = computeSelfDeckRect(screenW, screenH);
     const std::size_t handIndex = player.hand.size() - 1;
 
-    // Animate only local draws
     if (playerId == localPlayer.id && handIndex < cardRects.size()) {
         animationQueue.enqueueDrawCard(fromRect, cardRects[handIndex], handIndex, 320);    
     }
@@ -353,13 +508,16 @@ void Playing::render(const Game& game) {
     RenderPlaying::render(*this, game);
 }
 
+// -------------------------
+// Layout Computation
+// -------------------------
 std::vector<SDL_Rect> Playing::computeCardLayout(std::size_t count, int screenW, int screenH) const {
     std::vector<SDL_Rect> layout;
     if (count == 0 || screenW <= 0 || screenH <= 0) return layout;
 
-    const int cardWidth = 110;
-    const int cardHeight = 165;
-    const int maxWidth = static_cast<int>(screenW * 0.8f);
+    const int cardWidth = 100;
+    const int cardHeight = 150;
+    const int maxWidth = static_cast<int>(screenW * 0.75f);
     
     int totalWidthNoOverlap = static_cast<int>(count) * cardWidth;
     
@@ -371,9 +529,7 @@ std::vector<SDL_Rect> Playing::computeCardLayout(std::size_t count, int screenW,
     int finalHandWidth = (static_cast<int>(count) * cardWidth) + (static_cast<int>(count - 1) * spacing);
     
     int startX = (screenW - finalHandWidth) / 2;
-    
-    // NEW: Position cards above the player stat bar (80px from bottom instead of 30px)
-    int startY = screenH - cardHeight - 90;  // Changed from 30 to 90
+    int startY = screenH - cardHeight - 80;
     
     for (std::size_t i = 0; i < count; ++i) {
         layout.push_back(SDL_Rect{
@@ -395,16 +551,15 @@ void Playing::computeZones(int screenW, int screenH) {
         return;
     }
 
-    const int handCardHeight = 165;
-    const int handYOffset = 30;
+    const int handCardHeight = 150;
+    const int handYOffset = 80;
     const int slotCount = 5;
-    const int slotWidth = 120;
-    const int slotHeight = 160;
-    const int slotSpacing = 12;
+    const int slotWidth = 115;
+    const int slotHeight = 145;
+    const int slotSpacing = 15;
     const int margin = 20;
-    const int discardWidth = 110;
-    const int discardHeight = 130;
-    const int gapToDiscard = 18;
+    const int discardSize = 120;
+    const int gapToDiscard = 20;
 
     int handY = screenH - handCardHeight - handYOffset;
     if (!cardRects.empty()) {
@@ -413,10 +568,10 @@ void Playing::computeZones(int screenW, int screenH) {
 
     int totalSlotsWidth = slotCount * slotWidth + (slotCount - 1) * slotSpacing;
 
-    // Center the play zone itself; deck/discard sit outside of this band.
-    int startX = std::max(margin, (screenW - totalSlotsWidth) / 2);
-    int slotY = handY - slotHeight - 16;
-    if (slotY < margin) slotY = margin;
+    int startX = (screenW - totalSlotsWidth) / 2;
+    
+    int slotY = handY - slotHeight - 35;
+    if (slotY < 80) slotY = 80;
 
     playSlots.reserve(static_cast<std::size_t>(slotCount));
     for (int i = 0; i < slotCount; ++i) {
@@ -427,25 +582,26 @@ void Playing::computeZones(int screenW, int screenH) {
             slotHeight
         });
     }
+    
     if (!playSlots.empty()) {
         const SDL_Rect& firstSlot = playSlots.front();
         const SDL_Rect& lastSlot = playSlots.back();
 
         playZoneBand.x = firstSlot.x;
         playZoneBand.y = firstSlot.y;
-        playZoneBand.w = (lastSlot.x + lastSlot.w) - firstSlot.x; // from left edge of first to right edge of last
-        playZoneBand.h = firstSlot.h; // all slots have same height
+        playZoneBand.w = (lastSlot.x + lastSlot.w) - firstSlot.x;
+        playZoneBand.h = firstSlot.h;
     } else {
         playZoneBand = SDL_Rect{0,0,0,0};
     }
 
-    int discardX = startX - gapToDiscard - discardWidth;
+    int discardX = startX - gapToDiscard - discardSize;
     if (discardX < margin) {
         discardX = margin;
     }
 
-    int discardY = slotY + (slotHeight - discardHeight) / 2;
-    discardZone = SDL_Rect{discardX, discardY, discardWidth, discardHeight};
+    int discardY = slotY + (slotHeight - discardSize) / 2;
+    discardZone = SDL_Rect{discardX, discardY, discardSize, discardSize};
 }
 
 void Playing::computeUiRects(int screenW, int screenH) {
@@ -463,17 +619,14 @@ void Playing::computeUiRects(int screenW, int screenH) {
 
     const int margin = 20;
     
-    // Menu button - top right, rounded design
     const int menuW = 120;
     const int menuH = 50;
-    menuButton = SDL_Rect{screenW - menuW - margin, margin, menuW, menuH};
+    menuButton = SDL_Rect{margin, margin, menuW, menuH};
     
-    // Pause modal - centered
     const int pauseModalW = 400;
     const int pauseModalH = 280;
     pauseModal = SDL_Rect{(screenW - pauseModalW) / 2, (screenH - pauseModalH) / 2, pauseModalW, pauseModalH};
     
-    // Pause modal buttons
     const int buttonW = 320;
     const int buttonH = 60;
     const int buttonSpacing = 20;
@@ -482,12 +635,10 @@ void Playing::computeUiRects(int screenW, int screenH) {
     resumeButton = SDL_Rect{(screenW - buttonW) / 2, firstButtonY, buttonW, buttonH};
     pauseExitButton = SDL_Rect{(screenW - buttonW) / 2, firstButtonY + buttonH + buttonSpacing, buttonW, buttonH};
     
-    // Exit confirmation modal - centered
     const int exitModalW = 480;
     const int exitModalH = 320;
     exitModal = SDL_Rect{(screenW - exitModalW) / 2, (screenH - exitModalH) / 2, exitModalW, exitModalH};
     
-    // Exit modal buttons
     const int exitButtonW = 200;
     const int exitButtonH = 60;
     const int exitButtonSpacing = 20;
@@ -496,322 +647,7 @@ void Playing::computeUiRects(int screenW, int screenH) {
     saveExitButton = SDL_Rect{(screenW - exitButtonW * 2 - exitButtonSpacing) / 2, exitFirstButtonY, exitButtonW, exitButtonH};
     noSaveExitButton = SDL_Rect{saveExitButton.x + exitButtonW + exitButtonSpacing, exitFirstButtonY, exitButtonW, exitButtonH};
     
-    // Return to title button (for surrender screen)
     const int returnW = 260;
     const int returnH = 62;
     returnToTitleButton = SDL_Rect{(screenW - returnW) / 2, (screenH / 2) + 24, returnW, returnH};
-}
-
-SDL_Rect Playing::computeSelfDeckRect(int screenW, int screenH) const {
-    if (screenW <= 0 || screenH <= 0 || playSlots.empty()) {
-        return SDL_Rect{0, 0, 0, 0};
-    }
-
-    const int gap = 18;
-    const int margin = 10;
-    const int deckW = discardZone.w > 0 ? discardZone.w : 110;
-    const int deckH = discardZone.h > 0 ? discardZone.h : 130;
-    const int deckY = playSlots.front().y + (playSlots.front().h - deckH) / 2;
-
-    if (event.type == SDL_MOUSEBUTTONDOWN && event.button.button == SDL_BUTTON_LEFT) {
-        const int mouseX = event.button.x;
-        const int mouseY = event.button.y;
-
-        if (surrendered) {
-            if (pointInRect(returnToTitleButton, mouseX, mouseY)) {
-                surrendered = false;
-                menuOpen = false;
-                game.setNextState(GameState::Title);
-            }
-            return;
-        }
-    }
-
-    if (surrendered) {
-        return;
-    }
-
-    if (pendingSpellTarget.active) {
-        if (event.type == SDL_MOUSEBUTTONDOWN && event.button.button == SDL_BUTTON_LEFT) {
-            if (resolvePendingSpellTargetAt(event.button.x, event.button.y)) {
-                board.displayDiscard(player.id);
-            }
-        }
-        return;
-    }
-
-    switch (event.type) {
-        case SDL_MOUSEBUTTONDOWN:
-            if (event.button.button == SDL_BUTTON_LEFT) {
-                const int mouseX = event.button.x;
-                const int mouseY = event.button.y;
-
-                // Handle surrender screen
-                if (surrendered) {
-                    if (pointInRect(returnToTitleButton, mouseX, mouseY)) {
-                        surrendered = false;
-                        pauseModalOpen = false;
-                        exitModalOpen = false;
-                        game.setNextState(GameState::Title);
-                    }
-                    return;
-                }
-
-                // Handle exit confirmation modal
-                if (exitModalOpen) {
-                    if (pointInRect(saveExitButton, mouseX, mouseY)) {
-                        // User chose "Save & Exit" - both lead to title for now
-                        surrendered = false;
-                        pauseModalOpen = false;
-                        exitModalOpen = false;
-                        game.setNextState(GameState::Title);
-                        return;
-                    }
-                    if (pointInRect(noSaveExitButton, mouseX, mouseY)) {
-                        // User chose "Exit Without Saving"
-                        surrendered = false;
-                        pauseModalOpen = false;
-                        exitModalOpen = false;
-                        game.setNextState(GameState::Title);
-                        return;
-                    }
-                    // Click outside modal closes it
-                    if (!pointInRect(exitModal, mouseX, mouseY)) {
-                        exitModalOpen = false;
-                    }
-                    return;
-                }
-
-                // Handle pause modal
-                if (pauseModalOpen) {
-                    if (pointInRect(resumeButton, mouseX, mouseY)) {
-                        pauseModalOpen = false;
-                        return;
-                    }
-                    if (pointInRect(pauseExitButton, mouseX, mouseY)) {
-                        pauseModalOpen = false;
-                        exitModalOpen = true;
-                        return;
-                    }
-                    // Click outside modal closes it
-                    if (!pointInRect(pauseModal, mouseX, mouseY)) {
-                        pauseModalOpen = false;
-                    }
-                    return;
-                }
-
-                // Handle menu button
-                if (pointInRect(menuButton, mouseX, mouseY)) {
-                    pauseModalOpen = true;
-                    return;
-                }
-
-                // Don't start drag if preview is locked
-                if (previewLocked) return;
-                
-                // Handle card dragging
-                for (int i = static_cast<int>(cardRects.size()) - 1; i >= 0; --i) {
-                    if (pointInRect(cardRects[static_cast<std::size_t>(i)], mouseX, mouseY)) {
-                        drag.active = true;
-                        drag.index = static_cast<std::size_t>(i);
-                        drag.offsetX = mouseX - cardRects[drag.index].x;
-                        drag.offsetY = mouseY - cardRects[drag.index].y;
-                        drag.x = cardRects[drag.index].x;
-                        drag.y = cardRects[drag.index].y;
-                        break;
-                    }
-                }
-            }
-            break;
-        case SDL_MOUSEMOTION:
-            if (drag.active) {
-                drag.x = event.motion.x - drag.offsetX;
-                drag.y = event.motion.y - drag.offsetY;
-            }
-            break;
-        case SDL_MOUSEBUTTONUP:
-            if (drag.active && event.button.button == SDL_BUTTON_LEFT) {
-                const int releaseX = event.button.x;
-                const int releaseY = event.button.y;
-
-                const bool droppedInDiscard =
-                    drag.index < player.hand.size() &&
-                    pointInRect(discardZone, releaseX, releaseY);
-                int laneIndex = -1;
-                if (drag.index < player.hand.size()) {
-                    for (std::size_t slot = 0; slot < playSlots.size(); ++slot) {
-                        if (pointInRect(playSlots[slot], releaseX, releaseY)) {
-                            laneIndex = static_cast<int>(slot);
-                            break;
-                        }
-                    }
-                }
-                const bool droppedInPlay = laneIndex >= 0;
-                
-                if (droppedInDiscard) {
-                    std::cout << "Discarding " << player.hand[drag.index].get()->getName() << "\n";
-                    const auto manaGain = player.hand[drag.index].get()->getManaValue();
-                    if (board.addToDiscard(std::move(player.hand[drag.index]), player.id)) {
-
-                        std::cout << "Adding mana\n";
-                        player.addMana(manaGain);
-                        
-                        std::cout << "Removing card from hand\n";
-                        player.hand.erase(player.hand.begin() + static_cast<std::ptrdiff_t>(drag.index));   
-                    } 
-                } else if (drag.index < player.hand.size()) {
-                    Card* draggedCard = player.hand[drag.index].get();
-                    if (!draggedCard) {
-                        break;
-                    }
-
-                    const int cost = draggedCard->getManaCost();
-                    if (player.mana < cost) {
-                        std::cout << "Not enough mana\n";
-                        break;
-                    }
-
-                    if (draggedCard->getType() == CardType::Spell) {
-                        std::unique_ptr<Card> castSpell = std::move(player.hand[drag.index]);
-                        player.hand.erase(player.hand.begin() + static_cast<std::ptrdiff_t>(drag.index));
-                        player.mana -= cost;
-
-                        if (castSpell && isTargetedSpell(*castSpell)) {
-                            std::cout << "Cast targeted spell: " << castSpell->getName()
-                                      << " (choose a target)\n";
-                            pendingSpellTarget.active = true;
-                            pendingSpellTarget.spell = std::move(castSpell);
-                        } else {
-                            std::cout << "Cast untargeted spell\n";
-                            consumeSpell(std::move(castSpell));
-                        }
-                    } else if (droppedInPlay && laneIndex < static_cast<int>(playSlots.size())) {
-                        std::cout << "Playing " << draggedCard->getName()
-                                  << " into lane " << laneIndex << "\n";
-
-                        if (board.isZoneEmpty(laneIndex, player.id)) {
-                            if (board.addToPlay(laneIndex, player.id, std::move(player.hand[drag.index]))) {
-                                player.mana -= cost;
-                                player.hand.erase(player.hand.begin() + static_cast<std::ptrdiff_t>(drag.index));
-                            }
-                        }
-                    }
-                }
-
-                drag.active = false;
-                cardRects = computeCardLayout(player.hand.size(), screenW, screenH);
-                computeZones(screenW, screenH);
-                // board.displayDiscard(player.id);
-                board.displayPlay(player.id);
-                
-            }
-            break;
-        case SDL_MOUSEWHEEL:
-            if (previewLocked) {
-                previewScrollOffset -= event.wheel.y * 20;
-                if (previewScrollOffset < 0) previewScrollOffset = 0;
-            }
-            break;
-        default:
-            break;
-    }
-}
-
-void Playing::run() {
-    if (!renderer) {
-        throw std::runtime_error("Call setup() before run()");
-    }
-
-    SDL_Event event;
-    while (running) {
-        while (SDL_PollEvent(&event)) {
-            if (event.type == SDL_QUIT) {
-                running = false;
-            }
-        }
-
-        const Uint32 now = SDL_GetTicks();
-        animationQueue.update(now);
-        if (now - lastDrawTick >= static_cast<Uint32>(drawIntervalSeconds * 1000)) {
-            tryDrawCardWithAnimation(now);
-            lastDrawTick = now;
-        }
-    }
-}
-
-void Playing::update(Game& /*game*/) {
-    if (!renderer) return; // not yet ready
-    if (surrendered) return;
-
-    const Uint32 now = SDL_GetTicks();
-    animationQueue.update(now);
-    if (now - lastDrawTick >= static_cast<Uint32>(drawIntervalSeconds * 1000)) {
-        tryDrawCardWithAnimation(now);
-        lastDrawTick = now;
-    }
-
-    int screenW = 0, screenH = 0;
-    SDL_GetRendererOutputSize(renderer, &screenW, &screenH);
-    
-    int mouseX = 0, mouseY = 0;
-    SDL_GetMouseState(&mouseX, &mouseY);
-
-    // Preview card rectangle
-    const int previewW = std::min(360, screenW - 80);
-    const int previewH = static_cast<int>(previewW * 1.5f);
-    const int previewX = (screenW - previewW) / 2;
-    const int previewY = (screenH - previewH) / 2;
-    SDL_Rect previewRect{previewX, previewY, previewW, previewH};
-
-    const bool mouseOverPreview = pointInRect(previewRect, mouseX, mouseY);
-
-    // If mouse is over preview, keep it locked and don't update anything
-    if (mouseOverPreview && previewLocked) {
-        return;
-    }
-
-    // Check if hovering over any hand card
-    const bool draggingCard = drag.active && drag.index < player.hand.size();
-    std::size_t newHoverIndex = static_cast<std::size_t>(-1);
-    
-    if (!draggingCard && !mouseOverPreview) {
-        for (int i = static_cast<int>(cardRects.size()) - 1; i >= 0; --i) {
-            if (pointInRect(cardRects[static_cast<std::size_t>(i)], mouseX, mouseY)) {
-                newHoverIndex = static_cast<std::size_t>(i);
-                break;
-            }
-        }
-    }
-
-    // Update hover index when not over preview
-    if (!mouseOverPreview) {
-        if (newHoverIndex != hoverIndex) {
-            hoverIndex = newHoverIndex;
-            hoverStartTick = now;
-            previewScrollOffset = 0;
-            previewLocked = false;
-        }
-    }
-
-    constexpr Uint32 hoverDelayMs = 1000;
-    
-    const bool hoverTimerReady =
-        hoverIndex != static_cast<std::size_t>(-1) &&
-        hoverIndex < player.hand.size() &&
-        now - hoverStartTick >= hoverDelayMs;
-
-    // Lock preview when timer is ready or mouse is over preview
-    if ((hoverTimerReady || mouseOverPreview) && hoverIndex < player.hand.size()) {
-        previewLocked = true;
-    } else if (!mouseOverPreview && !hoverTimerReady) {
-        previewLocked = false;
-    }
-}
-
-void Playing::render(const Game& game) {
-    RenderPlaying::render(*this, game);
-    int deckX = playSlots.back().x + playSlots.back().w + gap;
-    if (deckX + deckW > screenW - margin) deckX = std::max(margin, screenW - margin - deckW);
-
-    return SDL_Rect{deckX, deckY, deckW, deckH};
 }
