@@ -90,8 +90,11 @@ SDL_Rect Playing::computeSelfDeckRect(int screenW, int screenH) const {
     const int deckH = discardZone.h > 0 ? discardZone.h : 130;
     const int deckY = playSlots.front().y + (playSlots.front().h - deckH) / 2;
 
+    // Position deck on RIGHT side of play zones
     int deckX = playSlots.back().x + playSlots.back().w + gap;
-    if (deckX + deckW > screenW - margin) deckX = std::max(margin, screenW - margin - deckW);
+    if (deckX + deckW > screenW - margin) {
+        deckX = std::max(margin, screenW - margin - deckW);
+    }
 
     return SDL_Rect{deckX, deckY, deckW, deckH};
 }
@@ -179,25 +182,22 @@ std::vector<SDL_Rect> Playing::computeCardLayout(std::size_t count, int screenW,
 
     const int cardWidth = 110;
     const int cardHeight = 165;
-    const int maxWidth = static_cast<int>(screenW * 0.8f); // Use 80% of screen width
+    const int maxWidth = static_cast<int>(screenW * 0.8f);
     
-    // 1. Calculate how much space we need if cards didn't overlap
     int totalWidthNoOverlap = static_cast<int>(count) * cardWidth;
     
-    // 2. Determine spacing. 
-    // If totalWidth > maxWidth, spacing becomes negative (overlap).
-    int spacing = 10; // Default gap between cards
+    int spacing = 10;
     if (totalWidthNoOverlap > maxWidth && count > 1) {
         spacing = (maxWidth - totalWidthNoOverlap) / static_cast<int>(count - 1);
     }
 
-    // 3. Calculate actual total width with the new spacing
     int finalHandWidth = (static_cast<int>(count) * cardWidth) + (static_cast<int>(count - 1) * spacing);
     
-    // 4. Center the start position
     int startX = (screenW - finalHandWidth) / 2;
-    int startY = screenH - cardHeight - 30; // Fixed distance from bottom
-
+    
+    // NEW: Position cards above the player stat bar (80px from bottom instead of 30px)
+    int startY = screenH - cardHeight - 90;  // Changed from 30 to 90
+    
     for (std::size_t i = 0; i < count; ++i) {
         layout.push_back(SDL_Rect{
             startX + static_cast<int>(i) * (cardWidth + spacing),
@@ -274,24 +274,56 @@ void Playing::computeZones(int screenW, int screenH) {
 void Playing::computeUiRects(int screenW, int screenH) {
     if (screenW <= 0 || screenH <= 0) {
         menuButton = SDL_Rect{0, 0, 0, 0};
-        exitGameButton = SDL_Rect{0, 0, 0, 0};
+        pauseModal = SDL_Rect{0, 0, 0, 0};
+        resumeButton = SDL_Rect{0, 0, 0, 0};
+        pauseExitButton = SDL_Rect{0, 0, 0, 0};
+        exitModal = SDL_Rect{0, 0, 0, 0};
+        saveExitButton = SDL_Rect{0, 0, 0, 0};
+        noSaveExitButton = SDL_Rect{0, 0, 0, 0};
         returnToTitleButton = SDL_Rect{0, 0, 0, 0};
         return;
     }
 
     const int margin = 20;
-    const int menuW = 140;
-    const int menuH = 44;
-    const int exitW = 180;
-    const int exitH = 44;
+    
+    // Menu button - top right, rounded design
+    const int menuW = 120;
+    const int menuH = 50;
+    menuButton = SDL_Rect{screenW - menuW - margin, margin, menuW, menuH};
+    
+    // Pause modal - centered
+    const int pauseModalW = 400;
+    const int pauseModalH = 280;
+    pauseModal = SDL_Rect{(screenW - pauseModalW) / 2, (screenH - pauseModalH) / 2, pauseModalW, pauseModalH};
+    
+    // Pause modal buttons
+    const int buttonW = 320;
+    const int buttonH = 60;
+    const int buttonSpacing = 20;
+    const int firstButtonY = pauseModal.y + 100;
+    
+    resumeButton = SDL_Rect{(screenW - buttonW) / 2, firstButtonY, buttonW, buttonH};
+    pauseExitButton = SDL_Rect{(screenW - buttonW) / 2, firstButtonY + buttonH + buttonSpacing, buttonW, buttonH};
+    
+    // Exit confirmation modal - centered
+    const int exitModalW = 480;
+    const int exitModalH = 320;
+    exitModal = SDL_Rect{(screenW - exitModalW) / 2, (screenH - exitModalH) / 2, exitModalW, exitModalH};
+    
+    // Exit modal buttons
+    const int exitButtonW = 200;
+    const int exitButtonH = 60;
+    const int exitButtonSpacing = 20;
+    const int exitFirstButtonY = exitModal.y + 140;
+    
+    saveExitButton = SDL_Rect{(screenW - exitButtonW * 2 - exitButtonSpacing) / 2, exitFirstButtonY, exitButtonW, exitButtonH};
+    noSaveExitButton = SDL_Rect{saveExitButton.x + exitButtonW + exitButtonSpacing, exitFirstButtonY, exitButtonW, exitButtonH};
+    
+    // Return to title button (for surrender screen)
     const int returnW = 260;
     const int returnH = 62;
-
-    menuButton = SDL_Rect{screenW - menuW - margin, margin, menuW, menuH};
-    exitGameButton = SDL_Rect{menuButton.x + (menuButton.w - exitW), menuButton.y + menuButton.h + 12, exitW, exitH};
     returnToTitleButton = SDL_Rect{(screenW - returnW) / 2, (screenH / 2) + 24, returnW, returnH};
 }
-
 void Playing::handleEvents(Game& game, const SDL_Event& event) {
     if (!renderer) return;
 
@@ -316,22 +348,6 @@ void Playing::handleEvents(Game& game, const SDL_Event& event) {
             }
             return;
         }
-
-        if (pointInRect(menuButton, mouseX, mouseY)) {
-            menuOpen = !menuOpen;
-            return;
-        }
-
-        if (menuOpen && pointInRect(exitGameButton, mouseX, mouseY)) {
-            surrendered = true;
-            menuOpen = false;
-            drag.active = false;
-            return;
-        }
-
-        if (menuOpen) {
-            menuOpen = false;
-        }
     }
 
     if (surrendered) {
@@ -350,18 +366,79 @@ void Playing::handleEvents(Game& game, const SDL_Event& event) {
     switch (event.type) {
         case SDL_MOUSEBUTTONDOWN:
             if (event.button.button == SDL_BUTTON_LEFT) {
-                const int mx = event.button.x;
-                const int my = event.button.y;
-                
+                const int mouseX = event.button.x;
+                const int mouseY = event.button.y;
+
+                // Handle surrender screen
+                if (surrendered) {
+                    if (pointInRect(returnToTitleButton, mouseX, mouseY)) {
+                        surrendered = false;
+                        pauseModalOpen = false;
+                        exitModalOpen = false;
+                        game.setNextState(GameState::Title);
+                    }
+                    return;
+                }
+
+                // Handle exit confirmation modal
+                if (exitModalOpen) {
+                    if (pointInRect(saveExitButton, mouseX, mouseY)) {
+                        // User chose "Save & Exit" - both lead to title for now
+                        surrendered = false;
+                        pauseModalOpen = false;
+                        exitModalOpen = false;
+                        game.setNextState(GameState::Title);
+                        return;
+                    }
+                    if (pointInRect(noSaveExitButton, mouseX, mouseY)) {
+                        // User chose "Exit Without Saving"
+                        surrendered = false;
+                        pauseModalOpen = false;
+                        exitModalOpen = false;
+                        game.setNextState(GameState::Title);
+                        return;
+                    }
+                    // Click outside modal closes it
+                    if (!pointInRect(exitModal, mouseX, mouseY)) {
+                        exitModalOpen = false;
+                    }
+                    return;
+                }
+
+                // Handle pause modal
+                if (pauseModalOpen) {
+                    if (pointInRect(resumeButton, mouseX, mouseY)) {
+                        pauseModalOpen = false;
+                        return;
+                    }
+                    if (pointInRect(pauseExitButton, mouseX, mouseY)) {
+                        pauseModalOpen = false;
+                        exitModalOpen = true;
+                        return;
+                    }
+                    // Click outside modal closes it
+                    if (!pointInRect(pauseModal, mouseX, mouseY)) {
+                        pauseModalOpen = false;
+                    }
+                    return;
+                }
+
+                // Handle menu button
+                if (pointInRect(menuButton, mouseX, mouseY)) {
+                    pauseModalOpen = true;
+                    return;
+                }
+
                 // Don't start drag if preview is locked
                 if (previewLocked) return;
                 
+                // Handle card dragging
                 for (int i = static_cast<int>(cardRects.size()) - 1; i >= 0; --i) {
-                    if (pointInRect(cardRects[static_cast<std::size_t>(i)], mx, my)) {
+                    if (pointInRect(cardRects[static_cast<std::size_t>(i)], mouseX, mouseY)) {
                         drag.active = true;
                         drag.index = static_cast<std::size_t>(i);
-                        drag.offsetX = mx - cardRects[drag.index].x;
-                        drag.offsetY = my - cardRects[drag.index].y;
+                        drag.offsetX = mouseX - cardRects[drag.index].x;
+                        drag.offsetY = mouseY - cardRects[drag.index].y;
                         drag.x = cardRects[drag.index].x;
                         drag.y = cardRects[drag.index].y;
                         break;

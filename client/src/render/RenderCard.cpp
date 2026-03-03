@@ -293,9 +293,7 @@ namespace {
         measureText(font, s, tw, th);
         tr.drawText(r, s, font, SDL_Color{255, 255, 255, 255}, cx - tw/2, cy - th/2);
     }
-    const int manaTextX = manaGem.x + (manaGem.w - manaTextW) / 2;
-    const int manaTextY = manaGem.y + (manaGem.h - manaTextH) / 2;
-    textRenderer.drawText(renderer, manaText, manaFont, ink, manaTextX, manaTextY);
+
 
     // ── shared card body draw ─────────────────────────────────────────
     void drawCardBody(SDL_Renderer* renderer, const SDL_Rect& rect, int cornerRadius,

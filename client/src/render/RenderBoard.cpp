@@ -84,7 +84,7 @@ void RenderBoard::drawOpponentPlayZones(SDL_Renderer* renderer, RenderText& text
 	if (playSlots.empty()) return;
 
 	const int areaX = playSlots.front().x;
-	const int opponentOffset = 230;  // increased from 200 for more spacing
+	const int opponentOffset = 230;
 	const int areaY = playSlots.front().y - opponentOffset;
 
 	const int labelY = std::max(10, areaY - 22);
@@ -101,7 +101,6 @@ void RenderBoard::drawOpponentPlayZones(SDL_Renderer* renderer, RenderText& text
 		SDL_Rect adjustedSlot = slot;
 		adjustedSlot.y -= opponentOffset;
 
-		// Darker purple/brown for opponent zones
 		fillRoundedRect(renderer, adjustedSlot, 8, SDL_Color{50, 40, 55, 180});
 		drawRoundedBorder(renderer, adjustedSlot, 8, SDL_Color{120, 90, 130, 255}, 2);
 	}
@@ -126,7 +125,6 @@ void RenderBoard::drawPlayZones(SDL_Renderer* renderer, RenderText& textRenderer
 	);
 
 	for (const auto& slot : playSlots) {
-		// Teal/green for player zones
 		fillRoundedRect(renderer, slot, 8, SDL_Color{40, 60, 50, 180});
 		drawRoundedBorder(renderer, slot, 8, SDL_Color{100, 160, 120, 255}, 2);
 	}
@@ -136,7 +134,6 @@ void RenderBoard::drawDiscardZone(SDL_Renderer* renderer, RenderText& textRender
                                   const SDL_Rect& discardZone, bool hovering, TTF_Font* fontSmall) {
 	if (!renderer || !fontSmall) return;
 
-	// Blue tones for discard zone, brighter when hovering
 	SDL_Color fill = hovering ? SDL_Color{60, 75, 100, 200} : SDL_Color{45, 60, 80, 180};
 	SDL_Color border = hovering ? SDL_Color{120, 150, 200, 255} : SDL_Color{90, 120, 160, 255};
 
@@ -163,11 +160,13 @@ void RenderBoard::drawDiscardZone(SDL_Renderer* renderer, RenderText& textRender
 	);
 }
 
-void RenderBoard::drawBoardState(SDL_Renderer* renderer, RenderText& textRenderer, const Board& board, const std::vector<SDL_Rect>& playSlots, int localPlayerId, TTF_Font* fontSmall) {
-	if (!renderer || !fontSmall) return;
+void RenderBoard::drawBoardState(SDL_Renderer* renderer, RenderText& textRenderer, 
+                                 const Board& board, const std::vector<SDL_Rect>& playSlots, 
+                                 TTF_Font* fontTitle, TTF_Font* fontBody) {
+	if (!renderer || !fontTitle || !fontBody) return;
 	if (playSlots.empty()) return;
 
-	const int opponentOffset = 230;  // match the increased spacing
+	const int opponentOffset = 230;
 
 	for (int pid = 0; pid <= 1; ++pid) {
 		for (std::size_t lane = 0; lane < board.getLaneCount(); ++lane) {
@@ -177,8 +176,8 @@ void RenderBoard::drawBoardState(SDL_Renderer* renderer, RenderText& textRendere
 				if (!card) continue;
 
 				SDL_Rect rect = playSlots[lane];
-				if (pid != localPlayerId) {
-					rect.y -= 200;
+				if (pid == 1) {
+					rect.y -= opponentOffset;
 				}
 
 				RenderCard::drawBoardCard(renderer, textRenderer, *card, rect, fontTitle, fontBody);

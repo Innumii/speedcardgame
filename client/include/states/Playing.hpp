@@ -14,7 +14,7 @@
 #include "render/RenderText.hpp"
 #include "animation/animationQueue.hpp"
 
-class Game; // forward declaration to avoid circular include
+class Game;
 class Card;
 
 class Playing {
@@ -42,14 +42,25 @@ private:
     std::vector<SDL_Rect> playSlots;
     SDL_Rect discardZone{0, 0, 0, 0};
     SDL_Rect menuButton{0, 0, 0, 0};
-    SDL_Rect exitGameButton{0, 0, 0, 0};
+    SDL_Rect pauseModal{0, 0, 0, 0};
+    SDL_Rect resumeButton{0, 0, 0, 0};
+    SDL_Rect pauseExitButton{0, 0, 0, 0};
+    SDL_Rect exitModal{0, 0, 0, 0};
+    SDL_Rect saveExitButton{0, 0, 0, 0};
+    SDL_Rect noSaveExitButton{0, 0, 0, 0};
     SDL_Rect returnToTitleButton{0, 0, 0, 0};
+    
     DragState drag;
     std::size_t hoverIndex{static_cast<std::size_t>(-1)};
     Uint32 hoverStartTick{0};
+    bool previewLocked{false};
+    int previewScrollOffset{0};
     bool menuOpen{false};
+    bool pauseModalOpen{false};
+    bool exitModalOpen{false};
     bool surrendered{false};
     AnimationQueue animationQueue;
+    
     struct PendingSpellTargetState {
         bool active{false};
         std::unique_ptr<Card> spell;
@@ -74,6 +85,7 @@ public:
     Playing& operator=(const Playing&) = delete;
     Playing(Playing&&) noexcept = default;
     Playing& operator=(Playing&&) noexcept = default;
+    
     void setup(const Game& game);
     void setDeck(Deck newDeck);
     void handleEvents(Game& game, const SDL_Event& event);

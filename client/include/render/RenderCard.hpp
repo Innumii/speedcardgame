@@ -24,6 +24,8 @@ public:
                            int scrollOffset = 0);
 
     static void drawCardBack(SDL_Renderer* renderer, const SDL_Rect& cardRect);
+
+    static void clearImageCache();
 };
 
 #endif

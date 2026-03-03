@@ -8,7 +8,6 @@
 #include "render/RenderText.hpp"
 #include "render/Theme.hpp"
 #include "states/Playing.hpp"
-#include "states/DeckBuilding.hpp"
 
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_ttf.h>
@@ -23,7 +22,7 @@ namespace {
 		if (!renderer || !fontSmall) return;
 		if (playSlots.empty()) return;
 
-		const int opponentOffset = 200;
+		const int opponentOffset = 230;
 		const int gap = 18;
 		const int margin = 10;
 
@@ -36,12 +35,12 @@ namespace {
 		const int leftEdge = playSlots.front().x - gap;
 		const int rightEdge = playSlots.back().x + playSlots.back().w + gap;
 
-		int deckX = leftEdge - discardW;
-		if (deckX < margin) deckX = margin;
+		int discardX = leftEdge - discardW;
+		if (discardX < margin) discardX = margin;
 
-		int discardX = rightEdge;
-		if (discardX + discardW > screenW - margin) {
-			discardX = std::max(margin, screenW - margin - discardW);
+		int deckX = rightEdge;
+		if (deckX + discardW > screenW - margin) {
+			deckX = std::max(margin, screenW - margin - discardW);
 		}
 
 		SDL_Rect opponentDiscard{discardX, discardY, discardW, discardH};
@@ -74,8 +73,9 @@ namespace {
 		);
 	}
 
-	void drawSelfDeck(SDL_Renderer* renderer, RenderText& textRenderer, const std::vector<SDL_Rect>& playSlots,
-			const SDL_Rect& playerDiscardZone, int deckSize, int screenW, TTF_Font* fontSmall) {
+	void drawSelfDeck(SDL_Renderer* renderer, RenderText& textRenderer,
+			const std::vector<SDL_Rect>& playSlots, const SDL_Rect& playerDiscardZone,
+			int deckSize, int screenW, TTF_Font* fontSmall) {
 		if (!renderer || !fontSmall) return;
 		if (playSlots.empty()) return;
 
@@ -85,8 +85,11 @@ namespace {
 		const int deckH = playerDiscardZone.h > 0 ? playerDiscardZone.h : 130;
 		const int deckY = playSlots.front().y + (playSlots.front().h - deckH) / 2;
 
+		// Position deck on RIGHT side of play zones
 		int deckX = playSlots.back().x + playSlots.back().w + gap;
-		if (deckX + deckW > screenW - margin) deckX = std::max(margin, screenW - margin - deckW);
+		if (deckX + deckW > screenW - margin) {
+			deckX = std::max(margin, screenW - margin - deckW);
+		}
 
 		SDL_Rect deckBase{deckX, deckY, deckW, deckH};
 		const int stackCount = static_cast<int>(std::min<int>(deckSize, 5));
@@ -103,9 +106,7 @@ namespace {
 			deckBase.y + 6
 		);
 	}
-
 	void drawStatBox(SDL_Renderer* renderer, const SDL_Rect& box, SDL_Color fill, SDL_Color border, int radius) {
-		// rounded rect helper
 		auto fillCircle = [&](int cx, int cy, int r) {
 			for (int dy = -r; dy <= r; dy++) {
 				int dx = (int)sqrt((double)(r*r - dy*dy));
@@ -116,24 +117,24 @@ namespace {
 		SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
 		SDL_SetRenderDrawColor(renderer, fill.r, fill.g, fill.b, fill.a);
 		
-		SDL_Rect body  = {box.x + radius,        box.y,          box.w - 2*radius, box.h};
-		SDL_Rect left  = {box.x,                 box.y + radius, radius,           box.h - 2*radius};
-		SDL_Rect right = {box.x + box.w - radius, box.y + radius, radius,           box.h - 2*radius};
+		SDL_Rect body  = {box.x + radius, box.y, box.w - 2*radius, box.h};
+		SDL_Rect left  = {box.x, box.y + radius, radius, box.h - 2*radius};
+		SDL_Rect right = {box.x + box.w - radius, box.y + radius, radius, box.h - 2*radius};
 		
 		SDL_RenderFillRect(renderer, &body);
 		SDL_RenderFillRect(renderer, &left);
 		SDL_RenderFillRect(renderer, &right);
 		
-		fillCircle(box.x + radius,          box.y + radius,          radius);
-		fillCircle(box.x + box.w - radius,  box.y + radius,          radius);
-		fillCircle(box.x + radius,          box.y + box.h - radius,  radius);
-		fillCircle(box.x + box.w - radius,  box.y + box.h - radius,  radius);
+		fillCircle(box.x + radius, box.y + radius, radius);
+		fillCircle(box.x + box.w - radius, box.y + radius, radius);
+		fillCircle(box.x + radius, box.y + box.h - radius, radius);
+		fillCircle(box.x + box.w - radius, box.y + box.h - radius, radius);
 		
 		SDL_SetRenderDrawColor(renderer, border.r, border.g, border.b, border.a);
-		SDL_RenderDrawLine(renderer, box.x + radius,    box.y,          box.x + box.w - radius, box.y);
-		SDL_RenderDrawLine(renderer, box.x + radius,    box.y + box.h,  box.x + box.w - radius, box.y + box.h);
-		SDL_RenderDrawLine(renderer, box.x,             box.y + radius, box.x,                  box.y + box.h - radius);
-		SDL_RenderDrawLine(renderer, box.x + box.w,     box.y + radius, box.x + box.w,          box.y + box.h - radius);
+		SDL_RenderDrawLine(renderer, box.x + radius, box.y, box.x + box.w - radius, box.y);
+		SDL_RenderDrawLine(renderer, box.x + radius, box.y + box.h, box.x + box.w - radius, box.y + box.h);
+		SDL_RenderDrawLine(renderer, box.x, box.y + radius, box.x, box.y + box.h - radius);
+		SDL_RenderDrawLine(renderer, box.x + box.w, box.y + radius, box.x + box.w, box.y + box.h - radius);
 	}
 }
 
@@ -141,11 +142,9 @@ void RenderPlaying::render(Playing& playing, const Game& game) {
 	SDL_Renderer* renderer = game.getRenderer();
 	if (!renderer) return;
 
-	// ── get fonts from Game ──────────────────────────────────────────
-	const RenderText::FontSet& uiFonts    = game.getUIFonts();
+	const RenderText::FontSet& uiFonts = game.getUIFonts();
 	const RenderText::FontSet& titleFonts = game.getTitleFonts();
 
-	// ── background ───────────────────────────────────────────────────
 	SDL_SetRenderDrawColor(renderer, 28, 22, 45, 255);
 	SDL_RenderClear(renderer);
 
@@ -156,72 +155,13 @@ void RenderPlaying::render(Playing& playing, const Game& game) {
 		screenW = 800;
 		screenH = 600;
 	}
-	playing.computeUiRects(screenW, screenH);
 
 	RenderText textRenderer;
-	const RenderText::FontSet& uiFonts = game.getUIFonts();
-
-	textRenderer.drawText(
-		renderer,
-		"Health: " + std::to_string(playing.player.health),
-		playing.fonts.large,
-		SDL_Color{255, 255, 255, 255},
-		20,
-		20
-	);
-
-	const std::string manaText = "Mana: " + std::to_string(playing.player.mana);
-	textRenderer.drawText(
-		renderer,
-		manaText,
-		playing.fonts.large,
-		SDL_Color{255, 255, 255, 255},
-		20,
-		50
-	);
-
-	textRenderer.drawText(
-		renderer,
-		"Opponent Health: " + std::to_string(game.getHealth(game.getPlayer(true))),
-		playing.fonts.small,
-		SDL_Color{210, 210, 210, 255},
-		20,
-		80
-	);
-
-	const std::string opponentManaText = "Opponent Mana: " + std::to_string(game.getMana(game.getPlayer(true)));
-	textRenderer.drawText(
-		renderer,
-		opponentManaText,
-		playing.fonts.small,
-		SDL_Color{210, 210, 210, 255},
-		20,
-		105
-	);
-
-	// Opponent health box (left side)
-	SDL_Rect opponentHealthBox = {12, opponentStatsY, opponentHealthW + 16, opponentHealthH + 12};
-	drawStatBox(renderer, opponentHealthBox,
-	            SDL_Color{30, 20, 20, 150},   // darker muted red
-	            SDL_Color{120, 50, 50, 200},  // muted red border
-	            6);
-	textRenderer.drawText(renderer, opponentHealthText, uiFonts.small,
-	                      SDL_Color{200, 140, 140, 255},  // muted red-white
-	                      opponentHealthBox.x + 8, opponentHealthBox.y + 6);
-
-	// Opponent mana box (right side)
-	SDL_Rect opponentManaBox = {screenW - opponentManaW - 28, opponentStatsY, opponentManaW + 16, opponentManaH + 12};
-	drawStatBox(renderer, opponentManaBox,
-	            SDL_Color{20, 25, 35, 150},   // darker muted blue
-	            SDL_Color{50, 80, 120, 200},  // muted blue border
-	            6);
-	textRenderer.drawText(renderer, opponentManaText, uiFonts.small,
-	                      SDL_Color{140, 170, 200, 255},  // muted cyan
-	                      opponentManaBox.x + 8, opponentManaBox.y + 6);
 
 	// ── compute layouts ──────────────────────────────────────────────
 	playing.cardRects = playing.computeCardLayout(playing.player.hand.size(), screenW, screenH);
 	playing.computeZones(screenW, screenH);
+	playing.computeUiRects(screenW, screenH);
 
 	const std::size_t opponentHandSize = game.getHandSize(game.getPlayer(true));
 	std::vector<SDL_Rect> opponentHandRects = playing.computeCardLayout(opponentHandSize, screenW, screenH);
@@ -229,7 +169,7 @@ void RenderPlaying::render(Playing& playing, const Game& game) {
 		const int cardHeight = opponentHandRects.front().h;
 		int topHandY = 20;
 		if (!playing.playSlots.empty()) {
-			const int opponentOffset = 200;
+			const int opponentOffset = 230;
 			topHandY = std::max(20, playing.playSlots.front().y - opponentOffset - cardHeight - 20);
 		}
 		for (auto& rect : opponentHandRects) {
@@ -241,8 +181,6 @@ void RenderPlaying::render(Playing& playing, const Game& game) {
 	SDL_GetMouseState(&mouseX, &mouseY);
 	const bool hoveringDiscard = playing.pointInRect(playing.discardZone, mouseX, mouseY);
 	const bool hoveringMenu = playing.pointInRect(playing.menuButton, mouseX, mouseY);
-	const bool hoveringExit = playing.menuOpen && playing.pointInRect(playing.exitGameButton, mouseX, mouseY);
-	const bool hoveringReturn = playing.surrendered && playing.pointInRect(playing.returnToTitleButton, mouseX, mouseY);
 
 	const bool draggingCard = playing.drag.active && playing.drag.index < playing.player.hand.size();
 	const bool hasActiveDrawCard = playing.animationQueue.hasActiveDrawCard();
@@ -266,8 +204,8 @@ void RenderPlaying::render(Playing& playing, const Game& game) {
 	constexpr Uint32 hoverDelayMs = 1000;
 	const bool showPreview =
 		(playing.hoverIndex != static_cast<std::size_t>(-1) &&
-		playing.hoverIndex < playing.player.hand.size() &&
-		now - playing.hoverStartTick >= hoverDelayMs) || playing.previewLocked;
+		 playing.hoverIndex < playing.player.hand.size() &&
+		 now - playing.hoverStartTick >= hoverDelayMs) || playing.previewLocked;
 
 	// ── draw zones ───────────────────────────────────────────────────
 	RenderBoard::drawOpponentPlayZones(renderer, textRenderer, playing.playSlots, uiFonts.small);
@@ -289,15 +227,118 @@ void RenderPlaying::render(Playing& playing, const Game& game) {
 		playing.discardZone,
 		playing.deck.size(),
 		screenW,
-		playing.fonts.small
+		uiFonts.small
 	);
+
+// ── opponent stats - top center horizontal bar ───────────────────
+const std::string opponentText = "Opponent";
+const std::string opponentHealthText = "HP: " + std::to_string(game.getHealth(game.getPlayer(true)));
+const std::string opponentManaText = "MP: " + std::to_string(game.getMana(game.getPlayer(true)));
+
+int oppLabelW = 0, oppLabelH = 0;
+int oppHealthW = 0, oppHealthH = 0;
+int oppManaW = 0, oppManaH = 0;
+
+if (uiFonts.small) {
+	TTF_SizeText(uiFonts.small, opponentText.c_str(), &oppLabelW, &oppLabelH);
+	TTF_SizeText(uiFonts.small, opponentHealthText.c_str(), &oppHealthW, &oppHealthH);
+	TTF_SizeText(uiFonts.small, opponentManaText.c_str(), &oppManaW, &oppManaH);
+}
+
+const int oppBarW = 450;
+const int oppBarH = 40;
+const int oppBarX = (screenW - oppBarW) / 2;
+const int oppBarY = 12;
+
+SDL_Rect opponentBar = {oppBarX, oppBarY, oppBarW, oppBarH};
+drawStatBox(renderer, opponentBar,
+            SDL_Color{25, 20, 35, 220},
+            SDL_Color{100, 80, 120, 255},
+            8);
+
+// Opponent label
+textRenderer.drawText(renderer, opponentText, uiFonts.small,
+                      SDL_Color{180, 170, 200, 255},
+                      oppBarX + 12, oppBarY + (oppBarH - oppLabelH) / 2);
+
+// Divider line
+const int divider1X = oppBarX + oppLabelW + 24;
+SDL_SetRenderDrawColor(renderer, 100, 80, 120, 200);
+SDL_RenderDrawLine(renderer, divider1X, oppBarY + 8, divider1X, oppBarY + oppBarH - 8);
+
+// Opponent HP
+textRenderer.drawText(renderer, opponentHealthText, uiFonts.small,
+                      SDL_Color{200, 140, 140, 255},
+                      divider1X + 12, oppBarY + (oppBarH - oppHealthH) / 2);
+
+// Divider line
+const int divider2X = divider1X + oppHealthW + 24;
+SDL_SetRenderDrawColor(renderer, 100, 80, 120, 200);
+SDL_RenderDrawLine(renderer, divider2X, oppBarY + 8, divider2X, oppBarY + oppBarH - 8);
+
+// Opponent MP
+textRenderer.drawText(renderer, opponentManaText, uiFonts.small,
+                      SDL_Color{140, 170, 200, 255},
+                      divider2X + 12, oppBarY + (oppBarH - oppManaH) / 2);
+
+// ── player stats - bottom center horizontal bar ──────────────────
+const std::string healthText = "HP: " + std::to_string(playing.player.health);
+const std::string manaText = "MP: " + std::to_string(playing.player.mana);
+
+int healthW = 0, healthH = 0;
+int manaW = 0, manaH = 0;
+
+if (titleFonts.medium) {
+	TTF_SizeText(titleFonts.medium, healthText.c_str(), &healthW, &healthH);
+	TTF_SizeText(titleFonts.medium, manaText.c_str(), &manaW, &manaH);
+}
+
+const int playerBarW = 380;
+const int playerBarH = 60;
+const int playerBarX = (screenW - playerBarW) / 2;
+const int playerBarY = screenH - playerBarH - 20;
+
+SDL_Rect playerBar = {playerBarX, playerBarY, playerBarW, playerBarH};
+drawStatBox(renderer, playerBar,
+            SDL_Color{30, 25, 45, 240},
+            SDL_Color{140, 120, 180, 255},
+            10);
+
+// Player HP section (left half with red tint)
+SDL_Rect hpSection = {playerBarX, playerBarY, playerBarW / 2, playerBarH};
+drawStatBox(renderer, hpSection,
+            SDL_Color{40, 20, 20, 200},
+            SDL_Color{180, 60, 60, 255},
+            10);
+
+textRenderer.drawText(renderer, healthText, titleFonts.medium,
+                      SDL_Color{255, 220, 220, 255},
+                      hpSection.x + (hpSection.w - healthW) / 2,
+                      hpSection.y + (hpSection.h - healthH) / 2);
+
+// Player MP section (right half with blue tint)
+SDL_Rect mpSection = {playerBarX + playerBarW / 2, playerBarY, playerBarW / 2, playerBarH};
+drawStatBox(renderer, mpSection,
+            SDL_Color{20, 30, 50, 200},
+            SDL_Color{60, 120, 200, 255},
+            10);
+
+textRenderer.drawText(renderer, manaText, titleFonts.medium,
+                      SDL_Color{180, 220, 255, 255},
+                      mpSection.x + (mpSection.w - manaW) / 2,
+                      mpSection.y + (mpSection.h - manaH) / 2);
+
+// Center divider between HP and MP
+SDL_SetRenderDrawColor(renderer, 140, 120, 180, 255);
+SDL_RenderDrawLine(renderer, playerBarX + playerBarW / 2, playerBarY + 10,
+                   playerBarX + playerBarW / 2, playerBarY + playerBarH - 10);
 
 	if (playing.pendingSpellTarget.active) {
 		SDL_SetRenderDrawColor(renderer, 250, 220, 90, 255);
 		for (const auto& localSlot : playing.playSlots) {
 			SDL_RenderDrawRect(renderer, &localSlot);
 			SDL_Rect opponentSlot = localSlot;
-			opponentSlot.y -= 200;
+			opponentSlot.y -= 230;
 			SDL_RenderDrawRect(renderer, &opponentSlot);
 		}
 
@@ -308,7 +349,7 @@ void RenderPlaying::render(Playing& playing, const Game& game) {
 		textRenderer.drawText(
 			renderer,
 			targetPrompt,
-			playing.fonts.small,
+			uiFonts.small,
 			SDL_Color{250, 240, 180, 255},
 			20,
 			130
@@ -323,7 +364,8 @@ void RenderPlaying::render(Playing& playing, const Game& game) {
 		if (draggingCard && i == playing.drag.index) continue;
 		if (hasActiveDrawCard && i == activeDrawCardIndex) continue;
 		if (i < playing.cardRects.size() && playing.player.hand[i]) {
-			RenderCard::drawHandCard(renderer, textRenderer, *playing.player.hand[i], playing.cardRects[i], titleFonts.small, uiFonts.small);
+			RenderCard::drawHandCard(renderer, textRenderer, *playing.player.hand[i], 
+			                         playing.cardRects[i], uiFonts.tiny, uiFonts.small);
 		}
 	}
 
@@ -331,59 +373,176 @@ void RenderPlaying::render(Playing& playing, const Game& game) {
 		RenderCard::drawCardBack(renderer, playing.animationQueue.getActiveDrawCardRect());
 	}
 
-	RenderBoard::drawBoardState(renderer, textRenderer, playing.board, playing.playSlots, playing.player.id, playing.fonts.small);
+	RenderBoard::drawBoardState(renderer, textRenderer, playing.board, playing.playSlots, uiFonts.small, uiFonts.small);
 
 	if (draggingCard && playing.drag.index < playing.cardRects.size()) {
 		SDL_Rect floating = playing.cardRects[playing.drag.index];
 		floating.x = playing.drag.x;
 		floating.y = playing.drag.y;
-		RenderCard::drawHandCard(renderer, textRenderer, *playing.player.hand[playing.drag.index], floating, titleFonts.small, uiFonts.small);
+		RenderCard::drawHandCard(renderer, textRenderer, *playing.player.hand[playing.drag.index], 
+		                         floating, uiFonts.tiny, uiFonts.small);
 	}
 
-	if (showPreview) {
+	// ── card preview (centered magnified with scrolling) ─────────────
+	if (showPreview && playing.hoverIndex < playing.player.hand.size() && !playing.pauseModalOpen && !playing.exitModalOpen) {
 		if (const auto& cardPtr = playing.player.hand[playing.hoverIndex]) {
-			const int previewWidth = 180;
-			const int previewHeight = 240;
+			SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+			SDL_SetRenderDrawColor(renderer, 0, 0, 0, 160);
+			SDL_RenderFillRect(renderer, nullptr);
 
-        // ── larger centered card preview ─────────────────────────
-        const int previewW = std::min(360, screenW - 80);  // changed from 280 to 360
-        const int previewH = static_cast<int>(previewW * 1.5f);
-        
-        const int previewX = (screenW - previewW) / 2;
-        const int previewY = (screenH - previewH) / 2;
+			const int previewW = std::min(360, screenW - 80);
+			const int previewH = static_cast<int>(previewW * 1.5f);
+			
+			const int previewX = (screenW - previewW) / 2;
+			const int previewY = (screenH - previewH) / 2;
 
-        SDL_Rect panel{previewX, previewY, previewW, previewH};
-		RenderCard::drawPreview(renderer, textRenderer, *cardPtr, panel, 
-								uiFonts.large, titleFonts.medium, playing.previewScrollOffset);
-    }
-}
-
-	if (!playing.surrendered) {
-		RenderButton::drawButton(
-			renderer,
-			playing.menuButton,
-			"Menu",
-			uiFonts.medium,
-			Theme::BTN_SECONDARY,
-			Theme::BTN_BORDER,
-			Theme::BTN_TEXT,
-			hoveringMenu
-		);
-
-		if (playing.menuOpen) {
-			RenderButton::drawButton(
-				renderer,
-				playing.exitGameButton,
-				"Exit Game",
-				uiFonts.medium,
-				Theme::BTN_QUIT,
-				Theme::BTN_BORDER,
-				Theme::BTN_TEXT,
-				hoveringExit
-			);
+			SDL_Rect panel{previewX, previewY, previewW, previewH};
+			
+			RenderCard::drawPreview(renderer, textRenderer, *cardPtr, panel, 
+			                        uiFonts.large, titleFonts.medium, playing.previewScrollOffset);
 		}
 	}
 
+	// ── menu button ──────────────────────────────────────────────────
+	if (!playing.surrendered && !playing.pauseModalOpen && !playing.exitModalOpen) {
+		drawStatBox(renderer, playing.menuButton,
+		            SDL_Color{50, 50, 60, 200},
+		            hoveringMenu ? SDL_Color{120, 120, 140, 255} : SDL_Color{90, 90, 110, 255},
+		            10);
+		
+		int menuTextW = 0, menuTextH = 0;
+		if (uiFonts.medium) {
+			TTF_SizeText(uiFonts.medium, "Menu", &menuTextW, &menuTextH);
+		}
+		textRenderer.drawText(renderer, "Menu", uiFonts.medium,
+		                      SDL_Color{220, 220, 230, 255},
+		                      playing.menuButton.x + (playing.menuButton.w - menuTextW) / 2,
+		                      playing.menuButton.y + (playing.menuButton.h - menuTextH) / 2);
+	}
+
+	// ── pause modal ──────────────────────────────────────────────────
+	if (playing.pauseModalOpen && !playing.surrendered) {
+		// Dark overlay
+		SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+		SDL_SetRenderDrawColor(renderer, 0, 0, 0, 180);
+		SDL_RenderFillRect(renderer, nullptr);
+
+		// Modal background
+		drawStatBox(renderer, playing.pauseModal,
+					Theme::PANEL_FILL,
+					SDL_Color{160, 120, 200, 255},  // Purple border
+					12);
+
+		// Title
+		int pauseTitleW = 0, pauseTitleH = 0;
+		if (titleFonts.large) {
+			TTF_SizeText(titleFonts.large, "Game Paused", &pauseTitleW, &pauseTitleH);
+		}
+		textRenderer.drawText(renderer, "Game Paused", titleFonts.large,
+							Theme::TEXT_IVORY,
+							playing.pauseModal.x + (playing.pauseModal.w - pauseTitleW) / 2,
+							playing.pauseModal.y + 40);
+
+		// Resume button - vibrant green
+		const bool hoveringResume = playing.pointInRect(playing.resumeButton, mouseX, mouseY);
+		drawStatBox(renderer, playing.resumeButton,
+					hoveringResume ? SDL_Color{50, 180, 120, 255} : SDL_Color{35, 160, 130, 240},
+					hoveringResume ? SDL_Color{100, 220, 160, 255} : SDL_Color{80, 200, 140, 255},
+					8);
+		
+		int resumeTextW = 0, resumeTextH = 0;
+		if (uiFonts.large) {
+			TTF_SizeText(uiFonts.large, "Resume", &resumeTextW, &resumeTextH);
+		}
+		textRenderer.drawText(renderer, "Resume", uiFonts.large,
+							Theme::BTN_TEXT,
+							playing.resumeButton.x + (playing.resumeButton.w - resumeTextW) / 2,
+							playing.resumeButton.y + (playing.resumeButton.h - resumeTextH) / 2);
+
+		// Exit button - vibrant red
+		const bool hoveringPauseExit = playing.pointInRect(playing.pauseExitButton, mouseX, mouseY);
+		drawStatBox(renderer, playing.pauseExitButton,
+					hoveringPauseExit ? SDL_Color{220, 70, 90, 255} : SDL_Color{185, 50, 70, 240},
+					hoveringPauseExit ? SDL_Color{255, 120, 140, 255} : SDL_Color{220, 90, 110, 255},
+					8);
+		
+		int exitTextW = 0, exitTextH = 0;
+		if (uiFonts.large) {
+			TTF_SizeText(uiFonts.large, "Exit Game", &exitTextW, &exitTextH);
+		}
+		textRenderer.drawText(renderer, "Exit Game", uiFonts.large,
+							Theme::BTN_TEXT,
+							playing.pauseExitButton.x + (playing.pauseExitButton.w - exitTextW) / 2,
+							playing.pauseExitButton.y + (playing.pauseExitButton.h - exitTextH) / 2);
+	}
+
+	// ── exit confirmation modal ──────────────────────────────────────
+	if (playing.exitModalOpen && !playing.surrendered) {
+		// Dark overlay
+		SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+		SDL_SetRenderDrawColor(renderer, 0, 0, 0, 200);
+		SDL_RenderFillRect(renderer, nullptr);
+
+		// Modal background
+		drawStatBox(renderer, playing.exitModal,
+					Theme::PANEL_FILL,
+					SDL_Color{240, 192, 64, 150},  // Gold border
+					12);
+
+		// Title
+		int exitTitleW = 0, exitTitleH = 0;
+		if (titleFonts.large) {
+			TTF_SizeText(titleFonts.large, "Exit Game?", &exitTitleW, &exitTitleH);
+		}
+		textRenderer.drawText(renderer, "Exit Game?", titleFonts.large,
+							Theme::TEXT_IVORY,
+							playing.exitModal.x + (playing.exitModal.w - exitTitleW) / 2,
+							playing.exitModal.y + 40);
+
+		// Question text
+		int questionW = 0, questionH = 0;
+		const char* question = "Save your progress?";
+		if (uiFonts.medium) {
+			TTF_SizeText(uiFonts.medium, question, &questionW, &questionH);
+		}
+		textRenderer.drawText(renderer, question, uiFonts.medium,
+							Theme::TEXT_MUTED,
+							playing.exitModal.x + (playing.exitModal.w - questionW) / 2,
+							playing.exitModal.y + 100);
+
+		// Save & Exit button - vibrant blue
+		const bool hoveringSave = playing.pointInRect(playing.saveExitButton, mouseX, mouseY);
+		drawStatBox(renderer, playing.saveExitButton,
+					hoveringSave ? SDL_Color{90, 140, 220, 255} : SDL_Color{70, 120, 200, 240},
+					hoveringSave ? SDL_Color{140, 180, 255, 255} : SDL_Color{110, 160, 240, 255},
+					8);
+		
+		int saveTextW = 0, saveTextH = 0;
+		if (uiFonts.medium) {
+			TTF_SizeText(uiFonts.medium, "Save & Exit", &saveTextW, &saveTextH);
+		}
+		textRenderer.drawText(renderer, "Save & Exit", uiFonts.medium,
+							Theme::BTN_TEXT,
+							playing.saveExitButton.x + (playing.saveExitButton.w - saveTextW) / 2,
+							playing.saveExitButton.y + (playing.saveExitButton.h - saveTextH) / 2);
+
+		// Exit Without Saving button - vibrant red
+		const bool hoveringNoSave = playing.pointInRect(playing.noSaveExitButton, mouseX, mouseY);
+		drawStatBox(renderer, playing.noSaveExitButton,
+					hoveringNoSave ? SDL_Color{220, 70, 90, 255} : SDL_Color{185, 50, 70, 240},
+					hoveringNoSave ? SDL_Color{255, 120, 140, 255} : SDL_Color{220, 90, 110, 255},
+					8);
+		
+		int noSaveTextW = 0, noSaveTextH = 0;
+		if (uiFonts.medium) {
+			TTF_SizeText(uiFonts.medium, "Don't Save", &noSaveTextW, &noSaveTextH);
+		}
+		textRenderer.drawText(renderer, "Don't Save", uiFonts.medium,
+							Theme::BTN_TEXT,
+							playing.noSaveExitButton.x + (playing.noSaveExitButton.w - noSaveTextW) / 2,
+							playing.noSaveExitButton.y + (playing.noSaveExitButton.h - noSaveTextH) / 2);
+	}
+	// ── surrender screen ─────────────────────────────────────────────
 	if (playing.surrendered) {
 		SDL_Rect overlay{0, 0, screenW, screenH};
 		SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
@@ -392,30 +551,34 @@ void RenderPlaying::render(Playing& playing, const Game& game) {
 
 		int loseTextW = 0;
 		int loseTextH = 0;
-		if (playing.fonts.large) {
-			TTF_SizeText(playing.fonts.large, "You Lose", &loseTextW, &loseTextH);
+		if (titleFonts.large) {
+			TTF_SizeText(titleFonts.large, "You Lose", &loseTextW, &loseTextH);
 		}
 
 		textRenderer.drawText(
 			renderer,
 			"You Lose",
-			playing.fonts.large,
+			titleFonts.large,
 			Theme::TEXT_PRIMARY,
 			(screenW - loseTextW) / 2,
 			(screenH / 2) - loseTextH - 26
 		);
 
-		RenderButton::drawButton(
-			renderer,
-			playing.returnToTitleButton,
-			"Return to Title",
-			uiFonts.large,
-			Theme::BTN_PRIMARY,
-			Theme::BTN_BORDER,
-			Theme::BTN_TEXT,
-			hoveringReturn
-		);
+		const bool hoveringReturn = playing.pointInRect(playing.returnToTitleButton, mouseX, mouseY);
+		drawStatBox(renderer, playing.returnToTitleButton,
+		            SDL_Color{60, 100, 140, 220},
+		            hoveringReturn ? SDL_Color{100, 160, 220, 255} : SDL_Color{80, 130, 180, 255},
+		            10);
+		
+		int returnTextW = 0, returnTextH = 0;
+		if (uiFonts.large) {
+			TTF_SizeText(uiFonts.large, "Return to Title", &returnTextW, &returnTextH);
+		}
+		textRenderer.drawText(renderer, "Return to Title", uiFonts.large,
+		                      SDL_Color{255, 255, 255, 255},
+		                      playing.returnToTitleButton.x + (playing.returnToTitleButton.w - returnTextW) / 2,
+		                      playing.returnToTitleButton.y + (playing.returnToTitleButton.h - returnTextH) / 2);
 	}
 
-	// SDL_RenderPresent(renderer);
+	SDL_RenderPresent(renderer);
 }
