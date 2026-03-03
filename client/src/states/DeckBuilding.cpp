@@ -858,3 +858,7 @@ bool DeckBuilding::loadDeckFromService(const Game& game) {
 
     return true;
 }
+
+const std::vector<std::unique_ptr<Card>>& DeckBuilding::getAvailableCards() const {
+    return availableCards;
+}

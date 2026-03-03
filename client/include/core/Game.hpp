@@ -89,6 +89,8 @@ public:
 
     bool running() const;
 
+    DeckBuilding& getDeckBuildingState();
+
 
 private:
     bool isRunning{false};

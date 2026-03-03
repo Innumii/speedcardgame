@@ -405,3 +405,7 @@ void Game::clean() {
 bool Game::running() const {
     return isRunning;
 }
+
+DeckBuilding& Game::getDeckBuildingState() {
+    return deckBuildingState;
+}
