@@ -200,9 +200,11 @@ bool MatchSession::drawAndSend(int playerIndex) {
 
     int cardId = *cardIdOpt;
 
-    player.hand.push_back(cardId);   // if you only need ID, keep this
+    //add card ID to player's hand
+    player.hand.push_back(cardId);
 
     // auto& conn = (playerIndex == 0) ? playerA : playerB;
+    //send msg to both players, informing that playerIndex player has drawn 1 card
     std::cout << player.id << ": DRAW " << player.id << " " << std::to_string(cardId) << "\n";
     playerA->send("DRAW " + std::to_string(player.id) + " " + std::to_string(cardId) + "\n");
     playerB->send("DRAW " + std::to_string(player.id) + " " + std::to_string(cardId) + "\n");
@@ -251,6 +253,11 @@ void MatchSession::gameLoop() {
     std::cout << "[MatchSession] Exiting Match Game Loop...\n";
 }
 
+//This function handles player actions
+/*  Summon Creature
+    Cast Spell
+    Discard Card
+*/
 void MatchSession::handlePlayerMessage(int playerIndex, const std::vector<char>& raw) {
     std::string msg(raw.begin(), raw.end());
 
