@@ -11,6 +11,16 @@
 #include <chrono>
 #include <thread>
 #include <mutex>
+#include <queue>
+
+/* TODO: Full State Snapshot
+FULL_STATE {
+  player0: {health: 90, mana: 3, hand: [1,2,5]},
+  player1: {health: 80, mana: 2, hand: [7,8,9]},
+  lanes: [[null,1,2,3,null],[4,5,null,6,7]],
+  discard: [[8,9],[10,11]]
+}
+*/
 
 MatchSession::MatchSession(
     std::shared_ptr<PlayerConnection> a,
@@ -220,6 +230,7 @@ void MatchSession::gameLoop() {
 
     auto lastDrawTime = steady_clock::now();
     std::cout << "[MatchSession] Game loop started\n";
+
     std::string msgA = "MATCH_START " + std::to_string(playerB->getPlayerId()) + "\n";
     std::string msgB = "MATCH_START " + std::to_string(playerA->getPlayerId()) + "\n";
 
@@ -230,26 +241,25 @@ void MatchSession::gameLoop() {
     sendOpeningHands();
 
     while (running.load()) {
-        // Disconnect check (optional)
+
         if (!playerA->isAlive() || !playerB->isAlive()) {
             handleDisconnect();
             break;
         }
 
+        processActions();
+
         auto now = steady_clock::now();
 
-        //draw 1 every 5 seconds
         if (duration_cast<seconds>(now - lastDrawTime).count() >= drawInterval) {
-            {
-                std::lock_guard<std::mutex> lock(stateMutex);
-                drawAndSend(0); // draw for player a
-                drawAndSend(1); // draw for player b
-            }
+            drawAndSend(0);
+            drawAndSend(1);
             lastDrawTime = now;
         }
 
         std::this_thread::sleep_for(10ms);
     }
+
     std::cout << "[MatchSession] Exiting Match Game Loop...\n";
 }
 
@@ -261,13 +271,148 @@ void MatchSession::gameLoop() {
 void MatchSession::handlePlayerMessage(int playerIndex, const std::vector<char>& raw) {
     std::string msg(raw.begin(), raw.end());
 
-    std::cout << "[MatchSession] Player " << players[playerIndex].id << " -> " << msg;
+    std::istringstream ss(msg);
+    std::string cmd;
+    ss >> cmd;
 
+    PlayerAction action;
+    action.playerIndex = playerIndex;
+    action.type = cmd;
+
+    int arg;
+    while (ss >> arg) {
+        action.args.push_back(arg);
+    }
+
+    {
+        std::lock_guard<std::mutex> lock(actionMutex);
+        actionQueue.push(std::move(action));
+    }
     // TODO:
     // - Validate command
     // - Check legality
     // - Mutate authoritative state
     // - Broadcast result
+}
+
+void MatchSession::processActions() {
+    std::queue<PlayerAction> localQueue;
+
+    {
+        std::lock_guard<std::mutex> lock(actionMutex);
+        std::swap(localQueue, actionQueue);
+    }
+
+    while (!localQueue.empty()) {
+        const PlayerAction& action = localQueue.front();
+
+        if (action.type == "SUMMON") {
+            if (action.args.size() >= 2)
+                handleSummon(action.playerIndex, action.args[0], action.args[1]);
+        }
+        else if (action.type == "SPELL") {
+            if (action.args.size() >= 2)
+                handleSpell(action.playerIndex, action.args[0], action.args[1]);
+        }
+        else if (action.type == "DISCARD") {
+            if (!action.args.empty())
+                handleDiscard(action.playerIndex, action.args[0]);
+        }
+
+        localQueue.pop();
+    }
+}
+
+void MatchSession::handleSummon(int playerIndex, int handIndex, int lane) {
+    auto& player = players[playerIndex];
+
+    if (handIndex < 0 || handIndex >= (int) player.hand.size()) return;
+    if (lane < 0 || lane >= board.laneCount) return;
+
+    int cardId = player.hand[handIndex];
+
+    const ServerCard* card = getCard(cardId);
+    if (!card) return;
+
+    if (card->getType() != CardType::Creature) return;
+
+    if (board.lanes[playerIndex][lane].has_value()) return;
+
+    if (player.mana < card->getManaCost()) return;
+
+    player.mana -= card->getManaCost();
+
+    board.lanes[playerIndex][lane] = cardId;
+
+    player.hand.erase(player.hand.begin() + handIndex);
+
+    //Send confirmation message on successful summon
+    std::string msg = "SUMMON " + std::to_string(player.id) + " "
+                    + std::to_string(cardId) + " "
+                    + std::to_string(lane) + "\n";
+
+    playerA->send(msg);
+    playerB->send(msg);
+}
+
+//let -1 mean no target
+void MatchSession::handleSpell(int playerIndex, int handIndex, int lane) {
+    auto& player = players[playerIndex];
+
+    if (handIndex < 0 || handIndex >= player.hand.size()) return;
+
+    int cardId = player.hand[handIndex];
+
+    const ServerCard* card = getCard(cardId);
+    if (!card) return;
+
+    if (card->getType() != CardType::Spell) return;
+
+    if (player.mana < card->getManaCost()) return;
+
+    player.mana -= card->getManaCost();
+
+    // Example effect: destroy creature in lane
+    // int opponent = 1 - playerIndex;
+
+    // if (lane >= 0 && lane < board.laneCount) {
+    //     if (board.lanes[opponent][lane].has_value()) {
+    //         int destroyed = *board.lanes[opponent][lane];
+
+    //         board.discard[opponent].push_back(destroyed);
+    //         board.lanes[opponent][lane] = std::nullopt;
+    //     }
+    // }
+
+    //Spell effect goes here
+
+    //remove card from hand
+    player.hand.erase(player.hand.begin() + handIndex);
+
+    std::string msg = "SPELL " + std::to_string(player.id) + " "
+                    + std::to_string(cardId) + " "
+                    + std::to_string(lane) + "\n";
+
+    playerA->send(msg);
+    playerB->send(msg);
+}
+
+void MatchSession::handleDiscard(int playerIndex, int handIndex) {
+    auto& player = players[playerIndex];
+
+    if (handIndex < 0 || handIndex >= player.hand.size()) return;
+
+    int cardId = player.hand[handIndex];
+
+    board.discard[playerIndex].push_back(cardId);
+
+    player.hand.erase(player.hand.begin() + handIndex);
+
+    std::string msg = "DISCARD " + std::to_string(player.id)
+                    + " " + std::to_string(cardId) + "\n";
+
+    playerA->send(msg);
+    playerB->send(msg);
 }
 
 // --------------------------------------------------

@@ -87,7 +87,7 @@ MatchManager::findPending(const std::shared_ptr<PlayerConnection>& player)
             return m;
         }
     }
-    std::cout << "Nope\n";
+    // std::cout << "Nope\n";
     return nullptr;
 }
 

@@ -8,6 +8,7 @@
 #include <optional>
 #include <unordered_map>
 #include <mutex>
+#include <queue>
 
 #include "objects/ServerDeck.h"
 #include "objects/ServerCard.h"
@@ -22,6 +23,7 @@ struct ServerBoard {
     std::vector<std::optional<int>> lanes[2]; // card IDs
     std::vector<int> discard[2];
 
+    //Lane indexes go 0-4
     ServerBoard(int lanesCount = 5) : laneCount(lanesCount) {
         lanes[0].resize(laneCount);
         lanes[1].resize(laneCount);
@@ -41,8 +43,19 @@ struct PlayerState {
 };
 
 // ----------------------------
-// MatchSession
+// Player action
 // ----------------------------
+/* EXAMPLE:
+{player=0, type="SUMMON", args=[2]}
+{player=1, type="SPELL", args=[1]}
+{player=0, type="DISCARD", args=[3]}
+*/
+struct PlayerAction {
+    int playerIndex;
+    std::string type;
+    std::vector<int> args;
+};
+
 class MatchSession : public std::enable_shared_from_this<MatchSession>{
 public:
     MatchSession(std::shared_ptr<PlayerConnection> playerA,
@@ -55,13 +68,18 @@ public:
     bool start();
     void stop();
     void handlePlayerMessage(int playerIndex, const std::vector<char>& raw);
+    void processActions();
 
-
-    // Setup phase
+    //setup phase
     void setupDecks();
     void sendOpeningHands();
     bool drawAndSend(int playerIndex);
     bool loadDeckForPlayer(int playerId, ServerDeck& outDeck);
+
+    //player actions
+    void handleSummon(int playerIndex, int handIndex, int lane);
+    void handleSpell(int playerIndex, int handIndex, int lane);
+    void handleDiscard(int playerIndex, int handIndex);
 
     const ServerCard* getCard(int id) const;
 
@@ -78,8 +96,10 @@ private:
     std::unordered_map<int, std::shared_ptr<ServerCard>> cardCatalog;
     std::thread gameThread;
     std::atomic<bool> running{false};
-    std::mutex stateMutex; // prevent deadlock for Player actions
 
+    //Queue for storing player actions, so each action can be performed individually
+    std::queue<PlayerAction> actionQueue;
+    std::mutex actionMutex;
 
     // Authoritative state
     PlayerState players[2];   // 0 = A, 1 = B
