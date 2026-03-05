@@ -69,29 +69,23 @@ bool GameServer::start() {
             };
 
             // Message-received callback
-            player->onMessageReceived = [this, weakPlayer](const std::vector<char>& rawMsg)
-            {
-                if (auto p = weakPlayer.lock())
-                {
+            player->onMessageReceived = [this, weakPlayer](const std::vector<char>& rawMsg) {
+                if (auto p = weakPlayer.lock()) {
                     std::string msg(rawMsg.begin(), rawMsg.end());
 
-                    if (msg == "MATCH_ACCEPT\n")
-                    {
+                    if (msg == "MATCH_ACCEPT\n") {
                         if (matchManager) matchManager->onAccept(p);
-                    }
-                    else if (msg.find("{\"type\":\"player_info\"") != std::string::npos)
-                    {
+                    } else if (msg.find("{\"type\":\"player_info\"") != std::string::npos) {
                         // Parse player info JSON manually
                         auto idPos = msg.find("\"playerId\":");
                         auto namePos = msg.find("\"username\":\"");
-                        if (idPos != std::string::npos && namePos != std::string::npos)
-                        {
+                        if (idPos != std::string::npos && namePos != std::string::npos) {
                             int playerId = std::stoi(msg.substr(idPos + 11, msg.find(',', idPos) - (idPos + 11)));
                             int nameEnd = msg.find('"', namePos + 12);
                             std::string username = msg.substr(namePos + 12, nameEnd - (namePos + 12));
                             p->setPlayerInfo(playerId, username);
 
-                            std::cout << "Player info received: ID=" << playerId
+                            std::cout << "[GameServer] Player info received: ID=" << playerId
                                     << ", username=" << username << "\n";
 
                             // Enqueue for matchmaking
@@ -109,28 +103,28 @@ bool GameServer::start() {
             // Start the read thread
             if (!player->start())
             {
-                std::cerr << "Failed to start PlayerConnection for socket " << player->getSocket() << "\n";
+                std::cerr << "[GameServer] Failed to start PlayerConnection for socket " << player->getSocket() << "\n";
             }
         };
 
     
 
         if (!tcpServer->start()) {
-            std::cerr << "Failed to start TcpServer\n";
+            std::cerr << "[GameServer] Failed to start TcpServer\n";
             tcpServer.reset(); // cleanup
             matchmaker.reset();
             matchManager.reset();
             return false;
         }
 
-        std::cout << "TcpServer started on port " << port << "\n";
-        std::cout << "Matchmaker initialized\n";
+        std::cout << "[GameServer] TcpServer started on port " << port << "\n";
+        std::cout << "[GameServer] Matchmaker initialized\n";
 
         running = true;
         return true;
 
     } catch (const std::exception& ex) {
-        std::cerr << "Exception during GameServer startup: " << ex.what() << "\n";
+        std::cerr << "[GameServer] Exception during GameServer startup: " << ex.what() << "\n";
         if (tcpServer) tcpServer->stop();
         tcpServer.reset();
         matchmaker.reset();
@@ -138,7 +132,7 @@ bool GameServer::start() {
         running = false;
         return false;
     } catch (...) {
-        std::cerr << "Unknown exception during GameServer startup\n";
+        std::cerr << "[GameServer] Unknown exception during GameServer startup\n";
         if (tcpServer) tcpServer->stop();
         tcpServer.reset();
         matchmaker.reset();

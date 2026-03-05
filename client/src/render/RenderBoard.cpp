@@ -107,12 +107,14 @@ void RenderBoard::drawBoardState(SDL_Renderer* renderer, RenderText& textRendere
 
 	const int opponentOffset = 230;
 
-	for (int pid = 0; pid <= 1; ++pid) {
-		for (std::size_t lane = 0; lane < board.getLaneCount(); ++lane) {
-			const auto& optCard = board.getZone(static_cast<int>(lane), pid);
-			if (optCard && *optCard) {
-				const Card* card = optCard->get();
-				if (!card) continue;
+    // Loop over board indices: 0 = local, 1 = remote
+    for (int boardIndex = 0; boardIndex <= 1; ++boardIndex) {
+        for (std::size_t lane = 0; lane < board.getLaneCount(); ++lane) {
+            const auto& optCard = board.getZone(static_cast<int>(lane), boardIndex);
+            if (!optCard || !*optCard) continue;
+
+            const Card* card = optCard->get();
+            if (!card) continue;
 
 				SDL_Rect rect = playSlots[lane];
 				if (pid == 1) {

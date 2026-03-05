@@ -10,6 +10,17 @@
 #include <iostream>
 #include <chrono>
 #include <thread>
+#include <mutex>
+#include <queue>
+
+/* TODO: Full State Snapshot
+FULL_STATE {
+  player0: {health: 90, mana: 3, hand: [1,2,5]},
+  player1: {health: 80, mana: 2, hand: [7,8,9]},
+  lanes: [[null,1,2,3,null],[4,5,null,6,7]],
+  discard: [[8,9],[10,11]]
+}
+*/
 
 MatchSession::MatchSession(
     std::shared_ptr<PlayerConnection> a,
@@ -32,6 +43,18 @@ MatchSession::~MatchSession() {
 // --------------------------------------------------
 bool MatchSession::start() {
     if (running.load()) return false;
+
+    auto weakSelf = std::weak_ptr<MatchSession>(shared_from_this());
+    playerA->onMessageReceived = [weakSelf](const std::vector<char>& raw) {
+        if (auto self = weakSelf.lock()) {
+            self->handlePlayerMessage(0, raw);
+        }
+    };
+    playerB->onMessageReceived = [weakSelf](const std::vector<char>& raw) {
+        if (auto self = weakSelf.lock()) {
+            self->handlePlayerMessage(1, raw);
+        }
+    };
 
     try {
         gameThread = std::thread(&MatchSession::gameLoop, this);
@@ -150,6 +173,7 @@ bool MatchSession::parseDeckJson(const std::string& jsonStr, ServerDeck& outDeck
     return true;
 }
 
+//Sets up decks for both players at start of game (shuffle + draw 6)
 void MatchSession::setupDecks() {
     std::cout << "Attempting deck setup for " << playerA.get()->getUsername() << "\n";
     loadDeckForPlayer(playerA.get()->getPlayerId(), players[0].deck);
@@ -170,21 +194,27 @@ void MatchSession::sendOpeningHands() {
     }
 }
 
-// --------------------------------------------------
-// Draw logic
-// --------------------------------------------------
+
+//Draw function: playerIndex player draws 1 card, other player will also receive instruction that their opponent drew 1 card
 bool MatchSession::drawAndSend(int playerIndex) {
     auto& player = players[playerIndex];
     auto& deck = player.deck;
+
+    int handSize = player.hand.size();
+    if (handSize >= handLimit) {
+        return false;
+    }
 
     auto cardIdOpt = deck.draw();
     if (!cardIdOpt) return false;
 
     int cardId = *cardIdOpt;
 
-    player.hand.push_back(cardId);   // if you only need ID, keep this
+    //add card ID to player's hand
+    player.hand.push_back(cardId);
 
     // auto& conn = (playerIndex == 0) ? playerA : playerB;
+    //send msg to both players, informing that playerIndex player has drawn 1 card
     std::cout << player.id << ": DRAW " << player.id << " " << std::to_string(cardId) << "\n";
     playerA->send("DRAW " + std::to_string(player.id) + " " + std::to_string(cardId) + "\n");
     playerB->send("DRAW " + std::to_string(player.id) + " " + std::to_string(cardId) + "\n");
@@ -196,46 +226,225 @@ bool MatchSession::drawAndSend(int playerIndex) {
 // Game Loop
 // --------------------------------------------------
 void MatchSession::gameLoop() {
-    using namespace std::chrono_literals;
+    using namespace std::chrono;
 
-    std::cout << "Game loop started\n";
+    auto lastDrawTime = steady_clock::now();
+    std::cout << "[MatchSession] Game loop started\n";
 
-    playerA->send("MATCH_START\n");
-    playerB->send("MATCH_START\n");
+    std::string msgA = "MATCH_START " + std::to_string(playerB->getPlayerId()) + "\n";
+    std::string msgB = "MATCH_START " + std::to_string(playerA->getPlayerId()) + "\n";
+
+    playerA->send(msgA);
+    playerB->send(msgB);
 
     setupDecks();
     sendOpeningHands();
 
     while (running.load()) {
+
         if (!playerA->isAlive() || !playerB->isAlive()) {
             handleDisconnect();
             break;
         }
 
-        std::string msg;
+        processActions();
 
-        // Relay A → B (TEMPORARY until full authority)
-        while (playerA->pollMessage(msg) || playerB->pollMessage(msg)) {
-            if (playerA->pollMessage(msg)) {
-                playerA->send(msg);
-            }
-            if (playerB->pollMessage(msg)) {
-                playerB->send(msg);
-            }
+        auto now = steady_clock::now();
+
+        if (duration_cast<seconds>(now - lastDrawTime).count() >= drawInterval) {
+            drawAndSend(0);
+            drawAndSend(1);
+            lastDrawTime = now;
         }
 
-
-        std::this_thread::sleep_for(1ms);
+        std::this_thread::sleep_for(10ms);
     }
 
-    std::cout << "Game loop exiting\n";
+    std::cout << "[MatchSession] Exiting Match Game Loop...\n";
+}
+
+//This function handles player actions
+/*  Summon Creature
+    Cast Spell
+    Discard Card
+*/
+void MatchSession::handlePlayerMessage(int playerIndex, const std::vector<char>& raw) {
+    std::string msg(raw.begin(), raw.end());
+
+    std::istringstream ss(msg);
+    std::string cmd;
+    ss >> cmd;
+
+    PlayerAction action;
+    action.playerIndex = playerIndex;
+    action.type = cmd;
+
+    int arg;
+    while (ss >> arg) {
+        action.args.push_back(arg);
+    }
+
+    {
+        std::lock_guard<std::mutex> lock(actionMutex);
+        actionQueue.push(std::move(action));
+    }
+    // TODO:
+    // - Validate command
+    // - Check legality
+    // - Mutate authoritative state
+    // - Broadcast result
+}
+
+void MatchSession::processActions() {
+    std::queue<PlayerAction> localQueue;
+
+    {
+        std::lock_guard<std::mutex> lock(actionMutex);
+        std::swap(localQueue, actionQueue);
+    }
+
+    while (!localQueue.empty()) {
+        const PlayerAction& action = localQueue.front();
+
+        if (action.type == "PLAY") {
+            if (action.args.size() >= 2) {
+                int cardId = action.args[0];
+                int lane = action.args[1];
+                std::optional<int> targetId;
+
+                if (action.args.size() > 2) {
+                    targetId = action.args[2];
+                }
+
+                PlayerState& player = players[action.playerIndex];
+                const ServerCard* card = getCard(cardId);
+
+                if (!card) {
+                    std::cerr << "Unknown card ID " << cardId << "\n";
+                    localQueue.pop();
+                    continue;
+                }
+
+                if (card->getType() == CardType::Creature) {
+                    handleSummon(action.playerIndex, cardId, lane);
+                } else if (card->getType() == CardType::Spell) {
+                    handleSpell(action.playerIndex, cardId, lane);
+                }
+            }
+        }
+        else if (action.type == "DISCARD") {
+            if (!action.args.empty())
+                handleDiscard(action.playerIndex, action.args[0]);
+        }
+
+        localQueue.pop();
+    }
+}
+
+void MatchSession::handleSummon(int playerIndex, int cardId, int lane) {
+    auto& player = players[playerIndex];
+
+    if (lane < 0 || lane >= board.laneCount) return;
+
+    const ServerCard* card = getCard(cardId);
+    if (!card) return;
+    std::string name = card->getName();
+
+    if (card->getType() != CardType::Creature) return;
+
+    if (board.lanes[playerIndex][lane].has_value()) return;
+
+    if (player.mana < card->getManaCost()) {
+        std::cout << "[MatchSession] Insufficient Mana: " << player.mana << " : " << card->getManaCost() << "\n";
+        
+        return;}
+
+    // Deduct mana
+    player.mana -= card->getManaCost();
+
+    // Find and remove card from hand
+    auto it = findCardInHand(player, cardId);
+    if (it == player.hand.end()) {
+        std::cerr << "[ERROR] Card ID " << cardId
+                  << " not found in player " << playerIndex << "'s hand\n";
+        return;
+    }
+    player.hand.erase(it);
+
+    // Place card on board
+    board.lanes[playerIndex][lane] = cardId;
+
+    // Send confirmation message
+    std::cout << "[MatchSession] Summoning " << name << "\n";
+    std::ostringstream ss;
+    ss << "PLAY " << player.id << " " << cardId << " " << lane << "\n";
+    playerA->send(ss.str());
+    playerB->send(ss.str());
+}
+
+//let -1 mean no target
+void MatchSession::handleSpell(int playerIndex, int handIndex, int lane, std::optional<int> targetId) {
+    PlayerState& player = players[playerIndex];
+    if (handIndex < 0 || handIndex >= static_cast<int>(player.hand.size())) return;
+
+    int cardId = player.hand[handIndex];
+    const ServerCard* card = getCard(cardId);
+    if (!card) return;
+
+    // Example: targetId can be used here to determine which card or lane is affected
+    if (targetId.has_value()) {
+        // Apply spell effect to target
+    } else {
+        // Spell affects default lane
+    }
+
+    // Remove card from hand after cast
+    player.hand.erase(player.hand.begin() + handIndex);
+
+        //Send confirmation message on successful summon
+    std::string msg = "SPELL " + std::to_string(player.id) + " "
+                    + std::to_string(cardId) + " "
+                    + std::to_string(lane) + "\n";
+
+    playerA->send(msg);
+    playerB->send(msg);
+}
+
+void MatchSession::handleDiscard(int playerIndex, int cardId) {
+    auto& player = players[playerIndex];
+
+    const ServerCard* card = getCard(cardId);
+    if (!card) return;
+
+    // increment mana
+    player.mana += card->getManaCost();
+
+    std::cout << "[MatchSession] Discarding " << card->getName() << "\n";
+
+    // add to discard
+    board.discard[playerIndex].push_back(cardId);
+
+    // remove from hand using helper
+    auto it = findCardInHand(player, cardId);
+    if (it != player.hand.end()) {
+        player.hand.erase(it);
+    } else {
+        std::cerr << "[WARNING] Tried to discard cardId " << cardId
+                  << " but it was not in player " << playerIndex << "'s hand\n";
+    }
+
+    // broadcast
+    std::string msg = "DISCARD " + std::to_string(player.id)
+                    + " " + std::to_string(cardId) + "\n";
+    playerA->send(msg);
+    playerB->send(msg);
 }
 
 // --------------------------------------------------
 // Disconnect Handling
 // --------------------------------------------------
 void MatchSession::handleDisconnect() {
-    std::cout << "MatchSession: player disconnected\n";
+    std::cout << "[MatchSession]: Player disconnected\n";
 
     if (playerA->isAlive()) {
         playerA->send("OPPONENT_DISCONNECTED\n");
@@ -251,4 +460,8 @@ const ServerCard* MatchSession::getCard(int id) const {
     auto it = cardCatalog.find(id);
     if (it != cardCatalog.end()) return it->second.get();
     return nullptr;
+}
+
+std::vector<int>::iterator MatchSession::findCardInHand(PlayerState& player, int cardId) {
+    return std::find(player.hand.begin(), player.hand.end(), cardId);
 }

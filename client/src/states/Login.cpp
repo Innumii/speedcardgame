@@ -63,6 +63,7 @@ namespace {
         int statusCode = -1;
         std::string responseBody;
         if (!HttpUtil::sendHttp(host, port, "POST", "/auth/login", payload.str(), statusCode, responseBody)) {
+            // std::cout << host << "\n";
             error = "auth service unreachable";
             return false;
         }

@@ -91,13 +91,13 @@ bool PlayerConnection::send(const std::string& msg) {
     return n == static_cast<int>(msg.size());
 }
 
-bool PlayerConnection::pollMessage(std::string& outMsg) {
-    std::lock_guard<std::mutex> lock(queueMutex);
-    if (messageQueue.empty()) return false;
-    outMsg = messageQueue.front();
-    messageQueue.pop();
-    return true;
-}
+// bool PlayerConnection::pollMessage(std::string& outMsg) {
+//     std::lock_guard<std::mutex> lock(queueMutex);
+//     if (messageQueue.empty()) return false;
+//     outMsg = messageQueue.front();
+//     messageQueue.pop();
+//     return true;
+// }
 
 bool PlayerConnection::isAlive() const {
     return running.load();

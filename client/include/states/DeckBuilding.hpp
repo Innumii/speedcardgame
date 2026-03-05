@@ -24,6 +24,10 @@ public:
 	const std::string& getStatusMessage() const;
 	bool isStatusMessageActive(Uint32 now) const;
 
+	const std::vector<std::unique_ptr<Card>>& getAvailableCards() const;
+	
+
+
 private:
 	struct Layout {
 		SDL_Rect collectionArea{};
