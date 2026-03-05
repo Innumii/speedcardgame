@@ -116,13 +116,13 @@ void RenderBoard::drawBoardState(SDL_Renderer* renderer, RenderText& textRendere
             const Card* card = optCard->get();
             if (!card) continue;
 
+				// Apply offset for remote player
 				SDL_Rect rect = playSlots[lane];
-				if (pid == 1) {
+				if (boardIndex == 1) {
 					rect.y -= opponentOffset;
 				}
 
 				RenderCard::drawBoardCard(renderer, textRenderer, *card, rect, fontTitle, fontBody);
-			}
 		}
 	}
 }

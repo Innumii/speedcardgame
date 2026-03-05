@@ -357,13 +357,6 @@ void Playing::handleEvents(Game& game, const SDL_Event& event) {
                 }
                 else if (laneIndex >= 0) {
                     auto& card = localPlayer.hand[drag.index];
-                    int laneIndex = -1;
-                    for (std::size_t slot = 0; slot < playSlots.size(); ++slot) { //find out where card was played, zone wise
-                        if (pointInRect(playSlots[slot], mx, my)) {
-                            laneIndex = static_cast<int>(slot);
-                            break;
-                        }
-                    }
                     if (card->getType() == CardType::Creature) {
                         if (localPlayer.mana >= card->getManaCost()) { //Check if player has sufficient mana
                             authority->playCard(
@@ -703,7 +696,6 @@ void Playing::computeZones(int screenW, int screenH) {
     const int margin = 20;
     const int discardWidth = 110;
     const int discardHeight = 130;
-    const int gapToDiscard = 18;
     const int opponentOffset = 200; // vertical offset for opponent zones
     const int discardSize = 120;
     const int gapToDiscard = 20;

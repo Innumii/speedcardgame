@@ -65,8 +65,8 @@ namespace EnvUtil {
             envLoaded = true;
 
             const std::vector<std::string> candidatePaths = {
-                ".env"
-                // "../.env"
+                ".env",
+                "../.env"
             };
 
             for (const std::string& path : candidatePaths) {
@@ -124,7 +124,7 @@ namespace EnvUtil {
     }
 
     bool useAwsServices() {
-        return getEnvBoolOrDefault("USE_AWS_SERVICES", true);
+        return getEnvBoolOrDefault("USE_AWS_SERVICES", false);
     }
 
     std::string getAuthServiceHost() {

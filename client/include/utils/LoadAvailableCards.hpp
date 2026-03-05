@@ -9,6 +9,7 @@ class Card;
 namespace LoadAvailableCardsUtil {
     bool loadFromService(std::vector<std::unique_ptr<Card>>& outCards);
     bool loadFromCsv(std::vector<std::unique_ptr<Card>>& outCards);
+    std::vector<std::unique_ptr<Card>>& getAvailableCards();
 }
 
 #endif

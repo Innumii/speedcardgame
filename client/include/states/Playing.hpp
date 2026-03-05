@@ -37,10 +37,6 @@ public:
     void run();
     void update(Game& game);
     void render(const Game&);
-    
-    // Game related
-    bool handleServerMessage(const std::string& msg);
-    bool drawCard(int playerId, int cardId);
 
 private:
     // -------------------------

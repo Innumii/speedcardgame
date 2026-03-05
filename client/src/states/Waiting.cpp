@@ -7,6 +7,7 @@
 #include "utils/HttpUtil.hpp"
 #include "utils/EnvUtil.hpp"
 #include "utils/JsonUtil.hpp"
+#include "utils/LoadAvailableCards.hpp"
 #include "states/DeckBuilding.hpp"
 
 #include "core/Game.hpp"
@@ -129,7 +130,7 @@ void Waiting::update(Game& game) {
                     if (HttpUtil::sendHttp(host, port, "GET", path, "", statusCode, responseBody) && statusCode == 200) {
                         std::cout << "[Waiting] Opponent Deck JSON: " << responseBody << "\n";
                         DeckBuilding& deckBuilding = game.getDeckBuildingState();
-                        const auto& availableCards = game.getDeckBuildingState().getAvailableCards();
+                        const auto& availableCards = LoadAvailableCardsUtil::getAvailableCards();
                         
                         std::string cardsObject;
                         if (!JsonUtil::extractJsonObject(responseBody, "cards", cardsObject)) {

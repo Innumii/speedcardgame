@@ -12,8 +12,12 @@
 #include <fstream>
 #include <string>
 
-namespace {
-	std::string toLower(std::string value) {
+namespace LoadAvailableCardsUtil {
+	bool loadFromService(std::vector<std::unique_ptr<Card>>& outCards);
+	bool loadFromCsv(std::vector<std::unique_ptr<Card>>& outCards);
+    std::vector<std::unique_ptr<Card>>& getAvailableCards();
+
+    std::string toLower(std::string value) {
 		std::transform(value.begin(), value.end(), value.begin(), [](unsigned char c) {
 			return static_cast<char>(std::tolower(c));
 		});
@@ -142,3 +146,16 @@ bool LoadAvailableCardsUtil::loadFromCsv(std::vector<std::unique_ptr<Card>>& out
 	return true;
 }
 
+std::vector<std::unique_ptr<Card>>& LoadAvailableCardsUtil::getAvailableCards() {
+    static std::vector<std::unique_ptr<Card>> availableCards;
+    static bool loaded = false;
+
+    if (!loaded) {
+        if (!loadFromService(availableCards)) {
+            loadFromCsv(availableCards);
+        }
+        loaded = true;
+    }
+
+    return availableCards;
+}
