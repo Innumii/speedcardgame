@@ -110,6 +110,7 @@ private:
     //Game related
     bool handleServerMessage(const std::string& msg);
     bool drawCard(int playerId, int cardId);
+    void discardCard(int playerId, int cardId);
 };
 
 #endif

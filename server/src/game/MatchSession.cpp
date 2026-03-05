@@ -404,6 +404,13 @@ void MatchSession::handleDiscard(int playerIndex, int handIndex) {
 
     int cardId = player.hand[handIndex];
 
+    //grab card from card catalog
+    const ServerCard* card = getCard(cardId);
+    if (!card) return;
+
+    //increment mana
+    player.mana += card->getManaCost();
+
     board.discard[playerIndex].push_back(cardId);
 
     player.hand.erase(player.hand.begin() + handIndex);

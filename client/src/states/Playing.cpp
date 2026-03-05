@@ -293,12 +293,16 @@ bool Playing::handleServerMessage(const std::string& msg) {
     std::string cmd;
     iss >> cmd;
 
-std::cout << "[Playing]: " << msg << "\n";
+// std::cout << "[Playing]: " << msg << "\n";
     
     if (cmd == "DRAW") {
         int playerId, cardId;
         iss >> playerId >> cardId;
         drawCard(playerId, cardId);
+    } else if (cmd == "DISCARD") {
+        int playerId, cardId;
+        iss >> playerId >> cardId;
+        discardCard(playerId, cardId);
     }
 
     return true;
@@ -338,6 +342,31 @@ bool Playing::drawCard(int playerId, int cardId) {
 
     return true;
 }
+
+void Playing::discardCard(int playerId, int cardId) {
+    Player* player = (playerId == localPlayer.id) ? &localPlayer : &remotePlayer;
+
+    auto it = std::find_if(player->hand.begin(), player->hand.end(),
+                           [cardId](const std::unique_ptr<Card>& c) {
+                               return c->getId() == cardId;
+                           });
+
+    if (it == player->hand.end()) {
+        // Card not found (maybe already discarded?), just ignore
+        return;
+    }
+
+    std::unique_ptr<Card> cardToDiscard = std::move(*it);
+    player->hand.erase(it);
+    player->addMana(cardToDiscard->getManaCost());
+
+    board.addToDiscard(std::move(cardToDiscard), playerId);
+
+    // You can animate this if desired
+    std::cout<< "[Playing] " << playerId << " Discarded " << cardId << "\n";
+}
+
+
 
 void Playing::render(const Game& game) {
     RenderPlaying::render(*this, game);

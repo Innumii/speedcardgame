@@ -223,14 +223,8 @@ bool NetworkClient::sendPlayCard(int handIndex, int lane, std::optional<int> tar
 
 bool NetworkClient::sendDiscardCard(int handIndex) {
     if (!connected) return false;
-
-    //JSON
     std::ostringstream ss;
-    ss << "{";
-    ss << "\"type\":\"DISCARD_CARD\",";
-    ss << "\"handIndex\":" << handIndex;
-    ss << "}\n";
-
+    ss << "DISCARD " << handIndex << "\n";
     return sendString(ss.str());
 }
 
