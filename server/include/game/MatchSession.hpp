@@ -77,9 +77,9 @@ public:
     bool loadDeckForPlayer(int playerId, ServerDeck& outDeck);
 
     //player actions
-    void handleSummon(int playerIndex, int handIndex, int lane);
-    void handleSpell(int playerIndex, int handIndex, int lane);
-    void handleDiscard(int playerIndex, int handIndex);
+    void handleSummon(int playerIndex, int cardId, int lane);
+    void handleSpell(int playerIndex, int cardId, int lane, std::optional<int> targetId = std::nullopt);
+    void handleDiscard(int playerIndex, int cardId);
 
     const ServerCard* getCard(int id) const;
 
@@ -106,7 +106,7 @@ private:
     ServerBoard board;
 
     bool parseDeckJson(const std::string& jsonStr, ServerDeck& outDeck);
-
+    std::vector<int>::iterator findCardInHand(PlayerState& player, int cardId);
 };
 
 #endif

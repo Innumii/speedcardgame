@@ -16,7 +16,7 @@ public:
 	static void drawOpponentPlayZones(SDL_Renderer* renderer, RenderText& textRenderer, const std::vector<SDL_Rect>& playSlots, TTF_Font* fontSmall);
 	static void drawPlayZones(SDL_Renderer* renderer, RenderText& textRenderer, const std::vector<SDL_Rect>& playSlots, TTF_Font* fontSmall);
 	static void drawDiscardZone(SDL_Renderer* renderer, RenderText& textRenderer, const SDL_Rect& discardZone, bool hovering, TTF_Font* fontSmall);
-	static void drawBoardState(SDL_Renderer* renderer, RenderText& textRenderer, const Board& board, const std::vector<SDL_Rect>& playSlots, int localPlayerId, TTF_Font* fontSmall);
+	static void drawBoardState(SDL_Renderer* renderer, RenderText& textRenderer, const Board& board, const std::vector<SDL_Rect>& playSlots, TTF_Font* fontSmall);
 };
 
 #endif

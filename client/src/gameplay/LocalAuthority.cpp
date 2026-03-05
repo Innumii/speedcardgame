@@ -8,15 +8,15 @@ LocalAuthority::LocalAuthority(NetworkClient* net)
 {
 }
 
-void LocalAuthority::playCard(int handIndex, int lane, std::optional<int> targetId) {
+void LocalAuthority::playCard(int cardId, int lane, std::optional<int> targetId, std::optional<int> targetOpponent) {
     if (!network) return;
 
     // Single-phase: send everything at once
-    network->sendPlayCard(handIndex, lane, targetId);
+    network->sendPlayCard(cardId, lane, targetId, targetOpponent);
 }
 
-void LocalAuthority::discardCard(int handIndex) {
+void LocalAuthority::discardCard(int cardId) {
     if (!network) return;
 
-    network->sendDiscardCard(handIndex);
+    network->sendDiscardCard(cardId);
 }

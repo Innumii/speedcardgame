@@ -67,6 +67,7 @@ private:
     RenderText::FontSet fonts{};
     std::vector<SDL_Rect> cardRects;
     std::vector<SDL_Rect> playSlots;
+    std::vector<SDL_Rect> opponentSlots;
     SDL_Rect discardZone{0, 0, 0, 0};
     SDL_Rect menuButton{0, 0, 0, 0};
     SDL_Rect exitGameButton{0, 0, 0, 0};
@@ -83,10 +84,13 @@ private:
     struct PendingActionState {
         bool active{false};
         std::size_t handIndex{static_cast<std::size_t>(-1)};
+        int sourceLane{-1}; // lane where the spell was dropped
+        int targetOpponent{-1};
 
         void clear() {
             active = false;
             handIndex = static_cast<std::size_t>(-1);
+            sourceLane = -1;
         }
     };
     PendingActionState pendingAction;
@@ -111,6 +115,8 @@ private:
     bool handleServerMessage(const std::string& msg);
     bool drawCard(int playerId, int cardId);
     void discardCard(int playerId, int cardId);
+    void playCreature(int playerId, std::unique_ptr<Card> card, int lane);
+    // void playSpell(int playerId, std::unique_ptr<Card> card, int sourceLane, int targetLane, int targetOpponent);
 };
 
 #endif

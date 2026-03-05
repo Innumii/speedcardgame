@@ -306,13 +306,31 @@ void MatchSession::processActions() {
     while (!localQueue.empty()) {
         const PlayerAction& action = localQueue.front();
 
-        if (action.type == "SUMMON") {
-            if (action.args.size() >= 2)
-                handleSummon(action.playerIndex, action.args[0], action.args[1]);
-        }
-        else if (action.type == "SPELL") {
-            if (action.args.size() >= 2)
-                handleSpell(action.playerIndex, action.args[0], action.args[1]);
+        if (action.type == "PLAY") {
+            if (action.args.size() >= 2) {
+                int cardId = action.args[0];
+                int lane = action.args[1];
+                std::optional<int> targetId;
+
+                if (action.args.size() > 2) {
+                    targetId = action.args[2];
+                }
+
+                PlayerState& player = players[action.playerIndex];
+                const ServerCard* card = getCard(cardId);
+
+                if (!card) {
+                    std::cerr << "Unknown card ID " << cardId << "\n";
+                    localQueue.pop();
+                    continue;
+                }
+
+                if (card->getType() == CardType::Creature) {
+                    handleSummon(action.playerIndex, cardId, lane);
+                } else if (card->getType() == CardType::Spell) {
+                    handleSpell(action.playerIndex, cardId, lane);
+                }
+            }
         }
         else if (action.type == "DISCARD") {
             if (!action.args.empty())
@@ -323,72 +341,67 @@ void MatchSession::processActions() {
     }
 }
 
-void MatchSession::handleSummon(int playerIndex, int handIndex, int lane) {
+void MatchSession::handleSummon(int playerIndex, int cardId, int lane) {
     auto& player = players[playerIndex];
 
-    if (handIndex < 0 || handIndex >= (int) player.hand.size()) return;
     if (lane < 0 || lane >= board.laneCount) return;
-
-    int cardId = player.hand[handIndex];
 
     const ServerCard* card = getCard(cardId);
     if (!card) return;
+    std::string name = card->getName();
 
     if (card->getType() != CardType::Creature) return;
 
     if (board.lanes[playerIndex][lane].has_value()) return;
 
-    if (player.mana < card->getManaCost()) return;
+    if (player.mana < card->getManaCost()) {
+        std::cout << "[MatchSession] Insufficient Mana: " << player.mana << " : " << card->getManaCost() << "\n";
+        
+        return;}
 
+    // Deduct mana
     player.mana -= card->getManaCost();
 
+    // Find and remove card from hand
+    auto it = findCardInHand(player, cardId);
+    if (it == player.hand.end()) {
+        std::cerr << "[ERROR] Card ID " << cardId
+                  << " not found in player " << playerIndex << "'s hand\n";
+        return;
+    }
+    player.hand.erase(it);
+
+    // Place card on board
     board.lanes[playerIndex][lane] = cardId;
 
-    player.hand.erase(player.hand.begin() + handIndex);
-
-    //Send confirmation message on successful summon
-    std::string msg = "SUMMON " + std::to_string(player.id) + " "
-                    + std::to_string(cardId) + " "
-                    + std::to_string(lane) + "\n";
-
-    playerA->send(msg);
-    playerB->send(msg);
+    // Send confirmation message
+    std::cout << "[MatchSession] Summoning " << name << "\n";
+    std::ostringstream ss;
+    ss << "PLAY " << player.id << " " << cardId << " " << lane << "\n";
+    playerA->send(ss.str());
+    playerB->send(ss.str());
 }
 
 //let -1 mean no target
-void MatchSession::handleSpell(int playerIndex, int handIndex, int lane) {
-    auto& player = players[playerIndex];
-
-    if (handIndex < 0 || handIndex >= player.hand.size()) return;
+void MatchSession::handleSpell(int playerIndex, int handIndex, int lane, std::optional<int> targetId) {
+    PlayerState& player = players[playerIndex];
+    if (handIndex < 0 || handIndex >= static_cast<int>(player.hand.size())) return;
 
     int cardId = player.hand[handIndex];
-
     const ServerCard* card = getCard(cardId);
     if (!card) return;
 
-    if (card->getType() != CardType::Spell) return;
+    // Example: targetId can be used here to determine which card or lane is affected
+    if (targetId.has_value()) {
+        // Apply spell effect to target
+    } else {
+        // Spell affects default lane
+    }
 
-    if (player.mana < card->getManaCost()) return;
-
-    player.mana -= card->getManaCost();
-
-    // Example effect: destroy creature in lane
-    // int opponent = 1 - playerIndex;
-
-    // if (lane >= 0 && lane < board.laneCount) {
-    //     if (board.lanes[opponent][lane].has_value()) {
-    //         int destroyed = *board.lanes[opponent][lane];
-
-    //         board.discard[opponent].push_back(destroyed);
-    //         board.lanes[opponent][lane] = std::nullopt;
-    //     }
-    // }
-
-    //Spell effect goes here
-
-    //remove card from hand
+    // Remove card from hand after cast
     player.hand.erase(player.hand.begin() + handIndex);
 
+        //Send confirmation message on successful summon
     std::string msg = "SPELL " + std::to_string(player.id) + " "
                     + std::to_string(cardId) + " "
                     + std::to_string(lane) + "\n";
@@ -397,27 +410,32 @@ void MatchSession::handleSpell(int playerIndex, int handIndex, int lane) {
     playerB->send(msg);
 }
 
-void MatchSession::handleDiscard(int playerIndex, int handIndex) {
+void MatchSession::handleDiscard(int playerIndex, int cardId) {
     auto& player = players[playerIndex];
 
-    if (handIndex < 0 || handIndex >= player.hand.size()) return;
-
-    int cardId = player.hand[handIndex];
-
-    //grab card from card catalog
     const ServerCard* card = getCard(cardId);
     if (!card) return;
 
-    //increment mana
+    // increment mana
     player.mana += card->getManaCost();
 
+    std::cout << "[MatchSession] Discarding " << card->getName() << "\n";
+
+    // add to discard
     board.discard[playerIndex].push_back(cardId);
 
-    player.hand.erase(player.hand.begin() + handIndex);
+    // remove from hand using helper
+    auto it = findCardInHand(player, cardId);
+    if (it != player.hand.end()) {
+        player.hand.erase(it);
+    } else {
+        std::cerr << "[WARNING] Tried to discard cardId " << cardId
+                  << " but it was not in player " << playerIndex << "'s hand\n";
+    }
 
+    // broadcast
     std::string msg = "DISCARD " + std::to_string(player.id)
                     + " " + std::to_string(cardId) + "\n";
-
     playerA->send(msg);
     playerB->send(msg);
 }
@@ -442,4 +460,8 @@ const ServerCard* MatchSession::getCard(int id) const {
     auto it = cardCatalog.find(id);
     if (it != cardCatalog.end()) return it->second.get();
     return nullptr;
+}
+
+std::vector<int>::iterator MatchSession::findCardInHand(PlayerState& player, int cardId) {
+    return std::find(player.hand.begin(), player.hand.end(), cardId);
 }

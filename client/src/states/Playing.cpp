@@ -27,19 +27,39 @@ bool Playing::resolvePendingActionAt(int x, int y) {
     if (!pendingAction.active)
         return false;
 
+    int targetLane = -1;
+    int targetOpponent = -1;
+
+    // Check local lanes first
     for (std::size_t slot = 0; slot < playSlots.size(); ++slot) {
         if (pointInRect(playSlots[slot], x, y)) {
-
-            // Play card into selected lane
-            authority->playCard(
-                static_cast<int>(pendingAction.handIndex),
-                static_cast<int>(slot),
-                static_cast<int>(slot) // targetId = lane index
-            );
-
-            pendingAction.clear();
-            return true;
+            targetLane = static_cast<int>(slot);
+            targetOpponent = 0;
+            break;
         }
+    }
+
+    // Check opponent lanes (offset by render, e.g., 200 px above)
+    for (std::size_t slot = 0; slot < playSlots.size(); ++slot) {
+        SDL_Rect opponentSlot = playSlots[slot];
+        opponentSlot.y -= 200; // same offset as rendering
+        if (pointInRect(opponentSlot, x, y)) {
+            targetLane = static_cast<int>(slot);
+            targetOpponent = 1;
+            break;
+        }
+    }
+
+    if (targetLane >= 0) {
+        authority->playCard(
+            static_cast<int>(pendingAction.handIndex),
+            pendingAction.sourceLane, // where the spell was dropped
+            targetLane,               // target lane
+            targetOpponent              // target player (local or opponent)
+        );
+
+        pendingAction.clear();
+        return true;
     }
 
     return false;
@@ -217,15 +237,34 @@ void Playing::handleEvents(Game& game, const SDL_Event& event) {
                     pointInRect(discardZone, mx, my);
 
                 if (droppedInDiscard) {
-                    authority->discardCard(
-                        static_cast<int>(drag.index));
+                    auto& card = localPlayer.hand[drag.index];
+                    std::cout << "[Playing] Attempting to Discard " << card->getName() << "\n";
+                    authority->discardCard(card->getId());
                 }
                 else if (laneIndex >= 0) {
-                    authority->playCard(
-                        static_cast<int>(drag.index),
-                        laneIndex,
-                        std::nullopt
-                    );
+                    auto& card = localPlayer.hand[drag.index];
+                    int laneIndex = -1;
+                    for (std::size_t slot = 0; slot < playSlots.size(); ++slot) { //find out where card was played, zone wise
+                        if (pointInRect(playSlots[slot], mx, my)) {
+                            laneIndex = static_cast<int>(slot);
+                            break;
+                        }
+                    }
+                    if (card->getType() == CardType::Creature) {
+                        if (localPlayer.mana >= card->getManaCost()) { //Check if player has sufficient mana
+                            authority->playCard(
+                                card->getId(),
+                                laneIndex,
+                                std::nullopt,  //NO TARGETING
+                                std::nullopt  //NO TARGETING
+
+                            );
+                        }
+                    } else if (card->getType() == CardType::Spell) { // Spell enters targeting mode, may need some logic to skip targeting for universal target spells
+                        pendingAction.active = true;
+                        pendingAction.handIndex = drag.index;
+                        pendingAction.sourceLane = laneIndex; // store where it was dropped
+                    }
                 }
 
                 drag.active = false;
@@ -303,10 +342,78 @@ bool Playing::handleServerMessage(const std::string& msg) {
         int playerId, cardId;
         iss >> playerId >> cardId;
         discardCard(playerId, cardId);
+    } else if (cmd == "PLAY") {
+        int playerId, cardId, lane;
+        iss >> playerId >> cardId >> lane;
+
+        Player& player = (playerId == localPlayer.id) ? localPlayer : remotePlayer;
+
+        // Find card in hand by ID
+        auto it = std::find_if(
+            player.hand.begin(), player.hand.end(),
+            [cardId](const std::unique_ptr<Card>& c){ return c->getId() == cardId; }
+        );
+
+        if (it == player.hand.end()) {
+            std::cerr << "[ERROR] Card ID " << cardId
+                    << " not found in player " << playerId << "'s hand\n";
+            return false;
+        }
+
+        CardType type = (*it)->getType();
+
+        if (type == CardType::Creature) {
+            // Move card into board
+            playCreature(playerId, std::move(*it), lane);
+            // Remove from hand
+            player.hand.erase(it);
+        }
+        else if (type == CardType::Spell) {
+            // Optionally read target lane and target opponent
+            std::optional<int> targetLane;
+            if (iss.peek() != EOF) {
+                int tmp;
+                if (iss >> tmp) targetLane = tmp;
+            }
+
+            int targetOpponent = 0;
+            if (iss.peek() != EOF) {
+                int tmp;
+                if (iss >> tmp) targetOpponent = tmp;
+            }
+
+            // Move card into spell handler
+            // playSpell(playerId, std::move(*it), lane, targetLane, targetOpponent);
+            player.hand.erase(it);
+        }
     }
 
     return true;
 }
+
+void Playing::playCreature(int playerId, std::unique_ptr<Card> card, int lane) {
+    // Determine player
+    Player& player = (playerId == localPlayer.id) ? localPlayer : remotePlayer;
+
+    if (lane < 0 || lane >= board.getLaneCount()) return;
+    if (!card) return;
+
+    if (card->getType() != CardType::Creature) return;
+
+    std::string name = card->getName();
+    player.mana -= card->getManaCost();
+
+    // Move the card into the board
+    int boardIndex = (playerId == localPlayer.id) ? 0:1;
+    board.addToPlay(lane, boardIndex, std::move(card));
+
+    // Optional: debug output
+    std::cout << "[Playing] Summoned" << name
+              << " for player " << playerId 
+              << " at lane " << lane << "\n";
+}
+
+
 
 bool Playing::drawCard(int playerId, int cardId) {
     Player& player = (playerId == localPlayer.id)
@@ -357,13 +464,15 @@ void Playing::discardCard(int playerId, int cardId) {
     }
 
     std::unique_ptr<Card> cardToDiscard = std::move(*it);
+    std::string name = cardToDiscard->getName();
     player->hand.erase(it);
-    player->addMana(cardToDiscard->getManaCost());
+    player->addMana(cardToDiscard->getManaValue());
 
-    board.addToDiscard(std::move(cardToDiscard), playerId);
+    int boardIndex = (playerId == localPlayer.id) ? 0:1;
+    board.addToDiscard(std::move(cardToDiscard), boardIndex);
 
     // You can animate this if desired
-    std::cout<< "[Playing] " << playerId << " Discarded " << cardId << "\n";
+    std::cout<< "[Playing] " << playerId << " Discarded " << name << "\n";
 }
 
 
@@ -410,7 +519,8 @@ std::vector<SDL_Rect> Playing::computeCardLayout(std::size_t count, int screenW,
 }
 
 void Playing::computeZones(int screenW, int screenH) {
-    playSlots.clear();
+    playSlots.clear();       // local player zones
+    opponentSlots.clear();   // opponent zones
 
     if (screenW <= 0 || screenH <= 0) {
         discardZone = SDL_Rect{0, 0, 0, 0};
@@ -427,44 +537,55 @@ void Playing::computeZones(int screenW, int screenH) {
     const int discardWidth = 110;
     const int discardHeight = 130;
     const int gapToDiscard = 18;
+    const int opponentOffset = 200; // vertical offset for opponent zones
 
+    // Hand Y position
     int handY = screenH - handCardHeight - handYOffset;
     if (!cardRects.empty()) {
         handY = cardRects.front().y;
     }
 
     int totalSlotsWidth = slotCount * slotWidth + (slotCount - 1) * slotSpacing;
-
-    // Center the play zone itself; deck/discard sit outside of this band.
     int startX = std::max(margin, (screenW - totalSlotsWidth) / 2);
+
+    // Local player slots
     int slotY = handY - slotHeight - 16;
     if (slotY < margin) slotY = margin;
 
     playSlots.reserve(static_cast<std::size_t>(slotCount));
+    opponentSlots.reserve(static_cast<std::size_t>(slotCount));
+
     for (int i = 0; i < slotCount; ++i) {
-        playSlots.push_back(SDL_Rect{
+        SDL_Rect localRect{
             startX + i * (slotWidth + slotSpacing),
             slotY,
             slotWidth,
             slotHeight
-        });
+        };
+        playSlots.push_back(localRect);
+
+        // Opponent zones are offset upward by opponentOffset
+        SDL_Rect oppRect = localRect;
+        oppRect.y -= opponentOffset;
+        opponentSlots.push_back(oppRect);
     }
+
+    // Optional: set playZoneBand for local rendering / input
     if (!playSlots.empty()) {
         const SDL_Rect& firstSlot = playSlots.front();
         const SDL_Rect& lastSlot = playSlots.back();
 
         playZoneBand.x = firstSlot.x;
         playZoneBand.y = firstSlot.y;
-        playZoneBand.w = (lastSlot.x + lastSlot.w) - firstSlot.x; // from left edge of first to right edge of last
-        playZoneBand.h = firstSlot.h; // all slots have same height
+        playZoneBand.w = (lastSlot.x + lastSlot.w) - firstSlot.x;
+        playZoneBand.h = firstSlot.h;
     } else {
         playZoneBand = SDL_Rect{0,0,0,0};
     }
 
+    // Discard zone
     int discardX = startX - gapToDiscard - discardWidth;
-    if (discardX < margin) {
-        discardX = margin;
-    }
+    if (discardX < margin) discardX = margin;
 
     int discardY = slotY + (slotHeight - discardHeight) / 2;
     discardZone = SDL_Rect{discardX, discardY, discardWidth, discardHeight};

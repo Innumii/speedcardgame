@@ -270,7 +270,7 @@ void RenderPlaying::render(Playing& playing, const Game& game) {
 		RenderCard::drawCardBack(renderer, playing.animationQueue.getActiveDrawCardRect());
 	}
 
-	RenderBoard::drawBoardState(renderer, textRenderer, playing.board, playing.playSlots, playing.localPlayer.id, playing.fonts.small);
+	RenderBoard::drawBoardState(renderer, textRenderer, playing.board, playing.playSlots, playing.fonts.small);
 
 	if (draggingCard && playing.drag.index < playing.cardRects.size()) {
 		SDL_Rect floating = playing.cardRects[playing.drag.index];

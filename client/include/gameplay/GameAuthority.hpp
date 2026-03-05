@@ -6,6 +6,6 @@ public:
     //virtual means can be overridden
     virtual ~GameAuthority() = default;
 
-    virtual void playCard(int handIndex, int lane, std::optional<int> targetId) = 0;
-    virtual void discardCard(int handIndex) = 0;
+    virtual void playCard(int cardId, int lane, std::optional<int> targetId, std::optional<int> targetOpponent) = 0;
+    virtual void discardCard(int cardId) = 0;
 };
