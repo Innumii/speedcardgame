@@ -15,6 +15,18 @@ terraform {
 
 provider "aws" {
   region = var.aws_region
+
+  default_tags {
+    tags = {
+      environment = var.environment
+      managed-by  = "terraform"
+    }
+  }
+}
+
+locals {
+  route53_zone_name = "${trimsuffix(var.base_domain, ".")}."
+  api_domain_name   = "api.${trimsuffix(var.base_domain, ".")}"
 }
 
 data "aws_vpc" "default" {
@@ -29,7 +41,7 @@ data "aws_subnets" "default" {
 }
 
 data "aws_route53_zone" "primary" {
-  name         = var.route53_zone_name
+  name         = local.route53_zone_name
   private_zone = false
 }
 
@@ -66,10 +78,6 @@ resource "aws_lb" "shared" {
   load_balancer_type = "application"
   security_groups    = [aws_security_group.alb.id]
   subnets            = data.aws_subnets.default.ids
-
-  lifecycle {
-    prevent_destroy = true
-  }
 }
 
 resource "aws_lb_target_group" "auth" {
@@ -98,7 +106,8 @@ resource "aws_lb_target_group" "cards" {
   }
 }
 
-resource "aws_lb_listener" "http" {
+resource "aws_lb_listener" "http_redirect" {
+  count             = var.enable_https_listener ? 1 : 0
   load_balancer_arn = aws_lb.shared.arn
   port              = 80
   protocol          = "HTTP"
@@ -114,7 +123,25 @@ resource "aws_lb_listener" "http" {
   }
 }
 
+resource "aws_lb_listener" "http" {
+  count             = var.enable_https_listener ? 0 : 1
+  load_balancer_arn = aws_lb.shared.arn
+  port              = 80
+  protocol          = "HTTP"
+
+  default_action {
+    type = "fixed-response"
+
+    fixed_response {
+      content_type = "application/json"
+      message_body = "{\"message\":\"Not Found\"}"
+      status_code  = "404"
+    }
+  }
+}
+
 resource "aws_lb_listener" "https" {
+  count             = var.enable_https_listener ? 1 : 0
   load_balancer_arn = aws_lb.shared.arn
   port              = 443
   protocol          = "HTTPS"
@@ -133,7 +160,7 @@ resource "aws_lb_listener" "https" {
 }
 
 resource "aws_lb_listener_rule" "auth" {
-  listener_arn = aws_lb_listener.https.arn
+  listener_arn = var.enable_https_listener ? aws_lb_listener.https[0].arn : aws_lb_listener.http[0].arn
   priority     = 100
 
   action {
@@ -149,7 +176,7 @@ resource "aws_lb_listener_rule" "auth" {
 }
 
 resource "aws_lb_listener_rule" "cards" {
-  listener_arn = aws_lb_listener.https.arn
+  listener_arn = var.enable_https_listener ? aws_lb_listener.https[0].arn : aws_lb_listener.http[0].arn
   priority     = 200
 
   action {
@@ -166,7 +193,7 @@ resource "aws_lb_listener_rule" "cards" {
 
 resource "aws_route53_record" "api" {
   zone_id = data.aws_route53_zone.primary.zone_id
-  name    = var.api_domain_name
+  name    = local.api_domain_name
   type    = "A"
 
   alias {

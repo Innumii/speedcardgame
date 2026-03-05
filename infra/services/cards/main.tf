@@ -17,6 +17,11 @@ provider "aws" {
   region = var.aws_region
 }
 
+locals {
+  use_alb_remote_state  = var.use_managed_alb_stack && fileexists(var.alb_stack_state_path)
+  use_data_remote_state = var.use_managed_data_stack && fileexists(var.data_stack_state_path)
+}
+
 data "aws_vpc" "default" {
   default = true
 }
@@ -29,7 +34,7 @@ data "aws_subnets" "default" {
 }
 
 data "terraform_remote_state" "alb" {
-  count   = var.use_managed_alb_stack ? 1 : 0
+  count   = local.use_alb_remote_state ? 1 : 0
   backend = "local"
   config = {
     path = var.alb_stack_state_path
@@ -37,7 +42,7 @@ data "terraform_remote_state" "alb" {
 }
 
 data "terraform_remote_state" "data" {
-  count   = var.use_managed_data_stack ? 1 : 0
+  count   = local.use_data_remote_state ? 1 : 0
   backend = "local"
   config = {
     path = var.data_stack_state_path
@@ -45,10 +50,10 @@ data "terraform_remote_state" "data" {
 }
 
 locals {
-  alb_outputs                  = var.use_managed_alb_stack ? data.terraform_remote_state.alb[0].outputs : {}
+  alb_outputs                  = local.use_alb_remote_state ? data.terraform_remote_state.alb[0].outputs : {}
   alb_security_group_id        = var.alb_security_group_id != null ? var.alb_security_group_id : try(local.alb_outputs.alb_security_group_id, null)
   cards_target_group_arn       = var.target_group_arn != null ? var.target_group_arn : try(local.alb_outputs.cards_target_group_arn, null)
-  data_outputs                 = var.use_managed_data_stack ? data.terraform_remote_state.data[0].outputs : {}
+  data_outputs                 = local.use_data_remote_state ? data.terraform_remote_state.data[0].outputs : {}
   postgres_host                = var.postgres_host != null ? var.postgres_host : try(local.data_outputs.cards_postgres_endpoint, null)
   postgres_user                = var.postgres_user != null ? var.postgres_user : try(local.data_outputs.cards_postgres_user, null)
   postgres_password            = var.postgres_password != null ? var.postgres_password : try(local.data_outputs.cards_postgres_password, null)
@@ -57,6 +62,7 @@ locals {
   postgres_port                = var.postgres_port != null ? var.postgres_port : try(local.data_outputs.cards_postgres_port, null)
   redis_host                   = var.redis_host != null ? var.redis_host : try(local.data_outputs.auth_redis_endpoint, null)
   redis_port                   = var.redis_port != null ? var.redis_port : try(local.data_outputs.auth_redis_port, null)
+  cards_database_url           = "postgres://${local.postgres_user}:${local.postgres_password}@${local.postgres_host}:${local.postgres_port}/${local.postgres_db}?sslmode=${var.postgres_sslmode}"
 }
 
 
@@ -85,24 +91,24 @@ module "service" {
   task_secret_arns = local.postgres_password_secret_arn != null ? toset([local.postgres_password_secret_arn]) : toset([])
 
   secrets = local.postgres_password_secret_arn != null ? {
-    POSTGRES_PASSWORD = "${local.postgres_password_secret_arn}:POSTGRES_PASSWORD::"
+    DATABASE_URL = "${local.postgres_password_secret_arn}:DATABASE_URL::"
   } : {}
 
   environment = merge(
     {
+      PORT               = tostring(8080)
       POSTGRES_HOST      = local.postgres_host
       POSTGRES_USER      = local.postgres_user
       POSTGRES_DB        = local.postgres_db
       POSTGRES_PORT      = tostring(local.postgres_port)
       POSTGRES_SSLMODE   = var.postgres_sslmode
       POSTGRES_TIMEZONE  = var.postgres_timezone
+      DATABASE_URL       = local.cards_database_url
       REDIS_HOST         = local.redis_host
       REDIS_PORT         = tostring(local.redis_port)
       CARDS_SERVICE_HOST = var.cards_service_host
       CARDS_SERVICE_PORT = tostring(var.cards_service_port)
     },
-    local.postgres_password_secret_arn == null && local.postgres_password != null ? {
-      POSTGRES_PASSWORD = local.postgres_password
-    } : {}
+    {}
   )
 }

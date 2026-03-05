@@ -408,4 +408,3 @@ void DeckBuilding::setStatusMessage(const std::string& message, Uint32 durationM
     statusMessage = message;
     statusMessageUntil = SDL_GetTicks() + durationMs;
 }
-

@@ -128,17 +128,39 @@ namespace EnvUtil {
     }
 
     std::string getAuthServiceHost() {
-        return getServiceHost("AUTH_SERVICE", "127.0.0.1", "api.myapp.com");
+        if (useAwsServices()) {
+            return getServiceHost("AWS_AUTH_SERVICE_HOST", "127.0.0.1", "");
+        } else {
+            return getEnvOrDefault("AUTH_SERVICE_HOST", "");
+        }
     }
 
     int getAuthServicePort() {
-        return getServicePort("AUTH_SERVICE", 8081, 443);
+        if (useAwsServices()) {
+            return getServicePort("AWS_AUTH_SERVICE_PORT", 8081, 443);
+        } else {
+            return getEnvIntOrDefault("AUTH_SERVICE_PORT", 8081);
+        }
     }
 
     std::string getServiceHost(const char* servicePrefix, const char* localFallback, const char* awsFallback) {
         if (useAwsServices()) {
             const std::string awsKey = buildAwsServiceKey(servicePrefix, "_HOST");
-            return getEnvOrDefault(awsKey.c_str(), awsFallback);
+            const char* awsConfigured = std::getenv(awsKey.c_str());
+            if (awsConfigured && *awsConfigured) {
+                return std::string(awsConfigured);
+            }
+
+            const char* sharedAwsHost = std::getenv("AWS_API_HOST");
+            if (sharedAwsHost && *sharedAwsHost) {
+                return std::string(sharedAwsHost);
+            }
+
+            if (awsFallback != nullptr && *awsFallback) {
+                return std::string(awsFallback);
+            }
+
+            return std::string(localFallback);
         }
 
         const std::string key = buildServiceKey(servicePrefix, "_HOST");
