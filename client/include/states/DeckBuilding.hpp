@@ -7,8 +7,6 @@
 #include <string>
 #include <vector>
 
-#include "objects/Deck.h"
-
 class Game;
 class RenderDeckBuilding;
 class Card;
@@ -23,11 +21,6 @@ public:
 	void enter(Game& game);
 	void exit(const Game& game);
 	bool refreshFromService(Game& game);
-	Deck buildDeck() const;
-	bool hasCardsInDeck() const;
-	bool hasFullDeck() const;
-	int getDeckCardCount() const;
-	static int getDeckSizeLimit();
 	const std::string& getStatusMessage() const;
 	bool isStatusMessageActive(Uint32 now) const;
 
@@ -50,15 +43,6 @@ private:
 	Layout buildLayout(const Game& game) const;
 	void updateMenuButtons(const Layout& layout);
 	std::vector<int> getDeckEntryOrder() const;
-	void tryAddToDeck(int cardIndex);
-	void tryRemoveFromDeck(int cardIndex);
-	bool loadAvailableCardsFromService(const Game& game);
-	bool loadAvailableCardsFromCsv(const Game& game);
-	bool loadInventoryFromService(const Game& game);
-	bool loadDeckFromService(const Game& game);
-	bool saveDeckToService(const Game& game) const;
-	int getInventoryCount(int cardIndex) const;
-	int getRemainingCount(int cardIndex) const;
 	void setStatusMessage(const std::string& message, Uint32 durationMs);
 
 	SDL_Rect TitleButton{20, 20, 140, 50};
@@ -80,8 +64,6 @@ private:
 	int collectionPage{0};
 	std::string statusMessage{};
 	Uint32 statusMessageUntil{0};
-
-	static constexpr int MaxDeckCopies = 4;
 };
 
 #endif

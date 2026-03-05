@@ -1,53 +1,5 @@
 #include "render/RenderBanner.hpp"
-#include <cmath>
-
-static void fillCircle(SDL_Renderer* renderer, int cx, int cy, int r) {
-    for (int dy = -r; dy <= r; dy++) {
-        int dx = (int)sqrt((double)(r * r - dy * dy));
-        SDL_RenderDrawLine(renderer, cx - dx, cy + dy, cx + dx, cy + dy);
-    }
-}
-
-static void drawRounded(SDL_Renderer* renderer, const SDL_Rect& rect,
-                         SDL_Color fill, SDL_Color border) {
-    const int r = 14;
-
-    SDL_SetRenderDrawColor(renderer, fill.r, fill.g, fill.b, fill.a);
-    SDL_Rect body  = {rect.x + r,          rect.y,     rect.w - 2*r, rect.h      };
-    SDL_Rect left  = {rect.x,               rect.y + r, r,            rect.h - 2*r};
-    SDL_Rect right = {rect.x + rect.w - r,  rect.y + r, r,            rect.h - 2*r};
-    SDL_RenderFillRect(renderer, &body);
-    SDL_RenderFillRect(renderer, &left);
-    SDL_RenderFillRect(renderer, &right);
-    fillCircle(renderer, rect.x + r,          rect.y + r,          r);
-    fillCircle(renderer, rect.x + rect.w - r, rect.y + r,          r);
-    fillCircle(renderer, rect.x + r,          rect.y + rect.h - r, r);
-    fillCircle(renderer, rect.x + rect.w - r, rect.y + rect.h - r, r);
-
-    SDL_SetRenderDrawColor(renderer, border.r, border.g, border.b, border.a);
-    SDL_RenderDrawLine(renderer, rect.x + r,      rect.y,          rect.x + rect.w - r, rect.y            );
-    SDL_RenderDrawLine(renderer, rect.x + r,      rect.y + rect.h, rect.x + rect.w - r, rect.y + rect.h   );
-    SDL_RenderDrawLine(renderer, rect.x,          rect.y + r,      rect.x,              rect.y + rect.h - r);
-    SDL_RenderDrawLine(renderer, rect.x + rect.w, rect.y + r,      rect.x + rect.w,     rect.y + rect.h - r);
-}
-
-static void drawCentered(SDL_Renderer* renderer, TTF_Font* font,
-                          const std::string& text, const SDL_Rect& rect, SDL_Color color) {
-    if (!font) return;
-    SDL_Surface* surface = TTF_RenderUTF8_Blended(font, text.c_str(), color);
-    if (!surface) return;
-    SDL_Texture* texture = SDL_CreateTextureFromSurface(renderer, surface);
-    if (texture) {
-        SDL_Rect dst = {
-            rect.x + (rect.w - surface->w) / 2,
-            rect.y + (rect.h - surface->h) / 2,
-            surface->w, surface->h
-        };
-        SDL_RenderCopy(renderer, texture, nullptr, &dst);
-        SDL_DestroyTexture(texture);
-    }
-    SDL_FreeSurface(surface);
-}
+#include "utils/RenderUtil.hpp"
 
 void RenderBanner::drawBanner(SDL_Renderer* renderer, const SDL_Rect& rect,
                                const std::string& text, TTF_Font* font,
@@ -67,13 +19,13 @@ void RenderBanner::drawBanner(SDL_Renderer* renderer, const SDL_Rect& rect,
     SDL_RenderFillRect(renderer, &sbody);
     SDL_RenderFillRect(renderer, &sleft);
     SDL_RenderFillRect(renderer, &sright);
-    fillCircle(renderer, s.x + r,       s.y + r,       r);
-    fillCircle(renderer, s.x + s.w - r, s.y + r,       r);
-    fillCircle(renderer, s.x + r,       s.y + s.h - r, r);
-    fillCircle(renderer, s.x + s.w - r, s.y + s.h - r, r);
+    RenderUtil::fillCircle(renderer, s.x + r,       s.y + r,       r);
+    RenderUtil::fillCircle(renderer, s.x + s.w - r, s.y + r,       r);
+    RenderUtil::fillCircle(renderer, s.x + r,       s.y + s.h - r, r);
+    RenderUtil::fillCircle(renderer, s.x + s.w - r, s.y + s.h - r, r);
 
     // banner body
-    drawRounded(renderer, rect, fill, border);
+    RenderUtil::drawRoundedRect(renderer, rect, 14, fill, border);
 
     // glow layers then crisp text on top
     if (font) {
@@ -98,6 +50,6 @@ void RenderBanner::drawBanner(SDL_Renderer* renderer, const SDL_Rect& rect,
             }
             SDL_FreeSurface(glowSurface);
         }
-        drawCentered(renderer, font, text, rect, textColor);
+        RenderUtil::drawCenteredText(renderer, font, text, rect, textColor);
     }
 }

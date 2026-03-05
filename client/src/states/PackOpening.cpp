@@ -7,141 +7,21 @@
 #include "render/RenderButton.hpp"
 #include "render/RenderText.hpp"
 #include "render/Theme.hpp"
+#include "objects/Deck.h"
 #include "utils/HttpUtil.hpp"
 #include "utils/JsonUtil.hpp"
 #include "utils/EnvUtil.hpp"
+#include "utils/LoadAvailableCards.hpp"
 
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_ttf.h>
 #include <algorithm>
-#include <cctype>
 #include <cstdlib>
-#include <fstream>
 #include <random>
 #include <sstream>
 #include <unordered_map>
 
 namespace {
-    std::string toLower(std::string value) {
-        std::transform(value.begin(), value.end(), value.begin(), [](unsigned char c) {
-            return static_cast<char>(std::tolower(c));
-        });
-        return value;
-    }
-
-    bool parseCsvLine(const std::string& line, std::vector<std::string>& out) {
-        out.clear();
-        std::string field;
-        bool inQuotes = false;
-        for (std::size_t i = 0; i < line.size(); ++i) {
-            char c = line[i];
-            if (c == '"') {
-                if (inQuotes && i + 1 < line.size() && line[i + 1] == '"') {
-                    field.push_back('"');
-                    ++i;
-                } else {
-                    inQuotes = !inQuotes;
-                }
-                continue;
-            }
-            if (c == ',' && !inQuotes) {
-                out.push_back(field);
-                field.clear();
-                continue;
-            }
-            field.push_back(c);
-        }
-        out.push_back(field);
-        return true;
-    }
-
-    bool tryOpenCsv(const std::string& path, std::ifstream& stream) {
-        stream.open(path);
-        return stream.is_open();
-    }
-
-    bool extractCardsObjectForUser(const std::string& json, int userId, std::string& outCards) {
-        std::size_t pos = 0;
-        while (pos < json.size()) {
-            if (json[pos] != '{') {
-                ++pos;
-                continue;
-            }
-
-            std::size_t objEnd = 0;
-            if (!JsonUtil::findMatchingBrace(json, pos, objEnd)) {
-                return false;
-            }
-
-            const std::string obj = json.substr(pos, objEnd - pos + 1);
-            int uid = -1;
-            JsonUtil::readJsonIntField(obj, "uid", uid);
-            if (uid == userId) {
-                const std::string needle = "\"cards\"";
-                std::size_t cardsPos = obj.find(needle);
-                if (cardsPos == std::string::npos) return false;
-                cardsPos = obj.find('{', cardsPos + needle.size());
-                if (cardsPos == std::string::npos) return false;
-                std::size_t cardsEnd = 0;
-                if (!JsonUtil::findMatchingBrace(obj, cardsPos, cardsEnd)) return false;
-                if (cardsEnd <= cardsPos + 1) {
-                    outCards.clear();
-                    return true;
-                }
-                outCards = obj.substr(cardsPos + 1, cardsEnd - cardsPos - 1);
-                return true;
-            }
-
-            pos = objEnd + 1;
-        }
-
-        return false;
-    }
-
-    bool parseCardsMap(const std::string& cardsJson, std::vector<std::pair<int, int>>& out) {
-        out.clear();
-        std::size_t pos = 0;
-        while (pos < cardsJson.size()) {
-            while (pos < cardsJson.size() &&
-                   (std::isspace(static_cast<unsigned char>(cardsJson[pos])) || cardsJson[pos] == ',')) {
-                ++pos;
-            }
-            if (pos >= cardsJson.size()) break;
-
-            std::string key;
-            if (!JsonUtil::parseJsonQuotedStringAt(cardsJson, pos, key)) {
-                ++pos;
-                continue;
-            }
-
-            while (pos < cardsJson.size() && std::isspace(static_cast<unsigned char>(cardsJson[pos]))) {
-                ++pos;
-            }
-            if (pos >= cardsJson.size() || cardsJson[pos] != ':') {
-                return false;
-            }
-            ++pos;
-
-            int value = 0;
-            if (!JsonUtil::parseJsonIntAt(cardsJson, pos, value)) {
-                return false;
-            }
-
-            int cardId = -1;
-            try {
-                cardId = std::stoi(key);
-            } catch (...) {
-                cardId = -1;
-            }
-
-            if (cardId >= 0) {
-                out.emplace_back(cardId, value);
-            }
-        }
-
-        return true;
-    }
-
     int resolveUserId(const Game& game) {
         const int playerId = game.getPlayerId();
         if (playerId > 0) {
@@ -389,132 +269,11 @@ void PackOpening::openPack(Game& game) {
 }
 
 bool PackOpening::loadAvailableCards(const Game& game) {
-    if (loadAvailableCardsFromService(game)) {
+    (void)game;
+    if (LoadAvailableCardsUtil::loadFromService(availableCards)) {
         return true;
     }
-    return loadAvailableCardsFromCsv(game);
-}
-
-bool PackOpening::loadAvailableCardsFromService(const Game& game) {
-    (void)game;
-    const std::string host = EnvUtil::getServiceHost("CARDS_SERVICE", "127.0.0.1", "api.myapp.com");
-    const int port = EnvUtil::getServicePort("CARDS_SERVICE", 8082, 443);
-    const std::string path = "/cards/cards";
-    int statusCode = -1;
-    std::string responseBody;
-    if (!HttpUtil::sendHttp(host, port, "GET", path, "", statusCode, responseBody)) {
-        return false;
-    }
-
-    std::vector<std::unique_ptr<Card>> fetchedCards;
-    std::size_t pos = 0;
-    while (true) {
-        const std::size_t objStart = responseBody.find('{', pos);
-        if (objStart == std::string::npos) break;
-        const std::size_t objEnd = responseBody.find('}', objStart);
-        if (objEnd == std::string::npos) break;
-        const std::string obj = responseBody.substr(objStart, objEnd - objStart + 1);
-
-        int cid = -1;
-        int cost = 0;
-        int value = 0;
-        int power = 0;
-        int toughness = 0;
-        std::string name;
-        std::string type;
-        std::string effect;
-
-        JsonUtil::readJsonIntField(obj, "cid", cid);
-        JsonUtil::readJsonStringField(obj, "name", name);
-        JsonUtil::readJsonStringField(obj, "type", type);
-        JsonUtil::readJsonIntField(obj, "cost", cost);
-        JsonUtil::readJsonIntField(obj, "value", value);
-        JsonUtil::readJsonIntField(obj, "power", power);
-        JsonUtil::readJsonIntField(obj, "toughness", toughness);
-        JsonUtil::readJsonStringField(obj, "effect", effect);
-
-        if (!name.empty()) {
-            const std::string typeLower = toLower(type);
-            const int manaValue = value > 0 ? value : cost;
-            if (typeLower == "creature") {
-                fetchedCards.push_back(std::make_unique<CreatureCard>(name, effect, manaValue, cost, power, toughness, cid));
-            } else {
-                fetchedCards.push_back(std::make_unique<SpellCard>(name, effect, manaValue, cost, cid));
-            }
-        }
-
-        pos = objEnd + 1;
-    }
-
-    if (fetchedCards.empty()) {
-        return false;
-    }
-
-    availableCards = std::move(fetchedCards);
-    return true;
-}
-
-bool PackOpening::loadAvailableCardsFromCsv(const Game& game) {
-    (void)game;
-    const std::string envPath = EnvUtil::getEnvOrDefault("CARDS_CSV_PATH", "");
-    std::ifstream file;
-    if (!envPath.empty() && tryOpenCsv(envPath, file)) {
-    } else if (tryOpenCsv("cards/cards.csv", file)) {
-    } else if (tryOpenCsv("../cards/cards.csv", file)) {
-    } else if (tryOpenCsv("../../cards/cards.csv", file)) {
-    } else {
-        return false;
-    }
-
-    std::string line;
-    if (!std::getline(file, line)) {
-        return false;
-    }
-
-    std::vector<std::unique_ptr<Card>> fetchedCards;
-    std::vector<std::string> fields;
-    while (std::getline(file, line)) {
-        if (line.empty()) continue;
-        parseCsvLine(line, fields);
-        if (fields.size() < 8) continue;
-
-        int cid = -1;
-        int cost = 0;
-        int value = 0;
-        int power = 0;
-        int toughness = 0;
-
-        try {
-            cid = std::stoi(fields[0]);
-            cost = std::stoi(fields[3]);
-            value = std::stoi(fields[4]);
-            power = std::stoi(fields[5]);
-            toughness = std::stoi(fields[6]);
-        } catch (...) {
-            continue;
-        }
-
-        const std::string name = fields[1];
-        const std::string type = fields[2];
-        const std::string effect = fields[7];
-
-        if (name.empty()) continue;
-        const std::string typeLower = toLower(type);
-        const int manaValue = value > 0 ? value : cost;
-
-        if (typeLower == "creature") {
-            fetchedCards.push_back(std::make_unique<CreatureCard>(name, effect, manaValue, cost, power, toughness, cid));
-        } else {
-            fetchedCards.push_back(std::make_unique<SpellCard>(name, effect, manaValue, cost, cid));
-        }
-    }
-
-    if (fetchedCards.empty()) {
-        return false;
-    }
-
-    availableCards = std::move(fetchedCards);
-    return true;
+    return LoadAvailableCardsUtil::loadFromCsv(availableCards);
 }
 
 bool PackOpening::loadInventoryFromService(const Game& game) {
@@ -550,7 +309,7 @@ bool PackOpening::loadInventoryFromService(const Game& game) {
     }
 
     std::vector<std::pair<int, int>> cardCounts;
-    if (!parseCardsMap(cardsJson, cardCounts)) {
+    if (!Deck::parseCardCounts(cardsJson, cardCounts)) {
         inventoryCopies.assign(availableCards.size(), 0);
         return false;
     }

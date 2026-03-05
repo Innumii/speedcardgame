@@ -5,6 +5,7 @@
 #include "objects/CreatureCard.h"
 #include "render/RenderText.hpp"
 #include "render/Theme.hpp"
+#include "utils/RenderUtil.hpp"
 #include "utils/EnvUtil.hpp"
 
 #include <SDL2/SDL.h>
@@ -183,69 +184,6 @@ namespace {
         };
     }
 
-    // ── filled rounded rectangle ──────────────────────────────────────
-    void fillRoundedRect(SDL_Renderer* r, const SDL_Rect& rect, int radius, SDL_Color c) {
-        radius = std::min(radius, std::min(rect.w, rect.h) / 2);
-        SDL_SetRenderDrawBlendMode(r, SDL_BLENDMODE_BLEND);
-        SDL_SetRenderDrawColor(r, c.r, c.g, c.b, c.a);
-        SDL_Rect body {rect.x + radius, rect.y,          rect.w - 2*radius, rect.h};
-        SDL_Rect left {rect.x,          rect.y + radius, radius,            rect.h - 2*radius};
-        SDL_Rect right{rect.x + rect.w - radius, rect.y + radius, radius,   rect.h - 2*radius};
-        SDL_RenderFillRect(r, &body);
-        SDL_RenderFillRect(r, &left);
-        SDL_RenderFillRect(r, &right);
-        for (int dy = -radius; dy <= radius; ++dy) {
-            int dx = (int)std::sqrt((double)(radius*radius - dy*dy));
-            SDL_RenderDrawLine(r, rect.x + radius - dx, rect.y + radius + dy,
-                                  rect.x + radius,      rect.y + radius + dy);
-            SDL_RenderDrawLine(r, rect.x + rect.w - radius,      rect.y + radius + dy,
-                                  rect.x + rect.w - radius + dx, rect.y + radius + dy);
-            SDL_RenderDrawLine(r, rect.x + radius - dx, rect.y + rect.h - radius + dy,
-                                  rect.x + radius,      rect.y + rect.h - radius + dy);
-            SDL_RenderDrawLine(r, rect.x + rect.w - radius,      rect.y + rect.h - radius + dy,
-                                  rect.x + rect.w - radius + dx, rect.y + rect.h - radius + dy);
-        }
-    }
-
-    // ── rounded border as a filled ring ───────────────────────────────
-    void drawRoundedBorder(SDL_Renderer* r, const SDL_Rect& rect, int radius, SDL_Color c, int thickness) {
-        radius   = std::min(radius,    std::min(rect.w, rect.h) / 2);
-        thickness = std::min(thickness, radius);
-        SDL_SetRenderDrawBlendMode(r, SDL_BLENDMODE_BLEND);
-        SDL_SetRenderDrawColor(r, c.r, c.g, c.b, c.a);
-
-        const int outerR = radius;
-        const int innerR = outerR - thickness;
-
-        SDL_Rect top  {rect.x + outerR, rect.y,                       rect.w - 2*outerR, thickness};
-        SDL_Rect bot  {rect.x + outerR, rect.y + rect.h - thickness,  rect.w - 2*outerR, thickness};
-        SDL_Rect left {rect.x,                      rect.y + outerR,  thickness, rect.h - 2*outerR};
-        SDL_Rect right{rect.x + rect.w - thickness, rect.y + outerR,  thickness, rect.h - 2*outerR};
-        SDL_RenderFillRect(r, &top);
-        SDL_RenderFillRect(r, &bot);
-        SDL_RenderFillRect(r, &left);
-        SDL_RenderFillRect(r, &right);
-
-        for (int dy = 0; dy <= outerR; ++dy) {
-            int outerDx = (int)std::sqrt(std::max(0.0, (double)(outerR*outerR - dy*dy)));
-            int innerDx = (innerR > 0 && dy < innerR)
-                ? (int)std::sqrt(std::max(0.0, (double)(innerR*innerR - dy*dy)))
-                : 0;
-
-            int row_top = rect.y + outerR - dy;
-            SDL_RenderDrawLine(r, rect.x + outerR - outerDx, row_top,
-                                  rect.x + outerR - innerDx, row_top);
-            SDL_RenderDrawLine(r, rect.x + rect.w - outerR + innerDx, row_top,
-                                  rect.x + rect.w - outerR + outerDx, row_top);
-
-            int row_bot = rect.y + rect.h - outerR + dy;
-            SDL_RenderDrawLine(r, rect.x + outerR - outerDx, row_bot,
-                                  rect.x + outerR - innerDx, row_bot);
-            SDL_RenderDrawLine(r, rect.x + rect.w - outerR + innerDx, row_bot,
-                                  rect.x + rect.w - outerR + outerDx, row_bot);
-        }
-    }
-
     // ── mana gem (filled circle with gradient) ────────────────────────
     void drawManaGem(SDL_Renderer* r, RenderText& tr, TTF_Font* font,
                      int mana, int cx, int cy, int radius, const RarityPalette& pal) {
@@ -283,7 +221,7 @@ namespace {
 // ── shared card body draw ─────────────────────────────────────────
 void drawCardBody(SDL_Renderer* renderer, const SDL_Rect& rect, int cornerRadius,
                   SDL_Color artColor, SDL_Color infoBg, int artH, int cardId) {
-    fillRoundedRect(renderer, rect, cornerRadius, infoBg);
+    RenderUtil::fillRoundedRect(renderer, rect, cornerRadius, infoBg);
     
     SDL_Rect artRect{rect.x, rect.y, rect.w, artH};
     
@@ -329,7 +267,7 @@ void drawCardBody(SDL_Renderer* renderer, const SDL_Rect& rect, int cornerRadius
         }
     } else {
         // No image - use gradient background as fallback
-        fillRoundedRect(renderer, artRect, cornerRadius, artColor);
+        RenderUtil::fillRoundedRect(renderer, artRect, cornerRadius, artColor);
         SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
         for (int y = cornerRadius; y < artH; ++y) {
             float t = (float)y / artH;
@@ -357,10 +295,10 @@ void drawCardBody(SDL_Renderer* renderer, const SDL_Rect& rect, int cornerRadius
 
         drawCardBody(renderer, rect, cornerRadius, artColor, pal.nameBg, artH, card.getId());
 
-        drawRoundedBorder(renderer, rect, cornerRadius, SDL_Color{0,0,0,200}, 1);
-        drawRoundedBorder(renderer, {rect.x+1, rect.y+1, rect.w-2, rect.h-2},
+        RenderUtil::drawRoundedBorder(renderer, rect, cornerRadius, SDL_Color{0,0,0,200}, 1);
+        RenderUtil::drawRoundedBorder(renderer, {rect.x+1, rect.y+1, rect.w-2, rect.h-2},
                           cornerRadius-1, pal.border, borderThick);
-        drawRoundedBorder(renderer, {rect.x+borderThick+1, rect.y+borderThick+1,
+        RenderUtil::drawRoundedBorder(renderer, {rect.x+borderThick+1, rect.y+borderThick+1,
                                      rect.w-2*(borderThick+1), rect.h-2*(borderThick+1)},
                           std::max(2, cornerRadius-borderThick-1), pal.borderInner, 1);
 
@@ -385,8 +323,8 @@ void drawCardBody(SDL_Renderer* renderer, const SDL_Rect& rect, int cornerRadius
             SDL_Rect badge{rect.x + rect.w - sw - bp*2 - 4,
                            rect.y + artH - sh - bp - 4,
                            sw + bp*2, sh + bp};
-            fillRoundedRect(renderer, badge, 3, SDL_Color{170, 120, 45, 235});
-            drawRoundedBorder(renderer, badge, 3, SDL_Color{220, 175, 70, 255}, 1);
+            RenderUtil::fillRoundedRect(renderer, badge, 3, SDL_Color{170, 120, 45, 235});
+            RenderUtil::drawRoundedBorder(renderer, badge, 3, SDL_Color{220, 175, 70, 255}, 1);
             textRenderer.drawText(renderer, statsText, bodyFont,
                                   SDL_Color{255, 245, 200, 255},
                                   badge.x + bp, badge.y + bp/2);
@@ -419,15 +357,15 @@ void drawCardBody(SDL_Renderer* renderer, const SDL_Rect& rect, int cornerRadius
 
         SDL_Color glow = pal.border;
         glow.a = 130;
-        drawRoundedBorder(renderer, {rect.x-3, rect.y-3, rect.w+6, rect.h+6},
+        RenderUtil::drawRoundedBorder(renderer, {rect.x-3, rect.y-3, rect.w+6, rect.h+6},
                           cornerRadius+3, glow, 4);
 
         drawCardBody(renderer, rect, cornerRadius, artColor, pal.nameBg, artH, card.getId());
 
-        drawRoundedBorder(renderer, rect, cornerRadius, SDL_Color{0,0,0,220}, 1);
-        drawRoundedBorder(renderer, {rect.x+1, rect.y+1, rect.w-2, rect.h-2},
+        RenderUtil::drawRoundedBorder(renderer, rect, cornerRadius, SDL_Color{0,0,0,220}, 1);
+        RenderUtil::drawRoundedBorder(renderer, {rect.x+1, rect.y+1, rect.w-2, rect.h-2},
                           cornerRadius-1, pal.border, borderThick);
-        drawRoundedBorder(renderer, {rect.x+borderThick+1, rect.y+borderThick+1,
+        RenderUtil::drawRoundedBorder(renderer, {rect.x+borderThick+1, rect.y+borderThick+1,
                                      rect.w-2*(borderThick+1), rect.h-2*(borderThick+1)},
                           std::max(2, cornerRadius-borderThick-1), pal.borderInner, 1);
 
@@ -532,8 +470,8 @@ void drawCardBody(SDL_Renderer* renderer, const SDL_Rect& rect, int cornerRadius
             SDL_Rect badge{rect.x + rect.w - sw - bp*2 - pad,
                            rect.y + rect.h - sh - bp - 10,
                            sw + bp*2, sh + bp};
-            fillRoundedRect(renderer, badge, 5, SDL_Color{170, 120, 45, 240});
-            drawRoundedBorder(renderer, badge, 5, SDL_Color{225, 180, 70, 255}, 2);
+            RenderUtil::fillRoundedRect(renderer, badge, 5, SDL_Color{170, 120, 45, 240});
+            RenderUtil::drawRoundedBorder(renderer, badge, 5, SDL_Color{225, 180, 70, 255}, 2);
             textRenderer.drawText(renderer, statsText, bodyFont,
                                   SDL_Color{255, 245, 200, 255},
                                   badge.x + bp, badge.y + bp/2);
@@ -583,14 +521,14 @@ void RenderCard::drawPreview(SDL_Renderer* renderer, RenderText& textRenderer, c
 void RenderCard::drawCardBack(SDL_Renderer* renderer, const SDL_Rect& cardRect) {
     if (!renderer) return;
     const int r = std::max(6, cardRect.w / 7);
-    fillRoundedRect(renderer, cardRect, r, SDL_Color{65, 48, 95, 255});
-    drawRoundedBorder(renderer, cardRect, r, SDL_Color{35, 25, 55, 255}, 1);
-    drawRoundedBorder(renderer, {cardRect.x+1, cardRect.y+1, cardRect.w-2, cardRect.h-2},
+    RenderUtil::fillRoundedRect(renderer, cardRect, r, SDL_Color{65, 48, 95, 255});
+    RenderUtil::drawRoundedBorder(renderer, cardRect, r, SDL_Color{35, 25, 55, 255}, 1);
+    RenderUtil::drawRoundedBorder(renderer, {cardRect.x+1, cardRect.y+1, cardRect.w-2, cardRect.h-2},
                       r-1, SDL_Color{115, 85, 155, 255}, 2);
     SDL_Rect inset{cardRect.x+8, cardRect.y+8, cardRect.w-16, cardRect.h-16};
     if (inset.w > 4 && inset.h > 4) {
-        fillRoundedRect(renderer, inset, std::max(3, r-5), SDL_Color{85, 60, 120, 255});
-        drawRoundedBorder(renderer, inset, std::max(3, r-5), SDL_Color{125, 95, 165, 255}, 1);
+        RenderUtil::fillRoundedRect(renderer, inset, std::max(3, r-5), SDL_Color{85, 60, 120, 255});
+        RenderUtil::drawRoundedBorder(renderer, inset, std::max(3, r-5), SDL_Color{125, 95, 165, 255}, 1);
     }
 }
 
