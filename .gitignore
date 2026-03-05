@@ -6,8 +6,6 @@ main.exe
 build/
 
 # Ignore environment variable files and certificate directories
-
-# Ignore environment variable files and certificate directories
 .env
 *certs/
 
@@ -16,26 +14,8 @@ build/
 *.tfstate.backup
 *.tfplan
 *.terraform/
-
-# Ignore Terraform variables files that may contain sensitive information
-*.tfvars
-*.tfvars.json
-
-# Ignore Terraform state files and plan files
-*.tfstate
-*.tfstate.backup
-*.tfplan
-*.terraform/
-
-# Ignore Terraform variables files that may contain sensitive information
-*.tfvars
-*.tfvars.json
-
-# Ignore Terraform state files and plan files
-*.tfstate
-*.tfstate.backup
-*.tfplan
-*.terraform/
+**/tf_outputs.json
+**/tfplan.binary
 
 # Ignore Terraform variables files that may contain sensitive information
 *.tfvars
