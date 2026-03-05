@@ -55,6 +55,7 @@ locals {
   postgres_user                = var.postgres_user != null ? var.postgres_user : try(local.data_outputs.auth_postgres_user, null)
   postgres_password            = var.postgres_password != null ? var.postgres_password : try(local.data_outputs.auth_postgres_password, null)
   postgres_password_secret_arn = var.postgres_password_secret_arn != null ? var.postgres_password_secret_arn : try(local.data_outputs.auth_postgres_runtime_secret_arn, null)
+  cards_service_base_url_secret_arn = var.cards_service_base_url_secret_arn != null ? var.cards_service_base_url_secret_arn : try(local.data_outputs.auth_postgres_runtime_secret_arn, null)
   postgres_db                  = var.postgres_db != null ? var.postgres_db : try(local.data_outputs.auth_postgres_db, null)
   postgres_port                = var.postgres_port != null ? var.postgres_port : try(local.data_outputs.auth_postgres_port, null)
   redis_host                   = var.redis_host != null ? var.redis_host : try(local.data_outputs.auth_redis_endpoint, null)
@@ -83,11 +84,19 @@ module "service" {
   target_group_arn      = local.auth_target_group_arn
   alb_security_group_id = local.alb_security_group_id
 
-  task_secret_arns = local.postgres_password_secret_arn != null ? toset([local.postgres_password_secret_arn]) : toset([])
+  task_secret_arns = toset(compact([
+    local.postgres_password_secret_arn,
+    local.cards_service_base_url_secret_arn
+  ]))
 
-  secrets = local.postgres_password_secret_arn != null ? {
-    POSTGRES_PASSWORD = "${local.postgres_password_secret_arn}:POSTGRES_PASSWORD::"
-  } : {}
+  secrets = merge(
+    local.postgres_password_secret_arn != null ? {
+      POSTGRES_PASSWORD = "${local.postgres_password_secret_arn}:POSTGRES_PASSWORD::"
+    } : {},
+    local.cards_service_base_url_secret_arn != null ? {
+      CARDS_SERVICE_BASE_URL = "${local.cards_service_base_url_secret_arn}:CARDS_SERVICE_BASE_URL::"
+    } : {}
+  )
 
   environment = merge(
     {
@@ -99,10 +108,12 @@ module "service" {
       POSTGRES_TIMEZONE      = var.postgres_timezone
       REDIS_HOST             = local.redis_host
       REDIS_PORT             = tostring(local.redis_port)
-      CARDS_SERVICE_BASE_URL = local.cards_service_base_url
       CARDS_SERVICE_HOST     = local.cards_service_host
       CARDS_SERVICE_PORT     = tostring(var.cards_service_port)
     },
+    local.cards_service_base_url_secret_arn == null && local.cards_service_base_url != null ? {
+      CARDS_SERVICE_BASE_URL = local.cards_service_base_url
+    } : {},
     local.postgres_password_secret_arn == null && local.postgres_password != null ? {
       POSTGRES_PASSWORD = local.postgres_password
     } : {}

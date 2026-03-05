@@ -79,7 +79,7 @@ namespace {
             return nullptr;
         }
 
-        const std::string host = EnvUtil::getServiceHost("CARDS_SERVICE", "127.0.0.1", "api.myapp.com");
+        const std::string host = EnvUtil::getServiceHost("CARDS_SERVICE", "host.docker.internal", "127.0.0.1");
         const int port = EnvUtil::getServicePort("CARDS_SERVICE", 8082, 443);
         const std::string preferredExt = EnvUtil::getEnvOrDefault("CARD_IMAGE_EXT", "");
         const std::array<std::string, 4> defaultExts{{"png", "jpg", "jpeg", "bmp"}};

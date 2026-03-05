@@ -25,16 +25,23 @@ variable "cards_target_group_name" {
 variable "acm_certificate_arn" {
   description = "ACM certificate ARN for HTTPS listener"
   type        = string
+  default     = null
 }
 
-variable "route53_zone_name" {
-  description = "Public Route53 zone name (must end with a trailing dot)"
+variable "base_domain" {
+  description = "Base public domain used for DNS records and endpoints"
   type        = string
-  default     = "myapp.com."
+  sensitive   = true
 }
 
-variable "api_domain_name" {
-  description = "Public API FQDN to point to the ALB"
+variable "enable_https_listener" {
+  description = "Enable HTTPS listener and redirect HTTP to HTTPS"
+  type        = bool
+  default     = false
+}
+
+variable "environment" {
+  description = "Environment tag value"
   type        = string
-  default     = "api.myapp.com"
+  default     = "dev"
 }
