@@ -149,8 +149,8 @@ void Game::commitStateChange() {
         state = nextState;
 
         if (state == GameState::Connecting) {
-            const std::string host = EnvUtil::getServiceHost("GAME_SERVER_SERVICE", "127.0.0.1", "server.speedcardgame.aws");
-            const int port = EnvUtil::getServicePort("GAME_SERVER_SERVICE", 4000, 4000);
+            const std::string host = EnvUtil::getGameServerHost();
+            const int port = EnvUtil::getGameServerPort();
             connectingState.emplace(host, port);
         }
 

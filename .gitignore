@@ -7,6 +7,7 @@ build/
 
 # Ignore environment variable files and certificate directories
 .env
+*.env
 *certs/
 
 # Ignore Terraform state files and plan files

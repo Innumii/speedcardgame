@@ -26,8 +26,8 @@ namespace LoadAvailableCardsUtil {
 }
 
 bool LoadAvailableCardsUtil::loadFromService(std::vector<std::unique_ptr<Card>>& outCards) {
-	const std::string host = EnvUtil::getServiceHost("CARDS_SERVICE", "127.0.0.1", "api.myapp.com");
-	const int port = EnvUtil::getServicePort("CARDS_SERVICE", 8082, 443);
+	const std::string host = EnvUtil::getCardsServiceHost();
+	const int port = EnvUtil::getCardsServicePort();
 	const std::string path = "/cards/cards";
 
 	int statusCode = -1;

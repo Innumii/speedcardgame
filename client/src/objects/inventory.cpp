@@ -55,8 +55,8 @@ bool Inventory::loadInventoryCopiesFromService(
 ) {
     if (availableCards.empty()) return false;
 
-    const std::string host = EnvUtil::getServiceHost("CARDS_SERVICE", "127.0.0.1", "api.myapp.com");
-    const int port = EnvUtil::getServicePort("CARDS_SERVICE", 8082, 443);
+    const std::string host = EnvUtil::getCardsServiceHost();
+    const int port = EnvUtil::getCardsServicePort();
     const std::string path = "/cards/inventories";
     const int userId = EnvUtil::getEnvIntOrDefault("CARDS_SERVICE_UID", game.getPlayerId());
 

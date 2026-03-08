@@ -8,11 +8,26 @@ namespace EnvUtil {
     std::string getEnvOrDefault(const char* key, const char* fallback);
     int getEnvIntOrDefault(const char* key, int fallback);
     bool getEnvBoolOrDefault(const char* key, bool fallback);
-    bool useAwsServices();
+
+    // AWS-specific helpers
+    bool isAwsEnabled();
+    std::string resolveEndpoint(const std::string& dockerHostKey, const std::string& dockerPortKey, const std::string& awsEndpointKey);
+    std::string resolveHostOrPort(const std::string& dockerKey, const std::string& awsKey, bool resolveHost);
+
+    // Auth service
+    std::string getAuthServiceEndpoint();
     std::string getAuthServiceHost();
     int getAuthServicePort();
-    std::string getServiceHost(const char* servicePrefix, const char* localFallback, const char* awsFallback);
-    int getServicePort(const char* servicePrefix, int localFallback, int awsFallback);
+
+    // Cards service
+    std::string getCardsServiceEndpoint();
+    std::string getCardsServiceHost();
+    int getCardsServicePort();
+
+    // Game server
+    std::string getGameServerEndpoint();
+    std::string getGameServerHost();
+    int getGameServerPort();
 }
 
 #endif
