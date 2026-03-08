@@ -321,7 +321,7 @@ void RenderPlaying::render(Playing& playing, const Game& game) {
 	SDL_RenderDrawLine(renderer, playerBarX + playerBarW / 2, playerBarY + 10,
 	                   playerBarX + playerBarW / 2, playerBarY + playerBarH - 10);
 
-	if (playing.pendingSpellTarget.active) {
+	if (playing.pendingAction.active) {
 		SDL_SetRenderDrawColor(renderer, 250, 220, 90, 255);
 		for (const auto& localSlot : playing.playSlots) {
 			SDL_RenderDrawRect(renderer, &localSlot);

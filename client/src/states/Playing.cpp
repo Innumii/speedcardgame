@@ -43,34 +43,6 @@ bool Playing::consumeSpell(std::unique_ptr<Card> spell) {
     return board.addToDiscard(std::move(spell), localPlayer.id);
 }
 
-bool Playing::resolvePendingSpellTargetAt(int x, int y) {
-    if (!pendingSpellTarget.active || !pendingSpellTarget.spell) {
-        return false;
-    }
-
-    for (std::size_t lane = 0; lane < playSlots.size(); ++lane) {
-        SDL_Rect localRect = playSlots[lane];
-        if (pointInRect(localRect, x, y)) {
-            std::cout << "Target selected: player " << localPlayer.id << ", lane " << lane << "\n";
-            consumeSpell(std::move(pendingSpellTarget.spell));
-            pendingSpellTarget.active = false;
-            return true;
-        }
-
-        SDL_Rect opponentRect = playSlots[lane];
-        opponentRect.y -= 210;
-        const int opponentId = localPlayer.id == 0 ? 1 : 0;
-        if (pointInRect(opponentRect, x, y)) {
-            std::cout << "Target selected: player " << opponentId << ", lane " << lane << "\n";
-            consumeSpell(std::move(pendingSpellTarget.spell));
-            pendingSpellTarget.active = false;
-            return true;
-        }
-    }
-
-    return false;
-}
-
 bool Playing::resolvePendingActionAt(int x, int y) {
     if (!pendingAction.active)
         return false;
@@ -141,7 +113,6 @@ void Playing::setup(const Game& game) {
     surrendered = false;
     animationQueue.clear();
     pendingAction.clear();
-    pendingSpellTarget = PendingSpellTargetState{};
     running = true;
     lastDrawTick = SDL_GetTicks();
 
@@ -292,15 +263,6 @@ void Playing::handleEvents(Game& game, const SDL_Event& event) {
     }
 
     if (surrendered) return;
-
-    if (pendingSpellTarget.active) {
-        if (event.type == SDL_MOUSEBUTTONDOWN && event.button.button == SDL_BUTTON_LEFT) {
-            if (resolvePendingSpellTargetAt(event.button.x, event.button.y)) {
-                board.displayDiscard(localPlayer.id);
-            }
-        }
-        return;
-    }
 
     if (pendingAction.active) {
         if (event.type == SDL_MOUSEBUTTONDOWN && event.button.button == SDL_BUTTON_LEFT) {
