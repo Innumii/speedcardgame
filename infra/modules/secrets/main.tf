@@ -30,7 +30,7 @@ locals {
 }
 
 resource "aws_secretsmanager_secret_version" "auth_runtime_version" {
-  secret_id = aws_secretsmanager_secret.auth_runtime.id
+  secret_id     = aws_secretsmanager_secret.auth_runtime.id
   secret_string = jsonencode(local.auth_runtime_secret_values)
 }
 

@@ -237,7 +237,7 @@ resource "null_resource" "skip_secrets_manager" {
 }
 
 locals {
-  cards_database_url = "postgres://${var.cards_postgres_user}:${local.cards_postgres_password_resolved}@${module.cards_postgres.endpoint}:${module.cards_postgres.port}/${var.cards_postgres_db}?sslmode=disable"
+  cards_database_url              = "postgres://${var.cards_postgres_user}:${local.cards_postgres_password_resolved}@${module.cards_postgres.endpoint}:${module.cards_postgres.port}/${var.cards_postgres_db}?sslmode=disable"
   cards_service_base_url_resolved = coalesce(var.cards_service_base_url, "https://${trimsuffix(var.base_domain, ".")}")
 }
 
