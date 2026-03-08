@@ -202,6 +202,7 @@ int NetworkClient::receive(void* buffer, size_t size) {
 }
 
 //GAME ACTIONS (send data as JSON)
+
 bool NetworkClient::sendPlayCard(int cardId, int lane, std::optional<int> targetId, std::optional<int> targetOpponent) {
     if (!connected) return false;
 

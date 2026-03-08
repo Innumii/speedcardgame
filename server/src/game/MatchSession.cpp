@@ -310,10 +310,12 @@ void MatchSession::processActions() {
             if (action.args.size() >= 2) {
                 int cardId = action.args[0];
                 int lane = action.args[1];
-                std::optional<int> targetId;
+                std::optional<int> targetId; //id of targeteted lane 
+                std::optional<int> targetOpponent; //if opponent or not
 
                 if (action.args.size() > 2) {
                     targetId = action.args[2];
+                    targetOpponent = action.args[3];
                 }
 
                 PlayerState& player = players[action.playerIndex];
@@ -328,7 +330,7 @@ void MatchSession::processActions() {
                 if (card->getType() == CardType::Creature) {
                     handleSummon(action.playerIndex, cardId, lane);
                 } else if (card->getType() == CardType::Spell) {
-                    handleSpell(action.playerIndex, cardId, lane);
+                    handleSpell(action.playerIndex, cardId, lane, targetId, targetOpponent);
                 }
             }
         }
@@ -382,14 +384,17 @@ void MatchSession::handleSummon(int playerIndex, int cardId, int lane) {
     playerB->send(ss.str());
 }
 
-//let -1 mean no target
-void MatchSession::handleSpell(int playerIndex, int handIndex, int lane, std::optional<int> targetId) {
+//targetOpponent: 0(casting player), 1(opponent), -1(all or none)
+//targetId: represents target zone
+void MatchSession::handleSpell(int playerIndex, int cardId, int lane, std::optional<int> targetId, std::optional<int> targetOpponent) {
     PlayerState& player = players[playerIndex];
-    if (handIndex < 0 || handIndex >= static_cast<int>(player.hand.size())) return;
 
-    int cardId = player.hand[handIndex];
     const ServerCard* card = getCard(cardId);
     if (!card) return;
+    std::string name = card->getName();
+
+    // Deduct mana
+    player.mana -= card->getManaCost();
 
     // Example: targetId can be used here to determine which card or lane is affected
     if (targetId.has_value()) {
@@ -399,12 +404,24 @@ void MatchSession::handleSpell(int playerIndex, int handIndex, int lane, std::op
     }
 
     // Remove card from hand after cast
-    player.hand.erase(player.hand.begin() + handIndex);
+    auto it = findCardInHand(player, cardId);
+    if (it == player.hand.end()) {
+        std::cerr << "[ERROR] Card ID " << cardId
+                  << " not found in player " << playerIndex << "'s hand\n";
+        return;
+    }
+    player.hand.erase(it);
+
+    // board.lanes[playerIndex][lane] = cardId;
+    std::cout << "[MatchSession] Casting " << name << "\n";
 
         //Send confirmation message on successful summon
-    std::string msg = "SPELL " + std::to_string(player.id) + " "
+    std::string msg = "PLAY " + std::to_string(player.id) + " "
                     + std::to_string(cardId) + " "
-                    + std::to_string(lane) + "\n";
+                    + std::to_string(lane) + " "
+                    + (targetId ? std::to_string(*targetId) : "-1") + " "
+                    + (targetOpponent ? std::to_string(*targetOpponent) : "-1") + "\n";
+    std::cout << "[MatchSession] Sending Spell Command: " << msg << "\n";
 
     playerA->send(msg);
     playerB->send(msg);
