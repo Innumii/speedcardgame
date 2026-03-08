@@ -412,8 +412,7 @@ void MatchSession::handleSpell(int playerIndex, int cardId, int lane, std::optio
     }
     player.hand.erase(it);
 
-    //place card on board
-    board.lanes[playerIndex][lane] = cardId;
+    // board.lanes[playerIndex][lane] = cardId;
     std::cout << "[MatchSession] Casting " << name << "\n";
 
         //Send confirmation message on successful summon

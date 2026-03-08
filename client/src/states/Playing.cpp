@@ -428,8 +428,7 @@ void Playing::playSpell(int playerId, std::unique_ptr<Card> card, int sourceLane
     std::string name = card->getName();
     player.mana -= card->getManaCost();
 
-    int boardIndex = (playerId == localPlayer.id) ? 0:1;
-    board.addToPlay(sourceLane, boardIndex, std::move(card));
+    // board.addToPlay(sourceLane, boardIndex, std::move(card));
 
     //enact effect
     if (playerId != localPlayer.id) {
@@ -437,7 +436,6 @@ void Playing::playSpell(int playerId, std::unique_ptr<Card> card, int sourceLane
         else if (targetOpponent == 1) targetOpponent = 0;
     }
 
-    //remove from board
     std::cout << "[Playing] Casted" << name
               << " for player " << playerId 
               << " at lane " << sourceLane << "\n";
