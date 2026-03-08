@@ -61,7 +61,7 @@ public:
     //Getters and Setters
     void setNextState(GameState newState);
     void commitStateChange();
-    void setPlayingDeck(Deck newDeck);
+    void setPlayingDeck();
     bool refreshPlayerDeckFromService();
     Playing& getPlayingState();
 
@@ -133,6 +133,8 @@ private:
     std::optional<Connecting> connectingState;
     std::optional<Waiting> waitingState;
     // Connecting connectingState;
+
+    Deck deck;
 };
 
 #endif

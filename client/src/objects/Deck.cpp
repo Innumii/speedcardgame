@@ -282,44 +282,26 @@ Deck Deck::buildFromCopies(
 ) {
     Deck deck;
     const std::size_t count = std::min(availableCards.size(), deckCopies.size());
+
     for (std::size_t i = 0; i < count; ++i) {
-        const int copies = deckCopies[i];
+        int copies = deckCopies[i];
         if (copies <= 0) continue;
 
         const Card* base = availableCards[i].get();
         if (!base) continue;
 
         for (int copy = 0; copy < copies; ++copy) {
-            switch (base->getType()) {
-                case CardType::Creature: {
-                    const auto* creature = dynamic_cast<const CreatureCard*>(base);
-                    if (!creature) break;
-                    deck.addCard(std::make_unique<CreatureCard>(
-                        creature->getName(),
-                        creature->getText(),
-                        creature->getManaValue(),
-                        creature->getManaCost(),
-                        creature->getPower(),
-                        creature->getToughness(),
-                        creature->getId()
-                    ));
-                    break;
-                }
-                case CardType::Spell: {
-                    deck.addCard(std::make_unique<SpellCard>(
-                        base->getName(),
-                        base->getText(),
-                        base->getManaValue(),
-                        base->getManaCost(),
-                        base->getId()
-                    ));
-                    break;
-                }
-                default:
-                    break;
-            }
+            deck.addCard(base->clone()); // Use clone() here
         }
     }
 
     return deck;
+}
+
+Deck Deck::clone() const {
+    Deck newDeck;
+    for (const auto& card : cards) {
+        newDeck.addCard(card->clone());
+    }
+    return newDeck; // uses move semantics
 }

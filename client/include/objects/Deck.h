@@ -66,7 +66,7 @@ public:
         const std::vector<int>& deckCopies
     );
 
-
+    Deck clone() const;
     //Deck resetting
     // std::vector<int> exportCardIds() const;
     // void importFromIds(const std::vector<int>& ids);

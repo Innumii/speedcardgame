@@ -182,6 +182,7 @@ void Waiting::update(Game& game) {
                     
                     auto& playingState = game.getPlayingState();
                     auto& player = game.getPlayer();
+                    game.setPlayingDeck();
                     // std::cout << "[Waiting] "; 
                     // player.deck.toString();
                     // std::cout << "\n";
