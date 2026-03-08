@@ -241,8 +241,17 @@ void RenderPlaying::render(Playing& playing, const Game& game) {
 		}
 
 		std::string targetPrompt = "Choose target";
-		if (playing.pendingAction.handIndex != -1) {
-			targetPrompt = "Choose target for " + playing.localPlayer.hand[playing.pendingAction.handIndex].get()->getName();
+		if (playing.pendingAction.cardId != -1) {
+			auto& hand = playing.localPlayer.hand;
+
+			auto it = std::find_if(hand.begin(), hand.end(),
+				[&](const std::unique_ptr<Card>& c) {
+					return c && c->getId() == playing.pendingAction.cardId;
+				});
+
+			if (it != hand.end() && *it) {
+				targetPrompt = "Choose target for " + (*it)->getName();
+			}
 		}
 		textRenderer.drawText(
 			renderer,
