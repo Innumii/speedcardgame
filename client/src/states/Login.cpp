@@ -20,21 +20,6 @@ namespace {
     constexpr std::size_t kMaxUsernameLen = 64;
     constexpr std::size_t kMaxPasswordLen = 32;
 
-    std::string escapeJson(const std::string& s) {
-        std::string out;
-        for (char c : s) {
-            switch (c) {
-                case '\\': out += "\\\\"; break;
-                case '"':  out += "\\\""; break;
-                case '\n': out += "\\n";  break;
-                case '\r': out += "\\r";  break;
-                case '\t': out += "\\t";  break;
-                default:   out += c;
-            }
-        }
-        return out;
-    }
-
     bool parseUserId(const std::string& body, int& outId, std::string& error) {
         std::string userJson;
         if (!JsonUtil::extractJsonObject(body, "user", userJson)) {
@@ -57,8 +42,8 @@ namespace {
         const int         port = EnvUtil::getAuthServicePort();
 
         std::ostringstream payload;
-        payload << "{\"email\":\"" << escapeJson(email)
-                << "\",\"password\":\"" << escapeJson(password) << "\"}";
+        payload << "{\"email\":\"" << JsonUtil::escapeJsonString(email)
+            << "\",\"password\":\"" << JsonUtil::escapeJsonString(password) << "\"}";
 
         int statusCode = -1;
         std::string responseBody;

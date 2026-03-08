@@ -10,46 +10,6 @@
 #include <string>
 #include <unordered_map>
 
-namespace {
-    bool extractCardsObjectForUser(const std::string& json, int userId, std::string& outCards) {
-        std::size_t pos = 0;
-        while (pos < json.size()) {
-            if (json[pos] != '{') {
-                ++pos;
-                continue;
-            }
-
-            std::size_t objEnd = 0;
-            if (!JsonUtil::findMatchingBrace(json, pos, objEnd)) {
-                return false;
-            }
-
-            const std::string obj = json.substr(pos, objEnd - pos + 1);
-            int uid = -1;
-            JsonUtil::readJsonIntField(obj, "uid", uid);
-            if (uid == userId) {
-                const std::string needle = "\"cards\"";
-                std::size_t cardsPos = obj.find(needle);
-                if (cardsPos == std::string::npos) return false;
-                cardsPos = obj.find('{', cardsPos + needle.size());
-                if (cardsPos == std::string::npos) return false;
-                std::size_t cardsEnd = 0;
-                if (!JsonUtil::findMatchingBrace(obj, cardsPos, cardsEnd)) return false;
-                if (cardsEnd <= cardsPos + 1) {
-                    outCards.clear();
-                    return true;
-                }
-                outCards = obj.substr(cardsPos + 1, cardsEnd - cardsPos - 1);
-                return true;
-            }
-
-            pos = objEnd + 1;
-        }
-
-        return false;
-    }
-}
-
 Inventory::Inventory(int cardCount) : copiesByCardIndex(cardCount, 0) {}
 
 int Inventory::getCardCount(int cardIndex) const {
@@ -108,7 +68,7 @@ bool Inventory::loadInventoryCopiesFromService(
     }
 
     std::string cardsJson;
-    if (!extractCardsObjectForUser(responseBody, userId, cardsJson)) {
+    if (!JsonUtil::extractCardsObjectForUser(responseBody, userId, cardsJson)) {
         outInventoryCopies.assign(availableCards.size(), 0);
         return false;
     }
