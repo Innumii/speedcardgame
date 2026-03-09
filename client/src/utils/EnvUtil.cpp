@@ -1,10 +1,12 @@
 #include "utils/EnvUtil.hpp"
 #include "utils/StringUtil.hpp"
+#include "featureFlag/DebugFlag.hpp"
 #include <cstdlib>
 #include <cctype>
 #include <fstream>
 #include <stdexcept>
 #include <vector>
+#include <iostream>
 
 namespace EnvUtil {
     namespace {
@@ -111,13 +113,19 @@ namespace EnvUtil {
         if (!awsHost.empty()) {
             return awsHost + ":" + awsPort;
         }
+
+        return "";
     }
 
     std::string resolveHostOrPort(const std::string& dockerKey, const std::string& awsKey, bool resolveHost) {
         const std::string dockerValue = getEnvOrDefault(StringUtil::addSuffix(dockerKey, resolveHost ? "_HOST" : "_PORT").c_str(), resolveHost ? "localhost" : "8080");
         const std::string awsValue = getEnvOrDefault(StringUtil::addSuffix(awsKey, resolveHost ? "_HOST" : "_PORT").c_str(), "");
 
-        return !awsValue.empty() ? awsValue : dockerValue;
+        if (DebugFlag::getDebugEnvUtils()) {
+            std::cout << "Resolved " << (resolveHost ? "host" : "port") << " for " << dockerKey << ": isAwsEnabled()=" << isAwsEnabled() << " value=" << (isAwsEnabled() ? awsValue : dockerValue)  << "'\n";
+        }
+
+        return isAwsEnabled() ? awsValue : dockerValue;
     }
 
     // Auth service
