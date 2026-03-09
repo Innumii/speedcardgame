@@ -21,12 +21,15 @@ class PlayerConnection;
 struct ServerBoard {
     int laneCount = 5;
     std::vector<std::optional<int>> lanes[2]; // card IDs
+    std::vector<std::optional<std::pair<int, int>>> augments[2]; // buffs/debuffs
     std::vector<int> discard[2];
 
     //Lane indexes go 0-4
     ServerBoard(int lanesCount = 5) : laneCount(lanesCount) {
         lanes[0].resize(laneCount);
         lanes[1].resize(laneCount);
+        augments[0].resize(laneCount);
+        augments[1].resize(laneCount);
     }
 };
 
@@ -78,7 +81,7 @@ public:
 
     //player actions
     void handleSummon(int playerIndex, int cardId, int lane);
-    void handleSpell(int playerIndex, int cardId, int lane, std::optional<int> targetId = std::nullopt, std::optional<int> targetOpponent = std::nullopt);
+    void handleSpell(int playerIndex, int cardId, int lane, std::optional<int> targetId = std::nullopt, std::optional<int> targetIndex = std::nullopt);
     void handleDiscard(int playerIndex, int cardId);
 
     const ServerCard* getCard(int id) const;

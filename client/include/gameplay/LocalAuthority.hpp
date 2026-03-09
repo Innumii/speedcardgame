@@ -12,7 +12,7 @@ public:
     ~LocalAuthority() override = default;
 
     // Play card from hand
-    void playCard(int cardId, int lane, std::optional<int> targetId, std::optional<int> targetOpponent) override;
+    void playCard(int cardId, int lane, std::optional<int> targetId, std::optional<int> targetIndex) override;
 
     // Discard card from hand
     void discardCard(int cardId) override;

@@ -320,8 +320,7 @@ void RenderPlaying::render(Playing& playing, const Game& game) {
 	SDL_SetRenderDrawColor(renderer, 140, 120, 180, 255);
 	SDL_RenderDrawLine(renderer, playerBarX + playerBarW / 2, playerBarY + 10,
 	                   playerBarX + playerBarW / 2, playerBarY + playerBarH - 10);
-
-	if (playing.pendingSpellTarget.active) {
+	if (playing.pendingAction.active) {
 		SDL_SetRenderDrawColor(renderer, 250, 220, 90, 255);
 		for (const auto& localSlot : playing.playSlots) {
 			SDL_RenderDrawRect(renderer, &localSlot);
@@ -329,7 +328,6 @@ void RenderPlaying::render(Playing& playing, const Game& game) {
 			opponentSlot.y -= 210;
 			SDL_RenderDrawRect(renderer, &opponentSlot);
 		}
-
 		std::string targetPrompt = "Choose target";
 		if (playing.pendingAction.cardId != -1) {
 			auto& hand = playing.localPlayer.hand;

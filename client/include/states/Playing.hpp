@@ -91,12 +91,6 @@ private:
     bool exitModalOpen{false};
     bool surrendered{false};
     AnimationQueue animationQueue;
-    
-    struct PendingSpellTargetState {
-        bool active{false};
-        std::unique_ptr<Card> spell;
-    };
-    PendingSpellTargetState pendingSpellTarget;
 
     // -------------------------
     // Pending action (targeting system)
@@ -105,7 +99,7 @@ private:
         bool active{false};
         std::size_t cardId{static_cast<std::size_t>(-1)};
         int sourceLane{-1}; // lane where the spell was dropped
-        int targetOpponent{-1};
+        int targetIndex{-1};
 
         void clear() {
             active = false;
@@ -124,9 +118,6 @@ private:
     // Helpers
     // -------------------------
     bool pointInRect(const SDL_Rect& rect, int x, int y);
-    bool isTargetedSpell(const Card& card) const;
-    bool consumeSpell(std::unique_ptr<Card> spell);
-    bool resolvePendingSpellTargetAt(int x, int y);
     bool resolvePendingActionAt(int x, int y);
 
     std::vector<SDL_Rect> computeCardLayout(std::size_t count, int screenW, int screenH) const;
@@ -139,7 +130,7 @@ private:
     bool drawCard(int playerId, int cardId);
     void discardCard(int playerId, int cardId);
     void playCreature(int playerId, std::unique_ptr<Card> card, int lane);
-    void playSpell(int playerId, std::unique_ptr<Card> card, int sourceLane, std::optional<int> targetLane, std::optional<int> targetOpponent);
+    void playSpell(int playerId, std::unique_ptr<Card> card, int sourceLane, std::optional<int> targetLane, std::optional<int> targetIndex);
 
     // Animation related
     bool tryDrawCardWithAnimation(Uint32 now);

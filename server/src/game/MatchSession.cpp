@@ -311,11 +311,11 @@ void MatchSession::processActions() {
                 int cardId = action.args[0];
                 int lane = action.args[1];
                 std::optional<int> targetId; //id of targeteted lane 
-                std::optional<int> targetOpponent; //if opponent or not
+                std::optional<int> targetIndex; //if opponent or not
 
                 if (action.args.size() > 2) {
                     targetId = action.args[2];
-                    targetOpponent = action.args[3];
+                    targetIndex = action.args[3];
                 }
 
                 PlayerState& player = players[action.playerIndex];
@@ -330,7 +330,7 @@ void MatchSession::processActions() {
                 if (card->getType() == CardType::Creature) {
                     handleSummon(action.playerIndex, cardId, lane);
                 } else if (card->getType() == CardType::Spell) {
-                    handleSpell(action.playerIndex, cardId, lane, targetId, targetOpponent);
+                    handleSpell(action.playerIndex, cardId, lane, targetId, targetIndex);
                 }
             }
         }
@@ -384,9 +384,9 @@ void MatchSession::handleSummon(int playerIndex, int cardId, int lane) {
     playerB->send(ss.str());
 }
 
-//targetOpponent: 0(casting player), 1(opponent), -1(all or none)
+//targetIndex: 0(casting player), 1(casting player's opponent), -1(all or none)
 //targetId: represents target zone
-void MatchSession::handleSpell(int playerIndex, int cardId, int lane, std::optional<int> targetId, std::optional<int> targetOpponent) {
+void MatchSession::handleSpell(int playerIndex, int cardId, int lane, std::optional<int> targetId, std::optional<int> targetIndex) {
     PlayerState& player = players[playerIndex];
 
     const ServerCard* card = getCard(cardId);
@@ -396,13 +396,14 @@ void MatchSession::handleSpell(int playerIndex, int cardId, int lane, std::optio
     // Deduct mana
     player.mana -= card->getManaCost();
 
-    // Example: targetId can be used here to determine which card or lane is affected
-    if (targetId.has_value()) {
-        // Apply spell effect to target
-    } else {
-        // Spell affects default lane
-    }
-
+    //Assign targetIndex to appropriate target
+    // if 0 == targetIndex -> target itself
+    // if 1 == targetIndex -> target opponent
+    if (targetIndex.has_value()) {
+        //serverTargetIndex: the player affected by the spell, relative to server logic
+        int serverTargetIndex = (*targetIndex == 0) ? playerIndex : 1 - playerIndex;
+    }    
+    
     // Remove card from hand after cast
     auto it = findCardInHand(player, cardId);
     if (it == player.hand.end()) {
@@ -420,11 +421,14 @@ void MatchSession::handleSpell(int playerIndex, int cardId, int lane, std::optio
                     + std::to_string(cardId) + " "
                     + std::to_string(lane) + " "
                     + (targetId ? std::to_string(*targetId) : "-1") + " "
-                    + (targetOpponent ? std::to_string(*targetOpponent) : "-1") + "\n";
+                    + (targetIndex ? std::to_string(*targetIndex) : "-1") + "\n";
     std::cout << "[MatchSession] Sending Spell Command: " << msg << "\n";
 
     playerA->send(msg);
     playerB->send(msg);
+
+    // Call Effect
+
 }
 
 void MatchSession::handleDiscard(int playerIndex, int cardId) {
