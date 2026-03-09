@@ -31,6 +31,36 @@ namespace {
 
         return lines;
     }
+
+    bool measureTextImpl(TTF_Font* font, const std::string& text, int& w, int& h) {
+        if (!font) return false;
+        if (TTF_SizeUTF8(font, text.c_str(), &w, &h) != 0) { w = h = 0; return false; }
+        return true;
+    }
+
+    std::string truncateWithEllipsisImpl(TTF_Font* font, const std::string& text, int maxWidth) {
+        if (!font || maxWidth <= 0) return {};
+        int w = 0, h = 0;
+        if (measureTextImpl(font, text, w, h) && w <= maxWidth) return text;
+        const std::string ellipsis = "...";
+        int ew = 0, eh = 0;
+        if (!measureTextImpl(font, ellipsis, ew, eh) || ew > maxWidth) return {};
+        std::string t = text;
+        while (!t.empty()) {
+            t.pop_back();
+            std::string c = t + ellipsis;
+            if (measureTextImpl(font, c, w, h) && w <= maxWidth) return c;
+        }
+        return ellipsis;
+    }
+}
+
+bool RenderText::measureText(TTF_Font* font, const std::string& text, int& w, int& h) {
+    return measureTextImpl(font, text, w, h);
+}
+
+std::string RenderText::truncateWithEllipsis(TTF_Font* font, const std::string& text, int maxWidth) {
+    return truncateWithEllipsisImpl(font, text, maxWidth);
 }
 
 bool RenderText::ensureTtfReady() {

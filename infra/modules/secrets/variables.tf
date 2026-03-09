@@ -39,6 +39,13 @@ variable "auth_postgres_password" {
   sensitive   = true
 }
 
+variable "cards_service_base_url" {
+  description = "Auth CARDS_SERVICE_BASE_URL to store for runtime injection"
+  type        = string
+  sensitive   = true
+  default     = null
+}
+
 variable "cards_database_url" {
   description = "Cards DATABASE_URL to store for runtime injection"
   type        = string

@@ -3,6 +3,8 @@
 #include "core/Game.hpp"
 #include "states/DeckBuilding.hpp"
 #include "objects/Card.h"
+#include "objects/Deck.h"
+#include "objects/Inventory.hpp"
 #include "render/RenderCard.hpp"
 #include "render/RenderText.hpp"
 #include "render/RenderButton.hpp"
@@ -34,8 +36,8 @@ void RenderDeckBuilding::render(DeckBuilding& deckBuilding, Game& game) {
     TTF_Font* buttonFont = fontSmall ? fontSmall : fontLarge;
 
     // ── menu buttons ─────────────────────────────────────────────────
-    const bool canPlay = deckBuilding.hasFullDeck();
-    const bool canSave = deckBuilding.hasFullDeck();
+    const bool canPlay = Deck::hasFullDeck(deckBuilding.deckCopies);
+    const bool canSave = Deck::hasFullDeck(deckBuilding.deckCopies);
 
     RenderButton::drawButton(renderer, deckBuilding.PlayButton,
                               "Play", buttonFont,
@@ -94,7 +96,13 @@ void RenderDeckBuilding::render(DeckBuilding& deckBuilding, Game& game) {
         if (cardIndex < 0 || cardIndex >= static_cast<int>(deckBuilding.availableCards.size())) continue;
         const Card& card = *deckBuilding.availableCards[cardIndex];
 
-        const int remaining = deckBuilding.getRemainingCount(cardIndex);
+        const int remaining = Inventory::getRemainingCount(
+            deckBuilding.inventoryCopies,
+            deckBuilding.inventoryLoaded,
+            deckBuilding.deckCopies,
+            cardIndex,
+            Deck::getDeckCopiesLimit()
+        );
         const bool dimmed = remaining <= 0;
         RenderCard::drawCardFace(renderer, textRenderer, card, cardRect, fontSmall, fontTiny, dimmed);
 
@@ -143,8 +151,8 @@ void RenderDeckBuilding::render(DeckBuilding& deckBuilding, Game& game) {
     SDL_RenderDrawRect(renderer, &layout.deckArea);
 
     if (fontSmall) {
-        const int deckCount = deckBuilding.getDeckCardCount();
-        const int deckLimit = deckBuilding.getDeckSizeLimit();
+        const int deckCount = Deck::getDeckCardCount(deckBuilding.deckCopies);
+        const int deckLimit = Deck::getDeckSizeLimit();
         const std::string deckCountText = "Deck " + std::to_string(deckCount) + "/" + std::to_string(deckLimit);
         textRenderer.drawText(
             renderer,

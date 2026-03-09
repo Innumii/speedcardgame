@@ -8,12 +8,33 @@
 #include <utility>
 #include <SDL2/SDL_image.h>
 #include "utils/EnvUtil.hpp"
+#include "utils/LoadAvailableCards.hpp"
 
 namespace {
     int clampPositive(int value, int maxValue) {
         if (value < 0) return 0;
         if (value > maxValue) return maxValue;
         return value;
+    }
+
+    bool loadPlayerDeckFromService(const Game& game, Deck& outDeck) {
+        std::vector<std::unique_ptr<Card>> availableCards;
+        bool cardsLoaded = LoadAvailableCardsUtil::loadFromService(availableCards);
+        if (!cardsLoaded) {
+            cardsLoaded = LoadAvailableCardsUtil::loadFromCsv(availableCards);
+        }
+
+        if (!cardsLoaded || availableCards.empty()) {
+            return false;
+        }
+
+        std::vector<int> deckCopies(availableCards.size(), 0);
+        if (!Deck::loadDeckCopiesFromService(game, availableCards, deckCopies, Deck::getDeckCopiesLimit())) {
+            return false;
+        }
+
+        outDeck = Deck::buildFromCopies(availableCards, deckCopies);
+        return true;
     }
 }
 
@@ -128,8 +149,8 @@ void Game::commitStateChange() {
         state = nextState;
 
         if (state == GameState::Connecting) {
-            const std::string host = EnvUtil::getServiceHost("GAME_SERVER_SERVICE", "127.0.0.1", "server.speedcardgame.aws");
-            const int port = EnvUtil::getServicePort("GAME_SERVER_SERVICE", 4000, 4000);
+            const std::string host = EnvUtil::getGameServerHost();
+            const int port = EnvUtil::getGameServerPort();
             connectingState.emplace(host, port);
         }
 
@@ -176,11 +197,12 @@ void Game::setPlayingDeck(Deck newDeck) {
 }
 
 bool Game::refreshPlayerDeckFromService() {
-    if (!deckBuildingState.refreshFromService(*this)) {
+    Deck loadedDeck;
+    if (!loadPlayerDeckFromService(*this, loadedDeck)) {
         return false;
     }
 
-    setPlayingDeck(deckBuildingState.buildDeck());
+    setPlayingDeck(std::move(loadedDeck));
     return true;
 }
 
@@ -194,11 +216,11 @@ void Game::addPackRefundCoins(int delta) {
 }
 
 bool Game::tryStartPlayingWithBuiltDeck() {
-    if (!deckBuildingState.hasFullDeck()) {
+    const int deckLimit = Deck::getDeckSizeLimit();
+    if (player.getDeck().size() < deckLimit) {
         return false;
     }
 
-    setPlayingDeck(deckBuildingState.buildDeck());
     setNextState(GameState::Playing);
     return true;
 }
@@ -404,4 +426,8 @@ void Game::clean() {
 
 bool Game::running() const {
     return isRunning;
+}
+
+DeckBuilding& Game::getDeckBuildingState() {
+    return deckBuildingState;
 }

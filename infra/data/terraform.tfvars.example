@@ -1,4 +1,5 @@
 aws_region = "us-east-1"
+base_domain = "example.com"
 # Optional: set explicit DB passwords. If omitted, Terraform generates strong passwords
 # and stores runtime secrets in AWS Secrets Manager.
 # auth_postgres_password  = "change-me"

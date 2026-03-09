@@ -2,6 +2,7 @@
 #define CREATURE_CARD_H
 
 #include "Card.h"
+#include <memory>
 
 class CreatureCard : public Card {
 private:
@@ -21,6 +22,11 @@ public:
     int getToughness() const;
 
     void drawExtraInfo() const override;
+
+    std::unique_ptr<Card> clone() const override {
+        return std::make_unique<CreatureCard>(*this);
+    }
 };
+
 
 #endif

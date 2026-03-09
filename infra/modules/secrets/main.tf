@@ -18,11 +18,20 @@ resource "aws_secretsmanager_secret" "auth_runtime" {
   description = "Runtime secret values for auth service"
 }
 
+locals {
+  auth_runtime_secret_values = merge(
+    {
+      POSTGRES_PASSWORD = var.auth_postgres_password
+    },
+    var.cards_service_base_url != null ? {
+      CARDS_SERVICE_BASE_URL = var.cards_service_base_url
+    } : {}
+  )
+}
+
 resource "aws_secretsmanager_secret_version" "auth_runtime_version" {
-  secret_id = aws_secretsmanager_secret.auth_runtime.id
-  secret_string = jsonencode({
-    POSTGRES_PASSWORD = var.auth_postgres_password
-  })
+  secret_id     = aws_secretsmanager_secret.auth_runtime.id
+  secret_string = jsonencode(local.auth_runtime_secret_values)
 }
 
 resource "aws_secretsmanager_secret" "cards_runtime" {

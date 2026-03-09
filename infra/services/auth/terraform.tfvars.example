@@ -14,6 +14,7 @@ use_managed_alb_stack = true
 # postgres_host     = "your-postgres-host"
 # postgres_user     = "authuser"
 # postgres_password_secret_arn = "arn:aws:secretsmanager:...:secret:speedcardgame-auth-runtime"
+# cards_service_base_url_secret_arn = "arn:aws:secretsmanager:...:secret:speedcardgame-auth-runtime"
 # postgres_password = "change-me" # fallback only when not using Secrets Manager
 # postgres_db       = "authdb"
 # postgres_port     = 5432
@@ -24,6 +25,6 @@ use_managed_alb_stack = true
 # alb_security_group_id = "sg-xxxxxxxx"
 # target_group_arn      = "arn:aws:elasticloadbalancing:...:targetgroup/speedcard-auth-tg/xxxxxxxx"
 
-# Optional override. By default this comes from shared ALB output (https://api.myapp.com)
-# cards_service_base_url = "https://api.myapp.com"
+# Optional fallback override when Secrets Manager key CARDS_SERVICE_BASE_URL is unavailable.
+# cards_service_base_url = "https://example.com"
 cards_service_port = 443

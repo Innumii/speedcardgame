@@ -75,16 +75,42 @@ bool Playing::resolvePendingActionAt(int x, int y) {
     if (!pendingAction.active)
         return false;
 
+    int targetLane = -1;
+    int targetOpponent = -1;
+
+    // Check local lanes first
     for (std::size_t slot = 0; slot < playSlots.size(); ++slot) {
         if (pointInRect(playSlots[slot], x, y)) {
-            authority->playCard(
-                static_cast<int>(pendingAction.handIndex),
-                static_cast<int>(slot),
-                static_cast<int>(slot)
-            );
-            pendingAction.clear();
-            return true;
+            targetLane = static_cast<int>(slot);
+            targetOpponent = 0;
+            break;
         }
+    }
+
+    // Check opponent lanes (offset by render, e.g., 200 px above)
+    for (std::size_t slot = 0; slot < playSlots.size(); ++slot) {
+        SDL_Rect opponentSlot = playSlots[slot];
+        opponentSlot.y -= 200; // same offset as rendering
+        if (pointInRect(opponentSlot, x, y)) {
+            targetLane = static_cast<int>(slot);
+            targetOpponent = 1;
+            break;
+        }
+    }
+
+    if (targetLane >= 0) {
+        std::cout<< "[Playing] Casting at targetOpponent: " + std::to_string(targetOpponent) + "\n";
+        std::cout<< "[Playing] Casting at targetLane: " + std::to_string(targetLane) + "\n";
+
+        authority->playCard(
+            static_cast<int>(pendingAction.cardId),
+            pendingAction.sourceLane, // where the spell was dropped
+            targetLane,               // target lane
+            targetOpponent              // target player (local or opponent)
+        );
+
+        pendingAction.clear();
+        return true;
     }
 
     return false;
@@ -289,8 +315,6 @@ void Playing::handleEvents(Game& game, const SDL_Event& event) {
                 const int mx = event.button.x;
                 const int my = event.button.y;
                 
-                if (previewLocked) return;
-                
                 for (int i = static_cast<int>(cardRects.size()) - 1; i >= 0; --i) {
                     if (pointInRect(cardRects[static_cast<std::size_t>(i)], mx, my)) {
                         drag.active = true;
@@ -327,15 +351,28 @@ void Playing::handleEvents(Game& game, const SDL_Event& event) {
 
                 bool droppedInDiscard = pointInRect(discardZone, releaseX, releaseY);
 
-                if (droppedInDiscard && authority) {
-                    authority->discardCard(static_cast<int>(drag.index));
+                if (droppedInDiscard) {
+                    auto& card = localPlayer.hand[drag.index];
+                    std::cout << "[Playing] Attempting to Discard " << card->getName() << "\n";
+                    authority->discardCard(card->getId());
                 }
-                else if (laneIndex >= 0 && authority) {
-                    authority->playCard(
-                        static_cast<int>(drag.index),
-                        laneIndex,
-                        std::nullopt
-                    );
+                else if (laneIndex >= 0) {
+                    auto& card = localPlayer.hand[drag.index];
+                    if (card->getType() == CardType::Creature) {
+                        if (localPlayer.mana >= card->getManaCost()) { //Check if player has sufficient mana
+                            authority->playCard(
+                                card->getId(),
+                                laneIndex,
+                                std::nullopt,  //NO TARGETING
+                                std::nullopt  //NO TARGETING
+
+                            );
+                        }
+                    } else if (card->getType() == CardType::Spell) { // Spell enters targeting mode, may need some logic to skip targeting for universal target spells
+                        pendingAction.active = true;
+                        pendingAction.cardId = card->getId();
+                        pendingAction.sourceLane = laneIndex; // store where it was dropped
+                    }
                 }
 
                 drag.active = false;
@@ -343,10 +380,7 @@ void Playing::handleEvents(Game& game, const SDL_Event& event) {
             break;
             
         case SDL_MOUSEWHEEL:
-            if (previewLocked) {
-                previewScrollOffset -= event.wheel.y * 20;
-                if (previewScrollOffset < 0) previewScrollOffset = 0;
-            }
+            previewScrollOffset = 0;
             break;
             
         default:
@@ -409,22 +443,10 @@ void Playing::update(Game& game) {
     int mouseX = 0, mouseY = 0;
     SDL_GetMouseState(&mouseX, &mouseY);
 
-    const int previewW = std::min(360, screenW - 80);
-    const int previewH = static_cast<int>(previewW * 1.5f);
-    const int previewX = (screenW - previewW) / 2;
-    const int previewY = (screenH - previewH) / 2;
-    SDL_Rect previewRect{previewX, previewY, previewW, previewH};
-
-    const bool mouseOverPreview = pointInRect(previewRect, mouseX, mouseY);
-
-    if (mouseOverPreview && previewLocked) {
-        return;
-    }
-
     const bool draggingCard = drag.active && drag.index < localPlayer.hand.size();
     std::size_t newHoverIndex = static_cast<std::size_t>(-1);
     
-    if (!draggingCard && !mouseOverPreview) {
+    if (!draggingCard) {
         for (int i = static_cast<int>(cardRects.size()) - 1; i >= 0; --i) {
             if (pointInRect(cardRects[static_cast<std::size_t>(i)], mouseX, mouseY)) {
                 newHoverIndex = static_cast<std::size_t>(i);
@@ -433,13 +455,11 @@ void Playing::update(Game& game) {
         }
     }
 
-    if (!mouseOverPreview) {
-        if (newHoverIndex != hoverIndex) {
-            hoverIndex = newHoverIndex;
-            hoverStartTick = now;
-            previewScrollOffset = 0;
-            previewLocked = false;
-        }
+    if (newHoverIndex != hoverIndex) {
+        hoverIndex = newHoverIndex;
+        hoverStartTick = now;
+        previewScrollOffset = 0;
+        previewLocked = false;
     }
 
     constexpr Uint32 hoverDelayMs = 1000;
@@ -449,11 +469,7 @@ void Playing::update(Game& game) {
         hoverIndex < localPlayer.hand.size() &&
         now - hoverStartTick >= hoverDelayMs;
 
-    if ((hoverTimerReady || mouseOverPreview) && hoverIndex < localPlayer.hand.size()) {
-        previewLocked = true;
-    } else if (!mouseOverPreview && !hoverTimerReady) {
-        previewLocked = false;
-    }
+    previewLocked = false;
 }
 
 bool Playing::handleServerMessage(const std::string& msg) {
@@ -461,16 +477,114 @@ bool Playing::handleServerMessage(const std::string& msg) {
     std::string cmd;
     iss >> cmd;
 
-    std::cout << "[Playing]: " << msg << "\n";
+// std::cout << "[Playing]: " << msg << "\n";
     
     if (cmd == "DRAW") {
         int playerId, cardId;
         iss >> playerId >> cardId;
         drawCard(playerId, cardId);
+    } else if (cmd == "DISCARD") {
+        int playerId, cardId;
+        iss >> playerId >> cardId;
+        discardCard(playerId, cardId);
+    } else if (cmd == "PLAY") {
+        int playerId, cardId, lane;
+        iss >> playerId >> cardId >> lane;
+
+        Player& player = (playerId == localPlayer.id) ? localPlayer : remotePlayer;
+
+        // Find card in hand by ID
+        auto it = std::find_if(
+            player.hand.begin(), player.hand.end(),
+            [cardId](const std::unique_ptr<Card>& c){ return c->getId() == cardId; }
+        );
+
+        if (it == player.hand.end()) {
+            std::cerr << "[ERROR] Card ID " << cardId
+                    << " not found in player " << playerId << "'s hand\n";
+            return false;
+        }
+
+        CardType type = (*it)->getType();
+
+        if (type == CardType::Creature) {
+            // Move card into board
+            playCreature(playerId, std::move(*it), lane);
+            // Remove from hand
+            player.hand.erase(it);
+        }
+        else if (type == CardType::Spell) {
+            // Optionally read target lane and target opponent
+            std::cout<< "[Playing] Casting!\n";
+            std::optional<int> targetLane;
+            if (iss.peek() != EOF) {
+                int tmp;
+                if (iss >> tmp) targetLane = tmp;
+            }
+
+            std::optional<int> targetOpponent;
+            if (iss.peek() != EOF) {
+                int tmp;
+                if (iss >> tmp) targetOpponent = tmp;
+            }
+
+            // Move card into spell handler
+            playSpell(playerId, std::move(*it), lane, targetLane, targetOpponent);
+            player.hand.erase(it);
+        }
     }
 
     return true;
 }
+
+void Playing::playCreature(int playerId, std::unique_ptr<Card> card, int lane) {
+    // Determine player
+    Player& player = (playerId == localPlayer.id) ? localPlayer : remotePlayer;
+
+    if (lane < 0 || lane >= board.getLaneCount()) return;
+    if (!card) return;
+
+    if (card->getType() != CardType::Creature) return;
+
+    std::string name = card->getName();
+    player.mana -= card->getManaCost();
+
+    // Move the card into the board
+    int boardIndex = (playerId == localPlayer.id) ? 0:1;
+    board.addToPlay(lane, boardIndex, std::move(card));
+
+    // Optional: debug output
+    std::cout << "[Playing] Summoned" << name
+              << " for player " << playerId 
+              << " at lane " << lane << "\n";
+}
+
+void Playing::playSpell(int playerId, std::unique_ptr<Card> card, int sourceLane, std::optional<int> targetLane, std::optional<int> targetOpponent) {
+    Player& player = (playerId == localPlayer.id) ? localPlayer : remotePlayer;
+    if (sourceLane < 0 || sourceLane >= board.getLaneCount()) return;
+    if (!card) return;
+
+    if (card->getType() != CardType::Spell) return;
+    std::cout<< "[Playing] Casting from playSpell!\n";
+
+    std::string name = card->getName();
+    player.mana -= card->getManaCost();
+
+    // board.addToPlay(sourceLane, boardIndex, std::move(card));
+
+    //enact effect
+    if (playerId != localPlayer.id) {
+        if (targetOpponent == 0) targetOpponent = 1;
+        else if (targetOpponent == 1) targetOpponent = 0;
+    }
+
+    std::cout << "[Playing] Casted" << name
+              << " for player " << playerId 
+              << " at lane " << sourceLane << "\n";
+}
+
+
+
 
 bool Playing::drawCard(int playerId, int cardId) {
     Player& player = (playerId == localPlayer.id)
@@ -503,6 +617,33 @@ bool Playing::drawCard(int playerId, int cardId) {
 
     return true;
 }
+
+void Playing::discardCard(int playerId, int cardId) {
+    Player* player = (playerId == localPlayer.id) ? &localPlayer : &remotePlayer;
+
+    auto it = std::find_if(player->hand.begin(), player->hand.end(),
+                           [cardId](const std::unique_ptr<Card>& c) {
+                               return c->getId() == cardId;
+                           });
+
+    if (it == player->hand.end()) {
+        // Card not found (maybe already discarded?), just ignore
+        return;
+    }
+
+    std::unique_ptr<Card> cardToDiscard = std::move(*it);
+    std::string name = cardToDiscard->getName();
+    player->hand.erase(it);
+    player->addMana(cardToDiscard->getManaValue());
+
+    int boardIndex = (playerId == localPlayer.id) ? 0:1;
+    board.addToDiscard(std::move(cardToDiscard), boardIndex);
+
+    // You can animate this if desired
+    std::cout<< "[Playing] " << playerId << " Discarded " << name << "\n";
+}
+
+
 
 void Playing::render(const Game& game) {
     RenderPlaying::render(*this, game);
@@ -544,7 +685,8 @@ std::vector<SDL_Rect> Playing::computeCardLayout(std::size_t count, int screenW,
 }
 
 void Playing::computeZones(int screenW, int screenH) {
-    playSlots.clear();
+    playSlots.clear();       // local player zones
+    opponentSlots.clear();   // opponent zones
 
     if (screenW <= 0 || screenH <= 0) {
         discardZone = SDL_Rect{0, 0, 0, 0};
@@ -558,31 +700,44 @@ void Playing::computeZones(int screenW, int screenH) {
     const int slotHeight = 145;
     const int slotSpacing = 15;
     const int margin = 20;
+    const int discardWidth = 110;
+    const int discardHeight = 130;
+    const int opponentOffset = 200; // vertical offset for opponent zones
     const int discardSize = 120;
     const int gapToDiscard = 20;
 
+    // Hand Y position
     int handY = screenH - handCardHeight - handYOffset;
     if (!cardRects.empty()) {
         handY = cardRects.front().y;
     }
 
     int totalSlotsWidth = slotCount * slotWidth + (slotCount - 1) * slotSpacing;
+    int startX = std::max(margin, (screenW - totalSlotsWidth) / 2);
 
-    int startX = (screenW - totalSlotsWidth) / 2;
-    
-    int slotY = handY - slotHeight - 35;
-    if (slotY < 80) slotY = 80;
+    // Local player slots
+    int slotY = handY - slotHeight - 16;
+    if (slotY < margin) slotY = margin;
 
     playSlots.reserve(static_cast<std::size_t>(slotCount));
+    opponentSlots.reserve(static_cast<std::size_t>(slotCount));
+
     for (int i = 0; i < slotCount; ++i) {
-        playSlots.push_back(SDL_Rect{
+        SDL_Rect localRect{
             startX + i * (slotWidth + slotSpacing),
             slotY,
             slotWidth,
             slotHeight
-        });
+        };
+        playSlots.push_back(localRect);
+
+        // Opponent zones are offset upward by opponentOffset
+        SDL_Rect oppRect = localRect;
+        oppRect.y -= opponentOffset;
+        opponentSlots.push_back(oppRect);
     }
-    
+
+    // Optional: set playZoneBand for local rendering / input
     if (!playSlots.empty()) {
         const SDL_Rect& firstSlot = playSlots.front();
         const SDL_Rect& lastSlot = playSlots.back();
@@ -595,10 +750,9 @@ void Playing::computeZones(int screenW, int screenH) {
         playZoneBand = SDL_Rect{0,0,0,0};
     }
 
-    int discardX = startX - gapToDiscard - discardSize;
-    if (discardX < margin) {
-        discardX = margin;
-    }
+    // Discard zone
+    int discardX = startX - gapToDiscard - discardWidth;
+    if (discardX < margin) discardX = margin;
 
     int discardY = slotY + (slotHeight - discardSize) / 2;
     discardZone = SDL_Rect{discardX, discardY, discardSize, discardSize};

@@ -2,6 +2,7 @@
 #define WAITING_HPP
 #include <SDL2/SDL.h>
 #include <string>
+#include <vector>
 
 class Game;
 
@@ -26,6 +27,8 @@ private:
     bool declineHovered = false;
     bool acceptPressed = false;
     bool declinePressed = false;
+
+    std::vector<int> opponentDeckCopies;
 };
 
 #endif

@@ -92,6 +92,44 @@ namespace JsonUtil {
         return true;
     }
 
+    bool extractCardsObjectForUser(const std::string& json, int userId, std::string& outCards) {
+        std::size_t pos = 0;
+        while (pos < json.size()) {
+            if (json[pos] != '{') {
+                ++pos;
+                continue;
+            }
+
+            std::size_t objEnd = 0;
+            if (!findMatchingBrace(json, pos, objEnd)) {
+                return false;
+            }
+
+            const std::string obj = json.substr(pos, objEnd - pos + 1);
+            int uid = -1;
+            readJsonIntField(obj, "uid", uid);
+            if (uid == userId) {
+                const std::string needle = "\"cards\"";
+                std::size_t cardsPos = obj.find(needle);
+                if (cardsPos == std::string::npos) return false;
+                cardsPos = obj.find('{', cardsPos + needle.size());
+                if (cardsPos == std::string::npos) return false;
+                std::size_t cardsEnd = 0;
+                if (!findMatchingBrace(obj, cardsPos, cardsEnd)) return false;
+                if (cardsEnd <= cardsPos + 1) {
+                    outCards.clear();
+                    return true;
+                }
+                outCards = obj.substr(cardsPos + 1, cardsEnd - cardsPos - 1);
+                return true;
+            }
+
+            pos = objEnd + 1;
+        }
+
+        return false;
+    }
+
     bool parseJsonIntAt(const std::string& text, std::size_t& pos, int& out) {
         while (pos < text.size() && std::isspace(static_cast<unsigned char>(text[pos]))) {
             ++pos;

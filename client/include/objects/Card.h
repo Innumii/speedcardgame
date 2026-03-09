@@ -2,6 +2,7 @@
 #define CARD_H
 
 #include <string>
+#include <memory>
 
 enum class CardType {
     Creature,
@@ -26,6 +27,7 @@ public:
             int cardId = -1);
 
     virtual ~Card() = default;
+    virtual std::unique_ptr<Card> clone() const = 0;
 
     // Getters
     std::string getName() const;

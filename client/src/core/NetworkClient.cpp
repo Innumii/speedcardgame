@@ -202,35 +202,28 @@ int NetworkClient::receive(void* buffer, size_t size) {
 }
 
 //GAME ACTIONS (send data as JSON)
-bool NetworkClient::sendPlayCard(int handIndex, int lane, std::optional<int> targetId) {
+
+bool NetworkClient::sendPlayCard(int cardId, int lane, std::optional<int> targetId, std::optional<int> targetOpponent) {
     if (!connected) return false;
 
-    //JSON
     std::ostringstream ss;
-    ss << "{";
-    ss << "\"type\":\"PLAY_CARD\",";
-    ss << "\"handIndex\":" << handIndex << ",";
-    ss << "\"lane\":" << lane;
 
-    if (targetId.has_value()) {
-        ss << ",\"targetId\":" << *targetId;
+    if (targetId.has_value() && targetOpponent.has_value()) {
+        // Include both target lane and whether it's opponent
+        ss << "PLAY " << cardId << " " << lane
+           << " " << *targetId << " " << *targetOpponent << "\n";
+    } else {
+        // Creature summon: no target
+        ss << "PLAY " << cardId << " " << lane << "\n";
     }
-
-    ss << "}\n"; // newline = message delimiter
 
     return sendString(ss.str());
 }
 
-bool NetworkClient::sendDiscardCard(int handIndex) {
+bool NetworkClient::sendDiscardCard(int cardId) {
     if (!connected) return false;
-
-    //JSON
     std::ostringstream ss;
-    ss << "{";
-    ss << "\"type\":\"DISCARD_CARD\",";
-    ss << "\"handIndex\":" << handIndex;
-    ss << "}\n";
-
+    ss << "DISCARD " << cardId << "\n";
     return sendString(ss.str());
 }
 

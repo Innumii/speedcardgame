@@ -25,8 +25,6 @@ private:
     };
 
     bool loadAvailableCards(const Game& game);
-    bool loadAvailableCardsFromService(const Game& game);
-    bool loadAvailableCardsFromCsv(const Game& game);
     bool loadInventoryFromService(const Game& game);
     bool applyInventoryDelta(const Game& game, const std::unordered_map<int, int>& deltaByCardId);
 

@@ -7,13 +7,13 @@
 #include "render/RenderCard.hpp"
 #include "render/RenderText.hpp"
 #include "render/Theme.hpp"
+#include "utils/RenderUtil.hpp"
 #include "states/Playing.hpp"
 
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_ttf.h>
 #include <algorithm>
 #include <string>
-#include <cmath>
 
 namespace {
 	void drawOpponentDeckAndDiscard(SDL_Renderer* renderer, RenderText& textRenderer,
@@ -106,36 +106,6 @@ namespace {
 		);
 	}
 
-	void drawStatBox(SDL_Renderer* renderer, const SDL_Rect& box, SDL_Color fill, SDL_Color border, int radius) {
-		auto fillCircle = [&](int cx, int cy, int r) {
-			for (int dy = -r; dy <= r; dy++) {
-				int dx = (int)sqrt((double)(r*r - dy*dy));
-				SDL_RenderDrawLine(renderer, cx-dx, cy+dy, cx+dx, cy+dy);
-			}
-		};
-
-		SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
-		SDL_SetRenderDrawColor(renderer, fill.r, fill.g, fill.b, fill.a);
-		
-		SDL_Rect body  = {box.x + radius, box.y, box.w - 2*radius, box.h};
-		SDL_Rect left  = {box.x, box.y + radius, radius, box.h - 2*radius};
-		SDL_Rect right = {box.x + box.w - radius, box.y + radius, radius, box.h - 2*radius};
-		
-		SDL_RenderFillRect(renderer, &body);
-		SDL_RenderFillRect(renderer, &left);
-		SDL_RenderFillRect(renderer, &right);
-		
-		fillCircle(box.x + radius, box.y + radius, radius);
-		fillCircle(box.x + box.w - radius, box.y + radius, radius);
-		fillCircle(box.x + radius, box.y + box.h - radius, radius);
-		fillCircle(box.x + box.w - radius, box.y + box.h - radius, radius);
-		
-		SDL_SetRenderDrawColor(renderer, border.r, border.g, border.b, border.a);
-		SDL_RenderDrawLine(renderer, box.x + radius, box.y, box.x + box.w - radius, box.y);
-		SDL_RenderDrawLine(renderer, box.x + radius, box.y + box.h, box.x + box.w - radius, box.y + box.h);
-		SDL_RenderDrawLine(renderer, box.x, box.y + radius, box.x, box.y + box.h - radius);
-		SDL_RenderDrawLine(renderer, box.x + box.w, box.y + radius, box.x + box.w, box.y + box.h - radius);
-	}
 }
 
 void RenderPlaying::render(Playing& playing, const Game& game) {
@@ -209,23 +179,25 @@ void RenderPlaying::render(Playing& playing, const Game& game) {
 
 	// ── draw zones ───────────────────────────────────────────────────
 	RenderBoard::drawOpponentPlayZones(renderer, textRenderer, playing.playSlots, uiFonts.small);
+	const int opponentDeckCount = playing.remotePlayer.getDeck().size();
 	drawOpponentDeckAndDiscard(
 		renderer,
 		textRenderer,
 		playing.playSlots,
 		playing.discardZone,
-		0,
+		opponentDeckCount,
 		screenW,
 		uiFonts.small
 	);
 	RenderBoard::drawPlayZones(renderer, textRenderer, playing.playSlots, uiFonts.small);
 	RenderBoard::drawDiscardZone(renderer, textRenderer, playing.discardZone, hoveringDiscard, uiFonts.small);
+	const int selfDeckCount = playing.localPlayer.getDeck().size();
 	drawSelfDeck(
 		renderer,
 		textRenderer,
 		playing.playSlots,
 		playing.discardZone,
-		0,
+		selfDeckCount,
 		screenW,
 		uiFonts.small
 	);
@@ -251,10 +223,10 @@ void RenderPlaying::render(Playing& playing, const Game& game) {
 	const int oppBarY = 12;
 
 	SDL_Rect opponentBar = {oppBarX, oppBarY, oppBarW, oppBarH};
-	drawStatBox(renderer, opponentBar,
+	RenderUtil::drawRoundedRect(renderer, opponentBar,
+	            8,
 	            Theme::PANEL_FILL,
-	            SDL_Color{100, 80, 120, 255},
-	            8);
+	            SDL_Color{100, 80, 120, 255});
 
 	textRenderer.drawText(renderer, opponentText, uiFonts.small,
 	                      SDL_Color{180, 170, 200, 255},
@@ -296,29 +268,29 @@ void RenderPlaying::render(Playing& playing, const Game& game) {
 	SDL_Rect playerBar = {playerBarX, playerBarY, playerBarW, playerBarH};
 
 	// Outer glow for entire bar
-	drawStatBox(renderer, {playerBar.x - 3, playerBar.y - 3, playerBar.w + 6, playerBar.h + 6},
+	RenderUtil::drawRoundedRect(renderer, {playerBar.x - 3, playerBar.y - 3, playerBar.w + 6, playerBar.h + 6},
+	            12,
 	            SDL_Color{80, 60, 100, 100},
-	            SDL_Color{140, 120, 180, 180},
-	            12);
+	            SDL_Color{140, 120, 180, 180});
 
-	drawStatBox(renderer, playerBar,
+	RenderUtil::drawRoundedRect(renderer, playerBar,
+	            10,
 	            SDL_Color{30, 25, 45, 240},
-	            SDL_Color{140, 120, 180, 255},
-	            10);
+	            SDL_Color{140, 120, 180, 255});
 
 	// Player HP section (left half with red tint + glow)
 	SDL_Rect hpSection = {playerBarX, playerBarY, playerBarW / 2, playerBarH};
 
 	// HP glow
-	drawStatBox(renderer, {hpSection.x - 2, hpSection.y - 2, hpSection.w + 2, hpSection.h + 4},
+	RenderUtil::drawRoundedRect(renderer, {hpSection.x - 2, hpSection.y - 2, hpSection.w + 2, hpSection.h + 4},
+	            12,
 	            SDL_Color{60, 20, 20, 0},
-	            SDL_Color{220, 80, 80, 150},
-	            12);
+	            SDL_Color{220, 80, 80, 150});
 
-	drawStatBox(renderer, hpSection,
+	RenderUtil::drawRoundedRect(renderer, hpSection,
+	            10,
 	            SDL_Color{40, 20, 20, 200},
-	            SDL_Color{180, 60, 60, 255},
-	            10);
+	            SDL_Color{180, 60, 60, 255});
 
 	textRenderer.drawText(renderer, healthText, titleFonts.medium,
 	                      SDL_Color{255, 220, 220, 255},
@@ -329,15 +301,15 @@ void RenderPlaying::render(Playing& playing, const Game& game) {
 	SDL_Rect mpSection = {playerBarX + playerBarW / 2, playerBarY, playerBarW / 2, playerBarH};
 
 	// MP glow
-	drawStatBox(renderer, {mpSection.x - 2, mpSection.y - 2, mpSection.w + 4, mpSection.h + 4},
+	RenderUtil::drawRoundedRect(renderer, {mpSection.x - 2, mpSection.y - 2, mpSection.w + 4, mpSection.h + 4},
+	            12,
 	            SDL_Color{20, 40, 80, 0},
-	            SDL_Color{100, 160, 255, 150},
-	            12);
+	            SDL_Color{100, 160, 255, 150});
 
-	drawStatBox(renderer, mpSection,
+	RenderUtil::drawRoundedRect(renderer, mpSection,
+	            10,
 	            SDL_Color{20, 30, 50, 200},
-	            SDL_Color{60, 120, 200, 255},
-	            10);
+	            SDL_Color{60, 120, 200, 255});
 
 	textRenderer.drawText(renderer, manaText, titleFonts.medium,
 	                      SDL_Color{180, 220, 255, 255},
@@ -359,8 +331,17 @@ void RenderPlaying::render(Playing& playing, const Game& game) {
 		}
 
 		std::string targetPrompt = "Choose target";
-		if (playing.pendingSpellTarget.spell) {
-			targetPrompt = "Choose target for " + playing.pendingSpellTarget.spell->getName();
+		if (playing.pendingAction.cardId != -1) {
+			auto& hand = playing.localPlayer.hand;
+
+			auto it = std::find_if(hand.begin(), hand.end(),
+				[&](const std::unique_ptr<Card>& c) {
+					return c && c->getId() == playing.pendingAction.cardId;
+				});
+
+			if (it != hand.end() && *it) {
+				targetPrompt = "Choose target for " + (*it)->getName();
+			}
 		}
 		textRenderer.drawText(
 			renderer,
@@ -399,18 +380,13 @@ void RenderPlaying::render(Playing& playing, const Game& game) {
 		                         floating, uiFonts.tiny, uiFonts.small);
 	}
 
-	// ── card preview (centered magnified with scrolling) ─────────────
+	// ── card preview (left docked, non-blocking) ─────────────────────
 	if (showPreview && playing.hoverIndex < playing.localPlayer.hand.size() && !playing.pauseModalOpen && !playing.exitModalOpen) {
 		if (const auto& cardPtr = playing.localPlayer.hand[playing.hoverIndex]) {
-			SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
-			SDL_SetRenderDrawColor(renderer, 0, 0, 0, 160);
-			SDL_RenderFillRect(renderer, nullptr);
-
-			const int previewW = std::min(360, screenW - 80);
+			const int previewW = std::min(320, screenW - 40);
 			const int previewH = static_cast<int>(previewW * 1.5f);
-			
-			const int previewX = (screenW - previewW) / 2;
-			const int previewY = (screenH - previewH) / 2;
+			const int previewX = 20;
+			const int previewY = std::max(20, (screenH - previewH) / 2);
 
 			SDL_Rect panel{previewX, previewY, previewW, previewH};
 			
@@ -421,10 +397,10 @@ void RenderPlaying::render(Playing& playing, const Game& game) {
 
 	// ── menu button - top right ──────────────────────────────────────
 	if (!playing.surrendered && !playing.pauseModalOpen && !playing.exitModalOpen) {
-		drawStatBox(renderer, playing.menuButton,
+		RenderUtil::drawRoundedRect(renderer, playing.menuButton,
+		            10,
 		            SDL_Color{50, 50, 60, 200},
-		            hoveringMenu ? SDL_Color{120, 120, 140, 255} : SDL_Color{90, 90, 110, 255},
-		            10);
+		            hoveringMenu ? SDL_Color{120, 120, 140, 255} : SDL_Color{90, 90, 110, 255});
 		
 		int menuTextW = 0, menuTextH = 0;
 		if (uiFonts.medium) {
@@ -442,10 +418,10 @@ void RenderPlaying::render(Playing& playing, const Game& game) {
 		SDL_SetRenderDrawColor(renderer, 0, 0, 0, 180);
 		SDL_RenderFillRect(renderer, nullptr);
 
-		drawStatBox(renderer, playing.pauseModal,
+		RenderUtil::drawRoundedRect(renderer, playing.pauseModal,
+		            12,
 		            Theme::PANEL_FILL,
-		            SDL_Color{160, 120, 200, 255},
-		            12);
+		            SDL_Color{160, 120, 200, 255});
 
 		int pauseTitleW = 0, pauseTitleH = 0;
 		if (titleFonts.large) {
@@ -457,10 +433,10 @@ void RenderPlaying::render(Playing& playing, const Game& game) {
 		                      playing.pauseModal.y + 40);
 
 		const bool hoveringResume = playing.pointInRect(playing.resumeButton, mouseX, mouseY);
-		drawStatBox(renderer, playing.resumeButton,
+		RenderUtil::drawRoundedRect(renderer, playing.resumeButton,
+		            8,
 		            hoveringResume ? SDL_Color{50, 180, 120, 255} : SDL_Color{35, 160, 130, 240},
-		            hoveringResume ? SDL_Color{100, 220, 160, 255} : SDL_Color{80, 200, 140, 255},
-		            8);
+		            hoveringResume ? SDL_Color{100, 220, 160, 255} : SDL_Color{80, 200, 140, 255});
 		
 		int resumeTextW = 0, resumeTextH = 0;
 		if (uiFonts.large) {
@@ -472,10 +448,10 @@ void RenderPlaying::render(Playing& playing, const Game& game) {
 		                      playing.resumeButton.y + (playing.resumeButton.h - resumeTextH) / 2);
 
 		const bool hoveringPauseExit = playing.pointInRect(playing.pauseExitButton, mouseX, mouseY);
-		drawStatBox(renderer, playing.pauseExitButton,
+		RenderUtil::drawRoundedRect(renderer, playing.pauseExitButton,
+		            8,
 		            hoveringPauseExit ? SDL_Color{220, 70, 90, 255} : SDL_Color{185, 50, 70, 240},
-		            hoveringPauseExit ? SDL_Color{255, 120, 140, 255} : SDL_Color{220, 90, 110, 255},
-		            8);
+		            hoveringPauseExit ? SDL_Color{255, 120, 140, 255} : SDL_Color{220, 90, 110, 255});
 		
 		int exitTextW = 0, exitTextH = 0;
 		if (uiFonts.large) {
@@ -493,10 +469,10 @@ void RenderPlaying::render(Playing& playing, const Game& game) {
 		SDL_SetRenderDrawColor(renderer, 0, 0, 0, 200);
 		SDL_RenderFillRect(renderer, nullptr);
 
-		drawStatBox(renderer, playing.exitModal,
+		RenderUtil::drawRoundedRect(renderer, playing.exitModal,
+		            12,
 		            Theme::PANEL_FILL,
-		            SDL_Color{240, 192, 64, 150},
-		            12);
+		            SDL_Color{240, 192, 64, 150});
 
 		int exitTitleW = 0, exitTitleH = 0;
 		if (titleFonts.large) {
@@ -518,10 +494,10 @@ void RenderPlaying::render(Playing& playing, const Game& game) {
 		                      playing.exitModal.y + 100);
 
 		const bool hoveringSave = playing.pointInRect(playing.saveExitButton, mouseX, mouseY);
-		drawStatBox(renderer, playing.saveExitButton,
+		RenderUtil::drawRoundedRect(renderer, playing.saveExitButton,
+		            8,
 		            hoveringSave ? SDL_Color{90, 140, 220, 255} : SDL_Color{70, 120, 200, 240},
-		            hoveringSave ? SDL_Color{140, 180, 255, 255} : SDL_Color{110, 160, 240, 255},
-		            8);
+		            hoveringSave ? SDL_Color{140, 180, 255, 255} : SDL_Color{110, 160, 240, 255});
 		
 		int saveTextW = 0, saveTextH = 0;
 		if (uiFonts.medium) {
@@ -533,10 +509,10 @@ void RenderPlaying::render(Playing& playing, const Game& game) {
 		                      playing.saveExitButton.y + (playing.saveExitButton.h - saveTextH) / 2);
 
 		const bool hoveringNoSave = playing.pointInRect(playing.noSaveExitButton, mouseX, mouseY);
-		drawStatBox(renderer, playing.noSaveExitButton,
+		RenderUtil::drawRoundedRect(renderer, playing.noSaveExitButton,
+		            8,
 		            hoveringNoSave ? SDL_Color{220, 70, 90, 255} : SDL_Color{185, 50, 70, 240},
-		            hoveringNoSave ? SDL_Color{255, 120, 140, 255} : SDL_Color{220, 90, 110, 255},
-		            8);
+		            hoveringNoSave ? SDL_Color{255, 120, 140, 255} : SDL_Color{220, 90, 110, 255});
 		
 		int noSaveTextW = 0, noSaveTextH = 0;
 		if (uiFonts.medium) {
@@ -571,10 +547,10 @@ void RenderPlaying::render(Playing& playing, const Game& game) {
 		);
 
 		const bool hoveringReturn = playing.pointInRect(playing.returnToTitleButton, mouseX, mouseY);
-		drawStatBox(renderer, playing.returnToTitleButton,
+		RenderUtil::drawRoundedRect(renderer, playing.returnToTitleButton,
+		            10,
 		            SDL_Color{60, 100, 140, 220},
-		            hoveringReturn ? SDL_Color{100, 160, 220, 255} : SDL_Color{80, 130, 180, 255},
-		            10);
+		            hoveringReturn ? SDL_Color{100, 160, 220, 255} : SDL_Color{80, 130, 180, 255});
 		
 		int returnTextW = 0, returnTextH = 0;
 		if (uiFonts.large) {

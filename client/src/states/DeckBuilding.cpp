@@ -10,20 +10,13 @@
 #include "render/RenderDeckBuilding.hpp"
 #include "core/Game.hpp"
 #include "core/NetworkClient.hpp"
-#include "utils/HttpUtil.hpp"
-#include "utils/JsonUtil.hpp"
-#include "utils/EnvUtil.hpp"
-#include "objects/CreatureCard.h"
-#include "objects/SpellCard.h"
+#include "objects/Inventory.hpp"
+#include "utils/LoadAvailableCards.hpp"
 #include <SDL2/SDL.h>
 #include <iostream>
 #include <algorithm>
-#include <cctype>
 #include <cstdlib>
-#include <fstream>
-#include <numeric>
-#include <sstream>
-#include <unordered_map>
+
 
 namespace {
     SDL_Point getPoint(int x, int y) {
@@ -35,142 +28,15 @@ namespace {
         return SDL_PointInRect(&point, &rect) == SDL_TRUE;
     }
 
-    std::string toLower(std::string value) {
-        std::transform(value.begin(), value.end(), value.begin(), [](unsigned char c) {
-            return static_cast<char>(std::tolower(c));
-        });
-        return value;
-    }
-
-    int getDeckSizeLimitFromEnv() {
-        // const int configured = getEnvIntOrDefault("DECK_SIZE", 30);
-        const int configured = EnvUtil::getEnvIntOrDefault("DECK_SIZE", 30);
-        return configured > 0 ? configured : 30;
-    }
-
-
-    bool parseCsvLine(const std::string& line, std::vector<std::string>& out) {
-        out.clear();
-        std::string field;
-        bool inQuotes = false;
-        for (std::size_t i = 0; i < line.size(); ++i) {
-            char c = line[i];
-            if (c == '"') {
-                if (inQuotes && i + 1 < line.size() && line[i + 1] == '"') {
-                    field.push_back('"');
-                    ++i;
-                } else {
-                    inQuotes = !inQuotes;
-                }
-                continue;
-            }
-            if (c == ',' && !inQuotes) {
-                out.push_back(field);
-                field.clear();
-                continue;
-            }
-            field.push_back(c);
-        }
-        out.push_back(field);
-        return true;
-    }
-
-    bool tryOpenCsv(const std::string& path, std::ifstream& stream) {
-        stream.open(path);
-        return stream.is_open();
-    }
-
-
-    bool extractCardsObjectForUser(const std::string& json, int userId, std::string& outCards) {
-        std::size_t pos = 0;
-        while (pos < json.size()) {
-            if (json[pos] != '{') {
-                ++pos;
-                continue;
-            }
-
-            std::size_t objEnd = 0;
-            if (!JsonUtil::findMatchingBrace(json, pos, objEnd)) {
-                return false;
-            }
-
-            const std::string obj = json.substr(pos, objEnd - pos + 1);
-            int uid = -1;
-            JsonUtil::readJsonIntField(obj, "uid", uid);
-            if (uid == userId) {
-                const std::string needle = "\"cards\"";
-                std::size_t cardsPos = obj.find(needle);
-                if (cardsPos == std::string::npos) return false;
-                cardsPos = obj.find('{', cardsPos + needle.size());
-                if (cardsPos == std::string::npos) return false;
-                std::size_t cardsEnd = 0;
-                if (!JsonUtil::findMatchingBrace(obj, cardsPos, cardsEnd)) return false;
-                if (cardsEnd <= cardsPos + 1) {
-                    outCards.clear();
-                    return true;
-                }
-                outCards = obj.substr(cardsPos + 1, cardsEnd - cardsPos - 1);
-                return true;
-            }
-
-            pos = objEnd + 1;
-        }
-
-        return false;
-    }
-
-    bool parseCardsMap(const std::string& cardsJson, std::vector<std::pair<int, int>>& out) {
-        out.clear();
-        std::size_t pos = 0;
-        while (pos < cardsJson.size()) {
-            while (pos < cardsJson.size() &&
-                   (std::isspace(static_cast<unsigned char>(cardsJson[pos])) || cardsJson[pos] == ',')) {
-                ++pos;
-            }
-            if (pos >= cardsJson.size()) break;
-
-            std::string key;
-            if (!JsonUtil::parseJsonQuotedStringAt(cardsJson, pos, key)) {
-                ++pos;
-                continue;
-            }
-
-            while (pos < cardsJson.size() && std::isspace(static_cast<unsigned char>(cardsJson[pos]))) {
-                ++pos;
-            }
-            if (pos >= cardsJson.size() || cardsJson[pos] != ':') {
-                return false;
-            }
-            ++pos;
-
-            int value = 0;
-            if (!JsonUtil::parseJsonIntAt(cardsJson, pos, value)) {
-                return false;
-            }
-
-            int cardId = -1;
-            try {
-                cardId = std::stoi(key);
-            } catch (...) {
-                cardId = -1;
-            }
-
-            if (cardId >= 0) {
-                out.emplace_back(cardId, value);
-            }
-        }
-
-        return true;
-    }
 }
 
 DeckBuilding::DeckBuilding() = default;
 
 bool DeckBuilding::refreshFromService(Game& game) {
     //Get all available cards in the game
-    cardsLoadedFromService = loadAvailableCardsFromService(game);
+    cardsLoadedFromService = LoadAvailableCardsUtil::loadFromService(availableCards);
     if (!cardsLoadedFromService) {
-        cardsLoadedFromService = loadAvailableCardsFromCsv(game);
+        cardsLoadedFromService = LoadAvailableCardsUtil::loadFromCsv(availableCards);
     }
 
     //If no cards pulled, return false
@@ -181,8 +47,20 @@ bool DeckBuilding::refreshFromService(Game& game) {
         return false;
     }
 
-    const bool deckLoaded = loadDeckFromService(game); //get user deck from db
-    loadInventoryFromService(game);
+    deckCopies.assign(availableCards.size(), 0);
+
+    const bool deckLoaded = Deck::loadDeckCopiesFromService(
+        game,
+        availableCards,
+        deckCopies,
+        Deck::getDeckCopiesLimit()
+    );
+    inventoryLoaded = Inventory::loadInventoryCopiesFromService(
+        game,
+        availableCards,
+        inventoryCopies,
+        Deck::getDeckCopiesLimit()
+    );
     return deckLoaded;
 }
 
@@ -220,16 +98,16 @@ void DeckBuilding::handleEvents(Game& game, const SDL_Event& event) {
                     (event.button.x >= SaveButton.x && event.button.x <= (SaveButton.x + SaveButton.w)) &&
                     (event.button.y >= SaveButton.y && event.button.y <= (SaveButton.y + SaveButton.h));
     if (inSave) {
-        if (!hasFullDeck()) {
-            const int deckCount = getDeckCardCount();
-            const int deckLimit = getDeckSizeLimit();
+        if (!Deck::hasFullDeck(deckCopies)) {
+            const int deckCount = Deck::getDeckCardCount(deckCopies);
+            const int deckLimit = Deck::getDeckSizeLimit();
             setStatusMessage(
                 "Deck size too small (" + std::to_string(deckCount) + "/" + std::to_string(deckLimit) + ").",
                 2500
             );
             return;
         }
-        if (saveDeckToService(game)) {
+        if (Deck::saveDeckCopiesToService(game, availableCards, deckCopies)) {
             setStatusMessage("Deck saved.", 2000);
         } else {
             setStatusMessage("Failed to save deck.", 2000);
@@ -278,7 +156,13 @@ void DeckBuilding::handleEvents(Game& game, const SDL_Event& event) {
                 } else {
                     draggedCardIndex = static_cast<int>(i);
                 }
-                if (getRemainingCount(draggedCardIndex) <= 0) {
+                if (Inventory::getRemainingCount(
+                        inventoryCopies,
+                        inventoryLoaded,
+                        deckCopies,
+                        draggedCardIndex,
+                        Deck::getDeckCopiesLimit()
+                    ) <= 0) {
                     dragging = false;
                     draggedCardIndex = -1;
                     return;
@@ -312,11 +196,24 @@ void DeckBuilding::handleEvents(Game& game, const SDL_Event& event) {
         const bool overDeck = pointInRect(point, layout.deckArea);
 
         if (!draggingFromDeck && overDeck) {
-            tryAddToDeck(draggedCardIndex);
+            const int remaining = Inventory::getRemainingCount(
+                inventoryCopies,
+                inventoryLoaded,
+                deckCopies,
+                draggedCardIndex,
+                Deck::getDeckCopiesLimit()
+            );
+            Deck::addCopy(
+                deckCopies,
+                draggedCardIndex,
+                Deck::getDeckCopiesLimit(),
+                Deck::getDeckSizeLimit(),
+                remaining
+            );
         }
 
         if (draggingFromDeck && !overDeck) {
-            tryRemoveFromDeck(draggedCardIndex);
+            Deck::removeCopy(deckCopies, draggedCardIndex);
         }
 
         dragging = false;
@@ -499,80 +396,6 @@ std::vector<int> DeckBuilding::getDeckEntryOrder() const {
     return indices;
 }
 
-void DeckBuilding::tryAddToDeck(int cardIndex) {
-    if (cardIndex < 0 || cardIndex >= static_cast<int>(deckCopies.size())) return;
-    if (deckCopies[cardIndex] >= MaxDeckCopies) return;
-    if (getDeckCardCount() >= getDeckSizeLimit()) return;
-    if (getRemainingCount(cardIndex) <= 0) return;
-    deckCopies[cardIndex] += 1;
-}
-
-void DeckBuilding::tryRemoveFromDeck(int cardIndex) {
-    if (cardIndex < 0 || cardIndex >= static_cast<int>(deckCopies.size())) return;
-    if (deckCopies[cardIndex] <= 0) return;
-    deckCopies[cardIndex] -= 1;
-}
-
-Deck DeckBuilding::buildDeck() const {
-    Deck deck;
-    for (std::size_t i = 0; i < availableCards.size(); ++i) { //add mapped card objects
-        if (deckCopies[i] <= 0) continue;
-
-        const Card* base = availableCards[i].get();
-        if (!base) continue;
-
-        for (int copy = 0; copy < deckCopies[i]; ++copy) { // Card objects
-            switch (base->getType()) {
-                case CardType::Creature: { //
-                    const auto* creature = dynamic_cast<const CreatureCard*>(base);
-                    if (!creature) break;
-                    deck.addCard(std::make_unique<CreatureCard>( //duplicate into deck
-                        creature->getName(),
-                        creature->getText(),
-                        creature->getManaValue(),
-                        creature->getManaCost(),
-                        creature->getPower(),
-                        creature->getToughness(),
-                        creature->getId()
-                    ));
-                    break;
-                }
-                case CardType::Spell: {
-                    deck.addCard(std::make_unique<SpellCard>(
-                        base->getName(),
-                        base->getText(),
-                        base->getManaValue(),
-                        base->getManaCost(),
-                        base->getId()
-                    ));
-                    break;
-                }
-                default:
-                    break;
-            }
-        }
-    }
-    // std::cout<< "[DeckBuilding]: ";
-    // deck.toString();
-    return deck;
-}
-
-bool DeckBuilding::hasCardsInDeck() const {
-    return getDeckCardCount() > 0;
-}
-
-bool DeckBuilding::hasFullDeck() const {
-    return getDeckCardCount() >= getDeckSizeLimit();
-}
-
-int DeckBuilding::getDeckCardCount() const {
-    return std::accumulate(deckCopies.begin(), deckCopies.end(), 0);
-}
-
-int DeckBuilding::getDeckSizeLimit() {
-    return getDeckSizeLimitFromEnv();
-}
-
 const std::string& DeckBuilding::getStatusMessage() const {
     return statusMessage;
 }
@@ -584,277 +407,4 @@ bool DeckBuilding::isStatusMessageActive(Uint32 now) const {
 void DeckBuilding::setStatusMessage(const std::string& message, Uint32 durationMs) {
     statusMessage = message;
     statusMessageUntil = SDL_GetTicks() + durationMs;
-}
-
-bool DeckBuilding::loadAvailableCardsFromService(const Game& game) {
-    (void)game;
-    const std::string host = EnvUtil::getServiceHost("CARDS_SERVICE", "127.0.0.1", "api.myapp.com");
-    const int port = EnvUtil::getServicePort("CARDS_SERVICE", 8082, 443);
-    const std::string path = "/cards/cards";
-    int statusCode = -1;
-    std::string responseBody;
-    if (!HttpUtil::sendHttp(host, port, "GET", path, "", statusCode, responseBody)) {
-        return false;
-    }
-
-    std::vector<std::unique_ptr<Card>> fetchedCards;
-    std::size_t pos = 0;
-    while (true) {
-        const std::size_t objStart = responseBody.find('{', pos);
-        if (objStart == std::string::npos) break;
-        const std::size_t objEnd = responseBody.find('}', objStart);
-        if (objEnd == std::string::npos) break;
-        const std::string obj = responseBody.substr(objStart, objEnd - objStart + 1);
-
-        int cid = -1;
-        int cost = 0;
-        int value = 0;
-        int power = 0;
-        int toughness = 0;
-        std::string name;
-        std::string type;
-        std::string effect;
-
-        JsonUtil::readJsonIntField(obj, "cid", cid);
-        JsonUtil::readJsonStringField(obj, "name", name);
-        JsonUtil::readJsonStringField(obj, "type", type);
-        JsonUtil::readJsonIntField(obj, "cost", cost);
-        JsonUtil::readJsonIntField(obj, "value", value);
-        JsonUtil::readJsonIntField(obj, "power", power);
-        JsonUtil::readJsonIntField(obj, "toughness", toughness);
-        JsonUtil::readJsonStringField(obj, "effect", effect);
-
-        if (!name.empty()) {
-            const std::string typeLower = toLower(type);
-            const int manaValue = value > 0 ? value : cost;
-            if (typeLower == "creature") {
-                fetchedCards.push_back(std::make_unique<CreatureCard>(name, effect, manaValue, cost, power, toughness, cid));
-            } else {
-                fetchedCards.push_back(std::make_unique<SpellCard>(name, effect, manaValue, cost, cid));
-            }
-        }
-
-        pos = objEnd + 1;
-    }
-
-    if (fetchedCards.empty()) {
-        return false;
-    }
-
-    availableCards = std::move(fetchedCards);
-    deckCopies.assign(availableCards.size(), 0);
-    return true;
-}
-
-bool DeckBuilding::loadAvailableCardsFromCsv(const Game& game) {
-    (void)game;
-    const std::string envPath = EnvUtil::getEnvOrDefault("CARDS_CSV_PATH", "");
-    std::ifstream file;
-    if (!envPath.empty() && tryOpenCsv(envPath, file)) {
-        // file opened
-    } else if (tryOpenCsv("cards/cards.csv", file)) {
-        // file opened
-    } else if (tryOpenCsv("../cards/cards.csv", file)) {
-        // file opened
-    } else if (tryOpenCsv("../../cards/cards.csv", file)) {
-        // file opened
-    } else {
-        return false;
-    }
-
-    std::string line;
-    if (!std::getline(file, line)) {
-        return false;
-    }
-
-    std::vector<std::unique_ptr<Card>> fetchedCards;
-    std::vector<std::string> fields;
-    while (std::getline(file, line)) {
-        if (line.empty()) continue;
-        parseCsvLine(line, fields);
-        if (fields.size() < 8) continue;
-
-        int cid = -1;
-        int cost = 0;
-        int value = 0;
-        int power = 0;
-        int toughness = 0;
-
-        try {
-            cid = std::stoi(fields[0]);
-            cost = std::stoi(fields[3]);
-            value = std::stoi(fields[4]);
-            power = std::stoi(fields[5]);
-            toughness = std::stoi(fields[6]);
-        } catch (...) {
-            continue;
-        }
-
-        const std::string name = fields[1];
-        const std::string type = fields[2];
-        const std::string effect = fields[7];
-
-        if (name.empty()) continue;
-        const std::string typeLower = toLower(type);
-        const int manaValue = value > 0 ? value : cost;
-
-        if (typeLower == "creature") {
-            fetchedCards.push_back(std::make_unique<CreatureCard>(name, effect, manaValue, cost, power, toughness, cid));
-        } else {
-            fetchedCards.push_back(std::make_unique<SpellCard>(name, effect, manaValue, cost, cid));
-        }
-    }
-
-    if (fetchedCards.empty()) {
-        return false;
-    }
-
-    availableCards = std::move(fetchedCards);
-    deckCopies.assign(availableCards.size(), 0);
-    return true;
-}
-
-bool DeckBuilding::saveDeckToService(const Game& game) const {
-    if (!hasFullDeck()) {
-        return false;
-    }
-
-    const std::string host = EnvUtil::getServiceHost("CARDS_SERVICE", "127.0.0.1", "api.myapp.com");
-    const int port = EnvUtil::getServicePort("CARDS_SERVICE", 8082, 443);
-    const std::string path = "/cards/decks";
-    const int userId = EnvUtil::getEnvIntOrDefault("CARDS_SERVICE_UID", game.getPlayerId());
-
-    std::ostringstream payload;
-    payload << "{\"uid\":" << userId << ",\"cards\":{";
-    bool first = true;
-    for (std::size_t i = 0; i < availableCards.size(); ++i) {
-        const int copies = deckCopies[i];
-        if (copies <= 0) continue;
-        const int cardId = availableCards[i]->getId();
-        if (cardId < 0) continue;
-        if (!first) payload << ',';
-        payload << "\"" << cardId << "\":" << copies;
-        first = false;
-    }
-    payload << "}}";
-
-    int statusCode = -1;
-    std::string responseBody;
-    return HttpUtil::sendHttp(host, port, "POST", path, payload.str(), statusCode, responseBody);
-}
-
-bool DeckBuilding::loadInventoryFromService(const Game& game) {
-    if (availableCards.empty()) return false;
-
-    const std::string host = EnvUtil::getServiceHost("CARDS_SERVICE", "127.0.0.1", "api.myapp.com");
-    const int port = EnvUtil::getServicePort("CARDS_SERVICE", 8082, 443);
-    const std::string path = "/cards/inventories";
-    const int userId = EnvUtil::getEnvIntOrDefault("CARDS_SERVICE_UID", game.getPlayerId());
-    int statusCode = -1;
-    std::string responseBody;
-    if (!HttpUtil::sendHttp(host, port, "GET", path, "", statusCode, responseBody)) {
-        inventoryLoaded = false;
-        inventoryCopies.assign(availableCards.size(), 0);
-        return false;
-    }
-
-    std::string cardsJson;
-    if (!extractCardsObjectForUser(responseBody, userId, cardsJson)) {
-        inventoryLoaded = false;
-        inventoryCopies.assign(availableCards.size(), 0);
-        return false;
-    }
-
-    std::vector<std::pair<int, int>> cardCounts;
-    if (!parseCardsMap(cardsJson, cardCounts)) {
-        inventoryLoaded = false;
-        inventoryCopies.assign(availableCards.size(), 0);
-        return false;
-    }
-
-    std::unordered_map<int, std::size_t> cardIndexById;
-    cardIndexById.reserve(availableCards.size());
-    for (std::size_t i = 0; i < availableCards.size(); ++i) {
-        cardIndexById.emplace(availableCards[i]->getId(), i);
-    }
-
-    inventoryCopies.assign(availableCards.size(), 0);
-    for (const auto& pair : cardCounts) {
-        const int cardId = pair.first;
-        const int copies = pair.second;
-        if (copies <= 0) continue;
-        auto it = cardIndexById.find(cardId);
-        if (it == cardIndexById.end()) continue;
-        inventoryCopies[it->second] = std::min(copies, 4);
-    }
-
-    inventoryLoaded = true;
-    return true;
-}
-
-int DeckBuilding::getInventoryCount(int cardIndex) const {
-    if (cardIndex < 0 || cardIndex >= static_cast<int>(inventoryCopies.size())) return 0;
-    return inventoryCopies[cardIndex];
-}
-
-int DeckBuilding::getRemainingCount(int cardIndex) const {
-    if (cardIndex < 0 || cardIndex >= static_cast<int>(deckCopies.size())) return 0;
-    if (!inventoryLoaded || inventoryCopies.size() != deckCopies.size()) {
-        return MaxDeckCopies - deckCopies[cardIndex];
-    }
-    const int remaining = getInventoryCount(cardIndex) - deckCopies[cardIndex];
-    return remaining > 0 ? remaining : 0;
-}
-
-bool DeckBuilding::loadDeckFromService(const Game& game) {
-    if (availableCards.empty()) return false;
-
-    const std::string host = EnvUtil::getServiceHost("CARDS_SERVICE", "127.0.0.1", "api.myapp.com");
-    const int port = EnvUtil::getServicePort("CARDS_SERVICE", 8082, 443);
-    const std::string path = "/cards/decks";
-    const int userId = EnvUtil::getEnvIntOrDefault("CARDS_SERVICE_UID", game.getPlayerId());
-    
-    // Construct the specific endpoint: /cards/decks/{uid}
-    std::string endpoint = "/cards/decks/" + std::to_string(userId);
-    
-    int statusCode = -1;
-    std::string responseBody;
-    if (!HttpUtil::sendHttp(host, port, "GET", path, "", statusCode, responseBody)) {
-        return false;
-    }
-
-    // Extract the "cards" object from the response JSON
-    // The Go backend returns { "uid": 1, "cards": { "101": 2, ... } }
-    std::string cardsJson;
-    size_t cardsKeyPos = responseBody.find("\"cards\"");
-    if (cardsKeyPos == std::string::npos) return false;
-    
-    size_t startBrace = responseBody.find('{', cardsKeyPos);
-    size_t endBrace;
-    if (!JsonUtil::findMatchingBrace(responseBody, startBrace, endBrace)) return false;
-    
-    // Get just the inner content of the "cards" map
-    cardsJson = responseBody.substr(startBrace + 1, endBrace - startBrace - 1);
-
-    std::vector<std::pair<int, int>> cardCounts;
-    if (!parseCardsMap(cardsJson, cardCounts)) {
-        deckCopies.assign(availableCards.size(), 0);
-        return false;
-    }
-
-    // Map the card IDs from the JSON to our local index array
-    std::unordered_map<int, std::size_t> cardIndexById;
-    for (std::size_t i = 0; i < availableCards.size(); ++i) {
-        cardIndexById.emplace(availableCards[i]->getId(), i);
-    }
-
-    deckCopies.assign(availableCards.size(), 0);
-    for (const auto& pair : cardCounts) {
-        auto it = cardIndexById.find(pair.first);
-        if (it != cardIndexById.end()) {
-            deckCopies[it->second] = std::min(pair.second, MaxDeckCopies);
-        }
-    }
-
-    return true;
 }

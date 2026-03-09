@@ -114,6 +114,12 @@ variable "postgres_password_secret_arn" {
   default     = null
 }
 
+variable "cards_service_base_url_secret_arn" {
+  description = "Secrets Manager ARN containing CARDS_SERVICE_BASE_URL JSON key for auth runtime"
+  type        = string
+  default     = null
+}
+
 variable "postgres_db" {
   type    = string
   default = null
@@ -151,7 +157,7 @@ variable "cards_service_host" {
 }
 
 variable "cards_service_base_url" {
-  description = "Base URL for cards service (e.g. https://api.myapp.com)"
+  description = "Base URL for cards service (e.g. https://example.com)"
   type        = string
   default     = null
 }

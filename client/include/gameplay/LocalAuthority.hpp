@@ -12,10 +12,10 @@ public:
     ~LocalAuthority() override = default;
 
     // Play card from hand
-    void playCard(int handIndex, int lane, std::optional<int> targetId) override;
+    void playCard(int cardId, int lane, std::optional<int> targetId, std::optional<int> targetOpponent) override;
 
     // Discard card from hand
-    void discardCard(int handIndex) override;
+    void discardCard(int cardId) override;
 
 private:
     NetworkClient* network; // non-owning pointer

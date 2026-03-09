@@ -19,6 +19,13 @@ terraform {
 
 provider "aws" {
   region = var.aws_region
+
+  default_tags {
+    tags = {
+      environment = var.environment
+      managed-by  = "terraform"
+    }
+  }
 }
 
 data "aws_vpc" "default" {
@@ -230,7 +237,8 @@ resource "null_resource" "skip_secrets_manager" {
 }
 
 locals {
-  cards_database_url = "postgres://${var.cards_postgres_user}:${local.cards_postgres_password_resolved}@${module.cards_postgres.endpoint}:${module.cards_postgres.port}/${var.cards_postgres_db}?sslmode=disable"
+  cards_database_url              = "postgres://${var.cards_postgres_user}:${local.cards_postgres_password_resolved}@${module.cards_postgres.endpoint}:${module.cards_postgres.port}/${var.cards_postgres_db}?sslmode=disable"
+  cards_service_base_url_resolved = coalesce(var.cards_service_base_url, "https://${trimsuffix(var.base_domain, ".")}")
 }
 
 # Secrets
@@ -240,6 +248,7 @@ module "secrets" {
   github_token             = var.github_token
   existing_ghcr_secret_arn = var.existing_ghcr_secret_arn
   auth_postgres_password   = local.auth_postgres_password_resolved
+  cards_service_base_url   = local.cards_service_base_url_resolved
   cards_database_url       = local.cards_database_url
   count                    = var.skip_secrets_manager ? 0 : 1
 }

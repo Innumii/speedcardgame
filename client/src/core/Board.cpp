@@ -26,6 +26,7 @@ bool Board::addToPlay(int lane, int playerId, std::unique_ptr<Card> card) {
         std::cerr << "Failed to place card\n";
         return false;
     }
+    std::cout << "[Board] Successfully added\n";
 
     return true;
 }

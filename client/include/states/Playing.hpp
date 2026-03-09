@@ -37,10 +37,6 @@ public:
     void run();
     void update(Game& game);
     void render(const Game&);
-    
-    // Game related
-    bool handleServerMessage(const std::string& msg);
-    bool drawCard(int playerId, int cardId);
 
 private:
     // -------------------------
@@ -75,6 +71,7 @@ private:
     SDL_Renderer* renderer{nullptr}; // non-owning
     std::vector<SDL_Rect> cardRects;
     std::vector<SDL_Rect> playSlots;
+    std::vector<SDL_Rect> opponentSlots;
     SDL_Rect discardZone{0, 0, 0, 0};
     SDL_Rect menuButton{0, 0, 0, 0};
     SDL_Rect pauseModal{0, 0, 0, 0};
@@ -106,11 +103,14 @@ private:
     // -------------------------
     struct PendingActionState {
         bool active{false};
-        std::size_t handIndex{static_cast<std::size_t>(-1)};
+        std::size_t cardId{static_cast<std::size_t>(-1)};
+        int sourceLane{-1}; // lane where the spell was dropped
+        int targetOpponent{-1};
 
         void clear() {
             active = false;
-            handIndex = static_cast<std::size_t>(-1);
+            cardId = static_cast<std::size_t>(-1);
+            sourceLane = -1;
         }
     };
     PendingActionState pendingAction;
@@ -133,6 +133,15 @@ private:
     void computeZones(int screenW, int screenH);
     void computeUiRects(int screenW, int screenH);
     SDL_Rect computeSelfDeckRect(int screenW, int screenH) const;
+
+    //Game related
+    bool handleServerMessage(const std::string& msg);
+    bool drawCard(int playerId, int cardId);
+    void discardCard(int playerId, int cardId);
+    void playCreature(int playerId, std::unique_ptr<Card> card, int lane);
+    void playSpell(int playerId, std::unique_ptr<Card> card, int sourceLane, std::optional<int> targetLane, std::optional<int> targetOpponent);
+
+    // Animation related
     bool tryDrawCardWithAnimation(Uint32 now);
 };
 

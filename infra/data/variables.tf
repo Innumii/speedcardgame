@@ -9,6 +9,18 @@ variable "aws_region" {
   type        = string
 }
 
+variable "base_domain" {
+  description = "Base public domain used for runtime service URLs"
+  type        = string
+  sensitive   = true
+}
+
+variable "environment" {
+  description = "Environment tag value"
+  type        = string
+  default     = "dev"
+}
+
 variable "auth_postgres_identifier" {
   description = "RDS identifier for auth database"
   type        = string
@@ -139,5 +151,12 @@ variable "github_token" {
 variable "existing_ghcr_secret_arn" {
   description = "Existing GHCR secret ARN to reuse instead of creating ghcr-auth-credentials"
   type        = string
+  default     = null
+}
+
+variable "cards_service_base_url" {
+  description = "Shared CARDS_SERVICE_BASE_URL for auth runtime"
+  type        = string
+  sensitive   = true
   default     = null
 }
