@@ -7,6 +7,10 @@ services:
     ports:
       - "4000:4000"
     restart: unless-stopped
+    environment:
+      - GAME_SERVER_PORT=4000
+      - TLS_CERT_PATH=/certs/server.crt
+      - TLS_KEY_PATH=/certs/server.key
     sysctls:
       - net.core.somaxconn=65535
     volumes:

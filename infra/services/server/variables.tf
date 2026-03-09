@@ -4,6 +4,12 @@ variable "aws_region" {
   type        = string
 }
 
+variable "game_port" {
+  description = "Raw TCP/TLS game server port"
+  type        = number
+  default     = 4000
+}
+
 variable "service_name" {
   description = "Server ECS/ECR service name"
   type        = string
@@ -50,6 +56,56 @@ variable "memory" {
 
 variable "assign_public_ip" {
   description = "Assign public IP to ECS tasks"
+  type        = bool
+  default     = true
+}
+
+variable "desired_count" {
+  description = "Desired ECS task count"
+  type        = number
+  default     = 1
+}
+
+variable "vpc_id" {
+  description = "Optional VPC ID override. If null, default VPC is used"
+  type        = string
+  default     = null
+}
+
+variable "subnet_ids" {
+  description = "Optional subnet IDs override. If empty, default VPC subnets are used"
+  type        = list(string)
+  default     = []
+}
+
+variable "tls_certificate_secret_arn" {
+  description = "Secrets Manager ARN containing the TLS certificate PEM for the game server"
+  type        = string
+  default     = null
+  sensitive   = true
+}
+
+variable "tls_private_key_secret_arn" {
+  description = "Secrets Manager ARN containing the TLS private key PEM for the game server"
+  type        = string
+  default     = null
+  sensitive   = true
+}
+
+variable "route53_zone_name" {
+  description = "Optional Route53 hosted zone name (e.g. example.com) for a stable game endpoint"
+  type        = string
+  default     = null
+}
+
+variable "route53_record_name" {
+  description = "Optional Route53 record name to create in route53_zone_name (e.g. game.example.com)"
+  type        = string
+  default     = null
+}
+
+variable "write_client_env_file" {
+  description = "Whether to generate client/env/.env from Terraform outputs"
   type        = bool
   default     = true
 }
