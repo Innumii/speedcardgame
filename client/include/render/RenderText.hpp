@@ -21,6 +21,8 @@ public:
     static void closeFonts(FontSet& fonts);
     static void drawText(SDL_Renderer* renderer, const std::string& text, TTF_Font* font, SDL_Color color, int x, int y);
     static void drawWrappedText(SDL_Renderer* renderer, const std::string& text, TTF_Font* font, SDL_Color color, int x, int y, std::size_t maxLineLen);
+    static bool measureText(TTF_Font* font, const std::string& text, int& w, int& h);
+    static std::string truncateWithEllipsis(TTF_Font* font, const std::string& text, int maxWidth);
 };
 
 #endif

@@ -131,28 +131,6 @@ namespace {
         return texture;
     }
 
-    bool measureText(TTF_Font* font, const std::string& text, int& w, int& h) {
-        if (!font) return false;
-        if (TTF_SizeUTF8(font, text.c_str(), &w, &h) != 0) { w = h = 0; return false; }
-        return true;
-    }
-
-    std::string truncateWithEllipsis(TTF_Font* font, const std::string& text, int maxWidth) {
-        if (!font || maxWidth <= 0) return {};
-        int w = 0, h = 0;
-        if (measureText(font, text, w, h) && w <= maxWidth) return text;
-        const std::string ellipsis = "...";
-        int ew = 0, eh = 0;
-        if (!measureText(font, ellipsis, ew, eh) || ew > maxWidth) return {};
-        std::string t = text;
-        while (!t.empty()) {
-            t.pop_back();
-            std::string c = t + ellipsis;
-            if (measureText(font, c, w, h) && w <= maxWidth) return c;
-        }
-        return ellipsis;
-    }
-
     // ── rarity palette from mana cost ────────────────────────────────
     // 1   → grey   (Common)
     // 2-3 → orange (Rare)
@@ -214,7 +192,7 @@ namespace {
         }
         const std::string s = std::to_string(mana);
         int tw = 0, th = 0;
-        measureText(font, s, tw, th);
+        RenderText::measureText(font, s, tw, th);
         tr.drawText(r, s, font, SDL_Color{255, 255, 255, 255}, cx - tw/2, cy - th/2);
     }
 
@@ -306,9 +284,9 @@ void drawCardBody(SDL_Renderer* renderer, const SDL_Rect& rect, int cornerRadius
         SDL_RenderDrawLine(renderer, rect.x + cornerRadius, rect.y + artH,
                            rect.x + rect.w - cornerRadius, rect.y + artH);
 
-        const std::string nameText = truncateWithEllipsis(titleFont, card.getName(), rect.w - 8);
+        const std::string nameText = RenderText::truncateWithEllipsis(titleFont, card.getName(), rect.w - 8);
         int nw=0, nh=0;
-        measureText(titleFont, nameText, nw, nh);
+        RenderText::measureText(titleFont, nameText, nw, nh);
         textRenderer.drawText(renderer, nameText, titleFont,
                               SDL_Color{255, 245, 210, 255},
                               rect.x + (rect.w - nw) / 2,
@@ -318,7 +296,7 @@ void drawCardBody(SDL_Renderer* renderer, const SDL_Rect& rect, int cornerRadius
             const std::string statsText = std::to_string(creature->getPower()) + "/" +
                                           std::to_string(creature->getToughness());
             int sw=0, sh=0;
-            measureText(bodyFont, statsText, sw, sh);
+            RenderText::measureText(bodyFont, statsText, sw, sh);
             const int bp = 4;
             SDL_Rect badge{rect.x + rect.w - sw - bp*2 - 4,
                            rect.y + artH - sh - bp - 4,
@@ -379,7 +357,7 @@ void drawCardBody(SDL_Renderer* renderer, const SDL_Rect& rect, int cornerRadius
         const std::string nameText = card.getName();
 
         int nw = 0, nh = 0;
-        measureText(titleFont, nameText, nw, nh);
+        RenderText::measureText(titleFont, nameText, nw, nh);
 
         if (nw > maxNameW) {
             SDL_Surface* nameSurf = TTF_RenderUTF8_Blended_Wrapped(
@@ -465,7 +443,7 @@ void drawCardBody(SDL_Renderer* renderer, const SDL_Rect& rect, int cornerRadius
             const std::string statsText = std::to_string(creature->getPower()) + "/" +
                                           std::to_string(creature->getToughness());
             int sw=0, sh=0;
-            measureText(bodyFont, statsText, sw, sh);
+            RenderText::measureText(bodyFont, statsText, sw, sh);
             const int bp = 7;
             SDL_Rect badge{rect.x + rect.w - sw - bp*2 - pad,
                            rect.y + rect.h - sh - bp - 10,

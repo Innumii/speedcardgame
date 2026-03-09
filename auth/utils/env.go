@@ -17,7 +17,7 @@ func isAwsEnabled() bool {
 	awsEnabledStr := GetEnvOrDefault("AWS_ENABLED", "false")
 	awsEnabled, err := strconv.ParseBool(awsEnabledStr)
 	if err != nil {
-		return false
+		return true
 	}
 	return awsEnabled
 }
