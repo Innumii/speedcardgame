@@ -91,12 +91,6 @@ private:
     bool exitModalOpen{false};
     bool surrendered{false};
     AnimationQueue animationQueue;
-    
-    struct PendingSpellTargetState {
-        bool active{false};
-        std::unique_ptr<Card> spell;
-    };
-    PendingSpellTargetState pendingSpellTarget;
 
     // -------------------------
     // Pending action (targeting system)
@@ -124,9 +118,6 @@ private:
     // Helpers
     // -------------------------
     bool pointInRect(const SDL_Rect& rect, int x, int y);
-    bool isTargetedSpell(const Card& card) const;
-    bool consumeSpell(std::unique_ptr<Card> spell);
-    bool resolvePendingSpellTargetAt(int x, int y);
     bool resolvePendingActionAt(int x, int y);
 
     std::vector<SDL_Rect> computeCardLayout(std::size_t count, int screenW, int screenH) const;
