@@ -111,8 +111,21 @@ func (service *AuthService) createStarterInventory(userID uint) error {
 	client := &http.Client{Timeout: 5 * time.Second}
 
 	inventoryPaths := []string{"/cards/inventories", "/cardbase/inventories"}
-	var inventoryErr error
-	for _, path := range inventoryPaths {
+	if err := service.postWithFallback(client, baseURL, inventoryPaths, payload, "cards service"); err != nil {
+		return err
+	}
+
+	deckPaths := []string{"/cards/decks/fill", "/cardbase/decks/fill"}
+	if err := service.postWithFallback(client, baseURL, deckPaths, payload, "deck fill"); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (service *AuthService) postWithFallback(client *http.Client, baseURL string, paths []string, payload []byte, operation string) error {
+	var operationErr error
+	for _, path := range paths {
 		url := fmt.Sprintf("%s%s", baseURL, path)
 		req, reqErr := http.NewRequest(http.MethodPost, url, bytes.NewReader(payload))
 		if reqErr != nil {
@@ -129,52 +142,16 @@ func (service *AuthService) createStarterInventory(userID uint) error {
 		resp.Body.Close()
 
 		if resp.StatusCode == http.StatusOK || resp.StatusCode == http.StatusCreated {
-			inventoryErr = nil
-			break
+			return nil
 		}
 
-		inventoryErr = fmt.Errorf("cards service returned %d: %s", resp.StatusCode, string(body))
+		operationErr = fmt.Errorf("%s returned %d: %s", operation, resp.StatusCode, string(body))
 		if resp.StatusCode != http.StatusNotFound {
 			break
 		}
 	}
-	if inventoryErr != nil {
-		return inventoryErr
-	}
 
-	deckPaths := []string{"/cards/decks/fill", "/cardbase/decks/fill"}
-	var deckErr error
-	for _, path := range deckPaths {
-		deckURL := fmt.Sprintf("%s%s", baseURL, path)
-		deckReq, reqErr := http.NewRequest(http.MethodPost, deckURL, bytes.NewReader(payload))
-		if reqErr != nil {
-			return reqErr
-		}
-		deckReq.Header.Set("Content-Type", "application/json")
-
-		deckResp, doErr := client.Do(deckReq)
-		if doErr != nil {
-			return doErr
-		}
-
-		body, _ := io.ReadAll(deckResp.Body)
-		deckResp.Body.Close()
-
-		if deckResp.StatusCode == http.StatusOK || deckResp.StatusCode == http.StatusCreated {
-			deckErr = nil
-			break
-		}
-
-		deckErr = fmt.Errorf("deck fill returned %d: %s", deckResp.StatusCode, string(body))
-		if deckResp.StatusCode != http.StatusNotFound {
-			break
-		}
-	}
-	if deckErr != nil {
-		return deckErr
-	}
-
-	return nil
+	return operationErr
 }
 
 // Authenticate user with username and password
