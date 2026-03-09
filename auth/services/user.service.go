@@ -9,9 +9,7 @@ import (
 	"io"
 	"log"
 	"net/http"
-	"os"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/Ryanljk/speedcardgame/auth/dtos"
@@ -81,27 +79,7 @@ func (service *AuthService) registerUser(registerDTO dtos.RegisterDTO, createInv
 }
 
 func (service *AuthService) createStarterInventory(userID uint) error {
-	baseURL := os.Getenv("CARDS_SERVICE_BASE_URL")
-
-	host := os.Getenv("CARDS_SERVICE_HOST")
-	if host == "" {
-		host = "127.0.0.1"
-	}
-	port := os.Getenv("CARDS_SERVICE_PORT")
-	if port == "" {
-		port = os.Getenv("CARDS_PORT")
-	}
-	if port == "" {
-		port = os.Getenv("CARDS_APP_PORT")
-	}
-	if port == "" {
-		port = "8082"
-	}
-
-	if baseURL == "" {
-		baseURL = fmt.Sprintf("http://%s:%s", host, port)
-	}
-	baseURL = strings.TrimRight(baseURL, "/")
+	baseURL := utils.ResolveCardsServiceBaseURL()
 
 	payload, err := json.Marshal(inventoryCreateRequest{Uid: userID})
 	if err != nil {
