@@ -315,8 +315,6 @@ void Playing::handleEvents(Game& game, const SDL_Event& event) {
                 const int mx = event.button.x;
                 const int my = event.button.y;
                 
-                if (previewLocked) return;
-                
                 for (int i = static_cast<int>(cardRects.size()) - 1; i >= 0; --i) {
                     if (pointInRect(cardRects[static_cast<std::size_t>(i)], mx, my)) {
                         drag.active = true;
@@ -382,10 +380,7 @@ void Playing::handleEvents(Game& game, const SDL_Event& event) {
             break;
             
         case SDL_MOUSEWHEEL:
-            if (previewLocked) {
-                previewScrollOffset -= event.wheel.y * 20;
-                if (previewScrollOffset < 0) previewScrollOffset = 0;
-            }
+            previewScrollOffset = 0;
             break;
             
         default:
@@ -448,22 +443,10 @@ void Playing::update(Game& game) {
     int mouseX = 0, mouseY = 0;
     SDL_GetMouseState(&mouseX, &mouseY);
 
-    const int previewW = std::min(360, screenW - 80);
-    const int previewH = static_cast<int>(previewW * 1.5f);
-    const int previewX = (screenW - previewW) / 2;
-    const int previewY = (screenH - previewH) / 2;
-    SDL_Rect previewRect{previewX, previewY, previewW, previewH};
-
-    const bool mouseOverPreview = pointInRect(previewRect, mouseX, mouseY);
-
-    if (mouseOverPreview && previewLocked) {
-        return;
-    }
-
     const bool draggingCard = drag.active && drag.index < localPlayer.hand.size();
     std::size_t newHoverIndex = static_cast<std::size_t>(-1);
     
-    if (!draggingCard && !mouseOverPreview) {
+    if (!draggingCard) {
         for (int i = static_cast<int>(cardRects.size()) - 1; i >= 0; --i) {
             if (pointInRect(cardRects[static_cast<std::size_t>(i)], mouseX, mouseY)) {
                 newHoverIndex = static_cast<std::size_t>(i);
@@ -472,13 +455,11 @@ void Playing::update(Game& game) {
         }
     }
 
-    if (!mouseOverPreview) {
-        if (newHoverIndex != hoverIndex) {
-            hoverIndex = newHoverIndex;
-            hoverStartTick = now;
-            previewScrollOffset = 0;
-            previewLocked = false;
-        }
+    if (newHoverIndex != hoverIndex) {
+        hoverIndex = newHoverIndex;
+        hoverStartTick = now;
+        previewScrollOffset = 0;
+        previewLocked = false;
     }
 
     constexpr Uint32 hoverDelayMs = 1000;
@@ -488,11 +469,7 @@ void Playing::update(Game& game) {
         hoverIndex < localPlayer.hand.size() &&
         now - hoverStartTick >= hoverDelayMs;
 
-    if ((hoverTimerReady || mouseOverPreview) && hoverIndex < localPlayer.hand.size()) {
-        previewLocked = true;
-    } else if (!mouseOverPreview && !hoverTimerReady) {
-        previewLocked = false;
-    }
+    previewLocked = false;
 }
 
 bool Playing::handleServerMessage(const std::string& msg) {

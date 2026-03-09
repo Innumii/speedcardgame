@@ -380,18 +380,13 @@ void RenderPlaying::render(Playing& playing, const Game& game) {
 		                         floating, uiFonts.tiny, uiFonts.small);
 	}
 
-	// ── card preview (centered magnified with scrolling) ─────────────
+	// ── card preview (left docked, non-blocking) ─────────────────────
 	if (showPreview && playing.hoverIndex < playing.localPlayer.hand.size() && !playing.pauseModalOpen && !playing.exitModalOpen) {
 		if (const auto& cardPtr = playing.localPlayer.hand[playing.hoverIndex]) {
-			SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
-			SDL_SetRenderDrawColor(renderer, 0, 0, 0, 160);
-			SDL_RenderFillRect(renderer, nullptr);
-
-			const int previewW = std::min(360, screenW - 80);
+			const int previewW = std::min(320, screenW - 40);
 			const int previewH = static_cast<int>(previewW * 1.5f);
-			
-			const int previewX = (screenW - previewW) / 2;
-			const int previewY = (screenH - previewH) / 2;
+			const int previewX = 20;
+			const int previewY = std::max(20, (screenH - previewH) / 2);
 
 			SDL_Rect panel{previewX, previewY, previewW, previewH};
 			
