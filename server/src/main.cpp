@@ -4,7 +4,6 @@
 #include <csignal>
 #include <mutex>
 #include <condition_variable>
-#include <cstdlib>
 
 //allocate null ptr to gameserver
 //use for signal handling
@@ -27,17 +26,8 @@ int main() {
     //flush buffer
     std::cout.setf(std::ios::unitbuf);
     // std::cout << "Yo\n";
-    int serverPort = 4000;
-    if (const char* envPort = std::getenv("GAME_SERVER_PORT")) {
-        try {
-            serverPort = std::stoi(envPort);
-        } catch (...) {
-            std::cerr << "Invalid GAME_SERVER_PORT value, using default 4000\n";
-        }
-    }
-
     //allocate on stack
-    GameServer server(serverPort);
+    GameServer server(4000);
     serverPtr = &server;
 
     std::signal(SIGINT, handleSignal);

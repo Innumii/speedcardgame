@@ -94,12 +94,6 @@ terraform plan
 terraform apply
 ```
 
-`infra/services/server` now supports:
-
-- runtime TLS injection from AWS Secrets Manager via `tls_certificate_secret_arn` and `tls_private_key_secret_arn`
-- optional stable Route53 endpoint for the raw TCP game socket via `route53_zone_name` + `route53_record_name`
-- automatic generation of `client/env/.env` after apply (can be disabled with `write_client_env_file = false`)
-
 ## Notes on wiring and overrides
 
 - `use_managed_data_stack = true` (default) makes auth/cards auto-read from the shared data state.

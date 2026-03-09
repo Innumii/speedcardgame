@@ -60,8 +60,6 @@ private:
 
     //SSL
     SSL_CTX* sslCtx{nullptr};
-    std::string runtimeCertPath;
-    std::string runtimeKeyPath;
 };
 
 #endif

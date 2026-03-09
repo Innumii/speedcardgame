@@ -2,17 +2,7 @@ aws_region = "us-east-1"
 image_tag  = "latest"
 image_repo = "ryanljk/g4t2-server-service"
 assign_public_ip = true
-game_port  = 4000
-desired_count = 1
 
 github_username     = "Ryanljk"
 github_repo_name    = "speedcardgame"
 ghcr_pat_secret_arn = "arn:aws:secretsmanager:us-east-1:123456789012:secret:ghcr-auth-credentials-xxxxxx"
-
-# Optional: inject TLS cert/key at runtime from Secrets Manager
-# tls_certificate_secret_arn = "arn:aws:secretsmanager:us-east-1:123456789012:secret:server-tls-cert-xxxxxx"
-# tls_private_key_secret_arn = "arn:aws:secretsmanager:us-east-1:123456789012:secret:server-tls-key-xxxxxx"
-
-# Optional: create stable DNS endpoint for clients (recommended)
-# route53_zone_name   = "example.com"
-# route53_record_name = "game.example.com"

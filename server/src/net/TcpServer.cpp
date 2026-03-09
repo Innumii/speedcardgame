@@ -7,60 +7,9 @@
 #include <netinet/in.h>
 #include <unistd.h>
 #include <arpa/inet.h>
-#include <sys/stat.h>
 #include <cstring>
-#include <cstdlib>
-#include <cstdio>
-#include <cerrno>
 #include <openssl/ssl.h>
 #include <openssl/err.h>
-
-namespace {
-std::string getEnvValue(const char* key, const std::string& fallback = "") {
-    const char* value = std::getenv(key);
-    if (!value) return fallback;
-    return std::string(value);
-}
-
-bool writeSecurePemToTempFile(const std::string& pemContent, const char* filePrefix, std::string& outPath) {
-    if (pemContent.empty()) return false;
-
-    std::string templatePath = std::string("/tmp/") + filePrefix + "-XXXXXX";
-    std::vector<char> mutableTemplate(templatePath.begin(), templatePath.end());
-    mutableTemplate.push_back('\0');
-
-    const int fd = mkstemp(mutableTemplate.data());
-    if (fd < 0) {
-        std::perror("mkstemp");
-        return false;
-    }
-
-    if (fchmod(fd, S_IRUSR | S_IWUSR) != 0) {
-        std::perror("fchmod");
-        close(fd);
-        std::remove(mutableTemplate.data());
-        return false;
-    }
-
-    ssize_t totalWritten = 0;
-    const char* raw = pemContent.data();
-    const ssize_t totalSize = static_cast<ssize_t>(pemContent.size());
-    while (totalWritten < totalSize) {
-        const ssize_t written = write(fd, raw + totalWritten, static_cast<size_t>(totalSize - totalWritten));
-        if (written <= 0) {
-            std::perror("write");
-            close(fd);
-            std::remove(mutableTemplate.data());
-            return false;
-        }
-        totalWritten += written;
-    }
-
-    close(fd);
-    outPath = std::string(mutableTemplate.data());
-    return true;
-}
-}
 
 TcpServer::TcpServer(int port)
     : listenPort(port), listenSocket(-1), running(false)
@@ -113,42 +62,13 @@ bool TcpServer::start() {
     sslCtx = SSL_CTX_new(TLS_server_method());
     if (!sslCtx) { std::cerr << "[TcpServer] Failed to create SSL context\n"; return false; }
 
-    const std::string certPem = getEnvValue("TLS_CERT_PEM");
-    const std::string keyPem = getEnvValue("TLS_KEY_PEM");
-
-    std::string certPath = getEnvValue("TLS_CERT_PATH", "/certs/server.crt");
-    std::string keyPath = getEnvValue("TLS_KEY_PATH", "/certs/server.key");
-
-    if (!certPem.empty() || !keyPem.empty()) {
-        if (certPem.empty() || keyPem.empty()) {
-            std::cerr << "[TcpServer] TLS_CERT_PEM and TLS_KEY_PEM must both be set when using in-memory TLS material\n";
-            return false;
-        }
-
-        if (!writeSecurePemToTempFile(certPem, "server-cert", runtimeCertPath)) {
-            std::cerr << "[TcpServer] Failed to write TLS certificate to runtime temp file\n";
-            return false;
-        }
-
-        if (!writeSecurePemToTempFile(keyPem, "server-key", runtimeKeyPath)) {
-            std::cerr << "[TcpServer] Failed to write TLS private key to runtime temp file\n";
-            if (!runtimeCertPath.empty()) {
-                std::remove(runtimeCertPath.c_str());
-                runtimeCertPath.clear();
-            }
-            return false;
-        }
-
-        certPath = runtimeCertPath;
-        keyPath = runtimeKeyPath;
-    }
-
-    if (SSL_CTX_use_certificate_file(sslCtx, certPath.c_str(), SSL_FILETYPE_PEM) <= 0) {
+    // Load server certificate and private key
+    if (SSL_CTX_use_certificate_file(sslCtx, "/certs/server.crt", SSL_FILETYPE_PEM) <= 0) {
         ERR_print_errors_fp(stderr);
         return false;
     }
 
-    if (SSL_CTX_use_PrivateKey_file(sslCtx, keyPath.c_str(), SSL_FILETYPE_PEM) <= 0) {
+    if (SSL_CTX_use_PrivateKey_file(sslCtx, "/certs/server.key", SSL_FILETYPE_PEM) <= 0) {
         ERR_print_errors_fp(stderr);
         return false;
     }
@@ -176,10 +96,10 @@ bool TcpServer::start() {
 }
 
 void TcpServer::stop() {
-    const bool wasRunning = running.exchange(false);
-    if (wasRunning) {
-        std::cout << "[TcpServer] Stopping...\n";
-    }
+    std::cout << "[TcpServer] Stopping...\n";
+    if (!running) return;
+
+    running = false;
 
     if (listenSocket >= 0) {
         shutdown(listenSocket, SHUT_RDWR);
@@ -199,9 +119,7 @@ void TcpServer::stop() {
     if (disconnectThread.joinable()) disconnectThread.join();
 
     // Stop all remaining clients
-    if (wasRunning) {
-        std::cout << "[TcpServer] Removing all players...\n";
-    }
+    std::cout << "[TcpServer] Removing all players...\n";
     std::vector<std::shared_ptr<PlayerConnection>> copy;
     {
         std::lock_guard<std::mutex> lock(clientsMutex);
@@ -209,20 +127,6 @@ void TcpServer::stop() {
         clients.clear();
     }
     for (auto& player : copy) player->stop();
-
-    if (sslCtx) {
-        SSL_CTX_free(sslCtx);
-        sslCtx = nullptr;
-    }
-
-    if (!runtimeCertPath.empty()) {
-        std::remove(runtimeCertPath.c_str());
-        runtimeCertPath.clear();
-    }
-    if (!runtimeKeyPath.empty()) {
-        std::remove(runtimeKeyPath.c_str());
-        runtimeKeyPath.clear();
-    }
 }
 
 void TcpServer::acceptClients() {
