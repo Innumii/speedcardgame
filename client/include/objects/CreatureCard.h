@@ -16,7 +16,8 @@ public:
                  int manaCost,
                  int power,
                  int toughness,
-                 int cardId = -1);
+                 int cardId = -1,
+                 Rarity rarity = Rarity::Common);
 
     int getPower() const;
     int getToughness() const;

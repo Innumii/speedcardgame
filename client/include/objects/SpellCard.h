@@ -10,7 +10,8 @@ public:
               const std::string& text,
               int manaValue,
               int manaCost,
-              int cardId = -1);
+              int cardId = -1,
+              Rarity rarity = Rarity::Common);
 
     void drawExtraInfo() const override;
     std::unique_ptr<Card> clone() const override {
