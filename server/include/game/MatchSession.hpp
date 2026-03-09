@@ -81,7 +81,7 @@ public:
 
     //player actions
     void handleSummon(int playerIndex, int cardId, int lane);
-    void handleSpell(int playerIndex, int cardId, int lane, std::optional<int> targetId = std::nullopt, std::optional<int> targetOpponent = std::nullopt);
+    void handleSpell(int playerIndex, int cardId, int lane, std::optional<int> targetId = std::nullopt, std::optional<int> targetIndex = std::nullopt);
     void handleDiscard(int playerIndex, int cardId);
 
     const ServerCard* getCard(int id) const;

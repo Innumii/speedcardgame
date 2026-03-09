@@ -28,13 +28,13 @@ bool Playing::resolvePendingActionAt(int x, int y) {
         return false;
 
     int targetLane = -1;
-    int targetOpponent = -1;
+    int targetIndex = -1;
 
     // Check local lanes first
     for (std::size_t slot = 0; slot < playSlots.size(); ++slot) {
         if (pointInRect(playSlots[slot], x, y)) {
             targetLane = static_cast<int>(slot);
-            targetOpponent = 0;
+            targetIndex = 0;
             break;
         }
     }
@@ -45,20 +45,20 @@ bool Playing::resolvePendingActionAt(int x, int y) {
         opponentSlot.y -= 200; // same offset as rendering
         if (pointInRect(opponentSlot, x, y)) {
             targetLane = static_cast<int>(slot);
-            targetOpponent = 1;
+            targetIndex = 1;
             break;
         }
     }
 
     if (targetLane >= 0) {
-        std::cout<< "[Playing] Casting at targetOpponent: " + std::to_string(targetOpponent) + "\n";
+        std::cout<< "[Playing] Casting at targetIndex: " + std::to_string(targetIndex) + "\n";
         std::cout<< "[Playing] Casting at targetLane: " + std::to_string(targetLane) + "\n";
 
         authority->playCard(
             static_cast<int>(pendingAction.cardId),
             pendingAction.sourceLane, // where the spell was dropped
             targetLane,               // target lane
-            targetOpponent              // target player (local or opponent)
+            targetIndex              // target player (local or opponent)
         );
 
         pendingAction.clear();
@@ -311,9 +311,12 @@ void Playing::handleEvents(Game& game, const SDL_Event& event) {
                             );
                         }
                     } else if (card->getType() == CardType::Spell) { // Spell enters targeting mode, may need some logic to skip targeting for universal target spells
-                        pendingAction.active = true;
-                        pendingAction.cardId = card->getId();
-                        pendingAction.sourceLane = laneIndex; // store where it was dropped
+                        if (localPlayer.mana >= card->getManaCost()) {
+                            pendingAction.active = true;
+                            pendingAction.cardId = card->getId();
+                            pendingAction.sourceLane = laneIndex; // store where it was dropped
+                        } //Check if player has sufficient mana
+
                     }
                 }
 
@@ -457,21 +460,21 @@ bool Playing::handleServerMessage(const std::string& msg) {
         }
         else if (type == CardType::Spell) {
             // Optionally read target lane and target opponent
-            std::cout<< "[Playing] Casting!\n";
+            // std::cout<< "[Playing] Casting!\n";
             std::optional<int> targetLane;
             if (iss.peek() != EOF) {
                 int tmp;
                 if (iss >> tmp) targetLane = tmp;
             }
 
-            std::optional<int> targetOpponent;
+            std::optional<int> targetIndex;
             if (iss.peek() != EOF) {
                 int tmp;
-                if (iss >> tmp) targetOpponent = tmp;
+                if (iss >> tmp) targetIndex = tmp;
             }
 
             // Move card into spell handler
-            playSpell(playerId, std::move(*it), lane, targetLane, targetOpponent);
+            playSpell(playerId, std::move(*it), lane, targetLane, targetIndex);
             player.hand.erase(it);
         }
     }
@@ -501,28 +504,31 @@ void Playing::playCreature(int playerId, std::unique_ptr<Card> card, int lane) {
               << " at lane " << lane << "\n";
 }
 
-void Playing::playSpell(int playerId, std::unique_ptr<Card> card, int sourceLane, std::optional<int> targetLane, std::optional<int> targetOpponent) {
+void Playing::playSpell(int playerId, std::unique_ptr<Card> card, int sourceLane, std::optional<int> targetLane, std::optional<int> targetIndex) {
     Player& player = (playerId == localPlayer.id) ? localPlayer : remotePlayer;
     if (sourceLane < 0 || sourceLane >= board.getLaneCount()) return;
     if (!card) return;
 
     if (card->getType() != CardType::Spell) return;
-    std::cout<< "[Playing] Casting from playSpell!\n";
+    // std::cout<< "[Playing] Casting from playSpell!\n";
 
     std::string name = card->getName();
     player.mana -= card->getManaCost();
 
     // board.addToPlay(sourceLane, boardIndex, std::move(card));
 
-    //enact effect
+    //reassign targetIndex value, relative to client instance
+    //targetIndex value received is relative to the caster's client. If the caster is opponent, need to reverse the values
     if (playerId != localPlayer.id) {
-        if (targetOpponent == 0) targetOpponent = 1;
-        else if (targetOpponent == 1) targetOpponent = 0;
+        if (targetIndex == 0) targetIndex = 1;
+        else if (targetIndex == 1) targetIndex = 0;
     }
 
-    std::cout << "[Playing] Casted" << name
-              << " for player " << playerId 
-              << " at lane " << sourceLane << "\n";
+    std::string side = (targetIndex == 0) ? "user's side" : "opponent's side";
+    std::cout << "[Playing] Casted " << name
+              << " by player " << playerId 
+              << " at lane " << sourceLane 
+              << " on " << side << "\n";
 }
 
 

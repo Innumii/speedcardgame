@@ -99,7 +99,7 @@ private:
         bool active{false};
         std::size_t cardId{static_cast<std::size_t>(-1)};
         int sourceLane{-1}; // lane where the spell was dropped
-        int targetOpponent{-1};
+        int targetIndex{-1};
 
         void clear() {
             active = false;
@@ -130,7 +130,7 @@ private:
     bool drawCard(int playerId, int cardId);
     void discardCard(int playerId, int cardId);
     void playCreature(int playerId, std::unique_ptr<Card> card, int lane);
-    void playSpell(int playerId, std::unique_ptr<Card> card, int sourceLane, std::optional<int> targetLane, std::optional<int> targetOpponent);
+    void playSpell(int playerId, std::unique_ptr<Card> card, int sourceLane, std::optional<int> targetLane, std::optional<int> targetIndex);
 
     // Animation related
     bool tryDrawCardWithAnimation(Uint32 now);
