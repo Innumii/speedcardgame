@@ -56,7 +56,7 @@ namespace EnvUtil {
             envLoaded = true;
 
             const std::vector<std::string> candidatePaths = {
-                "../env/.env"
+                "./env/.env"
             };
 
             for (const std::string& path : candidatePaths) {
@@ -158,7 +158,7 @@ namespace EnvUtil {
     std::string getGameServerHost() {
         return resolveHostOrPort("DOCKER_GAME_SERVER", "AWS_GAME_SERVER", true);
     }
-    
+
     int getGameServerPort() {
         const std::string portStr = resolveHostOrPort("DOCKER_GAME_SERVER", "AWS_GAME_SERVER", false);
         try { return std::stoi(portStr); } catch (...) { return 8080; }
