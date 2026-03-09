@@ -24,8 +24,8 @@ func isAwsEnabled() bool {
 
 func ResolveCardsServiceBaseURL() string {
 	if isAwsEnabled() {
-		host := GetEnvOrDefault("AWS_CARDS_SERVICE_HOST", "")
-		port := GetEnvOrDefault("AWS_CARDS_SERVICE_PORT", "")
+		host := GetEnvOrDefault("AWS_CARDS_SERVICE_HOST", "api.fylstudios.xyz")
+		port := GetEnvOrDefault("AWS_CARDS_SERVICE_PORT", "80")
 		if host != "" && port != "" {
 			return "http://" + host + ":" + port
 		}
