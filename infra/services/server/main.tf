@@ -28,6 +28,10 @@ data "aws_subnets" "default" {
   }
 }
 
+data "aws_secretsmanager_secret" "game_tls" {
+  name = "game-server-tls"
+}
+
 resource "aws_lb" "this" {
   name               = "${var.service_name}-nlb"
   internal           = false
@@ -73,4 +77,13 @@ module "service" {
   assign_public_ip = var.assign_public_ip
   desired_count    = 1
   target_group_arn = aws_lb_target_group.this.arn
+
+  secrets = {
+    TLS_CERT = "${data.aws_secretsmanager_secret.game_tls.arn}:cert::"
+    TLS_KEY  = "${data.aws_secretsmanager_secret.game_tls.arn}:key::"
+  }
+
+  task_secret_arns = [
+    data.aws_secretsmanager_secret.game_tls.arn
+  ]
 }

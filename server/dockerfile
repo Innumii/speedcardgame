@@ -9,6 +9,17 @@ RUN make
 # ---------- Runtime Stage ----------
 FROM gcc:13-bookworm AS runtime
 WORKDIR /app
+
+# Copy the compiled server binary
 COPY --from=builder /app/server .
+
+# Copy the entrypoint script
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+# Expose port
 EXPOSE 4000
-CMD ["./server"]
+
+# Use the entrypoint
+ENTRYPOINT ["/entrypoint.sh"]
+CMD []
