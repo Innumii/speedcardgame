@@ -2,10 +2,9 @@
 #include "net/PlayerConnection.hpp"
 #include "objects/CreatureCard.h"
 #include "objects/SpellCard.h"
+#include "utils/EnvUtil.hpp"
+#include "utils/HttpUtil.hpp"
 #include "utils/JsonUtil.hpp"
-
-#define CPPHTTPLIB_OPENSSL_SUPPORT
-#include "httplib/httplib.h"
 
 #include <iostream>
 #include <chrono>
@@ -81,32 +80,33 @@ void MatchSession::stop() {
 bool MatchSession::loadDeckForPlayer(int playerId, ServerDeck& outDeck) {
     std::cout << "[DEBUG] Loading deck for Player " << playerId << "\n";
 
-    httplib::Client client("host.docker.internal", 8082);
-    client.set_connection_timeout(3); // seconds
-    client.set_read_timeout(5);       // seconds
+    const std::string cardsHost = EnvUtil::getServiceHost("CARDS_SERVICE", "127.0.0.1", "api.myapp.com");
+    const int cardsPort = EnvUtil::getServicePort("CARDS_SERVICE", 8082, 443);
 
     std::string path = "/cardbase/decks/" + std::to_string(playerId);
-    std::cout << "[DEBUG] GET " << path << "\n";
+    std::cout << "[DEBUG] GET " << path << " via " << cardsHost << ":" << cardsPort << "\n";
 
-    auto res = client.Get(path.c_str());
+    int statusCode = -1;
+    std::string responseBody;
+    const bool ok = HttpUtil::sendHttp(cardsHost, cardsPort, "GET", path, "", statusCode, responseBody);
 
-    if (!res) {
-        std::cerr << "[ERROR] Request failed. Error: " << res.error() << "\n";
+    if (!ok) {
+        std::cerr << "[ERROR] Request failed. Error: Could not establish connection\n";
         return false;
     }
 
-    std::cout << "[DEBUG] HTTP Status: " << res->status << "\n";
+    std::cout << "[DEBUG] HTTP Status: " << statusCode << "\n";
 
-    if (res->status != 200) {
-        std::cerr << "[ERROR] Unexpected HTTP status: " << res->status << "\n";
-        std::cerr << "[ERROR] Response body: " << res->body << "\n";
+    if (statusCode != 200) {
+        std::cerr << "[ERROR] Unexpected HTTP status: " << statusCode << "\n";
+        std::cerr << "[ERROR] Response body: " << responseBody << "\n";
         return false;
     }
 
-    std::cout << "[DEBUG] Response body:\n" << res->body << "\n";
+    std::cout << "[DEBUG] Response body:\n" << responseBody << "\n";
 
     // Uncomment and use this when parsing JSON
-    return parseDeckJson(res->body, outDeck);
+    return parseDeckJson(responseBody, outDeck);
 
     // return true;
 }
