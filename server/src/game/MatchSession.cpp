@@ -11,6 +11,7 @@
 #include <thread>
 #include <mutex>
 #include <queue>
+#include <sstream>
 
 /* TODO: Full State Snapshot
 FULL_STATE {
