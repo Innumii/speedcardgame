@@ -6,3 +6,8 @@ assign_public_ip = true
 github_username     = "Ryanljk"
 github_repo_name    = "speedcardgame"
 ghcr_pat_secret_arn = "arn:aws:secretsmanager:us-east-1:123456789012:secret:ghcr-auth-credentials-xxxxxx"
+
+# Optional explicit override if cards routing is not auto-wired from the ALB stack
+# cards_service_base_url = "https://api.example.com"
+# cards_service_host     = "api.example.com"
+# cards_service_port     = 443

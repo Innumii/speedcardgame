@@ -17,6 +17,10 @@ provider "aws" {
   region = var.aws_region
 }
 
+locals {
+  use_alb_remote_state = var.use_managed_alb_stack && fileexists(var.alb_stack_state_path)
+}
+
 data "aws_vpc" "default" {
   default = true
 }
@@ -26,6 +30,27 @@ data "aws_subnets" "default" {
     name   = "vpc-id"
     values = [data.aws_vpc.default.id]
   }
+}
+
+data "terraform_remote_state" "alb" {
+  count   = local.use_alb_remote_state ? 1 : 0
+  backend = "local"
+  config = {
+    path = var.alb_stack_state_path
+  }
+}
+
+locals {
+  alb_outputs                  = local.use_alb_remote_state ? data.terraform_remote_state.alb[0].outputs : {}
+  cards_service_base_url_local = var.cards_service_base_url != null ? var.cards_service_base_url : try(local.alb_outputs.api_base_url, null)
+  cards_service_host = var.cards_service_host != null ? var.cards_service_host : (
+    local.cards_service_base_url_local != null ? replace(replace(local.cards_service_base_url_local, "https://", ""), "http://", "") : try(local.alb_outputs.api_domain_name, null)
+  )
+  cards_service_port = var.cards_service_port != null ? var.cards_service_port : (
+    local.cards_service_base_url_local != null ? (
+      startswith(local.cards_service_base_url_local, "https://") ? 443 : 80
+    ) : 443
+  )
 }
 
 data "aws_secretsmanager_secret" "game_tls" {
@@ -86,4 +111,15 @@ module "service" {
   task_secret_arns = [
     data.aws_secretsmanager_secret.game_tls.arn
   ]
+
+  environment = merge(
+    local.cards_service_host != null ? {
+      USE_AWS_SERVICES       = "true"
+      CARDS_SERVICE_HOST     = local.cards_service_host
+      CARDS_SERVICE_PORT     = tostring(local.cards_service_port)
+      AWS_CARDS_SERVICE_HOST = local.cards_service_host
+      AWS_CARDS_SERVICE_PORT = tostring(local.cards_service_port)
+    } : {},
+    {}
+  )
 }

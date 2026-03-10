@@ -60,40 +60,57 @@ void NetworkClient::cleanupSSL() {
 bool NetworkClient::connectTo(const std::string& ip, int port) {
     if (connected) return false;
 
-    // 1️⃣ Create socket
-    socketFd = socket(AF_INET, SOCK_STREAM, 0);
-    if (socketFd < 0) {
-        std::cerr << "[NetworkClient] socket() failed: " << std::strerror(errno) << "\n";
+    // 1️⃣ Resolve host (supports both raw IP and DNS hostnames)
+    addrinfo hints{};
+    hints.ai_family = AF_UNSPEC;
+    hints.ai_socktype = SOCK_STREAM;
+
+    const std::string portStr = std::to_string(port);
+    addrinfo* results = nullptr;
+    const int gaiResult = getaddrinfo(ip.c_str(), portStr.c_str(), &hints, &results);
+    if (gaiResult != 0 || !results) {
+#ifdef _WIN32
+        std::cerr << "[NetworkClient] getaddrinfo() failed: " << gaiResult << "\n";
+#else
+        std::cerr << "[NetworkClient] getaddrinfo() failed: " << gai_strerror(gaiResult) << "\n";
+#endif
         return false;
     }
 
-    sockaddr_in serverAddr{};
-    serverAddr.sin_family = AF_INET;
-    serverAddr.sin_port   = htons(port);
+    // 2️⃣ Create socket + connect (try each resolved address)
+    bool connectStarted = false;
+    for (addrinfo* node = results; node != nullptr; node = node->ai_next) {
+        socketFd = socket(node->ai_family, node->ai_socktype, node->ai_protocol);
+        if (socketFd < 0) {
+            continue;
+        }
 
-    if (inet_pton(AF_INET, ip.c_str(), &serverAddr.sin_addr) <= 0) {
-        std::cerr << "[NetworkClient] inet_pton() failed: invalid IP\n";
-        CLOSE_SOCKET(socketFd);
-        socketFd = -1;
-        return false;
-    }
+        if (connect(socketFd, node->ai_addr, static_cast<int>(node->ai_addrlen)) == 0) {
+            connectStarted = true;
+            break;
+        }
 
-    // 2️⃣ Connect TCP
-    if (connect(socketFd, reinterpret_cast<sockaddr*>(&serverAddr), sizeof(serverAddr)) < 0) {
 #ifdef _WIN32
         int err = WSAGetLastError();
-        if (!(mode == SocketMode::NonBlocking && err == WSAEWOULDBLOCK)) {
-            std::cerr << "[NetworkClient] connect() failed: WSA error " << err << "\n";
-            CLOSE_SOCKET(socketFd); socketFd = -1;
-            return false;
+        if (mode == SocketMode::NonBlocking && err == WSAEWOULDBLOCK) {
+            connectStarted = true;
+            break;
         }
 #else
-        if (!(mode == SocketMode::NonBlocking && errno == EINPROGRESS)) {
-            perror("connect");
-            CLOSE_SOCKET(socketFd); socketFd = -1;
-            return false;
+        if (mode == SocketMode::NonBlocking && errno == EINPROGRESS) {
+            connectStarted = true;
+            break;
         }
 #endif
+
+        CLOSE_SOCKET(socketFd);
+        socketFd = -1;
+    }
+    freeaddrinfo(results);
+
+    if (!connectStarted || socketFd < 0) {
+        std::cerr << "[NetworkClient] connect() failed for host: " << ip << ":" << port << "\n";
+        return false;
     }
 
     // 3️⃣ Set socket mode

@@ -53,3 +53,33 @@ variable "assign_public_ip" {
   type        = bool
   default     = true
 }
+
+variable "use_managed_alb_stack" {
+  description = "When true, read API host from infra/services/alb remote state."
+  type        = bool
+  default     = true
+}
+
+variable "alb_stack_state_path" {
+  description = "Path to infra/services/alb terraform state file for API host wiring."
+  type        = string
+  default     = "../alb/terraform.tfstate"
+}
+
+variable "cards_service_host" {
+  description = "Cards service host reachable from server task"
+  type        = string
+  default     = null
+}
+
+variable "cards_service_port" {
+  description = "Cards service port reachable from server task"
+  type        = number
+  default     = null
+}
+
+variable "cards_service_base_url" {
+  description = "Base URL for cards service (e.g. https://example.com)"
+  type        = string
+  default     = null
+}

@@ -21,3 +21,6 @@ build/
 # Ignore Terraform variables files that may contain sensitive information
 *.tfvars
 *.tfvars.json
+
+# personal scripts
+*.ps1
