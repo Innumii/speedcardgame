@@ -1,13 +1,26 @@
 #!/bin/sh
 set -e
 
-# Create the certs directory
-mkdir -p /tmp/certs
-printf "%s" "$TLS_CERT" > /tmp/certs/server.crt
-printf "%s" "$TLS_KEY" > /tmp/certs/server.key
+CERT_DIR=/certs
+CRT_FILE="$CERT_DIR/server.crt"
+KEY_FILE="$CERT_DIR/server.key"
 
-# Secure the files
-chmod 600 /tmp/certs/server.*
+# Create the certs directory if it doesn't exist
+mkdir -p "$CERT_DIR"
+
+# Only write cert and key if they don't already exist
+if [ ! -f "$CRT_FILE" ] && [ ! -f "$KEY_FILE" ]; then
+    if [ -n "$TLS_CERT" ] && [ -n "$TLS_KEY" ]; then
+        echo "$TLS_CERT" > "$CRT_FILE"
+        echo "$TLS_KEY"  > "$KEY_FILE"
+        chmod 600 "$KEY_FILE"
+        chmod 644 "$CRT_FILE"
+    else
+        echo "Warning: TLS_CERT or TLS_KEY not set. /certs will be empty."
+    fi
+else
+    echo "TLS cert and key already exist, skipping environment variables."
+fi
 
 # Execute the original server binary
 exec /app/server "$@"
