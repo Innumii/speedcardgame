@@ -84,7 +84,7 @@ bool MatchSession::loadDeckForPlayer(int playerId, ServerDeck& outDeck) {
     const std::string cardsHost = EnvUtil::getServiceHost("CARDS_SERVICE", "127.0.0.1", "api.myapp.com");
     const int cardsPort = EnvUtil::getServicePort("CARDS_SERVICE", 8082, 443);
 
-    std::string path = "/cardbase/decks/" + std::to_string(playerId);
+    std::string path = "/cards/decks/" + std::to_string(playerId);
     std::cout << "[DEBUG] GET " << path << " via " << cardsHost << ":" << cardsPort << "\n";
 
     int statusCode = -1;

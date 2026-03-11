@@ -125,7 +125,7 @@ func main() {
 	r.Get("/inventories/{uid}", services.GetInventoryByUserID) // Get inventory by user ID
 	r.Put("/inventories", services.UpdateInventory)            // Update inventory by user ID
 
-	router.Mount("/cardbase", r) //api prefix
+	// router.Mount("/cardbase", r) //api prefix
 	router.Mount("/cards", r)
 
 	srv := &http.Server{
