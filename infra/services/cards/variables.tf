@@ -154,3 +154,15 @@ variable "cards_service_port" {
   type        = number
   default     = 8080
 }
+
+variable "debug_log_enabled" {
+  description = "Enable debug logging in cards service"
+  type        = bool
+  default     = false
+}
+
+variable "http_request_log_enabled" {
+  description = "Enable HTTP request logging in cards service"
+  type        = bool
+  default     = true
+}

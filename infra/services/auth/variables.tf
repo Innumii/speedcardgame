@@ -150,6 +150,12 @@ variable "redis_port" {
   default = null
 }
 
+variable "use_aws_services" {
+  description = "When true, enables AWS Secrets Manager integration and VPC endpoints for data services"
+  type        = bool
+  default     = true
+}
+
 variable "cards_service_host" {
   description = "Cards service host reachable from auth task"
   type        = string
@@ -166,4 +172,16 @@ variable "cards_service_port" {
   description = "Cards service port"
   type        = number
   default     = 443
+}
+
+variable "debug_log_enabled" {
+  description = "Enable debug logging in auth service"
+  type        = bool
+  default     = false
+}
+
+variable "http_request_log_enabled" {
+  description = "Enable HTTP request logging in auth service"
+  type        = bool
+  default     = true
 }

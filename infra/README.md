@@ -102,6 +102,15 @@ terraform apply
 - Set `use_managed_alb_stack = false` to provide manual `target_group_arn` and `alb_security_group_id` in each service tfvars.
 - If needed, change `data_stack_state_path` in service stacks to point at a different shared state file.
 
+## Runtime logging toggles
+
+Auth and Cards ECS stacks expose two Terraform variables that map to container environment values:
+
+- `debug_log_enabled` (default `false`) -> `DEBUG_LOG_ENABLED`
+- `http_request_log_enabled` (default `true`) -> `HTTP_REQUEST_LOG_ENABLED`
+
+Set these in each service `terraform.tfvars` to tune production logging without rebuilding images.
+
 ## Build and push images
 
 After `terraform apply`, use each stack output `ecr_repository_url` to build and push your image.

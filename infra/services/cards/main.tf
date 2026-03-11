@@ -108,6 +108,8 @@ module "service" {
       REDIS_PORT         = tostring(local.redis_port)
       CARDS_SERVICE_HOST = var.cards_service_host
       CARDS_SERVICE_PORT = tostring(var.cards_service_port)
+      DEBUG_LOG_ENABLED  = tostring(var.debug_log_enabled)
+      HTTP_REQUEST_LOG_ENABLED = tostring(var.http_request_log_enabled)
     },
     {}
   )

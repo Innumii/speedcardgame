@@ -18,6 +18,8 @@ services:
       REDIS_PORT: ${AUTH_REDIS_PORT}
       CARDS_SERVICE_HOST: cards
       CARDS_SERVICE_PORT: ${CARDS_PORT}
+      DEBUG_LOG_ENABLED: ${DEBUG_LOG_ENABLED:-false}
+      HTTP_REQUEST_LOG_ENABLED: ${HTTP_REQUEST_LOG_ENABLED:-true}
     depends_on:
       auth-db:
         condition: service_healthy
@@ -70,6 +72,8 @@ services:
     environment:
       PORT: ${CARDS_PORT}
       DATABASE_URL: ${CARDS_DATABASE_URL}
+      DEBUG_LOG_ENABLED: ${DEBUG_LOG_ENABLED:-false}
+      HTTP_REQUEST_LOG_ENABLED: ${HTTP_REQUEST_LOG_ENABLED:-true}
     ports:
       - "${CARDS_APP_PORT:-8082}:${CARDS_PORT}"
 

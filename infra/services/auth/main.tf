@@ -108,8 +108,11 @@ module "service" {
       POSTGRES_TIMEZONE  = var.postgres_timezone
       REDIS_HOST         = local.redis_host
       REDIS_PORT         = tostring(local.redis_port)
+      AWS_ENABLED        = tostring(var.use_aws_services)
       CARDS_SERVICE_HOST = local.cards_service_host
       CARDS_SERVICE_PORT = tostring(var.cards_service_port)
+      DEBUG_LOG_ENABLED  = tostring(var.debug_log_enabled)
+      HTTP_REQUEST_LOG_ENABLED = tostring(var.http_request_log_enabled)
     },
     local.cards_service_base_url_secret_arn == null && local.cards_service_base_url != null ? {
       CARDS_SERVICE_BASE_URL = local.cards_service_base_url

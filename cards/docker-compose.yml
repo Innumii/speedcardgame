@@ -11,6 +11,8 @@ services:
     environment:
       - PORT=${PORT}  # Uses the value from the .env file
       - DATABASE_URL=${DATABASE_URL}  # Uses the value from the .env file
+      - DEBUG_LOG_ENABLED=${DEBUG_LOG_ENABLED:-false}
+      - HTTP_REQUEST_LOG_ENABLED=${HTTP_REQUEST_LOG_ENABLED:-true}
     ports:
       - "${APP_PORT}:${PORT}"  # Expose the app on the host using the .env values
     networks:
