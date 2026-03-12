@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"log"
 	"os"
 	"strconv"
 )
@@ -11,6 +12,16 @@ func GetEnvOrDefault(key, defaultValue string) string {
 		return value
 	}
 	return defaultValue
+}
+
+func GetEnvAsBool(key string, defaultValue bool) bool {
+	raw := GetEnvOrDefault(key, strconv.FormatBool(defaultValue))
+	value, err := strconv.ParseBool(raw)
+	if err != nil {
+		log.Printf("Invalid boolean value for %s=%q, using default %t", key, raw, defaultValue)
+		return defaultValue
+	}
+	return value
 }
 
 func isAwsEnabled() bool {

@@ -54,3 +54,12 @@ $env:AWS_GAME_SERVER_SERVICE_HOST = "<your-server-host>"
         docker-compose up -d --build
 
 - Note: Please copy and fill in the .env located in cards
+
+## HTTP and debug logging toggles
+
+The `auth` and `cards` services support runtime logging toggles through environment variables:
+
+- `HTTP_REQUEST_LOG_ENABLED` (default `true`): enables structured HTTP request logging.
+- `DEBUG_LOG_ENABLED` (default `false`): enables verbose request diagnostics (user-agent and referer).
+
+These vars work in local `docker-compose` and deployed ECS tasks (via Terraform).

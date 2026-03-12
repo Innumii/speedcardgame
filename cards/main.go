@@ -39,6 +39,10 @@ func main() {
 		log.Printf(".env not loaded: %v", err)
 	}
 
+	debugLoggingEnabled := util.GetEnvAsBool("DEBUG_LOG_ENABLED", false)
+	httpRequestLoggingEnabled := util.GetEnvAsBool("HTTP_REQUEST_LOG_ENABLED", true)
+	util.LogStartupConfiguration("cards", debugLoggingEnabled, httpRequestLoggingEnabled)
+
 	portString := os.Getenv("PORT") //grab port value from .env
 	if portString == "" {
 		log.Fatal("PORT not found in env")
@@ -79,6 +83,9 @@ func main() {
 
 	//Define the router
 	router := chi.NewRouter() //setup router
+	if httpRequestLoggingEnabled {
+		router.Use(util.HTTPRequestLogger(debugLoggingEnabled))
+	}
 	router.Use(cors.Handler(cors.Options{
 		AllowedOrigins:   []string{"https://*", "http://*"},
 		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},

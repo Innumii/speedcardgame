@@ -13,6 +13,8 @@ services:
       POSTGRES_TIMEZONE: UTC
       REDIS_HOST: redis
       REDIS_PORT: 6379
+      DEBUG_LOG_ENABLED: ${DEBUG_LOG_ENABLED:-false}
+      HTTP_REQUEST_LOG_ENABLED: ${HTTP_REQUEST_LOG_ENABLED:-true}
     depends_on:
       - db
       - redis

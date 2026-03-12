@@ -20,3 +20,7 @@ ghcr_pat_secret_arn = "arn:aws:secretsmanager:us-east-1:123456789012:secret:ghcr
 # Optional manual ALB wiring when use_managed_alb_stack = false
 # alb_security_group_id = "sg-xxxxxxxx"
 # target_group_arn      = "arn:aws:elasticloadbalancing:...:targetgroup/speedcard-cards-tg/xxxxxxxx"
+
+# Logging toggles
+debug_log_enabled = false
+http_request_log_enabled = true

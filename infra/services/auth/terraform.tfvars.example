@@ -28,3 +28,7 @@ use_managed_alb_stack = true
 # Optional fallback override when Secrets Manager key CARDS_SERVICE_BASE_URL is unavailable.
 # cards_service_base_url = "https://example.com"
 cards_service_port = 443
+
+# Logging toggles
+debug_log_enabled = false
+http_request_log_enabled = true

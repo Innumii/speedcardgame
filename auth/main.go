@@ -16,6 +16,7 @@ import (
 	"github.com/Ryanljk/speedcardgame/auth/models"
 	"github.com/Ryanljk/speedcardgame/auth/repositories"
 	"github.com/Ryanljk/speedcardgame/auth/services"
+	"github.com/Ryanljk/speedcardgame/auth/utils"
 
 	"github.com/redis/go-redis/v9"
 	"gorm.io/driver/postgres"
@@ -91,9 +92,17 @@ func main() {
 	authService := services.NewAuthService(userRepository, sessionService)
 	authController := controllers.NewAuthController(authService)
 	seedDevUsers(authService)
+	debugLoggingEnabled := utils.GetEnvAsBool("DEBUG_LOG_ENABLED", false)
+	httpRequestLoggingEnabled := utils.GetEnvAsBool("HTTP_REQUEST_LOG_ENABLED", true)
+	utils.ConfigureGinMode(debugLoggingEnabled)
+	utils.LogStartupConfiguration("auth", debugLoggingEnabled, httpRequestLoggingEnabled)
 
 	// Initialize Gin router
-	r := gin.Default()
+	r := gin.New()
+	if httpRequestLoggingEnabled {
+		r.Use(utils.GinRequestLogger(debugLoggingEnabled))
+	}
+	r.Use(gin.Recovery())
 
 	// Allow CORS
 	r.Use(cors.New(cors.Config{
