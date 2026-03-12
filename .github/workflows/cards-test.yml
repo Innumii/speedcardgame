@@ -1,0 +1,62 @@
+name: Cards Tests
+
+on:
+  push:
+    paths:
+      - 'cards/**'
+  pull_request:
+    paths:
+      - 'cards/**'
+
+jobs:
+  test:
+    name: Unit Tests & Coverage
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: 'cards/go.mod'
+          cache-dependency-path: 'cards/go.sum'
+
+      - name: Install dependencies
+        working-directory: cards
+        run: go mod download
+
+      - name: Run unit tests with coverage
+        working-directory: cards
+        run: |
+          go test ./services/... \
+            -v \
+            -coverprofile=coverage.out \
+            -covermode=atomic \
+            -race
+
+      - name: Print coverage summary
+        working-directory: cards
+        run: go tool cover -func=coverage.out
+
+      - name: Generate HTML coverage report
+        working-directory: cards
+        run: go tool cover -html=coverage.out -o coverage.html
+
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: cards-coverage-report
+          path: cards/coverage.html
+          retention-days: 14
+
+      - name: Enforce minimum coverage (80%)
+        working-directory: cards
+        run: |
+          COVERAGE=$(go tool cover -func=coverage.out | grep total | awk '{print $3}' | tr -d '%')
+          echo "Total coverage: ${COVERAGE}%"
+          if (( $(echo "$COVERAGE < 80" | bc -l) )); then
+            echo "Coverage ${COVERAGE}% is below the 80% threshold"
+            exit 1
+          fi
