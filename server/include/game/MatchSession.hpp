@@ -94,8 +94,8 @@ public:
 
     //Board actions
     void augmentCreature(int targetPlayerIndex, int lane, std::pair<int,int> augment); // buffs/debuffs creature
-    // void destroyCreature(int targetPlayerIndex, int lane); //removes creature from board, resets augments/effects vectors
-    // void augmentHP(int playerIndex, int amount); //raises or lowers player health 
+    void destroyCreature(int targetPlayerIndex, int lane); //removes creature from board, resets augments/effects vectors
+    void augmentHP(int playerIndex, int amount); //raises or lowers player health 
     void setCreature(int targetPlayerIndex, int lane, std::pair<int,int> augment); // buffs/debuffs creature
 
 

@@ -437,6 +437,7 @@ void MatchSession::handleSpell(int playerIndex, int cardId, int lane, std::optio
     // Call Effect
 
 
+
 }
 
 void MatchSession::handleDiscard(int playerIndex, int cardId) {
@@ -528,6 +529,7 @@ void MatchSession::augmentCreature(int targetPlayerIndex, int lane, std::pair<in
         // No existing augment: set initial values
         existingAugment = augment;
     }
+
 }
 
 void MatchSession::setCreature(int targetPlayerIndex, int lane, std::pair<int,int> augment) {
@@ -548,3 +550,37 @@ void MatchSession::setCreature(int targetPlayerIndex, int lane, std::pair<int,in
     existingAugment = augment;
     
 }
+
+//removes creature from board, resets augments/effects vectors
+void MatchSession::destroyCreature(int targetPlayerIndex, int lane) {
+    // Safety checks
+    if (targetPlayerIndex < 0 || targetPlayerIndex >= 2) return;
+    if (lane < 0 || lane >= board.laneCount) return;
+
+    auto& cardOpt = board.lanes[targetPlayerIndex][lane];
+    if (!cardOpt.has_value()) {
+        std::cout << "[MatchSession::destroyCreature] No Creature On Lane "
+                  << lane << " for " << getUsername(targetPlayerIndex) << "\n";
+        return;
+    }
+
+    int cardId = cardOpt.value();
+
+    // Move to discard pile
+    board.discard[targetPlayerIndex].push_back(cardId);
+
+    // Clear board state
+    board.lanes[targetPlayerIndex][lane] = std::nullopt;
+    board.augments[targetPlayerIndex][lane] = std::nullopt;
+    board.continuousEffects[targetPlayerIndex][lane] = std::nullopt;
+
+    std::cout << "[MatchSession::destroyCreature] Destroyed creature "
+              << cardId << " on lane " << lane
+              << " for " << getUsername(targetPlayerIndex) << "\n";
+}
+
+//raises or lowers player health 
+void MatchSession::augmentHP(int playerIndex, int amount){
+    players[playerIndex].health += amount;
+} 
+

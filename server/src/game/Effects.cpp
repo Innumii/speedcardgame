@@ -18,7 +18,7 @@ const std::vector<EffectFunc> Effects::effects = {
        std::optional<int> targetIndex, std::optional<int>, 
        std::optional<std::pair<int,int>>) {
         if (!targetLane || !targetIndex) return;
-        // session.destroyCreature(*targetIndex, *targetLane);
+        session.destroyCreature(*targetIndex, *targetLane);
     },
 
     // 2: Splash augment (augment all lanes for one side)
@@ -36,7 +36,7 @@ const std::vector<EffectFunc> Effects::effects = {
        std::optional<int>, std::optional<int> amount, 
        std::optional<std::pair<int,int>>) {
         if (!amount) return;
-        // session.augmentHP(playerIndex, *amount);
+        session.augmentHP(playerIndex, *amount);
     },
 
     [](MatchSession& session, int, std::optional<int> targetLane,
