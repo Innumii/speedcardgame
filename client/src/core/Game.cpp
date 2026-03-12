@@ -189,9 +189,10 @@ void Game::setNextState(GameState newState) {
     nextState = newState;
 }
 
-void Game::setPlayingDeck(Deck newDeck) {
+void Game::setPlayingDeck() {
 // newDeck.toString();
-    player.setDeck(std::move(newDeck));
+    Deck deckCopy = deck.clone();
+    player.setDeck(std::move(deckCopy));
 // player.deck.toString();
     playingSetup = false;
 }
@@ -201,8 +202,8 @@ bool Game::refreshPlayerDeckFromService() {
     if (!loadPlayerDeckFromService(*this, loadedDeck)) {
         return false;
     }
-
-    setPlayingDeck(std::move(loadedDeck));
+    deck = std::move(loadedDeck);
+    // setPlayingDeck(std::move(loadedDeck));
     return true;
 }
 
