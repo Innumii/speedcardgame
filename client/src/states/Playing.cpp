@@ -499,8 +499,8 @@ void Playing::playCreature(int playerId, std::unique_ptr<Card> card, int lane) {
     board.addToPlay(lane, boardIndex, std::move(card));
 
     // Optional: debug output
-    std::cout << "[Playing] Summoned" << name
-              << " for player " << playerId 
+    std::cout << "[Playing] Summoned " << name
+              << " for " << playerId 
               << " at lane " << lane << "\n";
 }
 

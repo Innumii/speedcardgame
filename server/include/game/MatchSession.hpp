@@ -21,7 +21,9 @@ class PlayerConnection;
 struct ServerBoard {
     int laneCount = 5;
     std::vector<std::optional<int>> lanes[2]; // card IDs
-    std::vector<std::optional<std::pair<int, int>>> augments[2]; // buffs/debuffs
+    std::vector<std::optional<std::pair<int, int>>> augments[2]; // buffs/debuffs (eg. 1,2 , 3,-1 , etc.)
+    std::vector<std::optional<int>> continuousEffects[2]; // continuous effects (eg. 1:Trample, 2:Double Strike, etc.)
+
     std::vector<int> discard[2];
 
     //Lane indexes go 0-4
@@ -30,6 +32,8 @@ struct ServerBoard {
         lanes[1].resize(laneCount);
         augments[0].resize(laneCount);
         augments[1].resize(laneCount);
+        continuousEffects[0].resize(laneCount);
+        continuousEffects[1].resize(laneCount);
     }
 };
 
@@ -85,6 +89,15 @@ public:
     void handleDiscard(int playerIndex, int cardId);
 
     const ServerCard* getCard(int id) const;
+    int getLaneCount() const;
+    const std::string getUsername(int playerIndex) const;
+
+    //Board actions
+    void augmentCreature(int targetPlayerIndex, int lane, std::pair<int,int> augment); // buffs/debuffs creature
+    // void destroyCreature(int targetPlayerIndex, int lane); //removes creature from board, resets augments/effects vectors
+    // void augmentHP(int playerIndex, int amount); //raises or lowers player health 
+    void setCreature(int targetPlayerIndex, int lane, std::pair<int,int> augment); // buffs/debuffs creature
+
 
 private:
     const int handLimit = 7;

@@ -360,7 +360,8 @@ void MatchSession::handleSummon(int playerIndex, int cardId, int lane) {
     if (player.mana < card->getManaCost()) {
         std::cout << "[MatchSession] Insufficient Mana: " << player.mana << " : " << card->getManaCost() << "\n";
         
-        return;}
+        return;
+    }
 
     // Deduct mana
     player.mana -= card->getManaCost();
@@ -369,7 +370,7 @@ void MatchSession::handleSummon(int playerIndex, int cardId, int lane) {
     auto it = findCardInHand(player, cardId);
     if (it == player.hand.end()) {
         std::cerr << "[ERROR] Card ID " << cardId
-                  << " not found in player " << playerIndex << "'s hand\n";
+                  << " not found in player " << getUsername(playerIndex) << "'s hand\n";
         return;
     }
     player.hand.erase(it);
@@ -378,7 +379,7 @@ void MatchSession::handleSummon(int playerIndex, int cardId, int lane) {
     board.lanes[playerIndex][lane] = cardId;
 
     // Send confirmation message
-    std::cout << "[MatchSession] Summoning " << name << "\n";
+    std::cout << "[MatchSession] " << getUsername(playerIndex) << " Summons " << name << "\n";
     std::ostringstream ss;
     ss << "PLAY " << player.id << " " << cardId << " " << lane << "\n";
     playerA->send(ss.str());
@@ -393,6 +394,11 @@ void MatchSession::handleSpell(int playerIndex, int cardId, int lane, std::optio
     const ServerCard* card = getCard(cardId);
     if (!card) return;
     std::string name = card->getName();
+
+    if (player.mana < card->getManaCost()) {
+        std::cout << "[MatchSession] Insufficient Mana: " << player.mana << " : " << card->getManaCost() << "\n";
+        return;
+    }
 
     // Deduct mana
     player.mana -= card->getManaCost();
@@ -415,7 +421,7 @@ void MatchSession::handleSpell(int playerIndex, int cardId, int lane, std::optio
     player.hand.erase(it);
 
     // board.lanes[playerIndex][lane] = cardId;
-    std::cout << "[MatchSession] Casting " << name << "\n";
+    std::cout << "[MatchSession] " << getUsername(playerIndex) << " Casts " << name << "\n";
 
         //Send confirmation message on successful summon
     std::string msg = "PLAY " + std::to_string(player.id) + " "
@@ -430,6 +436,7 @@ void MatchSession::handleSpell(int playerIndex, int cardId, int lane, std::optio
 
     // Call Effect
 
+
 }
 
 void MatchSession::handleDiscard(int playerIndex, int cardId) {
@@ -441,7 +448,7 @@ void MatchSession::handleDiscard(int playerIndex, int cardId) {
     // increment mana
     player.mana += card->getManaCost();
 
-    std::cout << "[MatchSession] Discarding " << card->getName() << "\n";
+    std::cout << "[MatchSession] " << getUsername(playerIndex) << " Discards " << card->getName() << "\n";
 
     // add to discard
     board.discard[playerIndex].push_back(cardId);
@@ -452,7 +459,7 @@ void MatchSession::handleDiscard(int playerIndex, int cardId) {
         player.hand.erase(it);
     } else {
         std::cerr << "[WARNING] Tried to discard cardId " << cardId
-                  << " but it was not in player " << playerIndex << "'s hand\n";
+                  << " but it was not in player " << getUsername(playerIndex) << "'s hand\n";
     }
 
     // broadcast
@@ -484,6 +491,60 @@ const ServerCard* MatchSession::getCard(int id) const {
     return nullptr;
 }
 
+int MatchSession::getLaneCount() const {
+    return board.laneCount;
+}
+
+const std::string MatchSession::getUsername(int playerIndex) const {
+    return (playerIndex == 0) ? playerA->getUsername() : playerB->getUsername();
+}
+
 std::vector<int>::iterator MatchSession::findCardInHand(PlayerState& player, int cardId) {
     return std::find(player.hand.begin(), player.hand.end(), cardId);
+}
+
+//BOARD ACTIONS
+void MatchSession::augmentCreature(int targetPlayerIndex, int lane, std::pair<int,int> augment) {
+    // Safety checks
+    if (targetPlayerIndex < 0 || targetPlayerIndex >= 2) return;
+    if (lane < 0 || lane >= board.laneCount) return;
+
+    // Check if there's a creature on that lane
+    auto& cardOpt = board.lanes[targetPlayerIndex][lane];
+    if (!cardOpt.has_value()) {
+        std::cout << "[MatchSession::augmentCreature] No Creature On Lane " << lane
+                  << " for " << getUsername(targetPlayerIndex) << "\n";
+        return;
+    }
+
+    // Reference to the existing augment pair
+    auto& existingAugment = board.augments[targetPlayerIndex][lane];
+
+    if (existingAugment.has_value()) {
+        // Stack augments: add to existing values
+        existingAugment->first  += augment.first;
+        existingAugment->second += augment.second;
+    } else {
+        // No existing augment: set initial values
+        existingAugment = augment;
+    }
+}
+
+void MatchSession::setCreature(int targetPlayerIndex, int lane, std::pair<int,int> augment) {
+    // Safety checks
+    if (targetPlayerIndex < 0 || targetPlayerIndex >= 2) return;
+    if (lane < 0 || lane >= board.laneCount) return;
+
+    // Check if there's a creature on that lane
+    auto& cardOpt = board.lanes[targetPlayerIndex][lane];
+    if (!cardOpt.has_value()) {
+        std::cout << "[MatchSession::augmentCreature] No Creature On Lane " << lane
+                  << " for " << getUsername(targetPlayerIndex) << "\n";
+        return;
+    }
+
+    // Reference to the existing augment pair
+    auto& existingAugment = board.augments[targetPlayerIndex][lane];
+    existingAugment = augment;
+    
 }
