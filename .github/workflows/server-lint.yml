@@ -25,6 +25,7 @@ jobs:
             --enable=warning,portability \
             --error-exitcode=1 \
             --inline-suppr \
+            --force \
             --suppress=missingIncludeSystem \
             --suppress=preprocessorErrorDirective server/ \
             --template=gcc \
