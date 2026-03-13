@@ -4,7 +4,7 @@ WORKDIR /app
 COPY . .
 
 RUN apt-get update && apt-get install -y make && rm -rf /var/lib/apt/lists/*
-RUN make
+RUN make clean && make
 
 # ---------- Runtime Stage ----------
 FROM gcc:13-bookworm AS runtime
@@ -15,7 +15,7 @@ COPY --from=builder /app/server .
 
 # Copy the entrypoint script
 COPY entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
+RUN sed -i 's/\r$//' /entrypoint.sh && chmod +x /entrypoint.sh
 
 # Expose port
 EXPOSE 4000
