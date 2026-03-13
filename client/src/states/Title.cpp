@@ -23,7 +23,7 @@ void Title::updateLayout(SDL_Renderer* renderer) {
     const int bannerGap = 24;
     const int buttonGap = 16;
 
-    const int buttonsTotalH = (buttonH * 5) + (buttonGap * 4);
+    const int buttonsTotalH = (buttonH * 4) + (buttonGap * 3);
     const int totalH        = bannerH + bannerGap + buttonsTotalH;
     int topY = (screenH - totalH) / 2;
     if (topY < 20) topY = 20;
@@ -44,9 +44,6 @@ void Title::updateLayout(SDL_Renderer* renderer) {
 
     OpenPacksButton.x = startButton.x;
     OpenPacksButton.y = BuildDeckButton.y + buttonH + buttonGap;
-
-    ConnectButton.x   = startButton.x;
-    ConnectButton.y   = OpenPacksButton.y + buttonH + buttonGap;
 }
 
 void Title::handleEvents(Game& game, const SDL_Event& event) {
@@ -68,21 +65,14 @@ void Title::handleEvents(Game& game, const SDL_Event& event) {
                                  (mouseY >= BuildDeckButton.y && mouseY <= BuildDeckButton.y + BuildDeckButton.h);
         const bool inOpenPacks = (mouseX >= OpenPacksButton.x && mouseX <= OpenPacksButton.x + OpenPacksButton.w) &&
                      (mouseY >= OpenPacksButton.y && mouseY <= OpenPacksButton.y + OpenPacksButton.h);
-        const bool inConnect   = (mouseX >= ConnectButton.x   && mouseX <= ConnectButton.x   + ConnectButton.w) &&
-                                 (mouseY >= ConnectButton.y   && mouseY <= ConnectButton.y   + ConnectButton.h);
-
         if (inStart) {
-            if (!game.tryStartPlayingWithBuiltDeck()) {
-                game.setNextState(GameState::Playing);
-            }
+            game.setNextState(GameState::Connecting);
         } else if (inQuit) {
             game.setNextState(GameState::Quit);
         } else if (inBuildDeck) {
             game.setNextState(GameState::DeckBuilding);
         } else if (inOpenPacks) {
             game.setNextState(GameState::PackOpening);
-        } else if (inConnect) {
-            game.setNextState(GameState::Connecting);
         }
     }
 }
@@ -105,9 +95,6 @@ void Title::update(Game& game) {
     } else if (mouseX >= OpenPacksButton.x && mouseX <= OpenPacksButton.x + OpenPacksButton.w &&
                mouseY >= OpenPacksButton.y && mouseY <= OpenPacksButton.y + OpenPacksButton.h) {
         hoveredButton = 3;
-    } else if (mouseX >= ConnectButton.x && mouseX <= ConnectButton.x + ConnectButton.w &&
-               mouseY >= ConnectButton.y && mouseY <= ConnectButton.y + ConnectButton.h) {
-        hoveredButton = 4;
     }
 }
 
@@ -191,5 +178,4 @@ void Title::render(const Game& game) {
     drawBtn(quitButton,      Theme::BTN_QUIT,    "Quit Game",  1);
     drawBtn(BuildDeckButton, Theme::BTN_BUILD,   "Build Deck", 2);
     drawBtn(OpenPacksButton, Theme::BTN_START,   "Open Packs", 3);
-    drawBtn(ConnectButton,   Theme::BTN_CONNECT, "Connect",    4);
 }

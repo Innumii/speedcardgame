@@ -105,11 +105,12 @@ void RenderBoard::drawBoardState(SDL_Renderer* renderer, RenderText& textRendere
 	if (!renderer || !fontTitle || !fontBody) return;
 	if (playSlots.empty()) return;
 
-	const int opponentOffset = 230;
+	const int opponentOffset = 210;
+	const std::size_t laneCount = std::min(playSlots.size(), static_cast<std::size_t>(board.getLaneCount()));
 
     // Loop over board indices: 0 = local, 1 = remote
     for (int boardIndex = 0; boardIndex <= 1; ++boardIndex) {
-        for (std::size_t lane = 0; lane < board.getLaneCount(); ++lane) {
+				for (std::size_t lane = 0; lane < laneCount; ++lane) {
             const auto& optCard = board.getZone(static_cast<int>(lane), boardIndex);
             if (!optCard || !*optCard) continue;
 

@@ -474,15 +474,15 @@ void RenderPlaying::render(Playing& playing, const Game& game) {
 
 		int exitTitleW = 0, exitTitleH = 0;
 		if (titleFonts.large) {
-			TTF_SizeText(titleFonts.large, "Exit Game?", &exitTitleW, &exitTitleH);
+			TTF_SizeText(titleFonts.large, "Surrender Match?", &exitTitleW, &exitTitleH);
 		}
-		textRenderer.drawText(renderer, "Exit Game?", titleFonts.large,
+		textRenderer.drawText(renderer, "Surrender Match?", titleFonts.large,
 		                      Theme::TEXT_IVORY,
 		                      playing.exitModal.x + (playing.exitModal.w - exitTitleW) / 2,
 		                      playing.exitModal.y + 40);
 
 		int questionW = 0, questionH = 0;
-		const char* question = "Save your progress?";
+		const char* question = "Are you sure you want to surrender?";
 		if (uiFonts.medium) {
 			TTF_SizeText(uiFonts.medium, question, &questionW, &questionH);
 		}
@@ -499,9 +499,9 @@ void RenderPlaying::render(Playing& playing, const Game& game) {
 		
 		int saveTextW = 0, saveTextH = 0;
 		if (uiFonts.medium) {
-			TTF_SizeText(uiFonts.medium, "Save & Exit", &saveTextW, &saveTextH);
+			TTF_SizeText(uiFonts.medium, "Yes, Surrender", &saveTextW, &saveTextH);
 		}
-		textRenderer.drawText(renderer, "Save & Exit", uiFonts.medium,
+		textRenderer.drawText(renderer, "Yes, Surrender", uiFonts.medium,
 		                      Theme::BTN_TEXT,
 		                      playing.saveExitButton.x + (playing.saveExitButton.w - saveTextW) / 2,
 		                      playing.saveExitButton.y + (playing.saveExitButton.h - saveTextH) / 2);
@@ -514,9 +514,9 @@ void RenderPlaying::render(Playing& playing, const Game& game) {
 		
 		int noSaveTextW = 0, noSaveTextH = 0;
 		if (uiFonts.medium) {
-			TTF_SizeText(uiFonts.medium, "Don't Save", &noSaveTextW, &noSaveTextH);
+			TTF_SizeText(uiFonts.medium, "Cancel", &noSaveTextW, &noSaveTextH);
 		}
-		textRenderer.drawText(renderer, "Don't Save", uiFonts.medium,
+		textRenderer.drawText(renderer, "Cancel", uiFonts.medium,
 		                      Theme::BTN_TEXT,
 		                      playing.noSaveExitButton.x + (playing.noSaveExitButton.w - noSaveTextW) / 2,
 		                      playing.noSaveExitButton.y + (playing.noSaveExitButton.h - noSaveTextH) / 2);

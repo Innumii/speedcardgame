@@ -18,7 +18,6 @@ private:
     SDL_Rect quitButton{300,250,280,75};
     SDL_Rect BuildDeckButton{300,350,280,75};
     SDL_Rect OpenPacksButton{300, 450, 280, 75};
-    SDL_Rect ConnectButton{300, 550, 280, 75};
     SDL_Rect titleBanner{180, 40, 600, 100};
 
     // animation state

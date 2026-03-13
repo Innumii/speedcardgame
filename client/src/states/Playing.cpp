@@ -198,21 +198,20 @@ void Playing::handleEvents(Game& game, const SDL_Event& event) {
 
         if (exitModalOpen) {
             if (pointInRect(saveExitButton, mouseX, mouseY)) {
-                surrendered = false;
+                surrendered = true;
                 pauseModalOpen = false;
                 exitModalOpen = false;
-                game.setNextState(GameState::Title);
                 return;
             }
             if (pointInRect(noSaveExitButton, mouseX, mouseY)) {
-                surrendered = false;
-                pauseModalOpen = false;
                 exitModalOpen = false;
-                game.setNextState(GameState::Title);
+                pauseModalOpen = true;
                 return;
             }
             if (!pointInRect(exitModal, mouseX, mouseY)) {
                 exitModalOpen = false;
+                pauseModalOpen = true;
+                return;
             }
             return;
         }
