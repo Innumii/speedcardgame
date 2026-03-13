@@ -10,6 +10,7 @@
 #include <iostream>
 #include <stdexcept>
 #include <sstream>
+// #include <functional>
 
 namespace {
     SDL_Rect playZoneBand{0, 0, 0, 0};
@@ -417,6 +418,7 @@ void Playing::update(Game& game) {
     previewLocked = false;
 }
 
+//need to refactor into command map at some point. Current method is repetitive
 bool Playing::handleServerMessage(const std::string& msg) {
     std::istringstream iss(msg);
     std::string cmd;
@@ -477,6 +479,16 @@ bool Playing::handleServerMessage(const std::string& msg) {
             playSpell(playerId, std::move(*it), lane, targetLane, targetIndex);
             player.hand.erase(it);
         }
+    } else if (cmd == "COMBAT") { //use this to call rendering for the cards attacking each other
+
+    } else if (cmd == "DIRECT") { //use this to call rendering for direct attack
+
+    } else if (cmd == "AUGMENT") { //use this to modify the power/toughness of the cards
+
+    } else if (cmd == "DESTROY") { //use this to remove cards from the board
+
+    } else if (cmd == "HP") { //use this to modify player health
+
     }
 
     return true;

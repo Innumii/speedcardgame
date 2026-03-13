@@ -512,6 +512,7 @@ std::vector<int>::iterator MatchSession::findCardInHand(PlayerState& player, int
 }
 
 //BOARD ACTIONS
+//AUGMENT <playerId> <lane> <powerDelta> <toughnessDelta>
 void MatchSession::augmentCreature(int targetPlayerIndex, int lane, std::pair<int,int> augment) {
     // Safety checks
     if (targetPlayerIndex < 0 || targetPlayerIndex >= 2) return;
@@ -569,6 +570,7 @@ void MatchSession::setCreature(int targetPlayerIndex, int lane, std::pair<int,in
 }
 
 //removes creature from board, resets augments/effects vectors
+//DESTROY <playerId> <lane>
 void MatchSession::destroyCreature(int targetPlayerIndex, int lane) {
     // Safety checks
     if (targetPlayerIndex < 0 || targetPlayerIndex >= 2) return;
@@ -603,6 +605,7 @@ void MatchSession::destroyCreature(int targetPlayerIndex, int lane) {
 }
 
 //raises or lowers player health 
+//HP <playerId> <delta>
 void MatchSession::augmentHP(int playerIndex, int amount){
     players[playerIndex].health += amount;
 

@@ -83,20 +83,30 @@ public:
     bool drawAndSend(int playerIndex);
     bool loadDeckForPlayer(int playerId, ServerDeck& outDeck);
 
-    //player actions
+    //--------------player actions--------------
+    //PLAY <playerId> <cardId> <lane>
     void handleSummon(int playerIndex, int cardId, int lane);
+    //PLAY <playerId> <cardId> <lane> <targetLane> <clientTargetIndex>
+    //if clientTargetIndex == playerId means targets itself, otherwise target opponent
     void handleSpell(int playerIndex, int cardId, int lane, std::optional<int> targetId = std::nullopt, std::optional<int> targetIndex = std::nullopt);
+    //DISCARD <playerId> <cardId>
     void handleDiscard(int playerIndex, int cardId);
+    //--------------player actions--------------
 
     const ServerCard* getCard(int id) const;
     int getLaneCount() const;
     const std::string getUsername(int playerIndex) const;
 
-    //Board actions
+    //--------------board actions--------------
+    //AUGMENT <playerId> <lane> <powerDelta> <toughnessDelta> 
     void augmentCreature(int targetPlayerIndex, int lane, std::pair<int,int> augment); // buffs/debuffs creature
+    //DESTROY <playerId> <lane>
     void destroyCreature(int targetPlayerIndex, int lane); //removes creature from board, resets augments/effects vectors
+    //HP <playerId> <delta>
     void augmentHP(int playerIndex, int amount); //raises or lowers player health 
+    //SET <playerId> <lane>
     void setCreature(int targetPlayerIndex, int lane, std::pair<int,int> augment); // buffs/debuffs creature
+    //--------------board actions--------------
 
     //Battle Phase
     void resolveAttackPhase();
