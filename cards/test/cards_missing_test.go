@@ -1,4 +1,4 @@
-package services
+package services_test
 
 import (
 	"encoding/json"
@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/Ryanljk/speedcardgame/cards/models"
+	cardservices "github.com/Ryanljk/speedcardgame/cards/services"
 )
 
 // ── GetDeckByUserID ────────────────────────────────────────────────────────────
@@ -20,14 +21,16 @@ func TestGetDeckByUserID_Success(t *testing.T) {
 	req := withChiParam(httptest.NewRequest(http.MethodGet, "/decks/1", nil), "uid", "1")
 	rr := httptest.NewRecorder()
 
-	GetDeckByUserID(rr, req)
+	cardservices.GetDeckByUserID(rr, req)
 
 	if rr.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d: %s", rr.Code, rr.Body.String())
 	}
 
 	var deck models.Deck
-	json.NewDecoder(rr.Body).Decode(&deck)
+	if err := json.NewDecoder(rr.Body).Decode(&deck); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
 	if deck.Uid != 1 {
 		t.Errorf("expected uid 1, got %d", deck.Uid)
 	}
@@ -39,7 +42,7 @@ func TestGetDeckByUserID_NotFound(t *testing.T) {
 	req := withChiParam(httptest.NewRequest(http.MethodGet, "/decks/99", nil), "uid", "99")
 	rr := httptest.NewRecorder()
 
-	GetDeckByUserID(rr, req)
+	cardservices.GetDeckByUserID(rr, req)
 
 	if rr.Code != http.StatusNotFound {
 		t.Errorf("expected 404, got %d", rr.Code)
@@ -52,7 +55,7 @@ func TestGetDeckByUserID_InvalidUID(t *testing.T) {
 	req := withChiParam(httptest.NewRequest(http.MethodGet, "/decks/abc", nil), "uid", "abc")
 	rr := httptest.NewRecorder()
 
-	GetDeckByUserID(rr, req)
+	cardservices.GetDeckByUserID(rr, req)
 
 	if rr.Code != http.StatusBadRequest {
 		t.Errorf("expected 400, got %d", rr.Code)
@@ -68,14 +71,16 @@ func TestGetInventoryByUserID_Success(t *testing.T) {
 	req := withChiParam(httptest.NewRequest(http.MethodGet, "/inventories/1", nil), "uid", "1")
 	rr := httptest.NewRecorder()
 
-	GetInventoryByUserID(rr, req)
+	cardservices.GetInventoryByUserID(rr, req)
 
 	if rr.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d: %s", rr.Code, rr.Body.String())
 	}
 
 	var inv models.Inventory
-	json.NewDecoder(rr.Body).Decode(&inv)
+	if err := json.NewDecoder(rr.Body).Decode(&inv); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
 	if inv.Uid != 1 {
 		t.Errorf("expected uid 1, got %d", inv.Uid)
 	}
@@ -87,7 +92,7 @@ func TestGetInventoryByUserID_NotFound(t *testing.T) {
 	req := withChiParam(httptest.NewRequest(http.MethodGet, "/inventories/99", nil), "uid", "99")
 	rr := httptest.NewRecorder()
 
-	GetInventoryByUserID(rr, req)
+	cardservices.GetInventoryByUserID(rr, req)
 
 	if rr.Code != http.StatusInternalServerError {
 		t.Errorf("expected 500, got %d", rr.Code)
@@ -100,7 +105,7 @@ func TestGetInventoryByUserID_MissingUID(t *testing.T) {
 	req := withChiParam(httptest.NewRequest(http.MethodGet, "/inventories/", nil), "uid", "")
 	rr := httptest.NewRecorder()
 
-	GetInventoryByUserID(rr, req)
+	cardservices.GetInventoryByUserID(rr, req)
 
 	if rr.Code != http.StatusBadRequest {
 		t.Errorf("expected 400, got %d", rr.Code)
@@ -119,14 +124,16 @@ func TestFillDeckForUser_Success(t *testing.T) {
 	req := jsonRequest(t, http.MethodPost, "/decks/fill", body)
 	rr := httptest.NewRecorder()
 
-	FillDeckForUser(rr, req)
+	cardservices.FillDeckForUser(rr, req)
 
 	if rr.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d: %s", rr.Code, rr.Body.String())
 	}
 
 	var deck models.Deck
-	json.NewDecoder(rr.Body).Decode(&deck)
+	if err := json.NewDecoder(rr.Body).Decode(&deck); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
 	if deck.Uid != 1 {
 		t.Errorf("expected uid 1, got %d", deck.Uid)
 	}
@@ -139,7 +146,7 @@ func TestFillDeckForUser_InvalidUID(t *testing.T) {
 	req := jsonRequest(t, http.MethodPost, "/decks/fill", body)
 	rr := httptest.NewRecorder()
 
-	FillDeckForUser(rr, req)
+	cardservices.FillDeckForUser(rr, req)
 
 	if rr.Code != http.StatusBadRequest {
 		t.Errorf("expected 400, got %d", rr.Code)
@@ -153,7 +160,7 @@ func TestFillDeckForUser_InventoryNotFound(t *testing.T) {
 	req := jsonRequest(t, http.MethodPost, "/decks/fill", body)
 	rr := httptest.NewRecorder()
 
-	FillDeckForUser(rr, req)
+	cardservices.FillDeckForUser(rr, req)
 
 	if rr.Code != http.StatusNotFound {
 		t.Errorf("expected 404, got %d", rr.Code)
@@ -166,7 +173,7 @@ func TestFillDeckForUser_InvalidBody(t *testing.T) {
 	req := jsonRequest(t, http.MethodPost, "/decks/fill", "bad")
 	rr := httptest.NewRecorder()
 
-	FillDeckForUser(rr, req)
+	cardservices.FillDeckForUser(rr, req)
 
 	if rr.Code != http.StatusBadRequest {
 		t.Errorf("expected 400, got %d", rr.Code)
@@ -185,7 +192,7 @@ func TestSeedCardsFromCSV_Success(t *testing.T) {
 		t.Fatalf("failed to write temp csv: %v", err)
 	}
 
-	if err := SeedCardsFromCSV(db, tmpFile); err != nil {
+	if err := cardservices.SeedCardsFromCSV(db, tmpFile); err != nil {
 		t.Fatalf("expected no error, got: %v", err)
 	}
 
@@ -199,7 +206,7 @@ func TestSeedCardsFromCSV_Success(t *testing.T) {
 func TestSeedCardsFromCSV_FileNotFound(t *testing.T) {
 	db := setupTestDB(t)
 
-	err := SeedCardsFromCSV(db, "/nonexistent/path/cards.csv")
+	err := cardservices.SeedCardsFromCSV(db, "/nonexistent/path/cards.csv")
 	if err == nil {
 		t.Error("expected error for missing file, got nil")
 	}
@@ -211,9 +218,11 @@ func TestSeedCardsFromCSV_EmptyFile(t *testing.T) {
 	// Only headers, no data rows
 	csvContent := "cid,name,type,cost,value,power,toughness,effect\n"
 	tmpFile := filepath.Join(t.TempDir(), "empty.csv")
-	os.WriteFile(tmpFile, []byte(csvContent), 0644)
+	if err := os.WriteFile(tmpFile, []byte(csvContent), 0644); err != nil {
+		t.Fatalf("failed to write temp csv: %v", err)
+	}
 
-	if err := SeedCardsFromCSV(db, tmpFile); err != nil {
+	if err := cardservices.SeedCardsFromCSV(db, tmpFile); err != nil {
 		t.Fatalf("expected no error for empty CSV, got: %v", err)
 	}
 

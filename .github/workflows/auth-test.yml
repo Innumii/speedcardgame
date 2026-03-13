@@ -30,8 +30,9 @@ jobs:
       - name: Run unit tests with coverage
         working-directory: auth
         run: |
-          go test ./services/... \
+          go test ./test \
             -v \
+            -coverpkg=./services/... \
             -coverprofile=coverage.out \
             -covermode=atomic \
             -race

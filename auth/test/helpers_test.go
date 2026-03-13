@@ -1,10 +1,11 @@
-package services
+package services_test
 
 import (
 	"testing"
 
-	"github.com/alicebob/miniredis/v2"
+	"github.com/Ryanljk/speedcardgame/auth/services"
 	"github.com/Ryanljk/speedcardgame/auth/utils"
+	"github.com/alicebob/miniredis/v2"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -19,11 +20,11 @@ func newTestRedis(t *testing.T) (*miniredis.Miniredis, *redis.Client) {
 	return mr, client
 }
 
-func newTestServices(t *testing.T, repo *MockUserRepository) (*AuthService, *SessionService) {
+func newTestServices(t *testing.T, repo *MockUserRepository) (*services.AuthService, *services.SessionService) {
 	t.Helper()
 	_, redisClient := newTestRedis(t)
-	sessionSvc := NewSessionService(redisClient)
-	authSvc := NewAuthService(repo, sessionSvc)
+	sessionSvc := services.NewSessionService(redisClient)
+	authSvc := services.NewAuthService(repo, sessionSvc)
 	return authSvc, sessionSvc
 }
 

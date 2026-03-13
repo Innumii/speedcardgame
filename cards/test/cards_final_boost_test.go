@@ -1,4 +1,4 @@
-package services
+package services_test
 
 import (
 	"net/http"
@@ -7,6 +7,7 @@ import (
 
 	"github.com/Ryanljk/speedcardgame/cards/config"
 	"github.com/Ryanljk/speedcardgame/cards/models"
+	cardservices "github.com/Ryanljk/speedcardgame/cards/services"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
@@ -21,7 +22,9 @@ func setupBrokenDB(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create db: %v", err)
 	}
-	db.AutoMigrate(&models.Card{}, &models.Deck{}, &models.Inventory{})
+	if err := db.AutoMigrate(&models.Card{}, &models.Deck{}, &models.Inventory{}); err != nil {
+		t.Fatalf("failed to migrate db: %v", err)
+	}
 	sqlDB, _ := db.DB()
 	sqlDB.Close()
 
@@ -36,7 +39,7 @@ func TestCreateCard_DBError(t *testing.T) {
 	setupBrokenDB(t)
 	body := map[string]interface{}{"cid": 1, "name": "Card", "type": "Spell", "cost": 1}
 	rr := httptest.NewRecorder()
-	CreateCard(rr, jsonRequest(t, http.MethodPost, "/cards", body))
+	cardservices.CreateCard(rr, jsonRequest(t, http.MethodPost, "/cards", body))
 	if rr.Code != http.StatusInternalServerError {
 		t.Errorf("expected 500, got %d", rr.Code)
 	}
@@ -45,7 +48,7 @@ func TestCreateCard_DBError(t *testing.T) {
 func TestListCards_DBError(t *testing.T) {
 	setupBrokenDB(t)
 	rr := httptest.NewRecorder()
-	ListCards(rr, httptest.NewRequest(http.MethodGet, "/cards", nil))
+	cardservices.ListCards(rr, httptest.NewRequest(http.MethodGet, "/cards", nil))
 	if rr.Code != http.StatusInternalServerError {
 		t.Errorf("expected 500, got %d", rr.Code)
 	}
@@ -55,7 +58,7 @@ func TestUpdateCard_DBError(t *testing.T) {
 	setupBrokenDB(t)
 	body := map[string]interface{}{"cid": 1, "name": "New"}
 	rr := httptest.NewRecorder()
-	UpdateCard(rr, jsonRequest(t, http.MethodPut, "/cards", body))
+	cardservices.UpdateCard(rr, jsonRequest(t, http.MethodPut, "/cards", body))
 	if rr.Code != http.StatusNotFound {
 		t.Errorf("expected 404, got %d", rr.Code)
 	}
@@ -65,7 +68,7 @@ func TestDeleteCard_DBError(t *testing.T) {
 	setupBrokenDB(t)
 	body := map[string]interface{}{"cid": 1}
 	rr := httptest.NewRecorder()
-	DeleteCard(rr, jsonRequest(t, http.MethodDelete, "/cards", body))
+	cardservices.DeleteCard(rr, jsonRequest(t, http.MethodDelete, "/cards", body))
 	if rr.Code != http.StatusNotFound {
 		t.Errorf("expected 404, got %d", rr.Code)
 	}
@@ -74,7 +77,7 @@ func TestDeleteCard_DBError(t *testing.T) {
 func TestListDecks_DBError(t *testing.T) {
 	setupBrokenDB(t)
 	rr := httptest.NewRecorder()
-	ListDecks(rr, httptest.NewRequest(http.MethodGet, "/decks", nil))
+	cardservices.ListDecks(rr, httptest.NewRequest(http.MethodGet, "/decks", nil))
 	if rr.Code != http.StatusInternalServerError {
 		t.Errorf("expected 500, got %d", rr.Code)
 	}
@@ -84,7 +87,7 @@ func TestDeleteDeck_DBError(t *testing.T) {
 	setupBrokenDB(t)
 	body := map[string]interface{}{"uid": 1}
 	rr := httptest.NewRecorder()
-	DeleteDeck(rr, jsonRequest(t, http.MethodDelete, "/decks", body))
+	cardservices.DeleteDeck(rr, jsonRequest(t, http.MethodDelete, "/decks", body))
 	if rr.Code != http.StatusInternalServerError {
 		t.Errorf("expected 500, got %d", rr.Code)
 	}
@@ -93,7 +96,7 @@ func TestDeleteDeck_DBError(t *testing.T) {
 func TestListInventories_DBError(t *testing.T) {
 	setupBrokenDB(t)
 	rr := httptest.NewRecorder()
-	ListInventories(rr, httptest.NewRequest(http.MethodGet, "/inventories", nil))
+	cardservices.ListInventories(rr, httptest.NewRequest(http.MethodGet, "/inventories", nil))
 	if rr.Code != http.StatusInternalServerError {
 		t.Errorf("expected 500, got %d", rr.Code)
 	}
@@ -103,7 +106,7 @@ func TestGetInventoryByUserID_DBError(t *testing.T) {
 	setupBrokenDB(t)
 	req := withChiParam(httptest.NewRequest(http.MethodGet, "/inventories/1", nil), "uid", "1")
 	rr := httptest.NewRecorder()
-	GetInventoryByUserID(rr, req)
+	cardservices.GetInventoryByUserID(rr, req)
 	if rr.Code != http.StatusInternalServerError {
 		t.Errorf("expected 500, got %d", rr.Code)
 	}
@@ -113,7 +116,7 @@ func TestGetDeckByUserID_DBError(t *testing.T) {
 	setupBrokenDB(t)
 	req := withChiParam(httptest.NewRequest(http.MethodGet, "/decks/1", nil), "uid", "1")
 	rr := httptest.NewRecorder()
-	GetDeckByUserID(rr, req)
+	cardservices.GetDeckByUserID(rr, req)
 	if rr.Code != http.StatusNotFound {
 		t.Errorf("expected 404, got %d", rr.Code)
 	}
@@ -123,7 +126,7 @@ func TestFillDeckForUser_DBError(t *testing.T) {
 	setupBrokenDB(t)
 	body := map[string]interface{}{"uid": 1}
 	rr := httptest.NewRecorder()
-	FillDeckForUser(rr, jsonRequest(t, http.MethodPost, "/decks/fill", body))
+	cardservices.FillDeckForUser(rr, jsonRequest(t, http.MethodPost, "/decks/fill", body))
 	if rr.Code != http.StatusNotFound {
 		t.Errorf("expected 404, got %d", rr.Code)
 	}
@@ -133,7 +136,7 @@ func TestUpdateInventory_DBError(t *testing.T) {
 	setupBrokenDB(t)
 	body := map[string]interface{}{"uid": 1, "cards": map[string]int{"1": 1}}
 	rr := httptest.NewRecorder()
-	UpdateInventory(rr, jsonRequest(t, http.MethodPut, "/inventories", body))
+	cardservices.UpdateInventory(rr, jsonRequest(t, http.MethodPut, "/inventories", body))
 	if rr.Code != http.StatusInternalServerError {
 		t.Errorf("expected 500, got %d", rr.Code)
 	}
@@ -143,7 +146,7 @@ func TestCreateInventory_DBError(t *testing.T) {
 	setupBrokenDB(t)
 	body := map[string]interface{}{"uid": 1}
 	rr := httptest.NewRecorder()
-	CreateInventory(rr, jsonRequest(t, http.MethodPost, "/inventories", body))
+	cardservices.CreateInventory(rr, jsonRequest(t, http.MethodPost, "/inventories", body))
 	if rr.Code != http.StatusInternalServerError {
 		t.Errorf("expected 500, got %d", rr.Code)
 	}
@@ -155,7 +158,7 @@ func TestFillDecksFromInventories_DBError(t *testing.T) {
 	})
 	sqlDB, _ := db.DB()
 	sqlDB.Close()
-	if err := FillDecksFromInventories(db); err == nil {
+	if err := cardservices.FillDecksFromInventories(db); err == nil {
 		t.Error("expected error from broken DB, got nil")
 	}
 }
@@ -168,7 +171,7 @@ func TestCreateDeck_DBError(t *testing.T) {
 		"cards": map[string]int{"1": 1, "2": 1, "3": 1},
 	}
 	rr := httptest.NewRecorder()
-	CreateDeck(rr, jsonRequest(t, http.MethodPost, "/decks", body))
+	cardservices.CreateDeck(rr, jsonRequest(t, http.MethodPost, "/decks", body))
 	if rr.Code != http.StatusInternalServerError {
 		t.Errorf("expected 500, got %d", rr.Code)
 	}
@@ -181,7 +184,7 @@ func TestUpdateInventory_NilCardsInitialized(t *testing.T) {
 	db.Exec("INSERT INTO inventories (uid, cards) VALUES (?, NULL)", 1)
 	body := map[string]interface{}{"uid": 1, "cards": map[string]int{"1": 2}}
 	rr := httptest.NewRecorder()
-	UpdateInventory(rr, jsonRequest(t, http.MethodPut, "/inventories", body))
+	cardservices.UpdateInventory(rr, jsonRequest(t, http.MethodPut, "/inventories", body))
 	if rr.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d: %s", rr.Code, rr.Body.String())
 	}
@@ -195,7 +198,7 @@ func TestFillDeckForUser_NoCardsInDB(t *testing.T) {
 	seedInventory(t, db, models.Inventory{Uid: 1, Cards: models.CardCounts{1: 2}})
 	body := map[string]interface{}{"uid": 1}
 	rr := httptest.NewRecorder()
-	FillDeckForUser(rr, jsonRequest(t, http.MethodPost, "/decks/fill", body))
+	cardservices.FillDeckForUser(rr, jsonRequest(t, http.MethodPost, "/decks/fill", body))
 	if rr.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d: %s", rr.Code, rr.Body.String())
 	}
@@ -204,13 +207,13 @@ func TestFillDeckForUser_NoCardsInDB(t *testing.T) {
 // ── getCSVField bounds ─────────────────────────────────────────────────────────
 
 func TestGetCSVField_OutOfBounds(t *testing.T) {
-	if got := getCSVField([]string{"a", "b"}, 5); got != "" {
+	if got := cardservices.GetCSVField([]string{"a", "b"}, 5); got != "" {
 		t.Errorf("expected empty string, got %q", got)
 	}
 }
 
 func TestGetCSVField_NegativeIndex(t *testing.T) {
-	if got := getCSVField([]string{"a", "b"}, -1); got != "" {
+	if got := cardservices.GetCSVField([]string{"a", "b"}, -1); got != "" {
 		t.Errorf("expected empty string, got %q", got)
 	}
 }

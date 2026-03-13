@@ -1,4 +1,4 @@
-package services
+package services_test
 
 import (
 	"context"
@@ -11,6 +11,7 @@ import (
 
 	"github.com/Ryanljk/speedcardgame/auth/dtos"
 	"github.com/Ryanljk/speedcardgame/auth/models"
+	"github.com/Ryanljk/speedcardgame/auth/services"
 )
 
 // fakeServerHostPort splits "http://127.0.0.1:PORT" into host and port
@@ -174,8 +175,8 @@ func TestLogin_WrongPassword(t *testing.T) {
 
 func TestLogout_Success(t *testing.T) {
 	_, redisClient := newTestRedis(t)
-	sessionSvc := NewSessionService(redisClient)
-	authSvc := NewAuthService(&MockUserRepository{}, sessionSvc)
+	sessionSvc := services.NewSessionService(redisClient)
+	authSvc := services.NewAuthService(&MockUserRepository{}, sessionSvc)
 
 	ctx := context.Background()
 	sessionID, _ := sessionSvc.CreateSession(ctx, "42")
@@ -204,14 +205,14 @@ func TestLogout_SessionNotFound(t *testing.T) {
 
 func TestGetMe_Success(t *testing.T) {
 	_, redisClient := newTestRedis(t)
-	sessionSvc := NewSessionService(redisClient)
+	sessionSvc := services.NewSessionService(redisClient)
 
 	repo := &MockUserRepository{
 		FindByIDFn: func(userID uint) (*models.User, error) {
 			return &models.User{ID: userID, Name: "Alice", Email: "alice@example.com"}, nil
 		},
 	}
-	authSvc := NewAuthService(repo, sessionSvc)
+	authSvc := services.NewAuthService(repo, sessionSvc)
 
 	ctx := context.Background()
 	sessionID, _ := sessionSvc.CreateSession(ctx, "1")
@@ -355,14 +356,14 @@ func TestChangePassword_Success(t *testing.T) {
 	oldHashed := hashedPassword(t, oldPlain)
 
 	_, redisClient := newTestRedis(t)
-	sessionSvc := NewSessionService(redisClient)
+	sessionSvc := services.NewSessionService(redisClient)
 	repo := &MockUserRepository{
 		FindByIDFn: func(userID uint) (*models.User, error) {
 			return &models.User{ID: userID, Password: oldHashed}, nil
 		},
 		ChangePasswordFn: func(userID uint, newPassword string) error { return nil },
 	}
-	authSvc := NewAuthService(repo, sessionSvc)
+	authSvc := services.NewAuthService(repo, sessionSvc)
 
 	ctx := context.Background()
 	sessionID, _ := sessionSvc.CreateSession(ctx, "1")
@@ -378,13 +379,13 @@ func TestChangePassword_WrongOldPassword(t *testing.T) {
 	oldHashed := hashedPassword(t, "correctold")
 
 	_, redisClient := newTestRedis(t)
-	sessionSvc := NewSessionService(redisClient)
+	sessionSvc := services.NewSessionService(redisClient)
 	repo := &MockUserRepository{
 		FindByIDFn: func(userID uint) (*models.User, error) {
 			return &models.User{ID: userID, Password: oldHashed}, nil
 		},
 	}
-	authSvc := NewAuthService(repo, sessionSvc)
+	authSvc := services.NewAuthService(repo, sessionSvc)
 
 	ctx := context.Background()
 	sessionID, _ := sessionSvc.CreateSession(ctx, "1")

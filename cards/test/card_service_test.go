@@ -1,4 +1,4 @@
-package services
+package services_test
 
 import (
 	"bytes"
@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/Ryanljk/speedcardgame/cards/models"
+	cardservices "github.com/Ryanljk/speedcardgame/cards/services"
 )
 
 // ── CreateCard ─────────────────────────────────────────────────────────────────
@@ -22,7 +23,7 @@ func TestCreateCard_Success(t *testing.T) {
 	req := jsonRequest(t, http.MethodPost, "/cards", body)
 	rr := httptest.NewRecorder()
 
-	CreateCard(rr, req)
+	cardservices.CreateCard(rr, req)
 
 	if rr.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d: %s", rr.Code, rr.Body.String())
@@ -43,7 +44,7 @@ func TestCreateCard_InvalidBody(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/cards", bytes.NewBufferString("not-json"))
 	rr := httptest.NewRecorder()
 
-	CreateCard(rr, req)
+	cardservices.CreateCard(rr, req)
 
 	if rr.Code != http.StatusBadRequest {
 		t.Errorf("expected 400, got %d", rr.Code)
@@ -58,14 +59,16 @@ func TestListCards_Empty(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/cards", nil)
 	rr := httptest.NewRecorder()
 
-	ListCards(rr, req)
+	cardservices.ListCards(rr, req)
 
 	if rr.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d", rr.Code)
 	}
 
 	var cards []models.Card
-	json.NewDecoder(rr.Body).Decode(&cards)
+	if err := json.NewDecoder(rr.Body).Decode(&cards); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
 	if len(cards) != 0 {
 		t.Errorf("expected empty list, got %d cards", len(cards))
 	}
@@ -81,14 +84,16 @@ func TestListCards_ReturnsSeedData(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/cards", nil)
 	rr := httptest.NewRecorder()
 
-	ListCards(rr, req)
+	cardservices.ListCards(rr, req)
 
 	if rr.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d", rr.Code)
 	}
 
 	var cards []models.Card
-	json.NewDecoder(rr.Body).Decode(&cards)
+	if err := json.NewDecoder(rr.Body).Decode(&cards); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
 	if len(cards) != 2 {
 		t.Errorf("expected 2 cards, got %d", len(cards))
 	}
@@ -105,10 +110,12 @@ func TestListCards_OrderedByCid(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/cards", nil)
 	rr := httptest.NewRecorder()
 
-	ListCards(rr, req)
+	cardservices.ListCards(rr, req)
 
 	var cards []models.Card
-	json.NewDecoder(rr.Body).Decode(&cards)
+	if err := json.NewDecoder(rr.Body).Decode(&cards); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
 
 	for i := 1; i < len(cards); i++ {
 		if cards[i].Cid < cards[i-1].Cid {
@@ -127,14 +134,16 @@ func TestUpdateCard_Success(t *testing.T) {
 	req := jsonRequest(t, http.MethodPut, "/cards", body)
 	rr := httptest.NewRecorder()
 
-	UpdateCard(rr, req)
+	cardservices.UpdateCard(rr, req)
 
 	if rr.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d: %s", rr.Code, rr.Body.String())
 	}
 
 	var card models.Card
-	json.NewDecoder(rr.Body).Decode(&card)
+	if err := json.NewDecoder(rr.Body).Decode(&card); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
 	if card.Name != "New Name" {
 		t.Errorf("expected 'New Name', got %q", card.Name)
 	}
@@ -147,7 +156,7 @@ func TestUpdateCard_NotFound(t *testing.T) {
 	req := jsonRequest(t, http.MethodPut, "/cards", body)
 	rr := httptest.NewRecorder()
 
-	UpdateCard(rr, req)
+	cardservices.UpdateCard(rr, req)
 
 	if rr.Code != http.StatusNotFound {
 		t.Errorf("expected 404, got %d", rr.Code)
@@ -160,7 +169,7 @@ func TestUpdateCard_InvalidBody(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPut, "/cards", bytes.NewBufferString("bad"))
 	rr := httptest.NewRecorder()
 
-	UpdateCard(rr, req)
+	cardservices.UpdateCard(rr, req)
 
 	if rr.Code != http.StatusBadRequest {
 		t.Errorf("expected 400, got %d", rr.Code)
@@ -177,7 +186,7 @@ func TestDeleteCard_Success(t *testing.T) {
 	req := jsonRequest(t, http.MethodDelete, "/cards", body)
 	rr := httptest.NewRecorder()
 
-	DeleteCard(rr, req)
+	cardservices.DeleteCard(rr, req)
 
 	if rr.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d: %s", rr.Code, rr.Body.String())
@@ -198,7 +207,7 @@ func TestDeleteCard_NotFound(t *testing.T) {
 	req := jsonRequest(t, http.MethodDelete, "/cards", body)
 	rr := httptest.NewRecorder()
 
-	DeleteCard(rr, req)
+	cardservices.DeleteCard(rr, req)
 
 	if rr.Code != http.StatusNotFound {
 		t.Errorf("expected 404, got %d", rr.Code)
@@ -211,7 +220,7 @@ func TestDeleteCard_InvalidBody(t *testing.T) {
 	req := httptest.NewRequest(http.MethodDelete, "/cards", bytes.NewBufferString("bad"))
 	rr := httptest.NewRecorder()
 
-	DeleteCard(rr, req)
+	cardservices.DeleteCard(rr, req)
 
 	if rr.Code != http.StatusBadRequest {
 		t.Errorf("expected 400, got %d", rr.Code)

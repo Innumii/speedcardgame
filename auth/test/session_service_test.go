@@ -1,13 +1,15 @@
-package services
+package services_test
 
 import (
 	"context"
 	"testing"
+
+	"github.com/Ryanljk/speedcardgame/auth/services"
 )
 
 func TestCreateSession_StoresAndReturnsSessionID(t *testing.T) {
 	_, redisClient := newTestRedis(t)
-	svc := NewSessionService(redisClient)
+	svc := services.NewSessionService(redisClient)
 	ctx := context.Background()
 
 	sessionID, err := svc.CreateSession(ctx, "user-1")
@@ -21,7 +23,7 @@ func TestCreateSession_StoresAndReturnsSessionID(t *testing.T) {
 
 func TestCreateSession_ReplacesExistingSession(t *testing.T) {
 	_, redisClient := newTestRedis(t)
-	svc := NewSessionService(redisClient)
+	svc := services.NewSessionService(redisClient)
 	ctx := context.Background()
 
 	firstID, _ := svc.CreateSession(ctx, "user-1")
@@ -42,7 +44,7 @@ func TestCreateSession_ReplacesExistingSession(t *testing.T) {
 
 func TestGetSessionBySessionId_Success(t *testing.T) {
 	_, redisClient := newTestRedis(t)
-	svc := NewSessionService(redisClient)
+	svc := services.NewSessionService(redisClient)
 	ctx := context.Background()
 
 	sessionID, _ := svc.CreateSession(ctx, "user-42")
@@ -58,7 +60,7 @@ func TestGetSessionBySessionId_Success(t *testing.T) {
 
 func TestGetSessionBySessionId_NotFound(t *testing.T) {
 	_, redisClient := newTestRedis(t)
-	svc := NewSessionService(redisClient)
+	svc := services.NewSessionService(redisClient)
 
 	_, err := svc.GetSessionBySessionId(context.Background(), "nonexistent")
 	if err == nil {
@@ -68,7 +70,7 @@ func TestGetSessionBySessionId_NotFound(t *testing.T) {
 
 func TestGetSessionByUserId_Success(t *testing.T) {
 	_, redisClient := newTestRedis(t)
-	svc := NewSessionService(redisClient)
+	svc := services.NewSessionService(redisClient)
 	ctx := context.Background()
 
 	sessionID, _ := svc.CreateSession(ctx, "user-7")
@@ -84,7 +86,7 @@ func TestGetSessionByUserId_Success(t *testing.T) {
 
 func TestDeleteSession_RemovesBothMappings(t *testing.T) {
 	_, redisClient := newTestRedis(t)
-	svc := NewSessionService(redisClient)
+	svc := services.NewSessionService(redisClient)
 	ctx := context.Background()
 
 	sessionID, _ := svc.CreateSession(ctx, "user-5")
@@ -109,7 +111,7 @@ func TestDeleteSession_RemovesBothMappings(t *testing.T) {
 
 func TestDeleteSession_NonexistentIsNoop(t *testing.T) {
 	_, redisClient := newTestRedis(t)
-	svc := NewSessionService(redisClient)
+	svc := services.NewSessionService(redisClient)
 
 	err := svc.DeleteSession(context.Background(), "ghost-session")
 	if err != nil {

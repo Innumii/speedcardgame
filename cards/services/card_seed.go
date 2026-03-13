@@ -62,8 +62,8 @@ func SeedCardsFromCSV(db *gorm.DB, path string) error {
 			return err
 		}
 
-		name := strings.TrimSpace(getCSVField(record, columnIndex["name"]))
-		cardType := strings.TrimSpace(getCSVField(record, columnIndex["type"]))
+		name := strings.TrimSpace(GetCSVField(record, columnIndex["name"]))
+		cardType := strings.TrimSpace(GetCSVField(record, columnIndex["type"]))
 		if name == "" || cardType == "" {
 			return fmt.Errorf("line %d: name and type are required", line)
 		}
@@ -84,7 +84,7 @@ func SeedCardsFromCSV(db *gorm.DB, path string) error {
 		if err != nil {
 			return err
 		}
-		effect := strings.TrimSpace(getCSVField(record, columnIndex["effect"]))
+		effect := strings.TrimSpace(GetCSVField(record, columnIndex["effect"]))
 
 		card := models.Card{
 			Cid:       cid,
@@ -127,7 +127,7 @@ func SeedCardsFromCSV(db *gorm.DB, path string) error {
 }
 
 func parseCSVInt(record []string, index int, field string, line int) (int, error) {
-	raw := strings.TrimSpace(getCSVField(record, index))
+	raw := strings.TrimSpace(GetCSVField(record, index))
 	if raw == "" {
 		return 0, nil
 	}
@@ -138,7 +138,8 @@ func parseCSVInt(record []string, index int, field string, line int) (int, error
 	return value, nil
 }
 
-func getCSVField(record []string, index int) string {
+// GetCSVField returns the value at index, or an empty string when out of bounds.
+func GetCSVField(record []string, index int) string {
 	if index < 0 || index >= len(record) {
 		return ""
 	}

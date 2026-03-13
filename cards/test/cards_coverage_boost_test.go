@@ -1,4 +1,4 @@
-package services
+package services_test
 
 import (
 	"encoding/json"
@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/Ryanljk/speedcardgame/cards/models"
+	cardservices "github.com/Ryanljk/speedcardgame/cards/services"
 )
 
 // ── UpdateCard additional branches ────────────────────────────────────────────
@@ -25,13 +26,15 @@ func TestUpdateCard_UpdateType(t *testing.T) {
 	req := jsonRequest(t, http.MethodPut, "/cards", body)
 	rr := httptest.NewRecorder()
 
-	UpdateCard(rr, req)
+	cardservices.UpdateCard(rr, req)
 
 	if rr.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d: %s", rr.Code, rr.Body.String())
 	}
 	var card models.Card
-	json.NewDecoder(rr.Body).Decode(&card)
+	if err := json.NewDecoder(rr.Body).Decode(&card); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
 	if card.Type != "NewType" {
 		t.Errorf("expected type 'NewType', got %q", card.Type)
 	}
@@ -48,13 +51,15 @@ func TestUpdateCard_UpdateCost(t *testing.T) {
 	req := jsonRequest(t, http.MethodPut, "/cards", body)
 	rr := httptest.NewRecorder()
 
-	UpdateCard(rr, req)
+	cardservices.UpdateCard(rr, req)
 
 	if rr.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d: %s", rr.Code, rr.Body.String())
 	}
 	var card models.Card
-	json.NewDecoder(rr.Body).Decode(&card)
+	if err := json.NewDecoder(rr.Body).Decode(&card); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
 	if card.Cost != 5 {
 		t.Errorf("expected cost 5, got %d", card.Cost)
 	}
@@ -69,7 +74,7 @@ func TestUpdateCard_CostBranchAlwaysHitWhenNameAndTypeEmpty(t *testing.T) {
 	req := jsonRequest(t, http.MethodPut, "/cards", body)
 	rr := httptest.NewRecorder()
 
-	UpdateCard(rr, req)
+	cardservices.UpdateCard(rr, req)
 
 	// Returns 200 (Cost branch is hit, sets cost to 0)
 	if rr.Code != http.StatusOK {
@@ -90,13 +95,15 @@ func TestListCards_MultipleCards(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/cards", nil)
 	rr := httptest.NewRecorder()
 
-	ListCards(rr, req)
+	cardservices.ListCards(rr, req)
 
 	if rr.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d", rr.Code)
 	}
 	var cards []models.Card
-	json.NewDecoder(rr.Body).Decode(&cards)
+	if err := json.NewDecoder(rr.Body).Decode(&cards); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
 	if len(cards) != 3 {
 		t.Errorf("expected 3 cards, got %d", len(cards))
 	}
@@ -113,13 +120,15 @@ func TestListDecks_MultipleDecks(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/decks", nil)
 	rr := httptest.NewRecorder()
 
-	ListDecks(rr, req)
+	cardservices.ListDecks(rr, req)
 
 	if rr.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d", rr.Code)
 	}
 	var decks []models.Deck
-	json.NewDecoder(rr.Body).Decode(&decks)
+	if err := json.NewDecoder(rr.Body).Decode(&decks); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
 	if len(decks) != 3 {
 		t.Errorf("expected 3 decks, got %d", len(decks))
 	}
@@ -134,18 +143,20 @@ func TestListInventories_NormalizesOnRead(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/inventories", nil)
 	rr := httptest.NewRecorder()
 
-	ListInventories(rr, req)
+	cardservices.ListInventories(rr, req)
 
 	if rr.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d", rr.Code)
 	}
 	var invs []models.Inventory
-	json.NewDecoder(rr.Body).Decode(&invs)
+	if err := json.NewDecoder(rr.Body).Decode(&invs); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
 	if len(invs) != 1 {
 		t.Fatalf("expected 1 inventory, got %d", len(invs))
 	}
-	if invs[0].Cards[1] != maxCardCopies {
-		t.Errorf("expected card 1 normalized to %d, got %d", maxCardCopies, invs[0].Cards[1])
+	if invs[0].Cards[1] != 4 {
+		t.Errorf("expected card 1 normalized to %d, got %d", 4, invs[0].Cards[1])
 	}
 }
 
@@ -158,13 +169,15 @@ func TestListInventories_MultipleInventories(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/inventories", nil)
 	rr := httptest.NewRecorder()
 
-	ListInventories(rr, req)
+	cardservices.ListInventories(rr, req)
 
 	if rr.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d", rr.Code)
 	}
 	var invs []models.Inventory
-	json.NewDecoder(rr.Body).Decode(&invs)
+	if err := json.NewDecoder(rr.Body).Decode(&invs); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
 	if len(invs) != 3 {
 		t.Errorf("expected 3 inventories, got %d", len(invs))
 	}
@@ -178,9 +191,11 @@ func TestSeedCardsFromCSV_UpdatesExistingCard(t *testing.T) {
 
 	csvContent := "cid,name,type,cost,value,power,toughness,effect\n1,New Name,Creature,3,2,5,2,Updated\n"
 	tmpFile := filepath.Join(t.TempDir(), "update.csv")
-	os.WriteFile(tmpFile, []byte(csvContent), 0644)
+	if err := os.WriteFile(tmpFile, []byte(csvContent), 0644); err != nil {
+		t.Fatalf("failed to write temp csv: %v", err)
+	}
 
-	if err := SeedCardsFromCSV(db, tmpFile); err != nil {
+	if err := cardservices.SeedCardsFromCSV(db, tmpFile); err != nil {
 		t.Fatalf("expected no error, got: %v", err)
 	}
 
@@ -196,9 +211,11 @@ func TestSeedCardsFromCSV_MissingRequiredColumn(t *testing.T) {
 
 	csvContent := "cid,name,type,cost,value,power,toughness\n1,Card,Spell,1,1,1,1\n"
 	tmpFile := filepath.Join(t.TempDir(), "bad.csv")
-	os.WriteFile(tmpFile, []byte(csvContent), 0644)
+	if err := os.WriteFile(tmpFile, []byte(csvContent), 0644); err != nil {
+		t.Fatalf("failed to write temp csv: %v", err)
+	}
 
-	err := SeedCardsFromCSV(db, tmpFile)
+	err := cardservices.SeedCardsFromCSV(db, tmpFile)
 	if err == nil {
 		t.Error("expected error for missing column, got nil")
 	}
@@ -209,9 +226,11 @@ func TestSeedCardsFromCSV_InvalidIntField(t *testing.T) {
 
 	csvContent := "cid,name,type,cost,value,power,toughness,effect\nNOTANINT,Card,Spell,1,1,1,1,none\n"
 	tmpFile := filepath.Join(t.TempDir(), "badint.csv")
-	os.WriteFile(tmpFile, []byte(csvContent), 0644)
+	if err := os.WriteFile(tmpFile, []byte(csvContent), 0644); err != nil {
+		t.Fatalf("failed to write temp csv: %v", err)
+	}
 
-	err := SeedCardsFromCSV(db, tmpFile)
+	err := cardservices.SeedCardsFromCSV(db, tmpFile)
 	if err == nil {
 		t.Error("expected error for invalid int field, got nil")
 	}
@@ -222,9 +241,11 @@ func TestSeedCardsFromCSV_SkipsEmptyRows(t *testing.T) {
 
 	csvContent := "cid,name,type,cost,value,power,toughness,effect\n1,Card A,Spell,1,1,1,1,none\n\n2,Card B,Creature,2,2,2,2,none\n"
 	tmpFile := filepath.Join(t.TempDir(), "empty_rows.csv")
-	os.WriteFile(tmpFile, []byte(csvContent), 0644)
+	if err := os.WriteFile(tmpFile, []byte(csvContent), 0644); err != nil {
+		t.Fatalf("failed to write temp csv: %v", err)
+	}
 
-	if err := SeedCardsFromCSV(db, tmpFile); err != nil {
+	if err := cardservices.SeedCardsFromCSV(db, tmpFile); err != nil {
 		t.Fatalf("expected no error, got: %v", err)
 	}
 
@@ -240,9 +261,11 @@ func TestSeedCardsFromCSV_MissingNameOrType(t *testing.T) {
 
 	csvContent := "cid,name,type,cost,value,power,toughness,effect\n1,,Spell,1,1,1,1,none\n"
 	tmpFile := filepath.Join(t.TempDir(), "noname.csv")
-	os.WriteFile(tmpFile, []byte(csvContent), 0644)
+	if err := os.WriteFile(tmpFile, []byte(csvContent), 0644); err != nil {
+		t.Fatalf("failed to write temp csv: %v", err)
+	}
 
-	err := SeedCardsFromCSV(db, tmpFile)
+	err := cardservices.SeedCardsFromCSV(db, tmpFile)
 	if err == nil {
 		t.Error("expected error for missing name, got nil")
 	}
