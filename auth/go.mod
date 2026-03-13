@@ -3,6 +3,7 @@ module github.com/Ryanljk/speedcardgame/auth
 go 1.23.0
 
 require (
+	github.com/alicebob/miniredis/v2 v2.37.0
 	github.com/bokwoon95/wgo v0.5.6
 	github.com/gin-contrib/cors v1.7.2
 	github.com/gin-gonic/gin v1.10.0
@@ -198,6 +199,7 @@ require (
 	github.com/yagipy/maintidx v1.0.0 // indirect
 	github.com/yeya24/promlinter v0.3.0 // indirect
 	github.com/ykadowak/zerologlint v0.1.5 // indirect
+	github.com/yuin/gopher-lua v1.1.1 // indirect
 	gitlab.com/bosi/decorder v0.4.2 // indirect
 	go-simpler.org/musttag v0.12.2 // indirect
 	go-simpler.org/sloglint v0.7.2 // indirect

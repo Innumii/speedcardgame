@@ -8,16 +8,17 @@ import (
 	"sort"
 	"strconv"
 
-	"github.com/go-chi/chi"
 	"github.com/Ryanljk/speedcardgame/cards/config"
 	"github.com/Ryanljk/speedcardgame/cards/models"
 	"github.com/Ryanljk/speedcardgame/cards/util"
+	"github.com/go-chi/chi"
 	"gorm.io/gorm"
 )
 
 const defaultDeckSizeLimit = 30
 
-func getDeckSizeLimit() int {
+// GetDeckSizeLimit returns the configured deck size, or the default when unset.
+func GetDeckSizeLimit() int {
 	value := os.Getenv("DECK_SIZE")
 	if value == "" {
 		return defaultDeckSizeLimit
@@ -29,7 +30,8 @@ func getDeckSizeLimit() int {
 	return parsed
 }
 
-func countDeckCards(cards models.CardCounts) int {
+// CountDeckCards sums the quantities in a deck list.
+func CountDeckCards(cards models.CardCounts) int {
 	total := 0
 	for _, count := range cards {
 		total += count
@@ -55,8 +57,8 @@ func CreateDeck(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	deckSizeLimit := getDeckSizeLimit()
-	if countDeckCards(inputDeck.Cards) != deckSizeLimit {
+	deckSizeLimit := GetDeckSizeLimit()
+	if CountDeckCards(inputDeck.Cards) != deckSizeLimit {
 		http.Error(w, fmt.Sprintf("deck must contain exactly %d cards", deckSizeLimit), http.StatusBadRequest)
 		return
 	}
@@ -160,7 +162,7 @@ func FillDeckForUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	deckCounts := buildDeckCounts(inventory.Cards, allCards, getDeckSizeLimit())
+	deckCounts := BuildDeckCounts(inventory.Cards, allCards, GetDeckSizeLimit())
 	deck := models.Deck{
 		Uid:   input.Uid,
 		Cards: deckCounts,
@@ -193,7 +195,7 @@ func FillDecksFromInventories(db *gorm.DB) error {
 		return nil
 	}
 
-	deckSizeLimit := getDeckSizeLimit()
+	deckSizeLimit := GetDeckSizeLimit()
 
 	var allCards []models.Card
 	if err := db.Order("cid").Find(&allCards).Error; err != nil {
@@ -201,7 +203,7 @@ func FillDecksFromInventories(db *gorm.DB) error {
 	}
 
 	for _, inventory := range inventories {
-		deckCounts := buildDeckCounts(inventory.Cards, allCards, deckSizeLimit)
+		deckCounts := BuildDeckCounts(inventory.Cards, allCards, deckSizeLimit)
 		deck := models.Deck{
 			Uid:   inventory.Uid,
 			Cards: deckCounts,
@@ -218,7 +220,8 @@ func FillDecksFromInventories(db *gorm.DB) error {
 	return nil
 }
 
-func buildDeckCounts(inventory models.CardCounts, allCards []models.Card, limit int) models.CardCounts {
+// BuildDeckCounts fills a deck from inventory first, then from the card catalog.
+func BuildDeckCounts(inventory models.CardCounts, allCards []models.Card, limit int) models.CardCounts {
 	deck := make(models.CardCounts)
 	remaining := limit
 
@@ -257,21 +260,21 @@ func buildDeckCounts(inventory models.CardCounts, allCards []models.Card, limit 
 
 // GetDeckByUserID handles GET /decks/{uid}
 func GetDeckByUserID(w http.ResponseWriter, r *http.Request) {
-    uidStr := chi.URLParam(r, "uid")
-    uid, err := strconv.Atoi(uidStr)
-    if err != nil {
-        util.RespondWithError(w, http.StatusBadRequest, "Invalid user ID format")
-        return
-    }
+	uidStr := chi.URLParam(r, "uid")
+	uid, err := strconv.Atoi(uidStr)
+	if err != nil {
+		util.RespondWithError(w, http.StatusBadRequest, "Invalid user ID format")
+		return
+	}
 
-    var deck models.Deck
-    if err := config.DB.Where("uid = ?", uid).First(&deck).Error; err != nil {
-        util.RespondWithError(w, http.StatusNotFound, "Deck not found")
-        return
-    }
+	var deck models.Deck
+	if err := config.DB.Where("uid = ?", uid).First(&deck).Error; err != nil {
+		util.RespondWithError(w, http.StatusNotFound, "Deck not found")
+		return
+	}
 
-    w.Header().Set("Content-Type", "application/json")
-    err = json.NewEncoder(w).Encode(deck)
+	w.Header().Set("Content-Type", "application/json")
+	err = json.NewEncoder(w).Encode(deck)
 	if err != nil {
 		http.Error(w, "Failed to encode deck", http.StatusInternalServerError)
 		return

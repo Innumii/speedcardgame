@@ -17,7 +17,8 @@ var inputInventory struct {
 
 const maxCardCopies = 4
 
-func clampCardCount(value int) int {
+// ClampCardCount constrains an inventory quantity to the allowed range.
+func ClampCardCount(value int) int {
 	if value < 0 {
 		return 0
 	}
@@ -27,7 +28,8 @@ func clampCardCount(value int) int {
 	return value
 }
 
-func normalizeInventoryCards(cards models.CardCounts) bool {
+// NormalizeInventoryCards removes invalid entries and clamps valid card quantities.
+func NormalizeInventoryCards(cards models.CardCounts) bool {
 	if cards == nil {
 		return false
 	}
@@ -40,7 +42,7 @@ func normalizeInventoryCards(cards models.CardCounts) bool {
 			continue
 		}
 
-		clamped := clampCardCount(qty)
+		clamped := ClampCardCount(qty)
 		if clamped <= 0 {
 			if qty != 0 {
 				changed = true
@@ -87,7 +89,7 @@ func CreateInventory(w http.ResponseWriter, r *http.Request) {
 
 		inventory.Cards = IntroCards
 	}
-	normalizeInventoryCards(inventory.Cards)
+	NormalizeInventoryCards(inventory.Cards)
 	// Insert into the database
 	if err := config.DB.Create(&inventory).Error; err != nil {
 		http.Error(w, fmt.Sprintf("Failed to create inventory: %v", err), http.StatusInternalServerError)
@@ -112,7 +114,7 @@ func ListInventories(w http.ResponseWriter, _ *http.Request) {
 	}
 
 	for i := range inventories {
-		if normalizeInventoryCards(inventories[i].Cards) {
+		if NormalizeInventoryCards(inventories[i].Cards) {
 			_ = config.DB.Save(&inventories[i]).Error
 		}
 	}
@@ -138,7 +140,7 @@ func GetInventoryByUserID(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if normalizeInventoryCards(inventory.Cards) {
+	if NormalizeInventoryCards(inventory.Cards) {
 		if err := config.DB.Save(&inventory).Error; err != nil {
 			http.Error(w, fmt.Sprintf("Failed to normalize inventory: %v", err), http.StatusInternalServerError)
 			return
@@ -180,7 +182,7 @@ func UpdateInventory(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 		nextQty := inventory.Cards[cid] + qty
-		clamped := clampCardCount(nextQty)
+		clamped := ClampCardCount(nextQty)
 		if clamped <= 0 {
 			delete(inventory.Cards, cid)
 			continue
@@ -188,7 +190,7 @@ func UpdateInventory(w http.ResponseWriter, r *http.Request) {
 		inventory.Cards[cid] = clamped
 	}
 
-	normalizeInventoryCards(inventory.Cards)
+	NormalizeInventoryCards(inventory.Cards)
 
 	// Save the updated inventory
 	if err := config.DB.Save(&inventory).Error; err != nil {
