@@ -230,6 +230,8 @@ void MatchSession::gameLoop() {
     using namespace std::chrono;
 
     auto lastDrawTime = steady_clock::now();
+    auto lastAttackTime = steady_clock::now();
+
     std::cout << "[MatchSession] Game loop started\n";
 
     std::string msgA = "MATCH_START " + std::to_string(playerB->getPlayerId()) + "\n";
@@ -256,6 +258,11 @@ void MatchSession::gameLoop() {
             drawAndSend(0);
             drawAndSend(1);
             lastDrawTime = now;
+        }
+
+        if (duration_cast<seconds>(now - lastAttackTime).count() >= attackInterval) {
+            resolveAttackPhase();
+            lastAttackTime = now;
         }
 
         std::this_thread::sleep_for(10ms);
@@ -424,15 +431,15 @@ void MatchSession::handleSpell(int playerIndex, int cardId, int lane, std::optio
     std::cout << "[MatchSession] " << getUsername(playerIndex) << " Casts " << name << "\n";
 
         //Send confirmation message on successful summon
-    std::string msg = "PLAY " + std::to_string(player.id) + " "
+    std::string spellMsg = "PLAY " + std::to_string(player.id) + " "
                     + std::to_string(cardId) + " "
                     + std::to_string(lane) + " "
                     + (targetId ? std::to_string(*targetId) : "-1") + " "
                     + (targetIndex ? std::to_string(*targetIndex) : "-1") + "\n";
-    std::cout << "[MatchSession] Sending Spell Command: " << msg << "\n";
+    std::cout << "[MatchSession] Sending Spell Command: " << spellMsg << "\n";
 
-    playerA->send(msg);
-    playerB->send(msg);
+    playerA->send(spellMsg);
+    playerB->send(spellMsg);
 
     // Call Effect
 
@@ -530,6 +537,16 @@ void MatchSession::augmentCreature(int targetPlayerIndex, int lane, std::pair<in
         existingAugment = augment;
     }
 
+    // broadcast
+    std::string msg = "AUGMENT "
+        + std::to_string(players[targetPlayerIndex].id) + " "
+        + std::to_string(lane) + " "
+        + std::to_string(augment.first) + " "
+        + std::to_string(augment.second) + "\n";
+
+    playerA->send(msg);
+    playerB->send(msg);
+
 }
 
 void MatchSession::setCreature(int targetPlayerIndex, int lane, std::pair<int,int> augment) {
@@ -577,10 +594,124 @@ void MatchSession::destroyCreature(int targetPlayerIndex, int lane) {
     std::cout << "[MatchSession::destroyCreature] Destroyed creature "
               << cardId << " on lane " << lane
               << " for " << getUsername(targetPlayerIndex) << "\n";
+
+    // broadcast
+    std::string msg = "DESTROY " + std::to_string(players[targetPlayerIndex].id) + " "
+                    + std::to_string(lane)+ "\n";
+    playerA->send(msg);
+    playerB->send(msg);
 }
 
 //raises or lowers player health 
 void MatchSession::augmentHP(int playerIndex, int amount){
     players[playerIndex].health += amount;
+
+
 } 
 
+//COMBAT FUNCTIONS GO HERE
+int MatchSession::getCreaturePower(int playerIndex, int lane) {
+    auto& cardOpt = board.lanes[playerIndex][lane];
+    if (!cardOpt) return 0;
+
+    const ServerCard* card = getCard(*cardOpt);
+    if (!card) return 0;
+    const CreatureCard* creature = dynamic_cast<const CreatureCard*>(card);
+    if (!creature) {
+        std::cerr << "Card is not a creature\n";
+        return -1;
+    }
+
+    int power = creature->getPower();    
+
+    auto& aug = board.augments[playerIndex][lane];
+    if (aug) power += aug->first;
+
+    return power;
+}
+
+int MatchSession::getCreatureToughness(int playerIndex, int lane) {
+    auto& cardOpt = board.lanes[playerIndex][lane];
+    if (!cardOpt) return 0;
+
+    const ServerCard* card = getCard(*cardOpt);
+    if (!card) return 0;
+    const CreatureCard* creature = dynamic_cast<const CreatureCard*>(card);
+    if (!creature) {
+        std::cerr << "Card is not a creature\n";
+        return -1;
+    }
+    int toughness = creature->getToughness();
+
+    auto& aug = board.augments[playerIndex][lane];
+    if (aug) toughness += aug->second;
+
+    return toughness;
+}
+
+void MatchSession::resolveAttackPhase() {
+    std::cout << "[MatchSession] Attack Phase Entered\n";
+
+    for (int lane = 0; lane < board.laneCount; lane++) {
+        resolveLaneCombat(lane);
+    }
+
+    // After combat, check deaths
+    for (int p = 0; p < 2; p++) {
+        for (int lane = 0; lane < board.laneCount; lane++) {
+            auto& cardOpt = board.lanes[p][lane];
+            if (!cardOpt) continue;
+
+            int toughness = getCreatureToughness(p, lane);
+
+            if (toughness <= 0) {
+                destroyCreature(p, lane);
+            }
+        }
+    }
+}
+
+// COMBAT <lane> <playerA's card power> <playerB's card power>
+// DIRECT <attacker ID> <lane> <damage>
+void MatchSession::resolveLaneCombat(int lane) {
+
+    auto& cardA = board.lanes[0][lane];
+    auto& cardB = board.lanes[1][lane];
+
+    if (!cardA && !cardB) return;
+
+    if (cardA && cardB) {
+
+        int powerA = getCreaturePower(0, lane);
+        int powerB = getCreaturePower(1, lane);
+
+        std::cout << "[Combat] Lane " << lane
+                  << " A(" << powerA << ") vs B(" << powerB << ")\n";
+
+        augmentCreature(0, lane, {0, -powerB});
+        augmentCreature(1, lane, {0, -powerA});
+
+        std::ostringstream ss;
+        ss << "COMBAT " << lane << " " << powerA << " " << powerB << "\n";
+        playerA->send(ss.str());
+        playerB->send(ss.str());
+    } else {
+        int attackerIndex = -1;
+        if (cardA) attackerIndex = 0;
+        else if (cardB) attackerIndex = 1;
+
+        int power = getCreaturePower(attackerIndex, lane);
+
+        std::cout << "[Combat] Direct attack: "
+                  << getUsername(attackerIndex) << " deals "
+                  << power << " to "
+                  << getUsername(1 - attackerIndex) << "\n";
+
+        std::string msg = "DIRECT " + std::to_string(players[attackerIndex].id) + " " + std::to_string(lane) + " " + std::to_string(power) + "\n";
+        playerA->send(msg);
+        playerB->send(msg);
+
+        augmentHP(1 - attackerIndex, -power);
+
+    }
+}

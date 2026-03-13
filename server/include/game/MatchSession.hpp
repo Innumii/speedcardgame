@@ -98,10 +98,17 @@ public:
     void augmentHP(int playerIndex, int amount); //raises or lowers player health 
     void setCreature(int targetPlayerIndex, int lane, std::pair<int,int> augment); // buffs/debuffs creature
 
+    //Battle Phase
+    void resolveAttackPhase();
+    void resolveLaneCombat(int lane);
+    int getCreaturePower(int playerIndex, int lane);
+    int getCreatureToughness(int playerIndex, int lane);
+
 
 private:
     const int handLimit = 7;
     const int drawInterval = 5;
+    const int attackInterval = 5; 
 
     void gameLoop();
     void handleDisconnect();
