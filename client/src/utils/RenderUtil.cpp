@@ -83,6 +83,50 @@ void RenderUtil::drawRoundedRect(SDL_Renderer* renderer, const SDL_Rect& rect, i
     drawRoundedBorder(renderer, rect, radius, border, 1);
 }
 
+void RenderUtil::drawRoundedShadow(SDL_Renderer* renderer, const SDL_Rect& rect, int radius, int offset, SDL_Color color) {
+    if (!renderer || rect.w <= 0 || rect.h <= 0) return;
+
+    SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+    SDL_SetRenderDrawColor(renderer, color.r, color.g, color.b, color.a);
+
+    SDL_Rect shadowRect{rect.x + offset, rect.y + offset, rect.w, rect.h};
+    SDL_Rect body{shadowRect.x + radius, shadowRect.y, shadowRect.w - 2 * radius, shadowRect.h};
+    SDL_Rect left{shadowRect.x, shadowRect.y + radius, radius, shadowRect.h - 2 * radius};
+    SDL_Rect right{shadowRect.x + shadowRect.w - radius, shadowRect.y + radius, radius, shadowRect.h - 2 * radius};
+
+    SDL_RenderFillRect(renderer, &body);
+    SDL_RenderFillRect(renderer, &left);
+    SDL_RenderFillRect(renderer, &right);
+    fillCircle(renderer, shadowRect.x + radius, shadowRect.y + radius, radius);
+    fillCircle(renderer, shadowRect.x + shadowRect.w - radius, shadowRect.y + radius, radius);
+    fillCircle(renderer, shadowRect.x + radius, shadowRect.y + shadowRect.h - radius, radius);
+    fillCircle(renderer, shadowRect.x + shadowRect.w - radius, shadowRect.y + shadowRect.h - radius, radius);
+}
+
+void RenderUtil::drawRoundedGlow(SDL_Renderer* renderer, const SDL_Rect& rect, int radius, SDL_Color glowColor, int layers, Uint8 maxAlpha) {
+    if (!renderer || rect.w <= 0 || rect.h <= 0 || layers <= 0 || maxAlpha == 0) return;
+
+    SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+    for (int i = layers; i >= 1; --i) {
+        const Uint8 alpha = static_cast<Uint8>((static_cast<int>(maxAlpha) * (layers - i + 1)) / layers);
+        SDL_Color halo{glowColor.r, glowColor.g, glowColor.b, alpha};
+        SDL_Rect haloRect{rect.x - i, rect.y - i, rect.w + i * 2, rect.h + i * 2};
+        drawRoundedRect(renderer, haloRect, radius, SDL_Color{0, 0, 0, 0}, halo);
+    }
+}
+
+void RenderUtil::drawRectGlowBorder(SDL_Renderer* renderer, const SDL_Rect& rect, SDL_Color glowColor, int layers, Uint8 baseAlpha, Uint8 alphaStep) {
+    if (!renderer || rect.w <= 0 || rect.h <= 0 || layers <= 0) return;
+
+    SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+    for (int i = layers; i >= 1; --i) {
+        const Uint8 alpha = static_cast<Uint8>(baseAlpha + (layers - i) * alphaStep);
+        SDL_SetRenderDrawColor(renderer, glowColor.r, glowColor.g, glowColor.b, alpha);
+        SDL_Rect glowRect{rect.x - i, rect.y - i, rect.w + i * 2, rect.h + i * 2};
+        SDL_RenderDrawRect(renderer, &glowRect);
+    }
+}
+
 void RenderUtil::drawCenteredText(SDL_Renderer* renderer, TTF_Font* font, const std::string& text, const SDL_Rect& rect, SDL_Color color) {
     if (!renderer || !font || text.empty()) return;
 
@@ -102,6 +146,11 @@ void RenderUtil::drawCenteredText(SDL_Renderer* renderer, TTF_Font* font, const 
     }
 
     SDL_FreeSurface(surface);
+}
+
+bool RenderUtil::pointInRect(const SDL_Rect& rect, int x, int y) {
+    return x >= rect.x && x < rect.x + rect.w &&
+           y >= rect.y && y < rect.y + rect.h;
 }
 
 SDL_Color RenderUtil::brighten(SDL_Color color, int amount) {

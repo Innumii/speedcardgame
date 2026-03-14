@@ -4,6 +4,7 @@
 #include "utils/HttpUtil.hpp"
 #include "utils/JsonUtil.hpp"
 #include "utils/EnvUtil.hpp"
+#include "utils/RenderUtil.hpp"
 #include "render/RenderText.hpp"
 #include "render/RenderBanner.hpp"
 #include "render/Theme.hpp"
@@ -61,80 +62,6 @@ namespace {
     }
 }
 
-// ── render helpers (file-local) ───────────────────────────────────────────────
-
-namespace {
-    void fillCircleR(SDL_Renderer* r, int cx, int cy, int rad) {
-        for (int dy = -rad; dy <= rad; dy++) {
-            int dx = (int)sqrt((double)(rad*rad - dy*dy));
-            SDL_RenderDrawLine(r, cx-dx, cy+dy, cx+dx, cy+dy);
-        }
-    }
-
-    void drawRoundedRect(SDL_Renderer* r, const SDL_Rect& rect,
-                          int rad, SDL_Color fill, SDL_Color border) {
-        SDL_SetRenderDrawColor(r, fill.r, fill.g, fill.b, fill.a);
-        SDL_Rect body  = {rect.x + rad,          rect.y,       rect.w - 2*rad, rect.h        };
-        SDL_Rect left  = {rect.x,                 rect.y + rad, rad,            rect.h - 2*rad};
-        SDL_Rect right = {rect.x + rect.w - rad,  rect.y + rad, rad,            rect.h - 2*rad};
-        SDL_RenderFillRect(r, &body);
-        SDL_RenderFillRect(r, &left);
-        SDL_RenderFillRect(r, &right);
-        fillCircleR(r, rect.x + rad,          rect.y + rad,          rad);
-        fillCircleR(r, rect.x + rect.w - rad, rect.y + rad,          rad);
-        fillCircleR(r, rect.x + rad,          rect.y + rect.h - rad, rad);
-        fillCircleR(r, rect.x + rect.w - rad, rect.y + rect.h - rad, rad);
-
-        SDL_SetRenderDrawColor(r, border.r, border.g, border.b, border.a);
-        SDL_RenderDrawLine(r, rect.x + rad,       rect.y,            rect.x + rect.w - rad, rect.y            );
-        SDL_RenderDrawLine(r, rect.x + rad,       rect.y + rect.h,   rect.x + rect.w - rad, rect.y + rect.h   );
-        SDL_RenderDrawLine(r, rect.x,             rect.y + rad,      rect.x,                rect.y + rect.h - rad);
-        SDL_RenderDrawLine(r, rect.x + rect.w,    rect.y + rad,      rect.x + rect.w,       rect.y + rect.h - rad);
-    }
-
-    void drawGlowBorder(SDL_Renderer* r, const SDL_Rect& rect, SDL_Color glow) {
-        SDL_SetRenderDrawBlendMode(r, SDL_BLENDMODE_BLEND);
-        for (int i = 5; i >= 1; i--) {
-            Uint8 alpha = (Uint8)(20 + (5 - i) * 18);
-            SDL_SetRenderDrawColor(r, glow.r, glow.g, glow.b, alpha);
-            SDL_Rect g = {rect.x - i, rect.y - i, rect.w + i*2, rect.h + i*2};
-            SDL_RenderDrawRect(r, &g);
-        }
-    }
-
-    void drawShadow(SDL_Renderer* r, const SDL_Rect& rect, int rad) {
-        SDL_SetRenderDrawBlendMode(r, SDL_BLENDMODE_BLEND);
-        SDL_SetRenderDrawColor(r, 0, 0, 0, 90);
-        SDL_Rect s = {rect.x + 5, rect.y + 5, rect.w, rect.h};
-        SDL_Rect sb = {s.x + rad,        s.y,     s.w - 2*rad, s.h        };
-        SDL_Rect sl = {s.x,              s.y+rad, rad,         s.h - 2*rad};
-        SDL_Rect sr = {s.x + s.w - rad,  s.y+rad, rad,         s.h - 2*rad};
-        SDL_RenderFillRect(r, &sb);
-        SDL_RenderFillRect(r, &sl);
-        SDL_RenderFillRect(r, &sr);
-        fillCircleR(r, s.x + rad,       s.y + rad,       rad);
-        fillCircleR(r, s.x + s.w - rad, s.y + rad,       rad);
-        fillCircleR(r, s.x + rad,       s.y + s.h - rad, rad);
-        fillCircleR(r, s.x + s.w - rad, s.y + s.h - rad, rad);
-    }
-
-    void drawCentered(SDL_Renderer* r, TTF_Font* font,
-                       const std::string& text, const SDL_Rect& rect, SDL_Color color) {
-        if (!font) return;
-        SDL_Surface* s = TTF_RenderUTF8_Blended(font, text.c_str(), color);
-        if (!s) return;
-        SDL_Texture* t = SDL_CreateTextureFromSurface(r, s);
-        if (t) {
-            SDL_Rect dst = {rect.x + (rect.w - s->w)/2,
-                            rect.y + (rect.h - s->h)/2,
-                            s->w, s->h};
-            SDL_RenderCopy(r, t, nullptr, &dst);
-            SDL_DestroyTexture(t);
-        }
-        SDL_FreeSurface(s);
-    }
-}
-
 // ── Login implementation ──────────────────────────────────────────────────────
 
 Login::Login()  = default;
@@ -153,10 +80,6 @@ void Login::exit(Game& game) {
     backHover       = false;
 }
 
-bool Login::pointInRect(const SDL_Rect& rect, int x, int y) const {
-    return x >= rect.x && x <= rect.x + rect.w &&
-           y >= rect.y && y <= rect.y + rect.h;
-}
 
 void Login::setActiveField(Field field) {
     activeField = field;
@@ -198,16 +121,16 @@ void Login::handleEvents(Game& game, const SDL_Event& event) {
         return;
     }
     if (event.type == SDL_MOUSEMOTION) {
-        loginHover = pointInRect(loginButtonRect, event.motion.x, event.motion.y);
-        backHover  = pointInRect(backButtonRect,  event.motion.x, event.motion.y);
+        loginHover = RenderUtil::pointInRect(loginButtonRect, event.motion.x, event.motion.y);
+        backHover  = RenderUtil::pointInRect(backButtonRect,  event.motion.x, event.motion.y);
     }
     if (event.type == SDL_MOUSEBUTTONDOWN && event.button.button == SDL_BUTTON_LEFT) {
         const int mx = event.button.x, my = event.button.y;
-        if      (pointInRect(usernameRect,    mx, my)) setActiveField(Field::Username);
-        else if (pointInRect(passwordRect,    mx, my)) setActiveField(Field::Password);
+        if      (RenderUtil::pointInRect(usernameRect,    mx, my)) setActiveField(Field::Username);
+        else if (RenderUtil::pointInRect(passwordRect,    mx, my)) setActiveField(Field::Password);
         else                                           setActiveField(Field::None);
-        if      (pointInRect(loginButtonRect, mx, my)) loginPressed    = true;
-        else if (pointInRect(backButtonRect,  mx, my)) registerPressed = true;
+        if      (RenderUtil::pointInRect(loginButtonRect, mx, my)) loginPressed    = true;
+        else if (RenderUtil::pointInRect(backButtonRect,  mx, my)) registerPressed = true;
     }
     if (event.type == SDL_TEXTINPUT) {
         statusMessage.clear(); 
@@ -313,9 +236,9 @@ void Login::render(const Game& game) {
                               Theme::BANNER_TEXT,  Theme::BANNER_GLOW);
 
     // ── panel ────────────────────────────────────────────────────────
-    drawShadow(r, panelRect, Theme::PANEL_RADIUS);
-    drawRoundedRect(r, panelRect, Theme::PANEL_RADIUS,
-                    Theme::PANEL_FILL, Theme::PANEL_BORDER);
+    RenderUtil::drawRoundedShadow(r, panelRect, Theme::PANEL_RADIUS, Theme::Effects::SHADOW_OFFSET, Theme::Effects::SHADOW_COLOR);
+    RenderUtil::drawRoundedRect(r, panelRect, Theme::PANEL_RADIUS,
+                                Theme::PANEL_FILL, Theme::PANEL_BORDER);
 
     // ── panel title ──────────────────────────────────────────────────
     if (titleFonts.medium) {
@@ -338,15 +261,25 @@ void Login::render(const Game& game) {
     const bool userActive = activeField == Field::Username;
     const bool passActive = activeField == Field::Password;
 
-    drawRoundedRect(r, usernameRect, Theme::INPUT_RADIUS,
-                    userActive ? Theme::INPUT_ACTIVE : Theme::INPUT_FILL,
-                    userActive ? Theme::INPUT_BORDER_ACTIVE : Theme::INPUT_BORDER_IDLE);
-    if (userActive) drawGlowBorder(r, usernameRect, Theme::INPUT_BORDER_ACTIVE);
+    RenderUtil::drawRoundedRect(r, usernameRect, Theme::INPUT_RADIUS,
+                                userActive ? Theme::INPUT_ACTIVE : Theme::INPUT_FILL,
+                                userActive ? Theme::INPUT_BORDER_ACTIVE : Theme::INPUT_BORDER_IDLE);
+    if (userActive) {
+        RenderUtil::drawRectGlowBorder(r, usernameRect, Theme::INPUT_BORDER_ACTIVE,
+                                       Theme::Effects::INPUT_GLOW_LAYERS,
+                                       Theme::Effects::INPUT_GLOW_BASE_ALPHA,
+                                       Theme::Effects::INPUT_GLOW_ALPHA_STEP);
+    }
 
-    drawRoundedRect(r, passwordRect, Theme::INPUT_RADIUS,
-                    passActive ? Theme::INPUT_ACTIVE : Theme::INPUT_FILL,
-                    passActive ? Theme::INPUT_BORDER_ACTIVE : Theme::INPUT_BORDER_IDLE);
-    if (passActive) drawGlowBorder(r, passwordRect, Theme::INPUT_BORDER_ACTIVE);
+    RenderUtil::drawRoundedRect(r, passwordRect, Theme::INPUT_RADIUS,
+                                passActive ? Theme::INPUT_ACTIVE : Theme::INPUT_FILL,
+                                passActive ? Theme::INPUT_BORDER_ACTIVE : Theme::INPUT_BORDER_IDLE);
+    if (passActive) {
+        RenderUtil::drawRectGlowBorder(r, passwordRect, Theme::INPUT_BORDER_ACTIVE,
+                                       Theme::Effects::INPUT_GLOW_LAYERS,
+                                       Theme::Effects::INPUT_GLOW_BASE_ALPHA,
+                                       Theme::Effects::INPUT_GLOW_ALPHA_STEP);
+    }
 
     // ── validation message ───────────────────────────────────────────
     if (uiFonts.small && !statusMessage.empty()) {
@@ -379,11 +312,11 @@ void Login::render(const Game& game) {
     SDL_Color loginFill    = loginHover ? brighten(Theme::BTN_PRIMARY,   40) : Theme::BTN_PRIMARY;
     SDL_Color registerFill = backHover  ? brighten(Theme::BTN_SECONDARY, 40) : Theme::BTN_SECONDARY;
 
-    drawShadow(r, loginButtonRect,  Theme::BTN_RADIUS);
-    drawRoundedRect(r, loginButtonRect,  Theme::BTN_RADIUS, loginFill,    Theme::BTN_BORDER);
-    drawCentered(r, uiFonts.large, "Login",    loginButtonRect,  Theme::BTN_TEXT);
+    RenderUtil::drawRoundedShadow(r, loginButtonRect, Theme::BTN_RADIUS, Theme::Effects::SHADOW_OFFSET, Theme::Effects::SHADOW_COLOR);
+    RenderUtil::drawRoundedRect(r, loginButtonRect, Theme::BTN_RADIUS, loginFill, Theme::BTN_BORDER);
+    RenderUtil::drawCenteredText(r, uiFonts.large, "Login", loginButtonRect, Theme::BTN_TEXT);
 
-    drawShadow(r, backButtonRect,   Theme::BTN_RADIUS);
-    drawRoundedRect(r, backButtonRect,   Theme::BTN_RADIUS, registerFill, Theme::BTN_BORDER);
-    drawCentered(r, uiFonts.large, "Register", backButtonRect,   Theme::BTN_TEXT);
+    RenderUtil::drawRoundedShadow(r, backButtonRect, Theme::BTN_RADIUS, Theme::Effects::SHADOW_OFFSET, Theme::Effects::SHADOW_COLOR);
+    RenderUtil::drawRoundedRect(r, backButtonRect, Theme::BTN_RADIUS, registerFill, Theme::BTN_BORDER);
+    RenderUtil::drawCenteredText(r, uiFonts.large, "Register", backButtonRect, Theme::BTN_TEXT);
 }

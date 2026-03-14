@@ -1,4 +1,5 @@
 #include "render/RenderBanner.hpp"
+#include "render/Theme.hpp"
 #include "utils/RenderUtil.hpp"
 
 void RenderBanner::drawBanner(SDL_Renderer* renderer, const SDL_Rect& rect,
@@ -8,29 +9,19 @@ void RenderBanner::drawBanner(SDL_Renderer* renderer, const SDL_Rect& rect,
     if (!renderer) return;
 
     // shadow
-    const int r      = 14;
-    const int offset = 5;
-    SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
-    SDL_SetRenderDrawColor(renderer, 0, 0, 0, 100);
-    SDL_Rect s      = {rect.x + offset, rect.y + offset, rect.w, rect.h};
-    SDL_Rect sbody  = {s.x + r,         s.y,     s.w - 2*r, s.h        };
-    SDL_Rect sleft  = {s.x,             s.y + r, r,         s.h - 2*r  };
-    SDL_Rect sright = {s.x + s.w - r,   s.y + r, r,         s.h - 2*r  };
-    SDL_RenderFillRect(renderer, &sbody);
-    SDL_RenderFillRect(renderer, &sleft);
-    SDL_RenderFillRect(renderer, &sright);
-    RenderUtil::fillCircle(renderer, s.x + r,       s.y + r,       r);
-    RenderUtil::fillCircle(renderer, s.x + s.w - r, s.y + r,       r);
-    RenderUtil::fillCircle(renderer, s.x + r,       s.y + s.h - r, r);
-    RenderUtil::fillCircle(renderer, s.x + s.w - r, s.y + s.h - r, r);
+    const int r = Theme::BTN_RADIUS;
+    RenderUtil::drawRoundedShadow(renderer, rect, r, Theme::Effects::SHADOW_OFFSET, Theme::Effects::SHADOW_COLOR);
 
     // banner body
-    RenderUtil::drawRoundedRect(renderer, rect, 14, fill, border);
+    RenderUtil::drawRoundedRect(renderer, rect, Theme::BTN_RADIUS, fill, border);
 
     // glow layers then crisp text on top
     if (font) {
-        for (int i = 4; i >= 1; i--) {
-            Uint8 alpha    = (Uint8)(15 + (4 - i) * 15);
+        for (int i = Theme::Effects::BANNER_TEXT_GLOW_LAYERS; i >= 1; i--) {
+            Uint8 alpha = static_cast<Uint8>(
+                Theme::Effects::BANNER_TEXT_GLOW_BASE_ALPHA +
+                (Theme::Effects::BANNER_TEXT_GLOW_LAYERS - i) * Theme::Effects::BANNER_TEXT_GLOW_STEP_ALPHA
+            );
             SDL_Color glow = {glowColor.r, glowColor.g, glowColor.b, alpha};
             SDL_Surface* glowSurface = TTF_RenderUTF8_Blended(font, text.c_str(), glow);
             if (!glowSurface) continue;

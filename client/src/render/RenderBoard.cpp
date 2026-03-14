@@ -4,6 +4,7 @@
 #include "objects/Card.h"
 #include "render/RenderCard.hpp"
 #include "render/RenderText.hpp"
+#include "render/Theme.hpp"
 #include "utils/RenderUtil.hpp"
 
 #include <SDL2/SDL.h>
@@ -12,30 +13,26 @@
 #include <vector>
 
 void RenderBoard::drawOpponentPlayZones(SDL_Renderer* renderer, RenderText& textRenderer, 
-                                        const std::vector<SDL_Rect>& playSlots, TTF_Font* fontSmall) {
+                                        const std::vector<SDL_Rect>& opponentSlots, TTF_Font* fontSmall) {
 	if (!renderer || !fontSmall) return;
-	if (playSlots.empty()) return;
+	if (opponentSlots.empty()) return;
 
-	const int areaX = playSlots.front().x;
-	const int opponentOffset = 210;
-	const int areaY = playSlots.front().y - opponentOffset;
+	const int areaX = opponentSlots.front().x;
+	const int areaY = opponentSlots.front().y;
 
-	const int labelY = std::max(10, areaY - 22);
+	const int labelY = std::max(Theme::Board::LABEL_MIN_Y, areaY - Theme::Board::LABEL_OFFSET_Y);
 	textRenderer.drawText(
 		renderer,
 		"Opponent Play Zone",
 		fontSmall,
-		SDL_Color{180, 160, 200, 255},
+		Theme::Board::OPPONENT_LABEL,
 		areaX,
 		labelY
 	);
 
-	for (const auto& slot : playSlots) {
-		SDL_Rect adjustedSlot = slot;
-		adjustedSlot.y -= opponentOffset;
-
-		RenderUtil::fillRoundedRect(renderer, adjustedSlot, 8, SDL_Color{50, 40, 55, 180});
-		RenderUtil::drawRoundedBorder(renderer, adjustedSlot, 8, SDL_Color{120, 90, 130, 255}, 2);
+	for (const auto& slot : opponentSlots) {
+		RenderUtil::fillRoundedRect(renderer, slot, Theme::Board::ZONE_CORNER_RADIUS, Theme::Board::OPPONENT_ZONE_FILL);
+		RenderUtil::drawRoundedBorder(renderer, slot, Theme::Board::ZONE_CORNER_RADIUS, Theme::Board::OPPONENT_ZONE_BORDER, Theme::Board::ZONE_BORDER_THICKNESS);
 	}
 }
 
@@ -47,19 +44,19 @@ void RenderBoard::drawPlayZones(SDL_Renderer* renderer, RenderText& textRenderer
 	const int areaX = playSlots.front().x;
 	const int areaY = playSlots.front().y;
 
-	const int labelY = std::max(10, areaY - 22);
+	const int labelY = std::max(Theme::Board::LABEL_MIN_Y, areaY - Theme::Board::LABEL_OFFSET_Y);
 	textRenderer.drawText(
 		renderer,
 		"Play Zone",
 		fontSmall,
-		SDL_Color{180, 220, 180, 255},
+		Theme::Board::PLAYER_LABEL,
 		areaX,
 		labelY
 	);
 
 	for (const auto& slot : playSlots) {
-		RenderUtil::fillRoundedRect(renderer, slot, 8, SDL_Color{40, 60, 50, 180});
-		RenderUtil::drawRoundedBorder(renderer, slot, 8, SDL_Color{100, 160, 120, 255}, 2);
+		RenderUtil::fillRoundedRect(renderer, slot, Theme::Board::ZONE_CORNER_RADIUS, Theme::Board::PLAYER_ZONE_FILL);
+		RenderUtil::drawRoundedBorder(renderer, slot, Theme::Board::ZONE_CORNER_RADIUS, Theme::Board::PLAYER_ZONE_BORDER, Theme::Board::ZONE_BORDER_THICKNESS);
 	}
 }
 
@@ -67,13 +64,14 @@ void RenderBoard::drawDiscardZone(SDL_Renderer* renderer, RenderText& textRender
                                   const SDL_Rect& discardZone, bool hovering, TTF_Font* fontSmall) {
 	if (!renderer || !fontSmall) return;
 
-	SDL_Color fill = hovering ? SDL_Color{60, 75, 100, 200} : SDL_Color{45, 60, 80, 180};
-	SDL_Color border = hovering ? SDL_Color{120, 150, 200, 255} : SDL_Color{90, 120, 160, 255};
+	SDL_Color fill = hovering ? Theme::Board::DISCARD_FILL_HOVER : Theme::Board::DISCARD_FILL;
+	SDL_Color border = hovering ? Theme::Board::DISCARD_BORDER_HOVER : Theme::Board::DISCARD_BORDER;
 
-	RenderUtil::fillRoundedRect(renderer, discardZone, 10, fill);
-	RenderUtil::drawRoundedBorder(renderer, discardZone, 10, border, hovering ? 3 : 2);
+	RenderUtil::fillRoundedRect(renderer, discardZone, Theme::Board::DISCARD_CORNER_RADIUS, fill);
+	RenderUtil::drawRoundedBorder(renderer, discardZone, Theme::Board::DISCARD_CORNER_RADIUS, border,
+	                             hovering ? Theme::Board::DISCARD_HOVER_BORDER_THICKNESS : Theme::Board::DISCARD_BORDER_THICKNESS);
 
-	const int textPadding = 6;
+	const int textPadding = Theme::Board::DISCARD_TEXT_PADDING;
 	const int maxTextWidth = discardZone.w - (textPadding * 2);
 
 	// Title
@@ -81,7 +79,7 @@ void RenderBoard::drawDiscardZone(SDL_Renderer* renderer, RenderText& textRender
 		renderer,
 		"Discard",
 		fontSmall,
-		SDL_Color{220, 230, 255, 255},
+		Theme::Board::DISCARD_TITLE_TEXT,
 		discardZone.x + textPadding,
 		discardZone.y + textPadding,
 		maxTextWidth
@@ -100,12 +98,11 @@ void RenderBoard::drawDiscardZone(SDL_Renderer* renderer, RenderText& textRender
 }
 
 void RenderBoard::drawBoardState(SDL_Renderer* renderer, RenderText& textRenderer, 
-                                 const Board& board, const std::vector<SDL_Rect>& playSlots, 
+                                 const Board& board, const std::vector<SDL_Rect>& playSlots,
+                                 const std::vector<SDL_Rect>& opponentSlots,
                                  TTF_Font* fontTitle, TTF_Font* fontBody) {
 	if (!renderer || !fontTitle || !fontBody) return;
 	if (playSlots.empty()) return;
-
-	const int opponentOffset = 210;
 	const std::size_t laneCount = std::min(playSlots.size(), static_cast<std::size_t>(board.getLaneCount()));
 
     // Loop over board indices: 0 = local, 1 = remote
@@ -118,10 +115,7 @@ void RenderBoard::drawBoardState(SDL_Renderer* renderer, RenderText& textRendere
             if (!card) continue;
 
 				// Apply offset for remote player
-				SDL_Rect rect = playSlots[lane];
-				if (boardIndex == 1) {
-					rect.y -= opponentOffset;
-				}
+				SDL_Rect rect = boardIndex == 1 ? opponentSlots[lane] : playSlots[lane];
 
 				RenderCard::drawBoardCard(renderer, textRenderer, *card, rect, fontTitle, fontBody);
 		}

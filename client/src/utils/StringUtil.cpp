@@ -1,7 +1,7 @@
 #include "utils/StringUtil.hpp"
 
-#include <string>
 #include <algorithm>
+#include <sstream>
 
 namespace StringUtil {
 
@@ -20,6 +20,44 @@ namespace StringUtil {
             return static_cast<char>(std::toupper(c));
         });
         return value;
+    }
+
+    std::vector<std::string> splitTrimmedLines(const std::string& text) {
+        std::vector<std::string> lines;
+        std::istringstream stream(text);
+        std::string line;
+        while (std::getline(stream, line)) {
+            const std::string cleaned = trim(line);
+            if (!cleaned.empty()) {
+                lines.push_back(cleaned);
+            }
+        }
+        return lines;
+    }
+
+    void splitAbilityTextAndFlavor(const std::string& text,
+                                   std::vector<std::string>& abilities,
+                                   std::string& flavor) {
+        abilities.clear();
+        flavor.clear();
+
+        const std::string marker = "Flavor:";
+        const auto markerPos = text.find(marker);
+        if (markerPos != std::string::npos) {
+            abilities = splitTrimmedLines(trim(text.substr(0, markerPos)));
+            flavor = trim(text.substr(markerPos + marker.size()));
+            return;
+        }
+
+        const std::string paragraphBreak = "\n\n";
+        const auto breakPos = text.find(paragraphBreak);
+        if (breakPos != std::string::npos) {
+            abilities = splitTrimmedLines(trim(text.substr(0, breakPos)));
+            flavor = trim(text.substr(breakPos + paragraphBreak.size()));
+            return;
+        }
+
+        abilities = splitTrimmedLines(text);
     }
 
     std::string addPrefix(const std::string& str, const std::string& prefix) {

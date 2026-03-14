@@ -3,7 +3,10 @@
 #include "core/Game.hpp"
 #include "render/RenderPlaying.hpp"
 #include "render/RenderText.hpp"
+#include "render/Theme.hpp"
 #include "gameplay/LocalAuthority.hpp"
+#include "utils/PlayingLayoutUtil.hpp"
+#include "utils/RenderUtil.hpp"
 
 #include <SDL2/SDL.h>
 #include <algorithm>
@@ -12,17 +15,9 @@
 #include <sstream>
 // #include <functional>
 
-namespace {
-    SDL_Rect playZoneBand{0, 0, 0, 0};
-}
-
 // -------------------------
 // Helpers
 // -------------------------
-bool Playing::pointInRect(const SDL_Rect& rect, int x, int y) {
-    return x >= rect.x && x < rect.x + rect.w &&
-           y >= rect.y && y < rect.y + rect.h;
-}
 
 bool Playing::resolvePendingActionAt(int x, int y) {
     if (!pendingAction.active)
@@ -33,7 +28,7 @@ bool Playing::resolvePendingActionAt(int x, int y) {
 
     // Check local lanes first
     for (std::size_t slot = 0; slot < playSlots.size(); ++slot) {
-        if (pointInRect(playSlots[slot], x, y)) {
+        if (RenderUtil::pointInRect(playSlots[slot], x, y)) {
             targetLane = static_cast<int>(slot);
             targetIndex = 0;
             break;
@@ -41,10 +36,8 @@ bool Playing::resolvePendingActionAt(int x, int y) {
     }
 
     // Check opponent lanes (offset by render, e.g., 200 px above)
-    for (std::size_t slot = 0; slot < playSlots.size(); ++slot) {
-        SDL_Rect opponentSlot = playSlots[slot];
-        opponentSlot.y -= 200; // same offset as rendering
-        if (pointInRect(opponentSlot, x, y)) {
+    for (std::size_t slot = 0; slot < opponentSlots.size(); ++slot) {
+        if (RenderUtil::pointInRect(opponentSlots[slot], x, y)) {
             targetLane = static_cast<int>(slot);
             targetIndex = 1;
             break;
@@ -117,21 +110,18 @@ SDL_Rect Playing::computeSelfDeckRect(int screenW, int screenH) const {
         return SDL_Rect{0, 0, 0, 0};
     }
 
-    const int gap = 20;
-    const int margin = 10;
-    const int deckSize = 120;  // Match new size
-    const int deckY = playSlots.front().y + (playSlots.front().h - deckSize) / 2;
-
-    int deckX = playSlots.back().x + playSlots.back().w + gap;
-    if (deckX + deckSize > screenW - margin) {
-        deckX = std::max(margin, screenW - margin - deckSize);
-    }
-
-    return SDL_Rect{deckX, deckY, deckSize, deckSize};
+    return PlayingLayoutUtil::computeDeckRect(
+        playSlots,
+        screenW,
+        Theme::Playing::CARD_WIDTH,
+        Theme::Playing::CARD_HEIGHT,
+        Theme::Playing::SELF_DECK_GAP,
+        Theme::Playing::SIDE_ZONE_MARGIN
+    );
 }
 
 bool Playing::tryDrawCardWithAnimation(Uint32 now) {
-    if (localPlayer.hand.size() >= 10) {
+    if (localPlayer.hand.size() >= Theme::Playing::MAX_HAND_SIZE) {
         return false;
     }
 
@@ -187,7 +177,7 @@ void Playing::handleEvents(Game& game, const SDL_Event& event) {
         const int mouseY = event.button.y;
 
         if (surrendered) {
-            if (pointInRect(returnToTitleButton, mouseX, mouseY)) {
+            if (RenderUtil::pointInRect(returnToTitleButton, mouseX, mouseY)) {
                 surrendered = false;
                 pauseModalOpen = false;
                 exitModalOpen = false;
@@ -197,18 +187,18 @@ void Playing::handleEvents(Game& game, const SDL_Event& event) {
         }
 
         if (exitModalOpen) {
-            if (pointInRect(saveExitButton, mouseX, mouseY)) {
+            if (RenderUtil::pointInRect(saveExitButton, mouseX, mouseY)) {
                 surrendered = true;
                 pauseModalOpen = false;
                 exitModalOpen = false;
                 return;
             }
-            if (pointInRect(noSaveExitButton, mouseX, mouseY)) {
+            if (RenderUtil::pointInRect(noSaveExitButton, mouseX, mouseY)) {
                 exitModalOpen = false;
                 pauseModalOpen = true;
                 return;
             }
-            if (!pointInRect(exitModal, mouseX, mouseY)) {
+            if (!RenderUtil::pointInRect(exitModal, mouseX, mouseY)) {
                 exitModalOpen = false;
                 pauseModalOpen = true;
                 return;
@@ -217,22 +207,22 @@ void Playing::handleEvents(Game& game, const SDL_Event& event) {
         }
 
         if (pauseModalOpen) {
-            if (pointInRect(resumeButton, mouseX, mouseY)) {
+            if (RenderUtil::pointInRect(resumeButton, mouseX, mouseY)) {
                 pauseModalOpen = false;
                 return;
             }
-            if (pointInRect(pauseExitButton, mouseX, mouseY)) {
+            if (RenderUtil::pointInRect(pauseExitButton, mouseX, mouseY)) {
                 pauseModalOpen = false;
                 exitModalOpen = true;
                 return;
             }
-            if (!pointInRect(pauseModal, mouseX, mouseY)) {
+            if (!RenderUtil::pointInRect(pauseModal, mouseX, mouseY)) {
                 pauseModalOpen = false;
             }
             return;
         }
 
-        if (pointInRect(menuButton, mouseX, mouseY)) {
+        if (RenderUtil::pointInRect(menuButton, mouseX, mouseY)) {
             pauseModalOpen = true;
             return;
         }
@@ -258,7 +248,7 @@ void Playing::handleEvents(Game& game, const SDL_Event& event) {
                 const int my = event.button.y;
                 
                 for (int i = static_cast<int>(cardRects.size()) - 1; i >= 0; --i) {
-                    if (pointInRect(cardRects[static_cast<std::size_t>(i)], mx, my)) {
+                    if (RenderUtil::pointInRect(cardRects[static_cast<std::size_t>(i)], mx, my)) {
                         drag.active = true;
                         drag.index = static_cast<std::size_t>(i);
                         drag.offsetX = mx - cardRects[drag.index].x;
@@ -285,13 +275,13 @@ void Playing::handleEvents(Game& game, const SDL_Event& event) {
 
                 int laneIndex = -1;
                 for (std::size_t slot = 0; slot < playSlots.size(); ++slot) {
-                    if (pointInRect(playSlots[slot], releaseX, releaseY)) {
+                    if (RenderUtil::pointInRect(playSlots[slot], releaseX, releaseY)) {
                         laneIndex = static_cast<int>(slot);
                         break;
                     }
                 }
 
-                bool droppedInDiscard = pointInRect(discardZone, releaseX, releaseY);
+                bool droppedInDiscard = RenderUtil::pointInRect(discardZone, releaseX, releaseY);
 
                 if (droppedInDiscard) {
                     auto& card = localPlayer.hand[drag.index];
@@ -393,7 +383,7 @@ void Playing::update(Game& game) {
     
     if (!draggingCard) {
         for (int i = static_cast<int>(cardRects.size()) - 1; i >= 0; --i) {
-            if (pointInRect(cardRects[static_cast<std::size_t>(i)], mouseX, mouseY)) {
+            if (RenderUtil::pointInRect(cardRects[static_cast<std::size_t>(i)], mouseX, mouseY)) {
                 newHoverIndex = static_cast<std::size_t>(i);
                 break;
             }
@@ -615,13 +605,13 @@ std::vector<SDL_Rect> Playing::computeCardLayout(std::size_t count, int screenW,
     std::vector<SDL_Rect> layout;
     if (count == 0 || screenW <= 0 || screenH <= 0) return layout;
 
-    const int cardWidth = 100;
-    const int cardHeight = 150;
-    const int maxWidth = static_cast<int>(screenW * 0.75f);
+    const int cardWidth = Theme::Playing::CARD_WIDTH;
+    const int cardHeight = Theme::Playing::CARD_HEIGHT;
+    const int maxWidth = static_cast<int>(screenW * Theme::Playing::HAND_MAX_WIDTH_RATIO);
     
     int totalWidthNoOverlap = static_cast<int>(count) * cardWidth;
     
-    int spacing = 10;
+    int spacing = Theme::Playing::HAND_DEFAULT_SPACING;
     if (totalWidthNoOverlap > maxWidth && count > 1) {
         spacing = (maxWidth - totalWidthNoOverlap) / static_cast<int>(count - 1);
     }
@@ -629,7 +619,7 @@ std::vector<SDL_Rect> Playing::computeCardLayout(std::size_t count, int screenW,
     int finalHandWidth = (static_cast<int>(count) * cardWidth) + (static_cast<int>(count - 1) * spacing);
     
     int startX = (screenW - finalHandWidth) / 2;
-    int startY = screenH - cardHeight - 80;
+    int startY = screenH - cardHeight - Theme::Playing::HAND_Y_OFFSET;
     
     for (std::size_t i = 0; i < count; ++i) {
         layout.push_back(SDL_Rect{
@@ -652,18 +642,14 @@ void Playing::computeZones(int screenW, int screenH) {
         return;
     }
 
-    const int handCardHeight = 150;
-    const int handYOffset = 80;
-    const int slotCount = 5;
-    const int slotWidth = 115;
-    const int slotHeight = 145;
-    const int slotSpacing = 15;
-    const int margin = 20;
-    const int discardWidth = 110;
-    const int discardHeight = 130;
-    const int opponentOffset = 200; // vertical offset for opponent zones
-    const int discardSize = 120;
-    const int gapToDiscard = 20;
+    const int handCardHeight = Theme::Playing::CARD_HEIGHT;
+    const int handYOffset = Theme::Playing::HAND_Y_OFFSET;
+    const int slotCount = Theme::Playing::SLOT_COUNT;
+    const int slotWidth = Theme::Playing::SLOT_WIDTH;
+    const int slotHeight = Theme::Playing::SLOT_HEIGHT;
+    const int slotSpacing = Theme::Playing::SLOT_SPACING;
+    const int margin = Theme::Playing::SCREEN_MARGIN;
+    const int opponentOffset = Theme::Playing::OPPONENT_ZONE_OFFSET;
 
     // Hand Y position
     int handY = screenH - handCardHeight - handYOffset;
@@ -675,7 +661,7 @@ void Playing::computeZones(int screenW, int screenH) {
     int startX = std::max(margin, (screenW - totalSlotsWidth) / 2);
 
     // Local player slots
-    int slotY = handY - slotHeight - 16;
+    int slotY = handY - slotHeight - Theme::Playing::SLOT_TO_HAND_GAP;
     if (slotY < margin) slotY = margin;
 
     playSlots.reserve(static_cast<std::size_t>(slotCount));
@@ -696,25 +682,13 @@ void Playing::computeZones(int screenW, int screenH) {
         opponentSlots.push_back(oppRect);
     }
 
-    // Optional: set playZoneBand for local rendering / input
-    if (!playSlots.empty()) {
-        const SDL_Rect& firstSlot = playSlots.front();
-        const SDL_Rect& lastSlot = playSlots.back();
-
-        playZoneBand.x = firstSlot.x;
-        playZoneBand.y = firstSlot.y;
-        playZoneBand.w = (lastSlot.x + lastSlot.w) - firstSlot.x;
-        playZoneBand.h = firstSlot.h;
-    } else {
-        playZoneBand = SDL_Rect{0,0,0,0};
-    }
-
-    // Discard zone
-    int discardX = startX - gapToDiscard - discardWidth;
-    if (discardX < margin) discardX = margin;
-
-    int discardY = slotY + (slotHeight - discardSize) / 2;
-    discardZone = SDL_Rect{discardX, discardY, discardSize, discardSize};
+    discardZone = PlayingLayoutUtil::computeDiscardRect(
+        playSlots,
+        Theme::Playing::CARD_WIDTH,
+        Theme::Playing::CARD_HEIGHT,
+        Theme::Playing::SELF_DECK_GAP,
+        Theme::Playing::SCREEN_MARGIN
+    );
 }
 
 void Playing::computeUiRects(int screenW, int screenH) {
@@ -730,38 +704,38 @@ void Playing::computeUiRects(int screenW, int screenH) {
         return;
     }
 
-    const int margin = 20;
+    const int margin = Theme::Playing::SCREEN_MARGIN;
     
     // Menu button - TOP RIGHT
-    const int menuW = 120;
-    const int menuH = 50;
+    const int menuW = Theme::Playing::MENU_BUTTON_WIDTH;
+    const int menuH = Theme::Playing::MENU_BUTTON_HEIGHT;
     menuButton = SDL_Rect{screenW - menuW - margin, margin, menuW, menuH};
     
-    const int pauseModalW = 400;
-    const int pauseModalH = 280;
+    const int pauseModalW = Theme::Playing::PAUSE_MODAL_WIDTH;
+    const int pauseModalH = Theme::Playing::PAUSE_MODAL_HEIGHT;
     pauseModal = SDL_Rect{(screenW - pauseModalW) / 2, (screenH - pauseModalH) / 2, pauseModalW, pauseModalH};
     
-    const int buttonW = 320;
-    const int buttonH = 60;
-    const int buttonSpacing = 20;
-    const int firstButtonY = pauseModal.y + 100;
+    const int buttonW = Theme::Playing::PAUSE_BUTTON_WIDTH;
+    const int buttonH = Theme::Playing::PAUSE_BUTTON_HEIGHT;
+    const int buttonSpacing = Theme::Playing::PAUSE_BUTTON_SPACING;
+    const int firstButtonY = pauseModal.y + Theme::Playing::PAUSE_BUTTON_TOP;
     
     resumeButton = SDL_Rect{(screenW - buttonW) / 2, firstButtonY, buttonW, buttonH};
     pauseExitButton = SDL_Rect{(screenW - buttonW) / 2, firstButtonY + buttonH + buttonSpacing, buttonW, buttonH};
     
-    const int exitModalW = 480;
-    const int exitModalH = 320;
+    const int exitModalW = Theme::Playing::EXIT_MODAL_WIDTH;
+    const int exitModalH = Theme::Playing::EXIT_MODAL_HEIGHT;
     exitModal = SDL_Rect{(screenW - exitModalW) / 2, (screenH - exitModalH) / 2, exitModalW, exitModalH};
     
-    const int exitButtonW = 200;
-    const int exitButtonH = 60;
-    const int exitButtonSpacing = 20;
-    const int exitFirstButtonY = exitModal.y + 140;
+    const int exitButtonW = Theme::Playing::EXIT_BUTTON_WIDTH;
+    const int exitButtonH = Theme::Playing::EXIT_BUTTON_HEIGHT;
+    const int exitButtonSpacing = Theme::Playing::EXIT_BUTTON_SPACING;
+    const int exitFirstButtonY = exitModal.y + Theme::Playing::EXIT_BUTTON_TOP;
     
     saveExitButton = SDL_Rect{(screenW - exitButtonW * 2 - exitButtonSpacing) / 2, exitFirstButtonY, exitButtonW, exitButtonH};
     noSaveExitButton = SDL_Rect{saveExitButton.x + exitButtonW + exitButtonSpacing, exitFirstButtonY, exitButtonW, exitButtonH};
     
-    const int returnW = 260;
-    const int returnH = 62;
+    const int returnW = Theme::Playing::RETURN_BUTTON_WIDTH;
+    const int returnH = Theme::Playing::RETURN_BUTTON_HEIGHT;
     returnToTitleButton = SDL_Rect{(screenW - returnW) / 2, (screenH / 2) + 24, returnW, returnH};
 }
