@@ -78,7 +78,7 @@ namespace Theme {
 
         constexpr int SLOT_COUNT                       = 5;
         constexpr int SLOT_WIDTH                       = 115;
-        constexpr int SLOT_HEIGHT                      = 145;
+        constexpr int SLOT_HEIGHT                      = CARD_HEIGHT;
         constexpr int SLOT_SPACING                     = 15;
         constexpr int SLOT_TO_HAND_GAP                 = 16;
         constexpr int SCREEN_MARGIN                    = 20;
@@ -244,6 +244,8 @@ namespace Theme {
         constexpr SDL_Color BOTTOM_BAR_FILL           = {9, 18, 33, 245};
         constexpr SDL_Color STAT_LABEL                = {98, 118, 170, 255};
         constexpr SDL_Color STAT_VALUE                = {220, 230, 255, 255};
+        constexpr SDL_Color STAT_VALUE_BUFFED          = {255, 255, 180, 255};
+        constexpr SDL_Color STAT_VALUE_DEBUFFED        = {255, 180, 180, 255};
         constexpr SDL_Color MANA_BADGE_CREATURE_FILL  = {74, 58, 175, 255};
         constexpr SDL_Color MANA_BADGE_CREATURE_BORDER = {170, 150, 255, 255};
         constexpr SDL_Color MANA_BADGE_SPELL_FILL     = {55, 138, 78, 255};

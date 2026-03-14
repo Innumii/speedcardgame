@@ -8,6 +8,8 @@ class CreatureCard : public Card {
 private:
     int power;
     int toughness;
+    int basePower;
+    int baseToughness;
 
 public:
     CreatureCard(const std::string& name,
@@ -21,6 +23,8 @@ public:
 
     int getPower() const;
     int getToughness() const;
+    int getBasePower() const;
+    int getBaseToughness() const;
     
     void augmentStats(int powerDelta, int toughnessDelta);
     void drawExtraInfo() const override;

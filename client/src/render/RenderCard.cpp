@@ -138,10 +138,6 @@ namespace {
         return card.getType() == CardType::Creature ? "CREATURE" : "SPELL";
     }
 
-    std::string cardSubtypeLabel(const Card& card) {
-        return cardTypeLabel(card);
-    }
-
     void drawArtPanel(SDL_Renderer* renderer, const SDL_Rect& artRect, int cardId,
                       SDL_Color fallbackColor) {
         SDL_Texture* cardImage = getCardImageTexture(renderer, cardId);
@@ -210,7 +206,12 @@ namespace {
         const bool showManaValue = (mode != CardLayoutMode::Board);
         const bool expandedMode = (mode == CardLayoutMode::Expanded);
         const bool compactText = (mode == CardLayoutMode::Hand);
+        const bool boardMode = (mode == CardLayoutMode::Board);
         TTF_Font* uiFont = bodyFont ? bodyFont : titleFont;
+        TTF_Font* compactFont = uiFont;
+        if (titleFont && TTF_FontHeight(titleFont) < TTF_FontHeight(compactFont)) {
+            compactFont = titleFont;
+        }
 
         const int cornerRadius = std::max(Theme::Card::MIN_CORNER_RADIUS, rect.w / 9);
         const int borderThickness = (mode == CardLayoutMode::Expanded)
@@ -289,12 +290,13 @@ namespace {
         SDL_RenderFillRect(renderer, &nameRect);
 
         const int namePadX = std::max(Theme::Card::MIN_NAME_PADDING, nameRect.w / 18);
+        TTF_Font* nameFont = boardMode ? compactFont : uiFont;
         if (!expandedMode) {
-            const std::string nameText = RenderText::truncateWithEllipsis(uiFont, card.getName(), nameRect.w - namePadX * 2);
+            const std::string nameText = RenderText::truncateWithEllipsis(nameFont, card.getName(), nameRect.w - namePadX * 2);
             int nameW = 0;
             int nameTextH = 0;
-            RenderText::measureText(uiFont, nameText, nameW, nameTextH);
-            textRenderer.drawText(renderer, nameText, uiFont, Theme::Card::NAME_TEXT,
+            RenderText::measureText(nameFont, nameText, nameW, nameTextH);
+            textRenderer.drawText(renderer, nameText, nameFont, Theme::Card::NAME_TEXT,
                                   nameRect.x + std::max(namePadX, (nameRect.w - nameW) / 2),
                                   nameRect.y + (nameRect.h - nameTextH) / 2);
         } else {
@@ -330,7 +332,8 @@ namespace {
                                         ? Theme::Card::TYPE_PILL_CREATURE_FILL
                                         : Theme::Card::TYPE_PILL_SPELL_FILL);
         const std::string typeText = StringUtil::toUpper(cardTypeLabel(card));
-        RenderUtil::drawCenteredText(renderer, uiFont, typeText, typePill,
+        TTF_Font* typeFont = compactFont;
+        RenderUtil::drawCenteredText(renderer, typeFont, typeText, typePill,
                                      Theme::Card::TYPE_TEXT);
 
         if (showTextBox && textRect.h > 0 && !compactText) {
@@ -418,6 +421,8 @@ namespace {
         const int statValueY = bottomRect.y + bottomRect.h - std::max(Theme::Card::MIN_STAT_BASELINE_OFFSET, bottomRect.h / 2);
 
         if (creature) {
+            TTF_Font* statLabelFont = compactFont;
+            TTF_Font* statValueFont = uiFont;
             int atkLabelW = 0;
             int atkLabelH = 0;
             int defLabelW = 0;
@@ -429,33 +434,46 @@ namespace {
             const std::string atkValue = std::to_string(creature->getPower());
             const std::string defValue = std::to_string(creature->getToughness());
 
-            if (showTextBox) {
-                RenderText::measureText(uiFont, "ATK", atkLabelW, atkLabelH);
-                RenderText::measureText(uiFont, "DEF", defLabelW, defLabelH);
-            }
-            RenderText::measureText(uiFont, atkValue, atkValueW, atkValueH);
-            RenderText::measureText(uiFont, defValue, defValueW, defValueH);
+            RenderText::measureText(statLabelFont, "ATK", atkLabelW, atkLabelH);
+            RenderText::measureText(statLabelFont, "DEF", defLabelW, defLabelH);
+            RenderText::measureText(statValueFont, atkValue, atkValueW, atkValueH);
+            RenderText::measureText(statValueFont, defValue, defValueW, defValueH);
 
             SDL_Rect leftClip{leftBlockX, bottomRect.y + 1, leftBlockW, std::max(1, bottomRect.h - 2)};
             SDL_Rect rightClip{rightBlockX, bottomRect.y + 1, rightBlockW, std::max(1, bottomRect.h - 2)};
 
             SDL_RenderSetClipRect(renderer, &leftClip);
 
-            if (showTextBox) {
-                textRenderer.drawText(renderer, "ATK", uiFont, Theme::Card::STAT_LABEL, leftBlockX, statLabelY);
+            textRenderer.drawText(renderer, "ATK", statLabelFont, Theme::Card::STAT_LABEL, leftBlockX, statLabelY);
+
+            // get the colour for attack value
+            SDL_Color atkColor = Theme::Card::STAT_VALUE;
+            if (creature->getPower() > creature->getBasePower()) {
+                atkColor = Theme::Card::STAT_VALUE_BUFFED;
+            } else if (creature->getPower() < creature->getBasePower()) {
+                atkColor = Theme::Card::STAT_VALUE_DEBUFFED;
             }
-            textRenderer.drawText(renderer, atkValue, uiFont, Theme::Card::STAT_VALUE,
-                                  leftBlockX,
-                                  std::max(statValueY, bottomRect.y + 1 + atkLabelH));
+
+            textRenderer.drawText(renderer, atkValue, statValueFont, atkColor,
+                leftBlockX, std::max(statValueY, bottomRect.y + 1 + atkLabelH));
             SDL_RenderSetClipRect(renderer, nullptr);
 
             SDL_RenderSetClipRect(renderer, &rightClip);
-            if (showTextBox) {
-                textRenderer.drawText(renderer, "DEF", uiFont, Theme::Card::STAT_LABEL, rightBlockX + std::max(0, rightBlockW - defLabelW), statLabelY);
+
+            textRenderer.drawText(renderer, "DEF", statLabelFont, Theme::Card::STAT_LABEL, rightBlockX + std::max(0, rightBlockW - defLabelW), statLabelY);
+
+            // get the colour for defense value
+            SDL_Color defColor = Theme::Card::STAT_VALUE;
+            if (creature->getToughness() > creature->getBaseToughness()) {
+                defColor = Theme::Card::STAT_VALUE_BUFFED;
+            } else if (creature->getToughness() < creature->getBaseToughness()) {
+                defColor = Theme::Card::STAT_VALUE_DEBUFFED;
             }
-            textRenderer.drawText(renderer, defValue, uiFont, Theme::Card::STAT_VALUE,
-                                  rightBlockX + std::max(0, rightBlockW - defValueW),
-                                  std::max(statValueY, bottomRect.y + 1 + defLabelH));
+
+            textRenderer.drawText(renderer, defValue, statValueFont, defColor,
+                rightBlockX + std::max(0, rightBlockW - defValueW),
+                std::max(statValueY, bottomRect.y + 1 + defLabelH));
+
             SDL_RenderSetClipRect(renderer, nullptr);
         }
 
