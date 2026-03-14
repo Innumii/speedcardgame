@@ -104,8 +104,12 @@ public:
     void destroyCreature(int targetPlayerIndex, int lane); //removes creature from board, resets augments/effects vectors
     //HP <playerId> <delta>
     void augmentHP(int playerIndex, int amount); //raises or lowers player health 
-    //SET <playerId> <lane>
+    //SET <playerId> <lane> <power> <toughness>
     void setCreature(int targetPlayerIndex, int lane, std::pair<int,int> augment); // buffs/debuffs creature
+    //HP_SET <playerId> <amount>
+    void setHP(int playerIndex, int amount);
+    //MANA <playerId> <delta>
+    void augmentMana(int playerIndex, int amount);
     //--------------board actions--------------
 
     //Battle Phase

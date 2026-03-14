@@ -566,7 +566,13 @@ void MatchSession::setCreature(int targetPlayerIndex, int lane, std::pair<int,in
     // Reference to the existing augment pair
     auto& existingAugment = board.augments[targetPlayerIndex][lane];
     existingAugment = augment;
-    
+   
+    std::string msg = "SET " + std::to_string(players[targetPlayerIndex].id) + " "
+                    + std::to_string(lane) + " "
+                    + std::to_string(augment.first) + " "
+                    + std::to_string(augment.second) + "\n";
+    playerA->send(msg);
+    playerB->send(msg);
 }
 
 //removes creature from board, resets augments/effects vectors
@@ -609,6 +615,22 @@ void MatchSession::destroyCreature(int targetPlayerIndex, int lane) {
 void MatchSession::augmentHP(int playerIndex, int amount){
     players[playerIndex].health += amount;
     std::string msg = "HP " + std::to_string(players[playerIndex].id) + " "
+                    + std::to_string(amount)+ "\n";
+    playerA->send(msg);
+    playerB->send(msg);
+} 
+
+void MatchSession::setHP(int playerIndex, int amount){
+    players[playerIndex].health = amount;
+    std::string msg = "HP_SET " + std::to_string(players[playerIndex].id) + " "
+                    + std::to_string(amount)+ "\n";
+    playerA->send(msg);
+    playerB->send(msg);
+} 
+
+void MatchSession::augmentMana(int playerIndex, int amount){
+    players[playerIndex].mana += amount;
+    std::string msg = "MANA " + std::to_string(players[playerIndex].id) + " "
                     + std::to_string(amount)+ "\n";
     playerA->send(msg);
     playerB->send(msg);
