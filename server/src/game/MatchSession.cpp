@@ -608,8 +608,10 @@ void MatchSession::destroyCreature(int targetPlayerIndex, int lane) {
 //HP <playerId> <delta>
 void MatchSession::augmentHP(int playerIndex, int amount){
     players[playerIndex].health += amount;
-
-
+    std::string msg = "HP " + std::to_string(players[playerIndex].id) + " "
+                    + std::to_string(amount)+ "\n";
+    playerA->send(msg);
+    playerB->send(msg);
 } 
 
 //COMBAT FUNCTIONS GO HERE

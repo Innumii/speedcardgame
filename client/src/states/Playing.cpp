@@ -645,6 +645,8 @@ void Playing::resolveDirectCombat(int playerId, int lane, int damage) {
 }
 void Playing::augmentHP(int playerId, int delta) {
     //get player object reference, change HP according to delta
+    Player& player = (playerId == localPlayer.id) ? localPlayer : remotePlayer;
+    player.health += delta;
 }
 
 void Playing::render(const Game& game) {
