@@ -117,7 +117,6 @@ private:
     // -------------------------
     // Helpers
     // -------------------------
-    bool pointInRect(const SDL_Rect& rect, int x, int y);
     bool resolvePendingActionAt(int x, int y);
 
     std::vector<SDL_Rect> computeCardLayout(std::size_t count, int screenW, int screenH) const;

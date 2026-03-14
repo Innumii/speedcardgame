@@ -139,8 +139,8 @@ void RenderPlaying::render(Playing& playing, const Game& game) {
 
 	int mouseX = 0, mouseY = 0;
 	SDL_GetMouseState(&mouseX, &mouseY);
-	const bool hoveringDiscard = playing.pointInRect(playing.discardZone, mouseX, mouseY);
-	const bool hoveringMenu = playing.pointInRect(playing.menuButton, mouseX, mouseY);
+	const bool hoveringDiscard = RenderUtil::pointInRect(playing.discardZone, mouseX, mouseY);
+	const bool hoveringMenu = RenderUtil::pointInRect(playing.menuButton, mouseX, mouseY);
 
 	const bool draggingCard = playing.drag.active && playing.drag.index < playing.localPlayer.hand.size();
 	const bool hasActiveDrawCard = playing.animationQueue.hasActiveDrawCard();
@@ -149,7 +149,7 @@ void RenderPlaying::render(Playing& playing, const Game& game) {
 	std::size_t newHoverIndex = static_cast<std::size_t>(-1);
 	if (!draggingCard) {
 		for (std::size_t i = 0; i < playing.cardRects.size(); ++i) {
-			if (playing.pointInRect(playing.cardRects[i], mouseX, mouseY)) {
+			if (RenderUtil::pointInRect(playing.cardRects[i], mouseX, mouseY)) {
 				newHoverIndex = i;
 				break;
 			}
@@ -418,7 +418,7 @@ void RenderPlaying::render(Playing& playing, const Game& game) {
 		                      playing.pauseModal.x + (playing.pauseModal.w - pauseTitleW) / 2,
 		                      playing.pauseModal.y + Theme::Playing::PAUSE_MODAL_TITLE_TOP);
 
-		const bool hoveringResume = playing.pointInRect(playing.resumeButton, mouseX, mouseY);
+		const bool hoveringResume = RenderUtil::pointInRect(playing.resumeButton, mouseX, mouseY);
 		RenderUtil::drawRoundedRect(renderer, playing.resumeButton,
 		            8,
 		            hoveringResume ? Theme::Playing::RESUME_BUTTON_FILL_HOVER : Theme::Playing::RESUME_BUTTON_FILL,
@@ -433,7 +433,7 @@ void RenderPlaying::render(Playing& playing, const Game& game) {
 		                      playing.resumeButton.x + (playing.resumeButton.w - resumeTextW) / 2,
 		                      playing.resumeButton.y + (playing.resumeButton.h - resumeTextH) / 2);
 
-		const bool hoveringPauseExit = playing.pointInRect(playing.pauseExitButton, mouseX, mouseY);
+		const bool hoveringPauseExit = RenderUtil::pointInRect(playing.pauseExitButton, mouseX, mouseY);
 		RenderUtil::drawRoundedRect(renderer, playing.pauseExitButton,
 		            8,
 		            hoveringPauseExit ? Theme::Playing::DANGER_BUTTON_FILL_HOVER : Theme::Playing::DANGER_BUTTON_FILL,
@@ -479,7 +479,7 @@ void RenderPlaying::render(Playing& playing, const Game& game) {
 		                      playing.exitModal.x + (playing.exitModal.w - questionW) / 2,
 		                      playing.exitModal.y + Theme::Playing::EXIT_MODAL_QUESTION_TOP);
 
-		const bool hoveringSave = playing.pointInRect(playing.saveExitButton, mouseX, mouseY);
+		const bool hoveringSave = RenderUtil::pointInRect(playing.saveExitButton, mouseX, mouseY);
 		RenderUtil::drawRoundedRect(renderer, playing.saveExitButton,
 		            8,
 		            hoveringSave ? Theme::Playing::PRIMARY_ACTION_FILL_HOVER : Theme::Playing::PRIMARY_ACTION_FILL,
@@ -494,7 +494,7 @@ void RenderPlaying::render(Playing& playing, const Game& game) {
 		                      playing.saveExitButton.x + (playing.saveExitButton.w - saveTextW) / 2,
 		                      playing.saveExitButton.y + (playing.saveExitButton.h - saveTextH) / 2);
 
-		const bool hoveringNoSave = playing.pointInRect(playing.noSaveExitButton, mouseX, mouseY);
+		const bool hoveringNoSave = RenderUtil::pointInRect(playing.noSaveExitButton, mouseX, mouseY);
 		RenderUtil::drawRoundedRect(renderer, playing.noSaveExitButton,
 		            8,
 		            hoveringNoSave ? Theme::Playing::DANGER_BUTTON_FILL_HOVER : Theme::Playing::DANGER_BUTTON_FILL,
@@ -532,7 +532,7 @@ void RenderPlaying::render(Playing& playing, const Game& game) {
 			(screenH / 2) - loseTextH - 26
 		);
 
-		const bool hoveringReturn = playing.pointInRect(playing.returnToTitleButton, mouseX, mouseY);
+		const bool hoveringReturn = RenderUtil::pointInRect(playing.returnToTitleButton, mouseX, mouseY);
 		RenderUtil::drawRoundedRect(renderer, playing.returnToTitleButton,
 		            10,
 		            hoveringReturn ? Theme::Playing::RETURN_BUTTON_FILL_HOVER : Theme::Playing::RETURN_BUTTON_FILL,
