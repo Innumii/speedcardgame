@@ -21,7 +21,8 @@ public:
 
     int getPower() const;
     int getToughness() const;
-
+    
+    void augmentStats(int powerDelta, int toughnessDelta);
     void drawExtraInfo() const override;
 
     std::unique_ptr<Card> clone() const override {

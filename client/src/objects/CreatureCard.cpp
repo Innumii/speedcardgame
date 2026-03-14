@@ -19,3 +19,7 @@ int CreatureCard::getToughness() const { return toughness; }
 void CreatureCard::drawExtraInfo() const {
     std::cout << "  " << power << "/" << toughness << "\n";
 }
+void CreatureCard::augmentStats(int powerDelta, int toughnessDelta) {
+    power += powerDelta;
+    toughness += toughnessDelta;
+}

@@ -31,6 +31,20 @@ bool Board::addToPlay(int lane, int playerId, std::unique_ptr<Card> card) {
     return true;
 }
 
+bool Board::removeFromPlay(int lane, int playerId, std::unique_ptr<Card>& outCard) {
+    if (playerId < 0 || playerId > 1) return false;
+    if (lane < 0 || lane >= laneCount) return false;
+
+    auto& zone = lanes[playerId][lane];
+    if (!zone.has_value()) return false;
+
+    // Move card out of lane
+    outCard = std::move(zone.value());
+    zone.reset(); // clear the lane
+
+    return true;
+}
+
 void Board::displayPlay(int playerId) {
     if (playerId < 0 || playerId > 1) {
             std::cerr << "Invalid player ID\n";

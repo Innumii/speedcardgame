@@ -130,7 +130,12 @@ private:
     void discardCard(int playerId, int cardId);
     void playCreature(int playerId, std::unique_ptr<Card> card, int lane);
     void playSpell(int playerId, std::unique_ptr<Card> card, int sourceLane, std::optional<int> targetLane, std::optional<int> targetIndex);
-
+    void augmentCreature(int playerId, int lane, int powerDelta, int toughnessDelta);
+    void destroyCreature(int playerId, int lane);
+    void resolveLaneCombat(int playerAId, int playerBId, int lane, int powerA, int powerB);
+    void resolveDirectCombat(int playerId, int lane, int damage);
+    void augmentHP(int playerId, int delta);
+    
     // Animation related
     bool tryDrawCardWithAnimation(Uint32 now);
 };

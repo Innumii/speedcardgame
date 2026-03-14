@@ -12,6 +12,7 @@ public:
 
     //transfers ownership of card to Board object
     bool addToPlay(int lane, int playerId, std::unique_ptr<Card> card);
+    bool removeFromPlay(int lane, int playerId, std::unique_ptr<Card>& outCard);
     void displayPlay(int playerId);
 
     //return reference to Card object, if card is present on the zone

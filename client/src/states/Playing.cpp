@@ -13,6 +13,7 @@
 #include <iostream>
 #include <stdexcept>
 #include <sstream>
+#include <objects/CreatureCard.h>
 // #include <functional>
 
 // -------------------------
@@ -469,16 +470,31 @@ bool Playing::handleServerMessage(const std::string& msg) {
             player.hand.erase(it);
         }
     } else if (cmd == "COMBAT") { //use this to call rendering for the cards attacking each other
+        int playerAId, playerBId, lane, powerA, powerB;
+        iss >> playerAId >> playerBId >> lane >> powerA >> powerB;
+        resolveLaneCombat(playerAId, playerBId, lane, powerA, powerB);
 
     } else if (cmd == "DIRECT") { //use this to call rendering for direct attack
+        int playerId, lane, damage;
+        iss >> playerId >> lane >> damage;
+        resolveDirectCombat(playerId, lane, damage);
 
     } else if (cmd == "AUGMENT") { //use this to modify the power/toughness of the cards
+        int playerId, lane, powerDelta, toughnessDelta;
+        iss >> playerId >> lane >> powerDelta >> toughnessDelta;
+        augmentCreature(playerId, lane, powerDelta, toughnessDelta);
 
     } else if (cmd == "DESTROY") { //use this to remove cards from the board
+        int playerId, lane;
+        iss >> playerId >> lane;
+        destroyCreature(playerId, lane);
 
     } else if (cmd == "HP") { //use this to modify player health
+        int playerId, delta;
+        iss >> playerId >> delta;
+        augmentHP(playerId, delta);
 
-    }
+    } //add a mana command later -> decouple discard logic to offload to mana logic
 
     return true;
 }
@@ -592,7 +608,44 @@ void Playing::discardCard(int playerId, int cardId) {
     std::cout<< "[Playing] " << playerId << " Discarded " << name << "\n";
 }
 
+void Playing::augmentCreature(int playerId, int lane, int powerDelta, int toughnessDelta) {
+    int boardIndex = (playerId == localPlayer.id) ? 0 : 1;
+    const auto& zone = board.getZone(lane, boardIndex);
 
+    if (!zone.has_value()) {
+        std::cerr << "[augmentCreature] No creature in lane " << lane << "\n";
+        return;
+    }
+
+    Card* card = zone.value().get();
+
+    CreatureCard* creature = static_cast<CreatureCard*>(card);
+    creature->augmentStats(powerDelta, toughnessDelta);
+}
+
+void Playing::destroyCreature(int playerId, int lane) {
+    int boardIndex = (playerId == localPlayer.id) ? 0 : 1;
+
+    std::unique_ptr<Card> card;
+    if (!board.removeFromPlay(lane, boardIndex, card)) {
+        std::cout << "[destroyCreature] No card on lane " << lane
+                  << " for player " << playerId << "\n";
+        return;
+    }
+
+    // Optionally move to discard
+    // board.addToDiscard(std::move(card), boardIndex);
+}
+
+void Playing::resolveLaneCombat(int playerAId, int playerBId, int lane, int powerA, int powerB) {
+    //can call animation here ig
+}
+void Playing::resolveDirectCombat(int playerId, int lane, int damage) {
+    //can call animation here ig
+}
+void Playing::augmentHP(int playerId, int delta) {
+    //get player object reference, change HP according to delta
+}
 
 void Playing::render(const Game& game) {
     RenderPlaying::render(*this, game);

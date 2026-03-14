@@ -695,7 +695,12 @@ void MatchSession::resolveLaneCombat(int lane) {
         augmentCreature(1, lane, {0, -powerA});
 
         std::ostringstream ss;
-        ss << "COMBAT " << lane << " " << powerA << " " << powerB << "\n";
+        ss << "COMBAT "
+            << players[0].id << " "
+            << players[1].id << " "
+            << lane << " "
+            << powerA << " "
+            << powerB << "\n";
         playerA->send(ss.str());
         playerB->send(ss.str());
     } else {

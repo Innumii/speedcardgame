@@ -110,6 +110,9 @@ public:
 
     //Battle Phase
     void resolveAttackPhase();
+
+    // COMBAT <playerAId> <playerBId> <lane> <playerA's card power> <playerB's card power>
+    // DIRECT <attacker ID> <lane> <damage>
     void resolveLaneCombat(int lane);
     int getCreaturePower(int playerIndex, int lane);
     int getCreatureToughness(int playerIndex, int lane);
