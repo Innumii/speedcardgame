@@ -258,6 +258,14 @@ void RenderDeckBuilding::render(DeckBuilding& deckBuilding, Game& game) {
         if (previewY < 20) previewY = 20;
 
         SDL_Rect panel{previewX, previewY, previewWidth, previewHeight};
-        RenderCard::drawCardFace(renderer, textRenderer, *deckBuilding.availableCards[deckBuilding.hoverIndex], panel, fontLarge ? fontLarge : fontSmall, fontSmall, false);
+        RenderCard::drawPreview(
+            renderer,
+            textRenderer,
+            *deckBuilding.availableCards[deckBuilding.hoverIndex],
+            panel,
+            fontSmall,
+            fontLarge ? fontLarge : fontSmall,
+            0
+        );
     }
 }
