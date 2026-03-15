@@ -17,9 +17,11 @@
 
 class Game;
 class Card;
+class RenderTargeting;
 
 class Playing {
     friend class RenderPlaying;
+    friend class RenderTargeting;
 
 public:
     explicit Playing(int drawIntervalSeconds = 3);

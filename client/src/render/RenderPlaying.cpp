@@ -1,10 +1,10 @@
-#include "render/RenderPLaying.hpp"
+﻿#include "render/RenderPLaying.hpp"
 
 #include "core/Game.hpp"
-#include "objects/Card.h"
 #include "render/RenderBoard.hpp"
 #include "render/RenderButton.hpp"
 #include "render/RenderCard.hpp"
+#include "render/RenderTargeting.hpp"
 #include "render/RenderText.hpp"
 #include "render/Theme.hpp"
 #include "utils/PlayingLayoutUtil.hpp"
@@ -308,36 +308,7 @@ void RenderPlaying::render(Playing& playing, const Game& game) {
 	SDL_SetRenderDrawColor(renderer, Theme::Playing::PLAYER_BAR_BORDER.r, Theme::Playing::PLAYER_BAR_BORDER.g, Theme::Playing::PLAYER_BAR_BORDER.b, Theme::Playing::PLAYER_BAR_BORDER.a);
 	SDL_RenderDrawLine(renderer, playerBarX + playerBarW / 2, playerBarY + Theme::Playing::PLAYER_BAR_DIVIDER_INSET,
 	                   playerBarX + playerBarW / 2, playerBarY + playerBarH - Theme::Playing::PLAYER_BAR_DIVIDER_INSET);
-	if (playing.pendingAction.active) {
-		SDL_SetRenderDrawColor(renderer, Theme::Playing::TARGET_HIGHLIGHT.r, Theme::Playing::TARGET_HIGHLIGHT.g, Theme::Playing::TARGET_HIGHLIGHT.b, Theme::Playing::TARGET_HIGHLIGHT.a);
-		for (const auto& localSlot : playing.playSlots) {
-			SDL_RenderDrawRect(renderer, &localSlot);
-		}
-		for (const auto& opponentSlot : playing.opponentSlots) {
-			SDL_RenderDrawRect(renderer, &opponentSlot);
-		}
-		std::string targetPrompt = "Choose target";
-		if (playing.pendingAction.cardId != -1) {
-			auto& hand = playing.localPlayer.hand;
-
-			auto it = std::find_if(hand.begin(), hand.end(),
-				[&](const std::unique_ptr<Card>& c) {
-					return c && c->getId() == playing.pendingAction.cardId;
-				});
-
-			if (it != hand.end() && *it) {
-				targetPrompt = "Choose target for " + (*it)->getName();
-			}
-		}
-		textRenderer.drawText(
-			renderer,
-			targetPrompt,
-			uiFonts.small,
-			Theme::Playing::TARGET_PROMPT_TEXT,
-			Theme::Playing::TARGET_PROMPT_X,
-			Theme::Playing::TARGET_PROMPT_Y
-		);
-	}
+	RenderTargeting::drawPendingTargeting(renderer, textRenderer, playing, uiFonts.small);
 
 	for (const auto& rect : opponentHandRects) {
 		RenderCard::drawCardBack(renderer, rect);
