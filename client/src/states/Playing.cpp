@@ -5,6 +5,7 @@
 #include "render/RenderText.hpp"
 #include "render/Theme.hpp"
 #include "gameplay/LocalAuthority.hpp"
+#include "utils/GetValidTargets.hpp"
 #include "utils/PlayingLayoutUtil.hpp"
 #include "utils/RenderUtil.hpp"
 
@@ -24,28 +25,116 @@ bool Playing::resolvePendingActionAt(int x, int y) {
     if (!pendingAction.active)
         return false;
 
+    auto cardIt = std::find_if(
+        localPlayer.hand.begin(),
+        localPlayer.hand.end(),
+        [&](const std::unique_ptr<Card>& card) {
+            return card && card->getId() == pendingAction.cardId;
+        }
+    );
+
+    if (cardIt == localPlayer.hand.end() || !*cardIt) {
+        pendingAction.clear();
+        return false;
+    }
+
+    const std::vector<int> validTargets = getValidTargets(*this, **cardIt, pendingAction.sourceLane);
+
     int targetLane = -1;
     int targetIndex = -1;
+    int clickedTarget = -9999;
 
-    // Check local lanes first
-    for (std::size_t slot = 0; slot < playSlots.size(); ++slot) {
-        if (RenderUtil::pointInRect(playSlots[slot], x, y)) {
-            targetLane = static_cast<int>(slot);
-            targetIndex = 0;
+    int screenW = 0;
+    int screenH = 0;
+    if (renderer && SDL_GetRendererOutputSize(renderer, &screenW, &screenH) != 0) {
+        screenW = 800;
+        screenH = 600;
+    }
+
+    std::vector<SDL_Rect> opponentHandRects = computeCardLayout(remotePlayer.hand.size(), screenW, screenH);
+    if (!opponentHandRects.empty() && !opponentSlots.empty()) {
+        const int cardHeight = opponentHandRects.front().h;
+        const int topHandY = PlayingLayoutUtil::computeOpponentHandY(
+            opponentSlots,
+            cardHeight,
+            Theme::Playing::PREVIEW_MARGIN
+        );
+        for (auto& rect : opponentHandRects) {
+            rect.y = topHandY;
+        }
+    }
+
+    const SDL_Rect opponentPlayerRect{
+        (screenW - Theme::Playing::OPPONENT_BAR_WIDTH) / 2,
+        Theme::Playing::OPPONENT_BAR_TOP,
+        Theme::Playing::OPPONENT_BAR_WIDTH,
+        Theme::Playing::OPPONENT_BAR_HEIGHT
+    };
+
+    const SDL_Rect localPlayerRect{
+        (screenW - Theme::Playing::PLAYER_BAR_WIDTH) / 2,
+        screenH - Theme::Playing::PLAYER_BAR_HEIGHT - Theme::Playing::PLAYER_BAR_BOTTOM_MARGIN,
+        Theme::Playing::PLAYER_BAR_WIDTH,
+        Theme::Playing::PLAYER_BAR_HEIGHT
+    };
+
+    for (std::size_t i = 0; i < opponentHandRects.size(); ++i) {
+        if (RenderUtil::pointInRect(opponentHandRects[i], x, y)) {
+            clickedTarget = static_cast<int>(i);
             break;
         }
     }
 
-    // Check opponent lanes (offset by render, e.g., 200 px above)
-    for (std::size_t slot = 0; slot < opponentSlots.size(); ++slot) {
-        if (RenderUtil::pointInRect(opponentSlots[slot], x, y)) {
-            targetLane = static_cast<int>(slot);
-            targetIndex = 1;
-            break;
+    if (clickedTarget == -9999) {
+        // Check local lanes first
+        for (std::size_t slot = 0; slot < playSlots.size(); ++slot) {
+            if (RenderUtil::pointInRect(playSlots[slot], x, y)) {
+                clickedTarget = 100 + static_cast<int>(slot);
+                break;
+            }
         }
     }
 
-    if (targetLane >= 0) {
+    if (clickedTarget == -9999) {
+        // Check opponent lanes
+        for (std::size_t slot = 0; slot < opponentSlots.size(); ++slot) {
+            if (RenderUtil::pointInRect(opponentSlots[slot], x, y)) {
+                clickedTarget = 200 + static_cast<int>(slot);
+                break;
+            }
+        }
+    }
+
+    if (clickedTarget == -9999 && RenderUtil::pointInRect(localPlayerRect, x, y)) {
+        clickedTarget = -1;
+    }
+
+    if (clickedTarget == -9999 && RenderUtil::pointInRect(opponentPlayerRect, x, y)) {
+        clickedTarget = -2;
+    }
+
+    const bool isValidTarget = std::find(validTargets.begin(), validTargets.end(), clickedTarget) != validTargets.end();
+    if (!isValidTarget) {
+        // Cancel targeting on invalid click; card was never removed from hand.
+        pendingAction.clear();
+        return false;
+    }
+
+    if (clickedTarget >= 100 && clickedTarget < 200) {
+        targetLane = clickedTarget - 100;
+        targetIndex = 0;
+    } else if (clickedTarget >= 200 && clickedTarget < 300) {
+        targetLane = clickedTarget - 200;
+        targetIndex = 1;
+    } else if (clickedTarget == -1) {
+        targetLane = pendingAction.sourceLane;
+        targetIndex = 0;
+    } else if (clickedTarget == -2) {
+        targetLane = pendingAction.sourceLane;
+        targetIndex = 1;
+    }
+
+    if (targetLane >= 0 && targetIndex >= 0) {
         std::cout<< "[Playing] Casting at targetIndex: " + std::to_string(targetIndex) + "\n";
         std::cout<< "[Playing] Casting at targetLane: " + std::to_string(targetLane) + "\n";
 
@@ -60,6 +149,7 @@ bool Playing::resolvePendingActionAt(int x, int y) {
         return true;
     }
 
+    pendingAction.clear();
     return false;
 }
 
