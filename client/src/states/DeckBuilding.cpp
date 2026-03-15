@@ -10,6 +10,7 @@
 #include "render/RenderDeckBuilding.hpp"
 #include "core/Game.hpp"
 #include "core/NetworkClient.hpp"
+#include "objects/Card.h"
 #include "objects/Inventory.hpp"
 #include "utils/LoadAvailableCards.hpp"
 #include <SDL2/SDL.h>
@@ -33,11 +34,16 @@ namespace {
 DeckBuilding::DeckBuilding() = default;
 
 bool DeckBuilding::refreshFromService(Game& game) {
-    //Get all available cards in the game
-    cardsLoadedFromService = LoadAvailableCardsUtil::loadFromService(availableCards);
-    if (!cardsLoadedFromService) {
-        cardsLoadedFromService = LoadAvailableCardsUtil::loadFromCsv(availableCards);
+    // Reuse globally cached card templates and clone into local state.
+    const auto& cachedCards = LoadAvailableCardsUtil::getAvailableCards();
+    availableCards.clear();
+    availableCards.reserve(cachedCards.size());
+    for (const auto& card : cachedCards) {
+        if (card) {
+            availableCards.push_back(card->clone());
+        }
     }
+    cardsLoadedFromService = !availableCards.empty();
 
     //If no cards pulled, return false
     if (availableCards.empty()) {

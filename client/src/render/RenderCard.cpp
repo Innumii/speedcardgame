@@ -29,6 +29,7 @@
 namespace {
     std::unordered_map<int, SDL_Texture*> gCardImageCache;
     std::unordered_set<int> gMissingCardImages;
+    Uint32 gNextCardImageFetchTick = 0;
 
     //switch out
     bool downloadImageBody(const std::string& host, int port, int cardId,
@@ -45,12 +46,18 @@ namespace {
         httplib::SSLClient client(host.c_str(), port);
         client.enable_server_certificate_verification(false); // allow self-signed certs
         client.set_follow_location(true);
+        client.set_connection_timeout(0, 150000);
+        client.set_read_timeout(0, 250000);
+        client.set_write_timeout(0, 250000);
 
         res = client.Get(path.c_str());
 
     } else {
         httplib::Client client(host.c_str(), port);
         client.set_follow_location(true);
+        client.set_connection_timeout(0, 150000);
+        client.set_read_timeout(0, 250000);
+        client.set_write_timeout(0, 250000);
 
         res = client.Get(path.c_str());
     }
@@ -81,6 +88,13 @@ namespace {
         if (gMissingCardImages.find(cardId) != gMissingCardImages.end()) {
             return nullptr;
         }
+
+        const Uint32 now = SDL_GetTicks();
+        if (now < gNextCardImageFetchTick) {
+            return nullptr;
+        }
+        // Limit synchronous network fetches to keep frame pacing smooth.
+        gNextCardImageFetchTick = now + 40;
 
         const std::string host = EnvUtil::getCardsServiceHost();
         const int port = EnvUtil::getCardsServicePort();
@@ -568,4 +582,5 @@ void RenderCard::clearImageCache() {
     }
     gCardImageCache.clear();
     gMissingCardImages.clear();
+    gNextCardImageFetchTick = 0;
 }
