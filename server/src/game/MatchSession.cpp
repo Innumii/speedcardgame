@@ -449,6 +449,7 @@ void MatchSession::handleSpell(int playerIndex, int cardId, int lane, std::optio
 
     // Call Effect
     auto effects = Effects::getCardEffects(cardId);
+    std::cout << "CardID: " << cardId << "\n";
     if (!effects) return;
 
     for (const auto& entry : *effects) {

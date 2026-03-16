@@ -708,7 +708,7 @@ void Playing::augmentCreature(int playerId, int lane, int powerDelta, int toughn
     }
 
     Card* card = zone.value().get();
-
+    std::cout << "[augmentCreature] Augmenting " << std::to_string(powerDelta) << "/" << std::to_string(toughnessDelta) << "\n";
     CreatureCard* creature = static_cast<CreatureCard*>(card);
     creature->augmentStats(powerDelta, toughnessDelta);
 }

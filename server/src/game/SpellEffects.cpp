@@ -75,16 +75,16 @@ const std::vector<CardEffectEntry>* Effects::getCardEffects(int cardId) {
 }
 
 const std::unordered_map<int, std::vector<CardEffectEntry>> Effects::cardToEffectsMap = {
-    {1, {CardEffectEntry{1, std::nullopt, std::make_pair(0,-3)} }},
-    {4, { CardEffectEntry{1, std::nullopt, std::make_pair(2,2)} }}, //add conditional augment
+    {1, {CardEffectEntry{0, std::nullopt, std::make_pair(0,-3)} }},
+    {4, { CardEffectEntry{0, std::nullopt, std::make_pair(2,2)} }}, //add conditional augment
     {10, { CardEffectEntry{4, std::nullopt, std::make_pair(0,0)}}},
     {11, { CardEffectEntry{2, std::nullopt, std::make_pair(0,-1)}}},
-    {13, { CardEffectEntry{1, std::nullopt, std::make_pair(1,1)}}}, //conditonal +5/-1
-    {14, { CardEffectEntry{1, std::nullopt, std::make_pair(2,-1)}}},
+    {13, { CardEffectEntry{0, std::nullopt, std::make_pair(1,1)}}}, //conditonal +5/-1
+    {14, { CardEffectEntry{0, std::nullopt, std::make_pair(2,-1)}}},
     {15, { }}, //Double Strike
-    {17, { CardEffectEntry{1, std::nullopt, std::make_pair(-1,-1)}}},
+    {17, { CardEffectEntry{0, std::nullopt, std::make_pair(-1,-1)}}},
     {18, {}}, //Trample
-    {20, { CardEffectEntry{1, std::nullopt, std::make_pair(0,3)} }},
+    {20, { CardEffectEntry{0, std::nullopt, std::make_pair(0,3)} }},
     {23, { CardEffectEntry{3, -5, std::nullopt}, 
            CardEffectEntry{5, 5, std::nullopt} }},
     {25, {}}, // Conditional splash HP augment
