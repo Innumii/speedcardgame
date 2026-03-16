@@ -268,6 +268,15 @@ namespace {
             textH = inner.h - artH - nameH - typeH - bottomH;
         }
 
+        if (expandedMode && showTextBox) {
+            const int halvedNameH = std::max(1, nameH / 2);
+            const int halvedTextH = std::max(1, textH / 2);
+            const int reclaimedHeight = (nameH - halvedNameH) + (textH - halvedTextH);
+            nameH = halvedNameH;
+            textH = halvedTextH;
+            artH += reclaimedHeight;
+        }
+
         const SDL_Rect artRect{inner.x, inner.y, inner.w, artH};
         const SDL_Rect nameRect{inner.x, artRect.y + artRect.h, inner.w, nameH};
         const SDL_Rect typeRect{inner.x, nameRect.y + nameRect.h, inner.w, typeH};
