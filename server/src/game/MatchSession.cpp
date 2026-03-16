@@ -2,10 +2,11 @@
 #include "net/PlayerConnection.hpp"
 #include "objects/CreatureCard.h"
 #include "objects/SpellCard.h"
+#include "game/CombatEffects.hpp"
 #include "utils/EnvUtil.hpp"
 #include "utils/HttpUtil.hpp"
 #include "utils/JsonUtil.hpp"
-#include "game/Effects.hpp"
+#include "game/SpellEffects.hpp"
 
 #include <iostream>
 #include <chrono>
@@ -385,6 +386,9 @@ void MatchSession::handleSummon(int playerIndex, int cardId, int lane) {
 
     // Place card on board
     board.lanes[playerIndex][lane] = cardId;
+    const int combatEffectMask = CombatEffects::getMaskFromCard(card);
+    board.continuousEffects[playerIndex][lane] =
+        (combatEffectMask == 0) ? std::nullopt : std::optional<int>(combatEffectMask);
 
     // Send confirmation message
     std::cout << "[MatchSession] " << getUsername(playerIndex) << " Summons " << name << "\n";
@@ -728,43 +732,100 @@ void MatchSession::resolveLaneCombat(int lane) {
 
     if (!cardA && !cardB) return;
 
-    if (cardA && cardB) {
+    auto hasEffect = [this](int playerIndex, int laneIndex, int effectBit) {
+        const auto& effectMaskOpt = board.continuousEffects[playerIndex][laneIndex];
+        return CombatEffects::hasEffect(effectMaskOpt, effectBit);
+    };
 
-        int powerA = getCreaturePower(0, lane);
-        int powerB = getCreaturePower(1, lane);
+    auto checkLaneDeaths = [this, lane]() {
+        for (int p = 0; p < 2; ++p) {
+            const auto& maybeCard = board.lanes[p][lane];
+            if (!maybeCard) continue;
 
-        std::cout << "[Combat] Lane " << lane
-                  << " A(" << powerA << ") vs B(" << powerB << ")\n";
+            if (getCreatureToughness(p, lane) <= 0) {
+                destroyCreature(p, lane);
+            }
+        }
+    };
 
-        augmentCreature(0, lane, {0, -powerB});
-        augmentCreature(1, lane, {0, -powerA});
-
-        std::ostringstream ss;
-        ss << "COMBAT "
-            << players[0].id << " "
-            << players[1].id << " "
-            << lane << " "
-            << powerA << " "
-            << powerB << "\n";
-        playerA->send(ss.str());
-        playerB->send(ss.str());
-    } else {
-        int attackerIndex = -1;
-        if (cardA) attackerIndex = 0;
-        else if (cardB) attackerIndex = 1;
-
-        int power = getCreaturePower(attackerIndex, lane);
+    auto sendDirectDamage = [this, lane](int attackerIndex, int damage) {
+        if (damage <= 0) return;
 
         std::cout << "[Combat] Direct attack: "
                   << getUsername(attackerIndex) << " deals "
-                  << power << " to "
+                  << damage << " to "
                   << getUsername(1 - attackerIndex) << "\n";
 
-        std::string msg = "DIRECT " + std::to_string(players[attackerIndex].id) + " " + std::to_string(lane) + " " + std::to_string(power) + "\n";
+        std::string msg = "DIRECT "
+            + std::to_string(players[attackerIndex].id) + " "
+            + std::to_string(lane) + " "
+            + std::to_string(damage) + "\n";
         playerA->send(msg);
         playerB->send(msg);
 
-        augmentHP(1 - attackerIndex, -power);
+        augmentHP(1 - attackerIndex, -damage);
+    };
 
+    auto resolveCombatWindow = [&](bool allowA, bool allowB) {
+        const bool aAlive = board.lanes[0][lane].has_value();
+        const bool bAlive = board.lanes[1][lane].has_value();
+
+        if (!aAlive && !bAlive) return;
+
+        if (aAlive && bAlive) {
+            int powerA = allowA ? getCreaturePower(0, lane) : 0;
+            int powerB = allowB ? getCreaturePower(1, lane) : 0;
+            int toughnessA = getCreatureToughness(0, lane);
+            int toughnessB = getCreatureToughness(1, lane);
+
+            if (powerA <= 0 && powerB <= 0) return;
+
+            std::cout << "[Combat] Lane " << lane
+                      << " A(" << powerA << ") vs B(" << powerB << ")\n";
+
+            if (powerB > 0) {
+                augmentCreature(0, lane, {0, -powerB});
+            }
+            if (powerA > 0) {
+                augmentCreature(1, lane, {0, -powerA});
+            }
+
+            std::ostringstream ss;
+            ss << "COMBAT "
+               << players[0].id << " "
+               << players[1].id << " "
+               << lane << " "
+               << powerA << " "
+               << powerB << "\n";
+            playerA->send(ss.str());
+            playerB->send(ss.str());
+
+            if (powerA > 0 && hasEffect(0, lane, CombatEffects::kTrample) && toughnessB > 0) {
+                const int overflow = std::max(0, powerA - toughnessB);
+                sendDirectDamage(0, overflow);
+            }
+            if (powerB > 0 && hasEffect(1, lane, CombatEffects::kTrample) && toughnessA > 0) {
+                const int overflow = std::max(0, powerB - toughnessA);
+                sendDirectDamage(1, overflow);
+            }
+            return;
+        }
+
+        const int attackerIndex = aAlive ? 0 : 1;
+        const bool canStrike = (attackerIndex == 0) ? allowA : allowB;
+        if (!canStrike) return;
+
+        int power = getCreaturePower(attackerIndex, lane);
+        sendDirectDamage(attackerIndex, power);
+    };
+
+    const bool hasDoubleStrikeA = hasEffect(0, lane, CombatEffects::kDoubleStrike);
+    const bool hasDoubleStrikeB = hasEffect(1, lane, CombatEffects::kDoubleStrike);
+
+    if (hasDoubleStrikeA || hasDoubleStrikeB) {
+        resolveCombatWindow(hasDoubleStrikeA, hasDoubleStrikeB);
+        checkLaneDeaths();
     }
+
+    resolveCombatWindow(true, true);
 }
