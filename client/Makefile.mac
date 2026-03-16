@@ -1,0 +1,24 @@
+CXX      := g++
+STD      := -std=c++17
+INCLUDES := -I include $(shell pkg-config --cflags sdl2 SDL2_ttf SDL2_image openssl)
+LIBS     := $(shell pkg-config --libs   sdl2 SDL2_ttf SDL2_image openssl)
+BUILD_DIR := build
+MKDIR_P  := mkdir -p
+
+SRCS := $(wildcard src/*.cpp src/*/*.cpp src/*/*/*.cpp)
+OBJS := $(patsubst src/%.cpp,$(BUILD_DIR)/%.o,$(SRCS))
+DEPS := $(OBJS:.o=.d)
+
+all: main
+
+main: $(OBJS)
+	$(CXX) $(STD) -o $@ $^ $(LIBS)
+
+$(BUILD_DIR)/%.o: src/%.cpp
+	$(MKDIR_P) $(@D)
+	$(CXX) $(STD) $(INCLUDES) -MMD -MP -c $< -o $@
+
+-include $(DEPS)
+
+clean:
+	$(RM) -r $(BUILD_DIR) main

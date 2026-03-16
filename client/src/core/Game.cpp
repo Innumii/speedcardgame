@@ -72,9 +72,14 @@ Game::Game(const char *title, int xpos, int ypos, int width, int height, bool fu
 #ifdef _WIN32
     // Accelerated is safe on Windows
     useSoftwareRenderer = false;
+#elif defined(__APPLE__)
+    // Accelerated is safe on native macOS
+    useSoftwareRenderer = false;
 #else
     if (isWSL()) {
         std::cout << "WSL detected: forcing software renderer\n";
+    } else {
+        useSoftwareRenderer = false;
     }
 #endif
 

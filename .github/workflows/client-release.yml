@@ -12,7 +12,7 @@ permissions:
   contents: write
 
 jobs:
-  build-and-release:
+  build-windows:
     runs-on: windows-latest
     steps:
       - name: Checkout
@@ -69,6 +69,64 @@ jobs:
 
           Compress-Archive -Path client/dist/* -DestinationPath client/client-latest-windows.zip -Force
 
+      - name: Upload Windows artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: client-windows
+          path: client/client-latest-windows.zip
+
+  build-macos:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          brew install sdl2 sdl2_ttf sdl2_image openssl pkg-config
+
+      - name: Build client
+        run: |
+          cd client
+          make -f Makefile.mac
+
+      - name: Bundle artifact
+        run: |
+          set -euo pipefail
+          cd client
+
+          mkdir -p dist
+          cp main dist/main
+          chmod +x dist/main
+
+          if [ -d assets ]; then
+            cp -r assets dist/assets
+          fi
+
+          zip -r client-latest-macos.zip dist/
+
+      - name: Upload macOS artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: client-macos
+          path: client/client-latest-macos.zip
+
+  publish:
+    needs: [build-windows, build-macos]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download Windows artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: client-windows
+          path: release/
+
+      - name: Download macOS artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: client-macos
+          path: release/
+
       - name: Publish latest client release
         uses: ncipollo/release-action@v1
         with:
@@ -78,5 +136,5 @@ jobs:
           allowUpdates: true
           removeArtifacts: true
           artifactErrorsFailBuild: true
-          artifacts: client/client-latest-windows.zip
+          artifacts: release/client-latest-windows.zip,release/client-latest-macos.zip
           makeLatest: true
