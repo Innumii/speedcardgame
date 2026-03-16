@@ -320,11 +320,11 @@ void MatchSession::processActions() {
             if (action.args.size() >= 2) {
                 int cardId = action.args[0];
                 int lane = action.args[1];
-                std::optional<int> targetId; //id of targeteted lane 
-                std::optional<int> targetIndex; //if opponent or not
+                std::optional<int> targetLane;
+                std::optional<int> targetIndex;
 
-                if (action.args.size() > 2) {
-                    targetId = action.args[2];
+                if (action.args.size() >= 4) {
+                    targetLane = action.args[2];
                     targetIndex = action.args[3];
                 }
 
@@ -340,7 +340,7 @@ void MatchSession::processActions() {
                 if (card->getType() == CardType::Creature) {
                     handleSummon(action.playerIndex, cardId, lane);
                 } else if (card->getType() == CardType::Spell) {
-                    handleSpell(action.playerIndex, cardId, lane, targetId, targetIndex);
+                    handleSpell(action.playerIndex, cardId, lane, targetLane, targetIndex);
                 }
             }
         }
@@ -398,9 +398,9 @@ void MatchSession::handleSummon(int playerIndex, int cardId, int lane) {
     playerB->send(ss.str());
 }
 
-//targetIndex: 0(casting player), 1(casting player's opponent), -1(all or none)
-//targetId: represents target zone
-void MatchSession::handleSpell(int playerIndex, int cardId, int lane, std::optional<int> targetId, std::optional<int> targetIndex) {
+// targetIndex: 0(casting player), 1(casting player's opponent), -1(all or none)
+// targetLane: board lane selected as target
+void MatchSession::handleSpell(int playerIndex, int cardId, int lane, std::optional<int> targetLane, std::optional<int> targetIndex) {
     PlayerState& player = players[playerIndex];
 
     const ServerCard* card = getCard(cardId);
@@ -440,7 +440,7 @@ void MatchSession::handleSpell(int playerIndex, int cardId, int lane, std::optio
     std::string spellMsg = "PLAY " + std::to_string(player.id) + " "
                     + std::to_string(cardId) + " "
                     + std::to_string(lane) + " "
-                    + (targetId ? std::to_string(*targetId) : "-1") + " "
+                    + (targetLane ? std::to_string(*targetLane) : "-1") + " "
                     + (targetIndex ? std::to_string(*targetIndex) : "-1") + "\n";
     std::cout << "[MatchSession] Sending Spell Command: " << spellMsg << "\n";
 
@@ -457,7 +457,7 @@ void MatchSession::handleSpell(int playerIndex, int cardId, int lane, std::optio
         effect(
             *this,
             playerIndex,
-            lane,
+            targetLane,
             serverTargetIndex,
             entry.amount,
             entry.augment

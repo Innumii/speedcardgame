@@ -220,15 +220,15 @@ int NetworkClient::receive(void* buffer, size_t size) {
 
 //GAME ACTIONS (send data as JSON)
 
-bool NetworkClient::sendPlayCard(int cardId, int lane, std::optional<int> targetId, std::optional<int> targetIndex) {
+bool NetworkClient::sendPlayCard(int cardId, int lane, std::optional<int> targetLane, std::optional<int> targetIndex) {
     if (!connected) return false;
 
     std::ostringstream ss;
 
-    if (targetId.has_value() && targetIndex.has_value()) {
+    if (targetLane.has_value() && targetIndex.has_value()) {
         // Include both target lane and whether it's opponent
         ss << "PLAY " << cardId << " " << lane
-           << " " << *targetId << " " << *targetIndex << "\n";
+           << " " << *targetLane << " " << *targetIndex << "\n";
     } else {
         // Creature summon: no target
         ss << "PLAY " << cardId << " " << lane << "\n";

@@ -87,8 +87,8 @@ public:
     //PLAY <playerId> <cardId> <lane>
     void handleSummon(int playerIndex, int cardId, int lane);
     //PLAY <playerId> <cardId> <lane> <targetLane> <clientTargetIndex>
-    //if clientTargetIndex == playerId means targets itself, otherwise target opponent
-    void handleSpell(int playerIndex, int cardId, int lane, std::optional<int> targetId = std::nullopt, std::optional<int> targetIndex = std::nullopt);
+    //clientTargetIndex is caster-relative: 0=self, 1=opponent
+    void handleSpell(int playerIndex, int cardId, int lane, std::optional<int> targetLane = std::nullopt, std::optional<int> targetIndex = std::nullopt);
     //DISCARD <playerId> <cardId>
     void handleDiscard(int playerIndex, int cardId);
     //--------------player actions--------------
