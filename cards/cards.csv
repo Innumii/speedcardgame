@@ -13,7 +13,7 @@ cid,name,type,cost,value,power,toughness,effect
 12,Potential Man,Creature,3,2,2,2,
 13,With This Sacred Treasure,Spell,2,2,0,0,"Give target creature +1/+1, if the creature is named 'Potential Man', give it +5/-1 instead."
 14,Black Flash,Spell,1,1,0,0,Give target creature +2/-1.
-15,Maintain The Agenda,Spell,2,2,0,0,Give target creature Double Strike.
+15,Do it Again,Spell,2,2,0,0,Give target creature Double Strike.
 16,Fraud,Creature,0,0,0,1,
 17,Not Built For This,Spell,1,1,0,0,Give target creature -1/-1.
 18,The Pass,Spell,3,2,0,0,Give target creature Trample.
