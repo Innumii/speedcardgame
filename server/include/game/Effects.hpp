@@ -23,7 +23,7 @@ struct CardEffectEntry {
 class Effects {
 public:
     static EffectFunc getEffectById(int effectId);
-
+    static const std::vector<CardEffectEntry>* getCardEffects(int cardId);
 private:
     static const std::vector<EffectFunc> effects;
 

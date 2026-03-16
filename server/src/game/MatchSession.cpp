@@ -5,6 +5,7 @@
 #include "utils/EnvUtil.hpp"
 #include "utils/HttpUtil.hpp"
 #include "utils/JsonUtil.hpp"
+#include "game/Effects.hpp"
 
 #include <iostream>
 #include <chrono>
@@ -410,12 +411,13 @@ void MatchSession::handleSpell(int playerIndex, int cardId, int lane, std::optio
     // Deduct mana
     player.mana -= card->getManaCost();
 
+    std::optional<int> serverTargetIndex;
     //Assign targetIndex to appropriate target
     // if 0 == targetIndex -> target itself
     // if 1 == targetIndex -> target opponent
     if (targetIndex.has_value()) {
         //serverTargetIndex: the player affected by the spell, relative to server logic
-        int serverTargetIndex = (*targetIndex == 0) ? playerIndex : 1 - playerIndex;
+        serverTargetIndex = (*targetIndex == 0) ? playerIndex : 1 - playerIndex;
     }    
     
     // Remove card from hand after cast
@@ -442,8 +444,21 @@ void MatchSession::handleSpell(int playerIndex, int cardId, int lane, std::optio
     playerB->send(spellMsg);
 
     // Call Effect
+    auto effects = Effects::getCardEffects(cardId);
+    if (!effects) return;
 
-
+    for (const auto& entry : *effects) {
+        EffectFunc effect = Effects::getEffectById(entry.effectId);
+        if (!effect) continue;
+        effect(
+            *this,
+            playerIndex,
+            lane,
+            serverTargetIndex,
+            entry.amount,
+            entry.augment
+        );
+    }
 
 }
 
@@ -533,6 +548,12 @@ void MatchSession::augmentCreature(int targetPlayerIndex, int lane, std::pair<in
         // Stack augments: add to existing values
         existingAugment->first  += augment.first;
         existingAugment->second += augment.second;
+
+        // If augment reaches 0, destroy and return
+        if (existingAugment->second <= 0) {
+            destroyCreature(targetPlayerIndex, lane);
+            return;
+        }
     } else {
         // No existing augment: set initial values
         existingAugment = augment;

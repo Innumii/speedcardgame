@@ -68,6 +68,12 @@ EffectFunc Effects::getEffectById(int effectId) { //returns EffectFunc, but you 
     return effects[effectId];
 }
 
+const std::vector<CardEffectEntry>* Effects::getCardEffects(int cardId) {
+    auto it = cardToEffectsMap.find(cardId);
+    if (it == cardToEffectsMap.end()) return nullptr;
+    return &it->second;
+}
+
 const std::unordered_map<int, std::vector<CardEffectEntry>> Effects::cardToEffectsMap = {
     {1, {CardEffectEntry{1, std::nullopt, std::make_pair(0,-3)} }},
     {4, { CardEffectEntry{1, std::nullopt, std::make_pair(2,2)} }}, //add conditional augment
