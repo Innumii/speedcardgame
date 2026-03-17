@@ -121,25 +121,29 @@ void DeckBuilding::handleEvents(Game& game, const SDL_Event& event) {
         return;
     }
 
-    //Dead Button, remove later
     const bool inPlay = (event.type == SDL_MOUSEBUTTONDOWN) &&
                     (event.button.button == SDL_BUTTON_LEFT) &&
                     (event.button.x >= PlayButton.x && event.button.x <= (PlayButton.x + PlayButton.w)) &&
                     (event.button.y >= PlayButton.y && event.button.y <= (PlayButton.y + PlayButton.h));
-    // if (inPlay) {
-    //     if (!hasFullDeck()) {
-    //         const int deckCount = getDeckCardCount();
-    //         const int deckLimit = getDeckSizeLimit();
-    //         setStatusMessage(
-    //             "Deck size too small (" + std::to_string(deckCount) + "/" + std::to_string(deckLimit) + ").",
-    //             2500
-    //         );
-    //         return;
-    //     }
-    //     game.setPlayingDeck(buildDeck());
-    //     game.setNextState(GameState::Playing);
-    //     return;
-    // }
+    if (inPlay) {
+        if (!Deck::hasFullDeck(deckCopies)) {
+            const int deckCount = Deck::getDeckCardCount(deckCopies);
+            const int deckLimit = Deck::getDeckSizeLimit();
+            setStatusMessage(
+                "Deck size too small (" + std::to_string(deckCount) + "/" + std::to_string(deckLimit) + ").",
+                2500
+            );
+            return;
+        }
+
+        if (!Deck::saveDeckCopiesToService(game, availableCards, deckCopies)) {
+            setStatusMessage("Failed to save deck.", 2000);
+            return;
+        }
+
+        game.setNextState(GameState::Connecting);
+        return;
+    }
 
     if (event.type == SDL_MOUSEBUTTONDOWN && event.button.button == SDL_BUTTON_LEFT) {
         const SDL_Point point = getPoint(event.button.x, event.button.y);

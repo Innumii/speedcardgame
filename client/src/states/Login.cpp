@@ -196,10 +196,7 @@ void Login::update(Game& game) {
         game.setPlayerId(userId);
         std::cout << game.getPlayer().id << "\n";
         game.setPlayerUsername(username);
-        if (!game.refreshPlayerDeckFromService())
-            std::cerr << "Failed to refresh deck after login\n";
-// game.getPlayer().deck.toString();
-        game.setNextState(GameState::Title);
+        game.setNextState(GameState::Loading);
         return;
     }
     if (registerPressed) {

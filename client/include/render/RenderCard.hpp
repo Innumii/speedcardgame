@@ -25,6 +25,7 @@ public:
 
     static void drawCardBack(SDL_Renderer* renderer, const SDL_Rect& cardRect);
 
+    static void preloadCardArt(SDL_Renderer* renderer, int cardId);
     static void clearImageCache();
 };
 

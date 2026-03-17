@@ -18,15 +18,11 @@ namespace {
     }
 
     bool loadPlayerDeckFromService(const Game& game, Deck& outDeck) {
-        std::vector<std::unique_ptr<Card>> availableCards;
-        bool cardsLoaded = LoadAvailableCardsUtil::loadFromService(availableCards);
-        if (!cardsLoaded) {
-            cardsLoaded = LoadAvailableCardsUtil::loadFromCsv(availableCards);
-        }
-
-        if (!cardsLoaded || availableCards.empty()) {
+        if (!LoadAvailableCardsUtil::ensureAvailableCardsLoaded()) {
             return false;
         }
+
+        const auto& availableCards = LoadAvailableCardsUtil::getAvailableCards();
 
         std::vector<int> deckCopies(availableCards.size(), 0);
         if (!Deck::loadDeckCopiesFromService(game, availableCards, deckCopies, Deck::getDeckCopiesLimit())) {
@@ -142,6 +138,10 @@ void Game::commitStateChange() {
             registerState.exit(*this);
         }
 
+        if (previousState == GameState::Loading && state != GameState::Loading) {
+            loadingState.exit(*this);
+        }
+
         if (previousState == GameState::Playing && state != GameState::Playing) {
             playingSetup = false;
         }
@@ -170,6 +170,10 @@ void Game::commitStateChange() {
 
         if (state == GameState::Register && previousState != GameState::Register) {
             registerState.enter(*this);
+        }
+
+        if (state == GameState::Loading && previousState != GameState::Loading) {
+            loadingState.enter(*this);
         }
 
         if (state == GameState::Playing && !playingSetup) {
@@ -316,6 +320,9 @@ void Game::handleEvents() {
             case GameState::Register:
                 registerState.handleEvents(*this, event);
                 break;
+            case GameState::Loading:
+                loadingState.handleEvents(*this, event);
+                break;
             case GameState::DeckBuilding:
                 deckBuildingState.handleEvents(*this, event);
                 break;
@@ -366,6 +373,9 @@ void Game::update() {
         case GameState::Register:
             registerState.update(*this);
             break;
+        case GameState::Loading:
+            loadingState.update(*this);
+            break;
         case GameState::Connecting:
             if (connectingState) {
                 connectingState->update(*this);
@@ -394,6 +404,9 @@ void Game::render() {
             break;
         case GameState::Register:
             registerState.render(*this);
+            break;
+        case GameState::Loading:
+            loadingState.render(*this);
             break;
         case GameState::DeckBuilding:
             deckBuildingState.render(*this);

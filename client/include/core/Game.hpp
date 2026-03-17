@@ -17,6 +17,7 @@
 #include "states/Title.hpp"
 #include "states/Login.hpp"
 #include "states/Register.hpp"
+#include "states/Loading.hpp"
 #include "states/Playing.hpp"
 #include "states/DeckBuilding.hpp"
 #include "states/PackOpening.hpp"
@@ -127,6 +128,7 @@ private:
     Title titleState;
     Login loginState;
     Register registerState;
+    Loading loadingState;
     Playing playingState;
     DeckBuilding deckBuildingState;
     PackOpening packOpeningState;

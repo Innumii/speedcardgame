@@ -15,6 +15,8 @@
 namespace LoadAvailableCardsUtil {
 	bool loadFromService(std::vector<std::unique_ptr<Card>>& outCards);
 	bool loadFromCsv(std::vector<std::unique_ptr<Card>>& outCards);
+	bool ensureAvailableCardsLoaded();
+	bool areAvailableCardsLoaded();
     std::vector<std::unique_ptr<Card>>& getAvailableCards();
 
     std::string toLower(std::string value) {
@@ -22,6 +24,18 @@ namespace LoadAvailableCardsUtil {
 			return static_cast<char>(std::tolower(c));
 		});
 		return value;
+	}
+}
+
+namespace {
+	std::vector<std::unique_ptr<Card>>& cachedAvailableCardsStorage() {
+		static std::vector<std::unique_ptr<Card>> availableCards;
+		return availableCards;
+	}
+
+	bool& cachedAvailableCardsLoadedFlag() {
+		static bool loaded = false;
+		return loaded;
 	}
 }
 
@@ -147,15 +161,28 @@ bool LoadAvailableCardsUtil::loadFromCsv(std::vector<std::unique_ptr<Card>>& out
 }
 
 std::vector<std::unique_ptr<Card>>& LoadAvailableCardsUtil::getAvailableCards() {
-    static std::vector<std::unique_ptr<Card>> availableCards;
-    static bool loaded = false;
+	ensureAvailableCardsLoaded();
+	return cachedAvailableCardsStorage();
+}
 
-    if (!loaded) {
-        if (!loadFromService(availableCards)) {
-            loadFromCsv(availableCards);
-        }
-        loaded = true;
-    }
+bool LoadAvailableCardsUtil::ensureAvailableCardsLoaded() {
+	auto& availableCards = cachedAvailableCardsStorage();
+	bool& loaded = cachedAvailableCardsLoadedFlag();
 
-    return availableCards;
+	if (loaded) {
+		return !availableCards.empty();
+	}
+
+	loaded = true;
+	availableCards.clear();
+
+	if (!loadFromService(availableCards)) {
+		loadFromCsv(availableCards);
+	}
+
+	return !availableCards.empty();
+}
+
+bool LoadAvailableCardsUtil::areAvailableCardsLoaded() {
+	return cachedAvailableCardsLoadedFlag();
 }

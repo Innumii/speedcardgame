@@ -15,9 +15,10 @@ public:
 private:
     void updateLayout(SDL_Renderer* renderer);
     SDL_Rect startButton{300,150,280,75};
-    SDL_Rect quitButton{300,250,280,75};
-    SDL_Rect BuildDeckButton{300,350,280,75};
-    SDL_Rect OpenPacksButton{300, 450, 280, 75};
+    SDL_Rect BuildDeckButton{300,250,280,75};
+    SDL_Rect OpenPacksButton{300,350,280,75};
+    SDL_Rect logoutButton{300, 450, 132, 54};
+    SDL_Rect quitButton{448, 450, 132, 54};
     SDL_Rect titleBanner{180, 40, 600, 100};
 
     // animation state

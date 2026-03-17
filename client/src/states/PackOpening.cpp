@@ -270,10 +270,21 @@ void PackOpening::openPack(Game& game) {
 
 bool PackOpening::loadAvailableCards(const Game& game) {
     (void)game;
-    if (LoadAvailableCardsUtil::loadFromService(availableCards)) {
-        return true;
+    if (!LoadAvailableCardsUtil::ensureAvailableCardsLoaded()) {
+        availableCards.clear();
+        return false;
     }
-    return LoadAvailableCardsUtil::loadFromCsv(availableCards);
+
+    const auto& cachedCards = LoadAvailableCardsUtil::getAvailableCards();
+    availableCards.clear();
+    availableCards.reserve(cachedCards.size());
+    for (const auto& card : cachedCards) {
+        if (card) {
+            availableCards.push_back(card->clone());
+        }
+    }
+
+    return !availableCards.empty();
 }
 
 bool PackOpening::loadInventoryFromService(const Game& game) {

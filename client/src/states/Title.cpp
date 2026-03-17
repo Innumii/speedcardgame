@@ -20,10 +20,12 @@ void Title::updateLayout(SDL_Renderer* renderer) {
     const int bannerH   = titleBanner.h;
     const int buttonW   = startButton.w;
     const int buttonH   = startButton.h;
+    const int smallButtonH = logoutButton.h;
     const int bannerGap = 24;
     const int buttonGap = 16;
+    const int smallRowGap = 12;
 
-    const int buttonsTotalH = (buttonH * 4) + (buttonGap * 3);
+    const int buttonsTotalH = (buttonH * 3) + (buttonGap * 2) + smallButtonH;
     const int totalH        = bannerH + bannerGap + buttonsTotalH;
     int topY = (screenH - totalH) / 2;
     if (topY < 20) topY = 20;
@@ -36,14 +38,19 @@ void Title::updateLayout(SDL_Renderer* renderer) {
     startButton.x     = centerX - (buttonW / 2);
     startButton.y     = titleBanner.y + bannerH + bannerGap;
 
-    quitButton.x      = startButton.x;
-    quitButton.y      = startButton.y + buttonH + buttonGap;
-
     BuildDeckButton.x = startButton.x;
-    BuildDeckButton.y = quitButton.y + buttonH + buttonGap;
+    BuildDeckButton.y = startButton.y + buttonH + buttonGap;
 
     OpenPacksButton.x = startButton.x;
     OpenPacksButton.y = BuildDeckButton.y + buttonH + buttonGap;
+
+    const int smallTotalW = logoutButton.w + smallRowGap + quitButton.w;
+    const int smallStartX = centerX - (smallTotalW / 2);
+    const int smallY = OpenPacksButton.y + buttonH + buttonGap;
+    logoutButton.x = smallStartX;
+    logoutButton.y = smallY;
+    quitButton.x = logoutButton.x + logoutButton.w + smallRowGap;
+    quitButton.y = smallY;
 }
 
 void Title::handleEvents(Game& game, const SDL_Event& event) {
@@ -59,20 +66,26 @@ void Title::handleEvents(Game& game, const SDL_Event& event) {
 
         const bool inStart     = (mouseX >= startButton.x     && mouseX <= startButton.x     + startButton.w) &&
                                  (mouseY >= startButton.y     && mouseY <= startButton.y     + startButton.h);
-        const bool inQuit      = (mouseX >= quitButton.x      && mouseX <= quitButton.x      + quitButton.w)  &&
-                                 (mouseY >= quitButton.y      && mouseY <= quitButton.y      + quitButton.h);
         const bool inBuildDeck = (mouseX >= BuildDeckButton.x && mouseX <= BuildDeckButton.x + BuildDeckButton.w) &&
                                  (mouseY >= BuildDeckButton.y && mouseY <= BuildDeckButton.y + BuildDeckButton.h);
         const bool inOpenPacks = (mouseX >= OpenPacksButton.x && mouseX <= OpenPacksButton.x + OpenPacksButton.w) &&
                      (mouseY >= OpenPacksButton.y && mouseY <= OpenPacksButton.y + OpenPacksButton.h);
+        const bool inLogout    = (mouseX >= logoutButton.x    && mouseX <= logoutButton.x    + logoutButton.w) &&
+                                 (mouseY >= logoutButton.y    && mouseY <= logoutButton.y    + logoutButton.h);
+        const bool inQuit      = (mouseX >= quitButton.x      && mouseX <= quitButton.x      + quitButton.w)  &&
+                                 (mouseY >= quitButton.y      && mouseY <= quitButton.y      + quitButton.h);
         if (inStart) {
             game.setNextState(GameState::Connecting);
-        } else if (inQuit) {
-            game.setNextState(GameState::Quit);
         } else if (inBuildDeck) {
             game.setNextState(GameState::DeckBuilding);
         } else if (inOpenPacks) {
             game.setNextState(GameState::PackOpening);
+        } else if (inLogout) {
+            game.getNetworkClient().disconnect();
+            game.setPlayerUsername("Player");
+            game.setNextState(GameState::Login);
+        } else if (inQuit) {
+            game.setNextState(GameState::Quit);
         }
     }
 }
@@ -86,15 +99,18 @@ void Title::update(Game& game) {
     if (mouseX >= startButton.x && mouseX <= startButton.x + startButton.w &&
         mouseY >= startButton.y && mouseY <= startButton.y + startButton.h) {
         hoveredButton = 0;
-    } else if (mouseX >= quitButton.x && mouseX <= quitButton.x + quitButton.w &&
-               mouseY >= quitButton.y && mouseY <= quitButton.y + quitButton.h) {
-        hoveredButton = 1;
     } else if (mouseX >= BuildDeckButton.x && mouseX <= BuildDeckButton.x + BuildDeckButton.w &&
                mouseY >= BuildDeckButton.y && mouseY <= BuildDeckButton.y + BuildDeckButton.h) {
-        hoveredButton = 2;
+        hoveredButton = 1;
     } else if (mouseX >= OpenPacksButton.x && mouseX <= OpenPacksButton.x + OpenPacksButton.w &&
                mouseY >= OpenPacksButton.y && mouseY <= OpenPacksButton.y + OpenPacksButton.h) {
+        hoveredButton = 2;
+    } else if (mouseX >= logoutButton.x && mouseX <= logoutButton.x + logoutButton.w &&
+               mouseY >= logoutButton.y && mouseY <= logoutButton.y + logoutButton.h) {
         hoveredButton = 3;
+    } else if (mouseX >= quitButton.x && mouseX <= quitButton.x + quitButton.w &&
+               mouseY >= quitButton.y && mouseY <= quitButton.y + quitButton.h) {
+        hoveredButton = 4;
     }
 }
 
@@ -175,7 +191,8 @@ void Title::render(const Game& game) {
     };
 
     drawBtn(startButton,     Theme::BTN_START,   "Start Game", 0);
-    drawBtn(quitButton,      Theme::BTN_QUIT,    "Quit Game",  1);
-    drawBtn(BuildDeckButton, Theme::BTN_BUILD,   "Build Deck", 2);
-    drawBtn(OpenPacksButton, Theme::BTN_START,   "Open Packs", 3);
+    drawBtn(BuildDeckButton, Theme::BTN_BUILD,   "Build Deck", 1);
+    drawBtn(OpenPacksButton, Theme::BTN_START,   "Open Packs", 2);
+    drawBtn(logoutButton,    Theme::BTN_CONNECT, "Logout",     3);
+    drawBtn(quitButton,      Theme::BTN_QUIT,    "Quit Game",  4);
 }

@@ -29,3 +29,5 @@ cid,name,type,cost,value,power,toughness,effect
 28,Ay Lmao,Creature,2,2,5,1,"When summoned, you take 5 damage."
 29,Final Gambit,Spell,6,3,0,0,"Reduce your HP to 10, deal the difference to your opponent as damage."
 30,Dynamic Duo,Creature,5,3,3,5,Double Strike
+31, Ratatouille, Creature, 2, 1, 1, 1, "Deathtouch"
+32, Cheese Touch, Spell, 1, 1, 0, 0, "Target creature gains Deathtouch."

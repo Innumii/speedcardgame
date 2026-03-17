@@ -77,7 +77,7 @@ namespace {
     return !responseBody.empty();
 }
 
-    SDL_Texture* getCardImageTexture(SDL_Renderer* renderer, int cardId) {
+    SDL_Texture* getCardImageTexture(SDL_Renderer* renderer, int cardId, bool throttleFetches = true) {
         if (!renderer || cardId <= 0) return nullptr;
 
         const auto cacheIt = gCardImageCache.find(cardId);
@@ -90,11 +90,13 @@ namespace {
         }
 
         const Uint32 now = SDL_GetTicks();
-        if (now < gNextCardImageFetchTick) {
-            return nullptr;
+        if (throttleFetches) {
+            if (now < gNextCardImageFetchTick) {
+                return nullptr;
+            }
+            // Limit synchronous network fetches to keep frame pacing smooth.
+            gNextCardImageFetchTick = now + 40;
         }
-        // Limit synchronous network fetches to keep frame pacing smooth.
-        gNextCardImageFetchTick = now + 40;
 
         const std::string host = EnvUtil::getCardsServiceHost();
         const int port = EnvUtil::getCardsServicePort();
@@ -581,6 +583,10 @@ void RenderCard::drawCardBack(SDL_Renderer* renderer, const SDL_Rect& cardRect) 
         RenderUtil::fillRoundedRect(renderer, inset, std::max(Theme::Card::CARD_BACK_MIN_INSET_RADIUS, r - 5), Theme::Card::CARD_BACK_INSET_FILL);
         RenderUtil::drawRoundedBorder(renderer, inset, std::max(Theme::Card::CARD_BACK_MIN_INSET_RADIUS, r - 5), Theme::Card::CARD_BACK_INSET_BORDER, 1);
     }
+}
+
+void RenderCard::preloadCardArt(SDL_Renderer* renderer, int cardId) {
+    (void)getCardImageTexture(renderer, cardId, false);
 }
 
 void RenderCard::clearImageCache() {

@@ -4,6 +4,7 @@
 enum class GameState {
     Login,
     Register,
+    Loading,
     Title,
     DeckBuilding,
     PackOpening,
