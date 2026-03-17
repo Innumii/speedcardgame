@@ -7,8 +7,19 @@
 #include "utils/JsonUtil.hpp"
 
 #include <algorithm>
+#include <sstream>
 #include <string>
 #include <unordered_map>
+
+namespace {
+    int resolveUserId(const Game& game) {
+        const int playerId = game.getPlayerId();
+        if (playerId > 0) {
+            return playerId;
+        }
+        return EnvUtil::getEnvIntOrDefault("CARDS_SERVICE_UID", -1);
+    }
+}
 
 Inventory::Inventory(int cardCount) : copiesByCardIndex(cardCount, 0) {}
 
@@ -53,12 +64,33 @@ bool Inventory::loadInventoryCopiesFromService(
     std::vector<int>& outInventoryCopies,
     int maxCopies
 ) {
+    int ignoredCoins = 0;
+    return loadInventoryAndCoinsFromService(
+        game,
+        availableCards,
+        outInventoryCopies,
+        ignoredCoins,
+        maxCopies
+    );
+}
+
+bool Inventory::loadInventoryAndCoinsFromService(
+    const Game& game,
+    const std::vector<std::unique_ptr<Card>>& availableCards,
+    std::vector<int>& outInventoryCopies,
+    int& outCoins,
+    int maxCopies
+) {
     if (availableCards.empty()) return false;
 
     const std::string host = EnvUtil::getCardsServiceHost();
     const int port = EnvUtil::getCardsServicePort();
-    const std::string path = "/cards/inventories";
-    const int userId = EnvUtil::getEnvIntOrDefault("CARDS_SERVICE_UID", game.getPlayerId());
+    const int userId = resolveUserId(game);
+    if (userId <= 0) {
+        outInventoryCopies.assign(availableCards.size(), 0);
+        return false;
+    }
+    const std::string path = "/cards/inventories/" + std::to_string(userId);
 
     int statusCode = -1;
     std::string responseBody;
@@ -66,11 +98,27 @@ bool Inventory::loadInventoryCopiesFromService(
         outInventoryCopies.assign(availableCards.size(), 0);
         return false;
     }
-
-    std::string cardsJson;
-    if (!JsonUtil::extractCardsObjectForUser(responseBody, userId, cardsJson)) {
+    if (statusCode < 200 || statusCode >= 300) {
         outInventoryCopies.assign(availableCards.size(), 0);
         return false;
+    }
+
+    if (!JsonUtil::readJsonIntField(responseBody, "coins", outCoins)) {
+        outInventoryCopies.assign(availableCards.size(), 0);
+        return false;
+    }
+
+    std::string cardsObject;
+    if (!JsonUtil::extractJsonObject(responseBody, "cards", cardsObject)) {
+        outInventoryCopies.assign(availableCards.size(), 0);
+        return false;
+    }
+
+    std::string cardsJson;
+    if (cardsObject.size() >= 2 && cardsObject.front() == '{' && cardsObject.back() == '}') {
+        cardsJson = cardsObject.substr(1, cardsObject.size() - 2);
+    } else {
+        cardsJson = cardsObject;
     }
 
     std::vector<std::pair<int, int>> cardCounts;
@@ -97,4 +145,25 @@ bool Inventory::loadInventoryCopiesFromService(
     }
 
     return true;
+}
+
+bool Inventory::updateCoinsOnService(const Game& game, int coins) {
+    const std::string host = EnvUtil::getCardsServiceHost();
+    const int port = EnvUtil::getCardsServicePort();
+    const std::string path = "/cards/inventories/coins";
+    const int userId = game.getPlayerId();
+    if (userId <= 0) {
+        return false;
+    }
+
+    std::ostringstream payload;
+    payload << "{\"uid\":" << userId << ",\"coins\":" << coins << "}";
+
+    int statusCode = -1;
+    std::string responseBody;
+    if (!HttpUtil::sendHttp(host, port, "PUT", path, payload.str(), statusCode, responseBody)) {
+        return false;
+    }
+
+    return statusCode >= 200 && statusCode < 300;
 }

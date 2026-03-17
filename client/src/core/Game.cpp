@@ -220,6 +220,10 @@ int Game::getPackRefundCoins() const {
     return packRefundCoins;
 }
 
+void Game::setPackRefundCoins(int coins) {
+    packRefundCoins = coins > 0 ? coins : 0;
+}
+
 void Game::addPackRefundCoins(int delta) {
     const int next = packRefundCoins + delta;
     packRefundCoins = next > 0 ? next : 0;

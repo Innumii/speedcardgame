@@ -30,6 +30,16 @@ public:
         std::vector<int>& outInventoryCopies,
         int maxCopies
     );
+
+    static bool loadInventoryAndCoinsFromService(
+        const Game& game,
+        const std::vector<std::unique_ptr<Card>>& availableCards,
+        std::vector<int>& outInventoryCopies,
+        int& outCoins,
+        int maxCopies
+    );
+
+    static bool updateCoinsOnService(const Game& game, int coins);
 };
 
 #endif

@@ -3,13 +3,14 @@
 #include "core/Game.hpp"
 #include "objects/CreatureCard.h"
 #include "objects/SpellCard.h"
+#include "objects/Inventory.hpp"
 #include "render/RenderCard.hpp"
 #include "render/RenderButton.hpp"
 #include "render/RenderText.hpp"
 #include "render/Theme.hpp"
 #include "objects/Deck.h"
+#include "objects/Inventory.hpp"
 #include "utils/HttpUtil.hpp"
-#include "utils/JsonUtil.hpp"
 #include "utils/EnvUtil.hpp"
 #include "utils/LoadAvailableCards.hpp"
 
@@ -53,8 +54,11 @@ void PackOpening::enter(Game& game) {
         return;
     }
 
-    if (!loadInventoryFromService(game)) {
+    int loadedCoins = 0;
+    if (!Inventory::loadInventoryAndCoinsFromService(game, availableCards, inventoryCopies, loadedCoins, MaxCardCopies)) {
         statusMessage = "Failed to load inventory.";
+    } else {
+        game.setPackRefundCoins(loadedCoins);
     }
 }
 
@@ -74,10 +78,12 @@ void PackOpening::handleEvents(Game& game, const SDL_Event& event) {
     if (event.type == SDL_MOUSEMOTION) {
         const int x = event.motion.x;
         const int y = event.motion.y;
+        const bool canOpenPack = game.getPackRefundCoins() >= PackCostCoins;
         backHovered = (x >= backButton.x && x <= backButton.x + backButton.w &&
                        y >= backButton.y && y <= backButton.y + backButton.h);
         openHovered = (x >= openPackButton.x && x <= openPackButton.x + openPackButton.w &&
-                       y >= openPackButton.y && y <= openPackButton.y + openPackButton.h);
+                       y >= openPackButton.y && y <= openPackButton.y + openPackButton.h &&
+                       canOpenPack);
     }
 
     if (event.type == SDL_MOUSEBUTTONDOWN && event.button.button == SDL_BUTTON_LEFT) {
@@ -92,6 +98,10 @@ void PackOpening::handleEvents(Game& game, const SDL_Event& event) {
 
         if (x >= openPackButton.x && x <= openPackButton.x + openPackButton.w &&
             y >= openPackButton.y && y <= openPackButton.y + openPackButton.h) {
+            if (game.getPackRefundCoins() < PackCostCoins) {
+                statusMessage = "Not enough coins. Need " + std::to_string(PackCostCoins) + ".";
+                return;
+            }
             openPack(game);
             return;
         }
@@ -118,15 +128,23 @@ void PackOpening::render(Game& game) {
     SDL_SetRenderDrawColor(renderer, Theme::BG.r, Theme::BG.g, Theme::BG.b, 255);
     SDL_RenderClear(renderer);
 
+    const bool canOpenPack = game.getPackRefundCoins() >= PackCostCoins;
+    const SDL_Color disabledFill{92, 92, 92, 255};
+    const SDL_Color disabledBorder{140, 140, 140, 255};
+    const SDL_Color disabledText{190, 190, 190, 255};
+
     RenderButton::drawButton(renderer, backButton, "Back to Title", uiFonts.large,
                              Theme::BTN_QUIT, Theme::BTN_BORDER, Theme::BTN_TEXT, backHovered);
-    RenderButton::drawButton(renderer, openPackButton, "Open Pack", uiFonts.large,
-                             Theme::BTN_START, Theme::BTN_BORDER, Theme::BTN_TEXT, openHovered);
+    RenderButton::drawButton(renderer, openPackButton, "Open Pack (100c)", uiFonts.large,
+                             canOpenPack ? Theme::BTN_START : disabledFill,
+                             canOpenPack ? Theme::BTN_BORDER : disabledBorder,
+                             canOpenPack ? Theme::BTN_TEXT : disabledText,
+                             canOpenPack && openHovered);
 
     RenderText::drawText(renderer, "Pack Opening", titleFonts.large,
                          Theme::BANNER_TEXT, 40, 100);
 
-    const std::string coinsText = "Refund Coins: " + std::to_string(game.getPackRefundCoins());
+    const std::string coinsText = "Coins: " + std::to_string(game.getPackRefundCoins());
     RenderText::drawText(renderer, coinsText, uiFonts.large, Theme::BTN_TEXT, 40, 160);
 
     if (!statusMessage.empty()) {
@@ -143,7 +161,7 @@ void PackOpening::render(Game& game) {
     const int gap = 16;
     const int totalW = (PackSize * cardW) + ((PackSize - 1) * gap);
     const int startX = (screenW - totalW) / 2;
-    const int y = 270;
+    const int y = 220;
 
     RenderText textRenderer;
 
@@ -174,20 +192,22 @@ void PackOpening::render(Game& game) {
 
 void PackOpening::updateLayout(SDL_Renderer* renderer) {
     int screenW = 800;
+    int screenH = 600;
     if (renderer) {
-        int screenH = 600;
         SDL_GetRendererOutputSize(renderer, &screenW, &screenH);
     }
 
-    backButton.x = 30;
-    backButton.y = 24;
+    const int gap = 20;
+    const int groupW = backButton.w + gap + openPackButton.w;
+    const int maxButtonH = std::max(backButton.h, openPackButton.h);
+    const int startX = (screenW - groupW) / 2;
+    const int y = screenH - maxButtonH - 24;
 
-    openPackButton.x = backButton.x + backButton.w + 20;
-    openPackButton.y = backButton.y;
+    backButton.x = startX;
+    backButton.y = y;
 
-    if (openPackButton.x + openPackButton.w > screenW - 20) {
-        openPackButton.x = screenW - openPackButton.w - 20;
-    }
+    openPackButton.x = backButton.x + backButton.w + gap;
+    openPackButton.y = y;
 }
 
 void PackOpening::openPack(Game& game) {
@@ -197,10 +217,18 @@ void PackOpening::openPack(Game& game) {
     }
 
     if (inventoryCopies.size() != availableCards.size()) {
-        if (!loadInventoryFromService(game)) {
+        int loadedCoins = 0;
+        if (!Inventory::loadInventoryAndCoinsFromService(game, availableCards, inventoryCopies, loadedCoins, MaxCardCopies)) {
             statusMessage = "Failed to load inventory for your account.";
             return;
         }
+        game.setPackRefundCoins(loadedCoins);
+    }
+
+    const int currentCoins = game.getPackRefundCoins();
+    if (currentCoins < PackCostCoins) {
+        statusMessage = "Not enough coins. Need " + std::to_string(PackCostCoins) + ".";
+        return;
     }
 
     std::random_device rd;
@@ -252,8 +280,14 @@ void PackOpening::openPack(Game& game) {
         return;
     }
 
+    const int updatedCoins = currentCoins - PackCostCoins + refundCoins;
+    if (!Inventory::updateCoinsOnService(game, updatedCoins)) {
+        statusMessage = "Pack opened but failed to sync coins.";
+        return;
+    }
+    game.setPackRefundCoins(updatedCoins);
+
     inventoryCopies = std::move(nextInventory);
-    game.addPackRefundCoins(refundCoins);
     lastOpenedCards = std::move(results);
     lastRefundCoins = refundCoins;
 
@@ -262,7 +296,7 @@ void PackOpening::openPack(Game& game) {
         cardsAdded += pair.second;
     }
 
-    statusMessage = "Pack opened: +" + std::to_string(cardsAdded) + " card(s)";
+    statusMessage = "Pack opened (-" + std::to_string(PackCostCoins) + "c): +" + std::to_string(cardsAdded) + " card(s)";
     if (refundCoins > 0) {
         statusMessage += ", +" + std::to_string(refundCoins) + " coins refund.";
     }
@@ -285,63 +319,6 @@ bool PackOpening::loadAvailableCards(const Game& game) {
     }
 
     return !availableCards.empty();
-}
-
-bool PackOpening::loadInventoryFromService(const Game& game) {
-    if (availableCards.empty()) return false;
-
-    const std::string host = EnvUtil::getCardsServiceHost();
-    const int port = EnvUtil::getCardsServicePort();
-    const int userId = resolveUserId(game);
-    if (userId <= 0) {
-        inventoryCopies.assign(availableCards.size(), 0);
-        return false;
-    }
-
-    const std::string path = "/cards/inventories/" + std::to_string(userId);
-    int statusCode = -1;
-    std::string responseBody;
-    if (!HttpUtil::sendHttp(host, port, "GET", path, "", statusCode, responseBody) || statusCode < 200 || statusCode >= 300) {
-        inventoryCopies.assign(availableCards.size(), 0);
-        return false;
-    }
-
-    std::string cardsObject;
-    if (!JsonUtil::extractJsonObject(responseBody, "cards", cardsObject)) {
-        inventoryCopies.assign(availableCards.size(), 0);
-        return false;
-    }
-
-    std::string cardsJson;
-    if (cardsObject.size() >= 2 && cardsObject.front() == '{' && cardsObject.back() == '}') {
-        cardsJson = cardsObject.substr(1, cardsObject.size() - 2);
-    } else {
-        cardsJson = cardsObject;
-    }
-
-    std::vector<std::pair<int, int>> cardCounts;
-    if (!Deck::parseCardCounts(cardsJson, cardCounts)) {
-        inventoryCopies.assign(availableCards.size(), 0);
-        return false;
-    }
-
-    std::unordered_map<int, std::size_t> cardIndexById;
-    cardIndexById.reserve(availableCards.size());
-    for (std::size_t i = 0; i < availableCards.size(); ++i) {
-        cardIndexById.emplace(availableCards[i]->getId(), i);
-    }
-
-    inventoryCopies.assign(availableCards.size(), 0);
-    for (const auto& pair : cardCounts) {
-        const int cardId = pair.first;
-        const int copies = pair.second;
-        if (copies <= 0) continue;
-        auto it = cardIndexById.find(cardId);
-        if (it == cardIndexById.end()) continue;
-        inventoryCopies[it->second] = std::min(copies, MaxCardCopies);
-    }
-
-    return true;
 }
 
 bool PackOpening::applyInventoryDelta(const Game& game, const std::unordered_map<int, int>& deltaByCardId) {

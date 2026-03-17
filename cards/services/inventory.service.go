@@ -12,6 +12,7 @@ import (
 
 var inputInventory struct {
 	Uid   int               `json:"uid"`
+	Coins int               `json:"coins"`
 	Cards models.CardCounts `json:"cards"` // Map of card ID to quantity
 }
 
@@ -71,6 +72,7 @@ func CreateInventory(w http.ResponseWriter, r *http.Request) {
 	// Create a new Inventory directly in this handler
 	inventory := models.Inventory{
 		Uid:   inputInventory.Uid,
+		Coins: inputInventory.Coins,
 		Cards: inputInventory.Cards,
 	}
 	// Add in some default cards for new users
@@ -88,6 +90,8 @@ func CreateInventory(w http.ResponseWriter, r *http.Request) {
 		IntroCards[8] = 4
 
 		inventory.Cards = IntroCards
+
+		inventory.Coins = 1000
 	}
 	NormalizeInventoryCards(inventory.Cards)
 	// Insert into the database
@@ -202,6 +206,30 @@ func UpdateInventory(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(inventory); err != nil {
 		http.Error(w, fmt.Sprintf("Failed to encode inventory response: %v", err), http.StatusInternalServerError)
+		return
+	}
+}
+
+func UpdateInventoryCoins(w http.ResponseWriter, r *http.Request) {
+
+	// Decode the incoming request body
+	if err := json.NewDecoder(r.Body).Decode(&inputInventory); err != nil {
+		http.Error(w, "Invalid inputDeck", http.StatusBadRequest)
+		return
+	}
+
+	uid := inputInventory.Uid
+	coins := inputInventory.Coins
+	var inventory models.Inventory
+	if err := config.DB.Where("uid = ?", uid).First(&inventory).Error; err != nil {
+		http.Error(w, fmt.Sprintf("Failed to retrieve inventory: %v", err), http.StatusInternalServerError)
+		return
+	}
+	inventory.Coins = coins
+
+	// Save the updated inventory
+	if err := config.DB.Save(&inventory).Error; err != nil {
+		http.Error(w, fmt.Sprintf("Failed to update inventory: %v", err), http.StatusInternalServerError)
 		return
 	}
 }

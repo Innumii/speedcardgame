@@ -25,9 +25,8 @@ private:
     };
 
     bool loadAvailableCards(const Game& game);
-    bool loadInventoryFromService(const Game& game);
     bool applyInventoryDelta(const Game& game, const std::unordered_map<int, int>& deltaByCardId);
-
+    
     void updateLayout(SDL_Renderer* renderer);
     void openPack(Game& game);
 
@@ -46,6 +45,7 @@ private:
     static constexpr int PackSize = 5;
     static constexpr int MaxCardCopies = 4;
     static constexpr int RefundCoinsPerExtra = 10;
+    static constexpr int PackCostCoins = 100;
 };
 
 #endif

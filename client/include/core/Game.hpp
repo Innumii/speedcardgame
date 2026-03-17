@@ -69,6 +69,7 @@ public:
 
     bool tryStartPlayingWithBuiltDeck();
     int getPackRefundCoins() const;
+    void setPackRefundCoins(int coins);
     void addPackRefundCoins(int delta);
 
     GameState getState() const;
