@@ -546,6 +546,20 @@ void MatchSession::augmentCreature(int targetPlayerIndex, int lane, std::pair<in
         return;
     }
 
+    //Card
+    int cardId = *cardOpt;            // get the integer card ID
+    const ServerCard* card = getCard(cardId); // retrieve the card object from the catalog
+    if (!card) {
+        std::cerr << "[augmentCreature] Card ID " << cardId << " not found in catalog\n";
+        return;
+    }
+    // Cast to CreatureCard
+    const CreatureCard* creature = dynamic_cast<const CreatureCard*>(card);
+    if (!creature) {
+        std::cerr << "[augmentCreature] Card ID " << cardId << " is not a creature\n";
+        return;
+    }
+
     // Reference to the existing augment pair
     auto& existingAugment = board.augments[targetPlayerIndex][lane];
 
@@ -553,15 +567,15 @@ void MatchSession::augmentCreature(int targetPlayerIndex, int lane, std::pair<in
         // Stack augments: add to existing values
         existingAugment->first  += augment.first;
         existingAugment->second += augment.second;
-
-        // If augment reaches 0, destroy and return
-        if (existingAugment->second <= 0) {
-            destroyCreature(targetPlayerIndex, lane);
-            return;
-        }
     } else {
         // No existing augment: set initial values
         existingAugment = augment;
+    }
+
+    // If augment reaches 0, destroy and return
+    if (existingAugment->second + creature->getToughness() <= 0) {
+        destroyCreature(targetPlayerIndex, lane);
+        return;
     }
 
     // broadcast
