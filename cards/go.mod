@@ -7,6 +7,7 @@ require (
 	github.com/go-chi/cors v1.2.1
 	github.com/joho/godotenv v1.5.1
 	gorm.io/driver/postgres v1.5.9
+	gorm.io/driver/sqlite v1.6.0
 	gorm.io/gorm v1.30.0
 )
 
@@ -21,5 +22,4 @@ require (
 	golang.org/x/crypto v0.27.0 // indirect
 	golang.org/x/sync v0.9.0 // indirect
 	golang.org/x/text v0.20.0 // indirect
-	gorm.io/driver/sqlite v1.6.0 // indirect
 )

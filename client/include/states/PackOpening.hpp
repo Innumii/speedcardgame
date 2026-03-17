@@ -42,10 +42,15 @@ private:
     bool backHovered{false};
     bool openHovered{false};
 
+    // Reveal animation
+    int revealedCount{0};
+    Uint32 revealStartTick{0};
+
     static constexpr int PackSize = 5;
     static constexpr int MaxCardCopies = 4;
     static constexpr int RefundCoinsPerExtra = 10;
     static constexpr int PackCostCoins = 100;
+    static constexpr int CardRevealIntervalMs = 350;
 };
 
 #endif

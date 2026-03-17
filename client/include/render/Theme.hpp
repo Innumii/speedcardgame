@@ -23,6 +23,9 @@ namespace Theme {
     constexpr SDL_Color BTN_CONNECT         = {75,  95,  140, 255};
     constexpr SDL_Color BTN_PRIMARY         = {70,  120, 200, 255};
     constexpr SDL_Color BTN_SECONDARY       = {70,  70,  70,  255};
+    constexpr SDL_Color BTN_DISABLED        = {92,  92,  92,  255};
+    constexpr SDL_Color BTN_DISABLED_BORDER = {140, 140, 140, 255};
+    constexpr SDL_Color BTN_DISABLED_TEXT   = {190, 190, 190, 255};
 
     // ── text ─────────────────────────────────────────────────────────
     constexpr SDL_Color TEXT_PRIMARY        = {245, 245, 245, 255};
@@ -285,6 +288,15 @@ namespace Theme {
         constexpr int CARD_BACK_MIN_RADIUS            = 6;
         constexpr int CARD_BACK_INSET                 = 8;
         constexpr int CARD_BACK_MIN_INSET_RADIUS      = 3;
+    }
+
+    namespace PackOpening {
+        constexpr SDL_Color QTY_TEXT                  = {240, 220, 160, 255};
+        constexpr SDL_Color QTY_CHIP_BG               = {0,   0,   0,   170};
+        constexpr SDL_Color DUPLICATE_FILL            = {190, 65,  20,  255};
+        constexpr SDL_Color NEW_FILL                  = {30,  155, 85,  255};
+        constexpr SDL_Color BADGE_TEXT                = {255, 255, 255, 255};
+        constexpr SDL_Color SUMMARY_FILL              = {50,  32,  85,  230};
     }
 }
 

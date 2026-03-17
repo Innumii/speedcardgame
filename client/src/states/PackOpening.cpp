@@ -110,6 +110,12 @@ void PackOpening::handleEvents(Game& game, const SDL_Event& event) {
 
 void PackOpening::update(Game& game) {
     (void)game;
+    if (!lastOpenedCards.empty() && revealedCount < static_cast<int>(lastOpenedCards.size())) {
+        const Uint32 now = SDL_GetTicks();
+        const int elapsed = static_cast<int>(now - revealStartTick);
+        revealedCount = std::min(static_cast<int>(lastOpenedCards.size()),
+                                  elapsed / CardRevealIntervalMs + 1);
+    }
 }
 
 void PackOpening::render(Game& game) {
@@ -128,66 +134,132 @@ void PackOpening::render(Game& game) {
     SDL_SetRenderDrawColor(renderer, Theme::BG.r, Theme::BG.g, Theme::BG.b, 255);
     SDL_RenderClear(renderer);
 
+    // ── Top strip: title (centred) + coins (top-right), same baseline ───────
+    const int headerY = 14;
+    {
+        int titleW = 0, titleH = 0;
+        RenderText::measureText(titleFonts.large, "Pack Opening", titleW, titleH);
+        RenderText::drawText(renderer, "Pack Opening", titleFonts.large, Theme::BANNER_TEXT, 40, headerY);
+
+        const std::string coinsText = "Coins: " + std::to_string(game.getPackRefundCoins());
+        int coinsW = 0, coinsH = 0;
+        RenderText::measureText(uiFonts.large, coinsText, coinsW, coinsH);
+        const int coinsCentreY = headerY + (titleH - coinsH) / 2;
+        RenderText::drawText(renderer, coinsText, uiFonts.large, Theme::BANNER_BORDER,
+                             screenW - coinsW - 20, coinsCentreY);
+    }
+
+    // ── Buttons ─────────────────────────────────────────────────────────────
     const bool canOpenPack = game.getPackRefundCoins() >= PackCostCoins;
-    const SDL_Color disabledFill{92, 92, 92, 255};
-    const SDL_Color disabledBorder{140, 140, 140, 255};
-    const SDL_Color disabledText{190, 190, 190, 255};
 
     RenderButton::drawButton(renderer, backButton, "Back to Title", uiFonts.large,
                              Theme::BTN_QUIT, Theme::BTN_BORDER, Theme::BTN_TEXT, backHovered);
     RenderButton::drawButton(renderer, openPackButton, "Open Pack (100c)", uiFonts.large,
-                             canOpenPack ? Theme::BTN_START : disabledFill,
-                             canOpenPack ? Theme::BTN_BORDER : disabledBorder,
-                             canOpenPack ? Theme::BTN_TEXT : disabledText,
+                             canOpenPack ? Theme::BTN_START : Theme::BTN_DISABLED,
+                             canOpenPack ? Theme::BTN_BORDER : Theme::BTN_DISABLED_BORDER,
+                             canOpenPack ? Theme::BTN_TEXT : Theme::BTN_DISABLED_TEXT,
                              canOpenPack && openHovered);
 
-    RenderText::drawText(renderer, "Pack Opening", titleFonts.large,
-                         Theme::BANNER_TEXT, 40, 100);
-
-    const std::string coinsText = "Coins: " + std::to_string(game.getPackRefundCoins());
-    RenderText::drawText(renderer, coinsText, uiFonts.large, Theme::BTN_TEXT, 40, 160);
-
-    if (!statusMessage.empty()) {
-        RenderText::drawText(renderer, statusMessage, uiFonts.small, Theme::BTN_TEXT, 40, 200);
-    }
-
+    // ── Empty state ──────────────────────────────────────────────────────────
     if (lastOpenedCards.empty()) {
-        RenderText::drawText(renderer, "Open a pack to add cards to inventory.", uiFonts.small, Theme::BTN_TEXT, 40, 240);
+        int promptW = 0, promptH = 0;
+        const std::string promptStr = "Open a pack to add cards to inventory.";
+        RenderText::measureText(uiFonts.small, promptStr, promptW, promptH);
+        RenderText::drawText(renderer, promptStr, uiFonts.small, Theme::TEXT_MUTED,
+                             (screenW - promptW) / 2, screenH / 2 - promptH / 2);
+        if (!statusMessage.empty()) {
+            int errW = 0, errH = 0;
+            RenderText::measureText(uiFonts.large, statusMessage, errW, errH);
+            RenderText::drawText(renderer, statusMessage, uiFonts.large, Theme::ERROR_RED,
+                                 (screenW - errW) / 2, screenH / 2 + promptH + 8);
+        }
         return;
     }
 
-    const int cardW = 170;
-    const int cardH = 240;
-    const int gap = 16;
-    const int totalW = (PackSize * cardW) + ((PackSize - 1) * gap);
-    const int startX = (screenW - totalW) / 2;
-    const int y = 220;
+    // ── Dynamic card sizing (fit all 5 cards on screen) ──────────────────────
+    const int sidePad = 24;
+    const int cardGap = 10;
+    const int usableW  = screenW - 2 * sidePad;
+    const int cardW    = (usableW - (PackSize - 1) * cardGap) / PackSize;
+    const int cardH    = cardW * 3 / 2;
+    const int totalW   = PackSize * cardW + (PackSize - 1) * cardGap;
+    const int startX   = (screenW - totalW) / 2;
+
+    // ── Layout: summary panel above cards ────────────────────────────────────
+    const int badgeH    = 26;
+    const int summaryH  = 42;
+    const int summaryGap = 10;
+    const int groupH    = summaryH + summaryGap + cardH + 4 + badgeH;
+
+    // Vertically centre the group between header strip and buttons
+    const int topClear    = headerY + 44;   // a bit below the title row
+    const int bottomClear = backButton.y;   // top of buttons
+    const int groupY      = topClear + std::max(0, (bottomClear - topClear - groupH) / 2);
+
+    const int summaryY = groupY;
+    const int cardY = summaryY + summaryH + summaryGap;
 
     RenderText textRenderer;
 
     for (int i = 0; i < static_cast<int>(lastOpenedCards.size()); ++i) {
         const auto& result = lastOpenedCards[i];
-        SDL_Rect cardRect{startX + i * (cardW + gap), y, cardW, cardH};
+        SDL_Rect cardRect{startX + i * (cardW + cardGap), cardY, cardW, cardH};
 
-        std::string name = "Unknown";
+        if (i >= revealedCount) {
+            // Not revealed yet — show card back
+            RenderCard::drawCardBack(renderer, cardRect);
+            continue;
+        }
+
+        // ── Draw card face ───────────────────────────────────────────────────
         if (result.cardIndex >= 0 && result.cardIndex < static_cast<int>(availableCards.size()) && availableCards[result.cardIndex]) {
-            name = availableCards[result.cardIndex]->getName();
             RenderCard::drawPreview(renderer, textRenderer, *availableCards[result.cardIndex], cardRect, uiFonts.small, uiFonts.large);
         } else {
             RenderCard::drawCardBack(renderer, cardRect);
         }
 
-        const std::string qtyLine = "Qty: " + std::to_string(result.resultingCopies) + "/" + std::to_string(MaxCardCopies);
-        const std::string statusLine = result.refunded
-            ? "Duplicate (+" + std::to_string(RefundCoinsPerExtra) + "c)"
-            : "Added";
+        // ── Qty chip (top-right corner of card) ──────────────────────────────
+        const std::string qtyStr = std::to_string(result.resultingCopies) + "/" + std::to_string(MaxCardCopies);
+        const int chipW = 34;
+        const int chipH = 18;
+        SDL_Rect chip{cardRect.x + cardRect.w - chipW - 2, cardRect.y + 2, chipW, chipH};
+        SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+        SDL_SetRenderDrawColor(renderer, Theme::PackOpening::QTY_CHIP_BG.r,
+                               Theme::PackOpening::QTY_CHIP_BG.g,
+                               Theme::PackOpening::QTY_CHIP_BG.b,
+                               Theme::PackOpening::QTY_CHIP_BG.a);
+        SDL_RenderFillRect(renderer, &chip);
+        SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
+        drawCenteredText(renderer, qtyStr, uiFonts.small, Theme::PackOpening::QTY_TEXT, chip);
 
-        SDL_Rect qtyBox{cardRect.x, cardRect.y + cardRect.h + 4, cardRect.w, 22};
-        SDL_Rect statusBox{cardRect.x, cardRect.y + cardRect.h + 24, cardRect.w, 22};
-        drawCenteredText(renderer, qtyLine, uiFonts.small, Theme::BTN_TEXT, qtyBox);
-        drawCenteredText(renderer, statusLine, uiFonts.small, Theme::BTN_TEXT, statusBox);
+        // ── Status badge (coloured strip below card) ─────────────────────────
+        const SDL_Color badgeFill   = result.refunded ? Theme::PackOpening::DUPLICATE_FILL
+                                                       : Theme::PackOpening::NEW_FILL;
+        const std::string badgeLabel = result.refunded
+            ? ("DUPE  +" + std::to_string(RefundCoinsPerExtra) + "c")
+            : "NEW!";
+        SDL_Rect badge{cardRect.x, cardRect.y + cardRect.h + 4, cardRect.w, badgeH};
+        SDL_SetRenderDrawColor(renderer, badgeFill.r, badgeFill.g, badgeFill.b, 255);
+        SDL_RenderFillRect(renderer, &badge);
+        drawCenteredText(renderer, badgeLabel, uiFonts.small, Theme::PackOpening::BADGE_TEXT, badge);
     }
 
+    // ── Summary panel (above cards) ────────────────────────────────────────
+    if (!statusMessage.empty()) {
+        SDL_Rect panel{startX, summaryY, totalW, summaryH};
+
+        SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+        SDL_SetRenderDrawColor(renderer, Theme::PackOpening::SUMMARY_FILL.r,
+                               Theme::PackOpening::SUMMARY_FILL.g,
+                               Theme::PackOpening::SUMMARY_FILL.b,
+                               Theme::PackOpening::SUMMARY_FILL.a);
+        SDL_RenderFillRect(renderer, &panel);
+        SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
+        SDL_SetRenderDrawColor(renderer, Theme::BANNER_BORDER.r, Theme::BANNER_BORDER.g,
+                               Theme::BANNER_BORDER.b, 255);
+        SDL_RenderDrawRect(renderer, &panel);
+        drawCenteredText(renderer, statusMessage, uiFonts.large, Theme::BANNER_BORDER, panel);
+    }
 }
 
 void PackOpening::updateLayout(SDL_Renderer* renderer) {
@@ -290,6 +362,8 @@ void PackOpening::openPack(Game& game) {
     inventoryCopies = std::move(nextInventory);
     lastOpenedCards = std::move(results);
     lastRefundCoins = refundCoins;
+    revealedCount = 0;
+    revealStartTick = SDL_GetTicks();
 
     int cardsAdded = 0;
     for (const auto& pair : deltaByCardId) {

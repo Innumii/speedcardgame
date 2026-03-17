@@ -18,7 +18,7 @@ void Loading::enter(Game& game) {
     deckPrepared = false;
     currentCardIndex = 0;
     totalCards = 0;
-    statusMessage = "Loading cards...";
+    statusMessage = "Loading assets...";
 }
 
 void Loading::exit(Game& game) {
@@ -104,7 +104,7 @@ void Loading::render(const Game& game) {
     const int barMargin = 42;
     SDL_Rect barBg{
         panel.x + barMargin,
-        panel.y + panel.h - 78,
+        panel.y + panel.h - 45,
         panel.w - (barMargin * 2),
         24
     };
@@ -132,21 +132,7 @@ void Loading::render(const Game& game) {
             uiFonts.large,
             Theme::BTN_TEXT,
             panel.x + 42,
-            panel.y + 88
-        );
-    }
-
-    if (uiFonts.small) {
-        const std::string progressText = totalCards == 0
-            ? "0 / 0"
-            : std::to_string(std::min(currentCardIndex, totalCards)) + " / " + std::to_string(totalCards);
-        RenderText::drawText(
-            renderer,
-            progressText,
-            uiFonts.small,
-            Theme::TEXT_MUTED,
-            barBg.x,
-            barBg.y - 28
+            panel.y + 150
         );
     }
 }
