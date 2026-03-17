@@ -91,6 +91,8 @@ public:
     void handleSpell(int playerIndex, int cardId, int lane, std::optional<int> targetLane = std::nullopt, std::optional<int> targetIndex = std::nullopt);
     //DISCARD <playerId> <cardId>
     void handleDiscard(int playerIndex, int cardId);
+    //SURRENDER <playerId>
+    void handleSurrender(int playerIndex);
     //--------------player actions--------------
 
     const ServerCard* getCard(int id) const;

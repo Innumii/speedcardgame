@@ -20,3 +20,9 @@ void LocalAuthority::discardCard(int cardId) {
 
     network->sendDiscardCard(cardId);
 }
+
+void LocalAuthority::surrender() {
+    if (!network) return;
+    std::string msg = "SURRENDER\n";
+    network->sendString(msg);
+}

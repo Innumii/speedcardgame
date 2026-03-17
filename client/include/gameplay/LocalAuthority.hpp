@@ -16,6 +16,8 @@ public:
 
     // Discard card from hand
     void discardCard(int cardId) override;
+    void surrender() override;
+
 
 private:
     NetworkClient* network; // non-owning pointer

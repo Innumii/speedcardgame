@@ -279,6 +279,7 @@ void Playing::handleEvents(Game& game, const SDL_Event& event) {
 
         if (exitModalOpen) {
             if (RenderUtil::pointInRect(saveExitButton, mouseX, mouseY)) {
+                authority->surrender();
                 surrendered = true;
                 pauseModalOpen = false;
                 exitModalOpen = false;

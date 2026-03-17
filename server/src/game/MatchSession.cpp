@@ -348,9 +348,16 @@ void MatchSession::processActions() {
             if (!action.args.empty())
                 handleDiscard(action.playerIndex, action.args[0]);
         }
+        else if (action.type == "SURRENDER") {
+            handleSurrender(action.playerIndex);
+        }
 
         localQueue.pop();
     }
+}
+
+void MatchSession::handleSurrender(int playerIndex) {
+    std::cout << "[handleSurrender] Player " << getUsername(playerIndex) << " Surrendered\n";
 }
 
 void MatchSession::handleSummon(int playerIndex, int cardId, int lane) {
@@ -724,24 +731,23 @@ void MatchSession::resolveAttackPhase() {
     }
 
     // After combat, check deaths
-    for (int p = 0; p < 2; p++) {
-        for (int lane = 0; lane < board.laneCount; lane++) {
-            auto& cardOpt = board.lanes[p][lane];
-            if (!cardOpt) continue;
+    // for (int p = 0; p < 2; p++) {
+    //     for (int lane = 0; lane < board.laneCount; lane++) {
+    //         auto& cardOpt = board.lanes[p][lane];
+    //         if (!cardOpt) continue;
 
-            int toughness = getCreatureToughness(p, lane);
+    //         int toughness = getCreatureToughness(p, lane);
 
-            if (toughness <= 0) {
-                destroyCreature(p, lane);
-            }
-        }
-    }
+    //         if (toughness <= 0) {
+    //             destroyCreature(p, lane);
+    //         }
+    //     }
+    // }
 }
 
 // COMBAT <lane> <playerA's card power> <playerB's card power>
 // DIRECT <attacker ID> <lane> <damage>
 void MatchSession::resolveLaneCombat(int lane) {
-
     auto& cardA = board.lanes[0][lane];
     auto& cardB = board.lanes[1][lane];
 
@@ -750,17 +756,6 @@ void MatchSession::resolveLaneCombat(int lane) {
     auto hasEffect = [this](int playerIndex, int laneIndex, int effectBit) {
         const auto& effectMaskOpt = board.continuousEffects[playerIndex][laneIndex];
         return CombatEffects::hasEffect(effectMaskOpt, effectBit);
-    };
-
-    auto checkLaneDeaths = [this, lane]() {
-        for (int p = 0; p < 2; ++p) {
-            const auto& maybeCard = board.lanes[p][lane];
-            if (!maybeCard) continue;
-
-            if (getCreatureToughness(p, lane) <= 0) {
-                destroyCreature(p, lane);
-            }
-        }
     };
 
     auto sendDirectDamage = [this, lane](int attackerIndex, int damage) {
@@ -781,66 +776,58 @@ void MatchSession::resolveLaneCombat(int lane) {
         augmentHP(1 - attackerIndex, -damage);
     };
 
-    auto resolveCombatWindow = [&](bool allowA, bool allowB) {
-        const bool aAlive = board.lanes[0][lane].has_value();
-        const bool bAlive = board.lanes[1][lane].has_value();
-
-        if (!aAlive && !bAlive) return;
-
-        if (aAlive && bAlive) {
-            int powerA = allowA ? getCreaturePower(0, lane) : 0;
-            int powerB = allowB ? getCreaturePower(1, lane) : 0;
-            int toughnessA = getCreatureToughness(0, lane);
-            int toughnessB = getCreatureToughness(1, lane);
-
-            if (powerA <= 0 && powerB <= 0) return;
-
-            std::cout << "[Combat] Lane " << lane
-                      << " A(" << powerA << ") vs B(" << powerB << ")\n";
-
-            if (powerB > 0) {
-                augmentCreature(0, lane, {0, -powerB});
-            }
-            if (powerA > 0) {
-                augmentCreature(1, lane, {0, -powerA});
-            }
-
-            std::ostringstream ss;
-            ss << "COMBAT "
-               << players[0].id << " "
-               << players[1].id << " "
-               << lane << " "
-               << powerA << " "
-               << powerB << "\n";
-            playerA->send(ss.str());
-            playerB->send(ss.str());
-
-            if (powerA > 0 && hasEffect(0, lane, CombatEffects::kTrample) && toughnessB > 0) {
-                const int overflow = std::max(0, powerA - toughnessB);
-                sendDirectDamage(0, overflow);
-            }
-            if (powerB > 0 && hasEffect(1, lane, CombatEffects::kTrample) && toughnessA > 0) {
-                const int overflow = std::max(0, powerB - toughnessA);
-                sendDirectDamage(1, overflow);
-            }
-            return;
-        }
-
-        const int attackerIndex = aAlive ? 0 : 1;
-        const bool canStrike = (attackerIndex == 0) ? allowA : allowB;
-        if (!canStrike) return;
-
-        int power = getCreaturePower(attackerIndex, lane);
-        sendDirectDamage(attackerIndex, power);
-    };
-
     const bool hasDoubleStrikeA = hasEffect(0, lane, CombatEffects::kDoubleStrike);
     const bool hasDoubleStrikeB = hasEffect(1, lane, CombatEffects::kDoubleStrike);
 
+    auto resolveCombatOnce = [&](bool allowDoubleStrikePhase) {
+        // Check if creatures are still alive
+        bool aAlive = board.lanes[0][lane].has_value();
+        bool bAlive = board.lanes[1][lane].has_value();
+        if (!aAlive && !bAlive) return;
+
+        int powerA = aAlive ? getCreaturePower(0, lane) : 0;
+        int powerB = bAlive ? getCreaturePower(1, lane) : 0;
+
+        std::cout << "[Combat] Lane " << lane
+                  << " A(" << powerA << ") vs B(" << powerB << ")\n";
+
+        // Apply damage
+        if (aAlive && powerA > 0) augmentCreature(1, lane, {0, -powerA});
+        if (bAlive && powerB > 0) augmentCreature(0, lane, {0, -powerB});
+
+        // Handle trample / overflow damage after instant augments
+        aAlive = board.lanes[0][lane].has_value();
+        bAlive = board.lanes[1][lane].has_value();
+
+        if (aAlive && bAlive) {
+            int toughnessA = getCreatureToughness(0, lane);
+            int toughnessB = getCreatureToughness(1, lane);
+
+            if (hasEffect(0, lane, CombatEffects::kTrample) && toughnessB <= 0) {
+                sendDirectDamage(0, powerA - toughnessB);
+            }
+            if (hasEffect(1, lane, CombatEffects::kTrample) && toughnessA <= 0) {
+                sendDirectDamage(1, powerB - toughnessA);
+            }
+        }
+
+        // Broadcast combat event
+        std::ostringstream ss;
+        ss << "COMBAT "
+           << players[0].id << " "
+           << players[1].id << " "
+           << lane << " "
+           << powerA << " "
+           << powerB << "\n";
+        playerA->send(ss.str());
+        playerB->send(ss.str());
+    };
+
+    // Double strike phase first
     if (hasDoubleStrikeA || hasDoubleStrikeB) {
-        resolveCombatWindow(hasDoubleStrikeA, hasDoubleStrikeB);
-        checkLaneDeaths();
+        resolveCombatOnce(true);
     }
 
-    resolveCombatWindow(true, true);
+    // Normal combat phase
+    resolveCombatOnce(false);
 }
