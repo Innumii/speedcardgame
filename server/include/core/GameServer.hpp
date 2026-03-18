@@ -16,6 +16,7 @@ class Matchmaker;
 class GameServer {
 public:
     explicit GameServer(int port);
+    bool loadPlayerInfo(const std::shared_ptr<PlayerConnection>& player, const std::string& msg);
     bool start();
     void stop();
     void waitForShutdown();
