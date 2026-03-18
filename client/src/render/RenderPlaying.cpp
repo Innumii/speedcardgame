@@ -16,6 +16,7 @@
 #include "states/Playing.hpp"
 
 #include <SDL2/SDL.h>
+#include <SDL2/SDL_image.h>
 #include <SDL2/SDL_ttf.h>
 #include <algorithm>
 #include <memory>
@@ -107,6 +108,39 @@ namespace {
 		}
 
 		return nullptr;
+	}
+
+	SDL_Texture* getCombatIconTexture(SDL_Renderer* renderer) {
+		if (!renderer) {
+			return nullptr;
+		}
+
+		static SDL_Texture* cachedTexture = nullptr;
+		static SDL_Renderer* cachedRenderer = nullptr;
+
+		if (cachedTexture && cachedRenderer == renderer) {
+			return cachedTexture;
+		}
+
+		if (cachedTexture) {
+			SDL_DestroyTexture(cachedTexture);
+			cachedTexture = nullptr;
+			cachedRenderer = nullptr;
+		}
+
+		SDL_Surface* surface = IMG_Load("assets/images/combat.png");
+		if (!surface) {
+			return nullptr;
+		}
+
+		cachedTexture = SDL_CreateTextureFromSurface(renderer, surface);
+		SDL_FreeSurface(surface);
+		if (!cachedTexture) {
+			return nullptr;
+		}
+
+		cachedRenderer = renderer;
+		return cachedTexture;
 	}
 
 	void drawOpponentDeckAndDiscard(SDL_Renderer* renderer, RenderText& textRenderer,
@@ -335,6 +369,73 @@ void RenderPlaying::render(Playing& playing, const Game& game) {
 	textRenderer.drawText(renderer, opponentManaText, uiFonts.small,
 	                      Theme::Playing::OPPONENT_MANA_TEXT,
 	                      divider2X + Theme::Playing::OPPONENT_BAR_TEXT_PADDING, oppBarY + (oppBarH - oppManaH) / 2);
+
+	// ── combat phase widget - compact center overlay ──────────────────
+	const Uint32 cycleElapsed = now - playing.combatCycleStartTick;
+	const Uint32 cyclePosition = cycleElapsed % Playing::COMBAT_CYCLE_DURATION_MS;
+	const Uint32 preCombatDurationMs = Playing::COMBAT_PREPHASE_DURATION_MS;
+	const bool combatPhaseActive = cyclePosition >= preCombatDurationMs;
+
+	float barProgress = 1.0F;
+	if (combatPhaseActive) {
+		const Uint32 combatElapsed = cyclePosition - preCombatDurationMs;
+		barProgress = std::min(1.0F, static_cast<float>(combatElapsed) / static_cast<float>(Playing::COMBAT_PHASE_DURATION_MS));
+	} else {
+		barProgress = 1.0F - std::min(1.0F, static_cast<float>(cyclePosition) / static_cast<float>(preCombatDurationMs));
+	}
+
+	const std::string combatLabel = combatPhaseActive ? "Combat Phase" : "Combat Soon";
+	int combatTextW = 0;
+	int combatTextH = 0;
+	if (uiFonts.small) {
+		TTF_SizeText(uiFonts.small, combatLabel.c_str(), &combatTextW, &combatTextH);
+	}
+
+	const int iconSize = 30;
+	const int barWidth = 170;
+	const int barHeight = 9;
+	const int iconGap = 8;
+	const int textBarGap = 4;
+	const int widgetHeight = std::max(iconSize, combatTextH + textBarGap + barHeight);
+	const int widgetWidth = iconSize + iconGap + std::max(combatTextW, barWidth);
+	const int widgetX = (screenW - widgetWidth) / 2;
+
+	int widgetY = (screenH - widgetHeight) / 2;
+	if (!playing.opponentSlots.empty() && !playing.playSlots.empty()) {
+		const int gapTop = playing.opponentSlots.front().y + playing.opponentSlots.front().h;
+		const int gapBottom = playing.playSlots.front().y;
+		if (gapBottom > gapTop) {
+			widgetY = gapTop + (gapBottom - gapTop - widgetHeight) / 2;
+		}
+	}
+
+	const SDL_Rect iconRect{widgetX, widgetY + (widgetHeight - iconSize) / 2, iconSize, iconSize};
+	const int contentX = iconRect.x + iconRect.w + iconGap;
+	const SDL_Rect textRect{contentX, widgetY, std::max(combatTextW, barWidth), combatTextH};
+	const SDL_Rect barOuter{contentX, textRect.y + textRect.h + textBarGap, barWidth, barHeight};
+	const int barInnerWidth = std::max(0, static_cast<int>(static_cast<float>(barOuter.w - 2) * barProgress));
+	const SDL_Rect barInner{barOuter.x + 1, barOuter.y + 1, barInnerWidth, std::max(0, barOuter.h - 2)};
+
+	if (SDL_Texture* combatIcon = getCombatIconTexture(renderer)) {
+		SDL_RenderCopy(renderer, combatIcon, nullptr, &iconRect);
+	}
+
+	if (uiFonts.small) {
+		textRenderer.drawText(renderer, combatLabel, uiFonts.small, Theme::TEXT_PRIMARY, textRect.x, textRect.y);
+	}
+
+	SDL_SetRenderDrawColor(renderer, 34, 38, 44, 210);
+	SDL_RenderFillRect(renderer, &barOuter);
+	SDL_SetRenderDrawColor(renderer, 190, 200, 210, 255);
+	SDL_RenderDrawRect(renderer, &barOuter);
+
+	if (barInner.w > 0 && barInner.h > 0) {
+		const SDL_Color fillColor = combatPhaseActive
+			? SDL_Color{120, 205, 120, 235}
+			: SDL_Color{220, 170, 80, 235};
+		SDL_SetRenderDrawColor(renderer, fillColor.r, fillColor.g, fillColor.b, fillColor.a);
+		SDL_RenderFillRect(renderer, &barInner);
+	}
 
 	// ── player stats - bottom center horizontal bar with GLOW ────────
 	const std::string healthText = "Health: " + std::to_string(playing.localPlayer.health);

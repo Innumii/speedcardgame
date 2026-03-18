@@ -185,6 +185,8 @@ void Playing::setup(const Game& game) {
     pendingAction.clear();
     running = true;
     lastDrawTick = SDL_GetTicks();
+    combatCycleStartTick = lastDrawTick;
+    lastCombatSyncTick = 0;
 
     if (!authority) {
         authority = std::make_unique<LocalAuthority>(
@@ -510,6 +512,19 @@ bool Playing::handleServerMessage(const std::string& msg) {
     std::string cmd;
     iss >> cmd;
 
+    const auto syncCombatTimeline = [this]() {
+        const Uint32 now = SDL_GetTicks();
+
+        // Gate re-syncs so multiple lane COMBAT messages in the same phase do not jitter the UI.
+        if (lastCombatSyncTick != 0 && now - lastCombatSyncTick < (COMBAT_CYCLE_DURATION_MS / 2U)) {
+            return;
+        }
+
+        combatCycleStartTick =
+            (now > COMBAT_PREPHASE_DURATION_MS) ? (now - COMBAT_PREPHASE_DURATION_MS) : 0;
+        lastCombatSyncTick = now;
+    };
+
 // std::cout << "[Playing]: " << msg << "\n";
     
     if (cmd == "DRAW") {
@@ -568,11 +583,13 @@ bool Playing::handleServerMessage(const std::string& msg) {
     } else if (cmd == "COMBAT") { //use this to call rendering for the cards attacking each other
         int playerAId, playerBId, lane, powerA, powerB;
         iss >> playerAId >> playerBId >> lane >> powerA >> powerB;
+        syncCombatTimeline();
         resolveLaneCombat(playerAId, playerBId, lane, powerA, powerB);
 
     } else if (cmd == "DIRECT") { //use this to call rendering for direct attack
         int playerId, lane, damage;
         iss >> playerId >> lane >> damage;
+        syncCombatTimeline();
         resolveDirectCombat(playerId, lane, damage);
 
     } else if (cmd == "AUGMENT") { //use this to modify the power/toughness of the cards

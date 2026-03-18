@@ -45,6 +45,10 @@ public:
     void render(const Game&);
 
 private:
+    static constexpr Uint32 COMBAT_CYCLE_DURATION_MS = 5000U;
+    static constexpr Uint32 COMBAT_PHASE_DURATION_MS = 900U;
+    static constexpr Uint32 COMBAT_PREPHASE_DURATION_MS = COMBAT_CYCLE_DURATION_MS - COMBAT_PHASE_DURATION_MS;
+
     // -------------------------
     // Game state
     // -------------------------
@@ -96,6 +100,8 @@ private:
     bool pauseModalOpen{false};
     bool exitModalOpen{false};
     bool surrendered{false};
+    Uint32 combatCycleStartTick{0};
+    Uint32 lastCombatSyncTick{0};
     AnimationQueue animationQueue;
 
     struct PendingDestroyState {
