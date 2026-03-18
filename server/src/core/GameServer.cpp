@@ -75,7 +75,7 @@ bool GameServer::start() {
             {
                 if (auto p = weakPlayer.lock())
                 {
-                    std::cout << "Player disconnected: " << p->getUsername() << "\n";
+                    std::cout << "[GameServer] Player disconnected: " << p->getUsername() << "\n";
                     // Remove from queues / matches
                     if (tcpServer) tcpServer->enqueueDisconnect(p); //push disconnect action into queue, to drop the socket
                     if (matchmaker) matchmaker->removePlayer(p); //remove from queue if queueing

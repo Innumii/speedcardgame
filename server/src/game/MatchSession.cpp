@@ -37,6 +37,7 @@ MatchSession::MatchSession(
 }
 
 MatchSession::~MatchSession() {
+    std::cout << "[MatchSession] Destroying..." << "\n";
     stop();
 }
 
@@ -65,28 +66,39 @@ bool MatchSession::start() {
                 session->handlePlayerMessage(1, raw);
             }
         });
-        
+
     // Switch the players into Playing state
     playerA->state = ConnectionState::Playing;
     playerB->state = ConnectionState::Playing;
+    
+    running = true;
 
     try {
         gameThread = std::thread(&MatchSession::gameLoop, this);
     } catch (const std::exception& e) {
         std::cerr << "Failed to start match thread: " << e.what() << "\n";
+        running = false;
         return false;
     }
 
-    running = true;
     return true;
 }
 
 void MatchSession::stop() {
-    if (!running.exchange(false)) return;
+    std::cout  << "[MatchSession] Executing stop()...\n";
+
+    // if (!running.exchange(false)) return;
 
     if (gameThread.joinable()) {
-        gameThread.join();
+        if (std::this_thread::get_id() == gameThread.get_id()) {
+            std::cout  << "[MatchSession] Detaching Thread...\n";
+            gameThread.detach();
+        } else {
+            std::cout  << "[MatchSession] Joining Thread...\n";
+            gameThread.join();
+        }
     }
+    std::cout  << "[MatchSession] Stopped.\n";
 }
 
 // --------------------------------------------------
@@ -259,8 +271,13 @@ void MatchSession::gameLoop() {
 
     while (running.load()) {
 
-        if (!playerA->isAlive() || !playerB->isAlive()) {
-            handleDisconnect();
+        if (!playerA->isAlive()) {
+            handleDisconnect(playerA);
+            break;
+        }
+
+        if (!playerB->isAlive()) {
+            handleDisconnect(playerB);
             break;
         }
 
@@ -282,6 +299,7 @@ void MatchSession::gameLoop() {
         std::this_thread::sleep_for(10ms);
     }
 
+    if (onMatchEnd) onMatchEnd(shared_from_this());
     std::cout << "[MatchSession] Exiting Match Game Loop...\n";
 }
 
@@ -318,6 +336,7 @@ void MatchSession::handlePlayerMessage(int playerIndex, const std::vector<char>&
 }
 
 void MatchSession::processActions() {
+    if (!running.load()) return;
     std::queue<PlayerAction> localQueue;
 
     {
@@ -362,14 +381,30 @@ void MatchSession::processActions() {
         }
         else if (action.type == "SURRENDER") {
             handleSurrender(action.playerIndex);
+            return;
         }
 
         localQueue.pop();
     }
 }
 
-void MatchSession::handleSurrender(int playerIndex) {
-    std::cout << "[handleSurrender] Player " << getUsername(playerIndex) << " Surrendered\n";
+void MatchSession::handleSurrender(int surrenderingPlayerIndex) {
+    if (!running.load()) return; // already ended
+
+    std::shared_ptr<PlayerConnection> winner;
+    std::shared_ptr<PlayerConnection> loser;
+
+    if (surrenderingPlayerIndex == 0) {
+        loser = playerA;
+        winner = playerB;
+    } else if (surrenderingPlayerIndex == 1) {
+        loser = playerB;
+        winner = playerA;
+    } else {
+        std::cerr << "[MatchSession] Invalid player index for surrender\n";
+        return;
+    }
+    endMatch(winner, loser);
 }
 
 void MatchSession::handleSummon(int playerIndex, int cardId, int lane) {
@@ -519,17 +554,30 @@ void MatchSession::handleDiscard(int playerIndex, int cardId) {
 // --------------------------------------------------
 // Disconnect Handling
 // --------------------------------------------------
-void MatchSession::handleDisconnect() {
+void MatchSession::handleDisconnect(const std::shared_ptr<PlayerConnection>& player) {
+    if (!running.load()) return;
+
     std::cout << "[MatchSession]: Player disconnected\n";
 
-    if (playerA->isAlive()) {
-        playerA->send("OPPONENT_DISCONNECTED\n");
-    }
-    if (playerB->isAlive()) {
-        playerB->send("OPPONENT_DISCONNECTED\n");
+    std::shared_ptr<PlayerConnection> winner;
+    std::shared_ptr<PlayerConnection> loser = player;
+
+    if (player == playerA) {
+        winner = playerB;
+    } else if (player == playerB) {
+        winner = playerA;
+    } else {
+        std::cerr << "[MatchSession] Unknown player in disconnect\n";
+        return;
     }
 
-    running = false;
+    // Notify the remaining player, may not be needed?
+    if (winner && winner->isAlive()) {
+        winner->send("OPPONENT_DISCONNECTED\n");
+    }
+
+    // End match properly (this handles cleanup + callbacks)
+    endMatch(winner, loser);
 }
 
 const ServerCard* MatchSession::getCard(int id) const {
@@ -851,4 +899,19 @@ void MatchSession::resolveLaneCombat(int lane) {
 
     // Normal combat phase
     resolveCombatOnce(false);
+}
+
+void MatchSession::endMatch(std::shared_ptr<PlayerConnection> winner,
+                            std::shared_ptr<PlayerConnection> loser) {
+    // Update game state, send messages
+    if (winner) winner->send("MATCH_WON\n");
+    if (loser) loser->send("MATCH_LOST\n");
+
+    running = false; // stop game loop
+
+    // ---- Reset player states ----
+    if (winner) winner->state = ConnectionState::Waiting;
+    if (loser) loser->state = ConnectionState::Waiting;
+
+    // Notify any listener (usually MatchManager)
 }

@@ -97,6 +97,19 @@ void MatchManager::startMatch(const std::shared_ptr<PendingMatch>& match)
     //clone every card
 
     auto session = std::make_shared<MatchSession>(match->a, match->b, server.getAllCards());
+
+    // Register the end-of-match callback
+    session->onMatchEnd = [this](std::shared_ptr<MatchSession> s) {
+        // Remove from activeMatches
+        std::lock_guard<std::mutex> lock(mutex);
+        activeMatches.erase(
+            std::remove(activeMatches.begin(), activeMatches.end(), s),
+            activeMatches.end()
+        );
+
+        std::cout << "[MatchManager] Match ended, cleaned up activeMatches\n";
+    };
+    
     session->start();
 
     activeMatches.push_back(session);
