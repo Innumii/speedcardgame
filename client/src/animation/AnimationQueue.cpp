@@ -1,76 +1,77 @@
-#include "animation/animationQueue.hpp"
+#include "animation/AnimationQueue.hpp"
 
+#include <algorithm>
+
+void AnimationQueue::startNextAnimation() {
+	if (activeAnimation || animationQueue.empty()) {
+		return;
+	}
+
+	activeAnimation = animationQueue.front();
+	animationQueue.pop();
+	if (activeAnimation) {
+		activeAnimation->start();
+	}
+}
+
+void AnimationQueue::enqueue(std::shared_ptr<AnimationInterface> animation) {
+	if (!animation) {
+		return;
+	}
+
+	animationQueue.push(std::move(animation));
+}
+
+void AnimationQueue::enqueueGroup(const std::vector<std::shared_ptr<AnimationInterface>>& animations) {
+	auto group = std::make_shared<AnimationGroup>();
+	for (const auto& animation : animations) {
+		group->add(animation);
+	}
+
+	if (!group->getAnimations().empty()) {
+		enqueue(group);
+	}
+}
 void AnimationQueue::clear() {
-    drawCardQueue.clear();
-    activeDrawCard = DrawCardAnimation{};
-    activeDrawCardHandIndex = InvalidIndex;
-    activeAttack = AttackAnimation{};
-    activeAttackLane = InvalidIndex;
+	while (!animationQueue.empty()) {
+		animationQueue.pop();
+	}
+
+	activeAnimation.reset();
+	previousTick = 0;
 }
 
-void AnimationQueue::enqueueDrawCard(const SDL_Rect& from, const SDL_Rect& to, std::size_t handIndex, Uint32 durationMs) {
-    drawCardQueue.push_back(DrawCardRequest{from, to, handIndex, durationMs});
+void AnimationQueue::update(Uint32 nowTick) {
+	if (previousTick == 0) {
+		previousTick = nowTick;
+	}
+
+	startNextAnimation();
+	if (!activeAnimation) {
+		previousTick = nowTick;
+		return;
+	}
+
+	const Uint32 deltaTick = (nowTick >= previousTick) ? (nowTick - previousTick) : 0;
+	previousTick = nowTick;
+
+	const float dtSeconds = static_cast<float>(deltaTick) / 1000.0F;
+	activeAnimation->update(std::max(dtSeconds, 0.0F));
+
+	if (activeAnimation->isFinished()) {
+		activeAnimation.reset();
+		startNextAnimation();
+	}
 }
 
-void AnimationQueue::update(Uint32 now) {
-    if (!activeDrawCard.isActive() && !drawCardQueue.empty()) {
-        startNext(now);
-    }
-
-    activeDrawCard.update(now);
-
-    if (!activeDrawCard.isActive()) {
-        activeDrawCardHandIndex = InvalidIndex;
-
-        if (!drawCardQueue.empty()) {
-            startNext(now);
-            activeDrawCard.update(now);
-        }
-    }
-
-    activeAttack.update(now);
-    if (!activeAttack.isActive()) {
-        activeAttackLane = InvalidIndex;
-    }
+bool AnimationQueue::hasActiveAnimation() const {
+	return (activeAnimation != nullptr) || !animationQueue.empty();
 }
 
-bool AnimationQueue::hasActiveDrawCard() const {
-    return activeDrawCard.isActive() && activeDrawCardHandIndex != InvalidIndex;
+std::shared_ptr<AnimationInterface> AnimationQueue::getActiveAnimation() {
+	return activeAnimation;
 }
 
-const SDL_Rect& AnimationQueue::getActiveDrawCardRect() const {
-    return activeDrawCard.getCurrentRect();
-}
-
-std::size_t AnimationQueue::getActiveDrawCardHandIndex() const {
-    return activeDrawCardHandIndex;
-}
-
-void AnimationQueue::startAttack(const SDL_Rect& from, const SDL_Rect& to, std::size_t attackerLane, Uint32 durationMs) {
-    activeAttack.start(from, to, SDL_GetTicks(), durationMs);
-    activeAttackLane = attackerLane;
-}
-
-bool AnimationQueue::hasActiveAttack() const {
-    return activeAttack.isActive() && activeAttackLane != InvalidIndex;
-}
-
-const SDL_Rect& AnimationQueue::getActiveAttackRect() const {
-    return activeAttack.getCurrentRect();
-}
-
-std::size_t AnimationQueue::getActiveAttackLane() const {
-    return activeAttackLane;
-}
-
-void AnimationQueue::startNext(Uint32 now) {
-    if (drawCardQueue.empty()) {
-        return;
-    }
-
-    const DrawCardRequest request = drawCardQueue.front();
-    drawCardQueue.pop_front();
-
-    activeDrawCard.start(request.fromRect, request.toRect, now, request.durationMs);
-    activeDrawCardHandIndex = request.handIndex;
+std::shared_ptr<const AnimationInterface> AnimationQueue::getActiveAnimation() const {
+	return activeAnimation;
 }

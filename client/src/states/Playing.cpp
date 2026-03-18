@@ -1,6 +1,10 @@
 #include "states/Playing.hpp"
 
 #include "core/Game.hpp"
+#include "animation/AnimationGroup.hpp"
+#include "animation/AttackAnimation.hpp"
+#include "animation/DeathAnimation.hpp"
+#include "animation/DrawCardAnimation.hpp"
 #include "render/RenderPlaying.hpp"
 #include "render/RenderText.hpp"
 #include "render/Theme.hpp"
@@ -177,6 +181,7 @@ void Playing::setup(const Game& game) {
     exitModalOpen = false;
     surrendered = false;
     animationQueue.clear();
+    pendingDestroys.clear();
     pendingAction.clear();
     running = true;
     lastDrawTick = SDL_GetTicks();
@@ -244,7 +249,7 @@ bool Playing::tryDrawCardWithAnimation(Uint32 now) {
     const SDL_Rect fromRect = computeSelfDeckRect(screenW, screenH);
     const std::size_t handIndex = localPlayer.hand.size() - 1;
     if (handIndex < cardRects.size()) {
-        animationQueue.enqueueDrawCard(fromRect, cardRects[handIndex], handIndex, 320);
+        animationQueue.enqueue(std::make_shared<DrawCardAnimation>(fromRect, cardRects[handIndex], handIndex, 320U));
     }
 
     return true;
@@ -462,6 +467,7 @@ void Playing::update(Game& game) {
 
     const Uint32 now = SDL_GetTicks();
     animationQueue.update(now);
+    processPendingDestroys(now);
 
     int screenW = 0, screenH = 0;
     SDL_GetRendererOutputSize(renderer, &screenW, &screenH);
@@ -667,7 +673,7 @@ bool Playing::drawCard(int playerId, int cardId) {
     const std::size_t handIndex = player.hand.size() - 1;
 
     if (playerId == localPlayer.id && handIndex < cardRects.size()) {
-        animationQueue.enqueueDrawCard(fromRect, cardRects[handIndex], handIndex, 320);    
+        animationQueue.enqueue(std::make_shared<DrawCardAnimation>(fromRect, cardRects[handIndex], handIndex, 320U));
     }
 
     return true;
@@ -716,22 +722,176 @@ void Playing::augmentCreature(int playerId, int lane, int powerDelta, int toughn
 void Playing::destroyCreature(int playerId, int lane) {
     int boardIndex = (playerId == localPlayer.id) ? 0 : 1;
 
-    std::unique_ptr<Card> card;
-    if (!board.removeFromPlay(lane, boardIndex, card)) {
-        std::cout << "[destroyCreature] No card on lane " << lane
-                  << " for player " << playerId << "\n";
+    if (lane < 0 || lane >= board.getLaneCount()) {
         return;
     }
 
-    // Optionally move to discard
-    // board.addToDiscard(std::move(card), boardIndex);
+    auto removeAndAnimate = [&](int targetBoardIndex, int targetLane) {
+        std::unique_ptr<Card> card;
+        if (!board.removeFromPlay(targetLane, targetBoardIndex, card)) {
+            std::cout << "[destroyCreature] No card on lane " << targetLane
+                      << " for player " << playerId << "\n";
+            return;
+        }
+
+        animationQueue.enqueue(std::make_shared<DeathAnimation>(
+            targetLane,
+            targetBoardIndex == 0,
+            playSlots,
+            opponentSlots,
+            260U
+        ));
+    };
+
+    const auto& targetZone = board.getZone(lane, boardIndex);
+    if (!targetZone.has_value() || !targetZone.value()) {
+        return;
+    }
+
+    const int opposingBoardIndex = (boardIndex == 0) ? 1 : 0;
+    const auto& opposingZone = board.getZone(lane, opposingBoardIndex);
+    const bool contestedLane = opposingZone.has_value() && static_cast<bool>(opposingZone.value());
+
+    if (!contestedLane) {
+        removeAndAnimate(boardIndex, lane);
+        return;
+    }
+
+    const bool alreadyQueued = std::any_of(
+        pendingDestroys.begin(),
+        pendingDestroys.end(),
+        [&](const PendingDestroyState& pending) {
+            return pending.boardIndex == boardIndex && pending.lane == lane;
+        }
+    );
+
+    if (alreadyQueued) {
+        return;
+    }
+
+    static constexpr Uint32 destroyDelayMs = 520U;
+    pendingDestroys.push_back(PendingDestroyState{boardIndex, lane, SDL_GetTicks() + destroyDelayMs});
+}
+
+void Playing::processPendingDestroys(Uint32 now) {
+    if (pendingDestroys.empty()) {
+        return;
+    }
+
+    std::vector<PendingDestroyState> stillPending;
+    stillPending.reserve(pendingDestroys.size());
+
+    for (const PendingDestroyState& pending : pendingDestroys) {
+        if (now < pending.executeAt) {
+            stillPending.push_back(pending);
+            continue;
+        }
+
+        std::unique_ptr<Card> card;
+        if (!board.removeFromPlay(pending.lane, pending.boardIndex, card)) {
+            continue;
+        }
+
+        animationQueue.enqueue(std::make_shared<DeathAnimation>(
+            pending.lane,
+            pending.boardIndex == 0,
+            playSlots,
+            opponentSlots,
+            260U
+        ));
+    }
+
+    pendingDestroys.swap(stillPending);
 }
 
 void Playing::resolveLaneCombat(int playerAId, int playerBId, int lane, int powerA, int powerB) {
-    //can call animation here ig
+    (void)powerA;
+    (void)powerB;
+
+    if (lane < 0) {
+        return;
+    }
+
+    const int boardIndexA = (playerAId == localPlayer.id) ? 0 : 1;
+    const int boardIndexB = (playerBId == localPlayer.id) ? 0 : 1;
+
+    const std::vector<SDL_Rect>& slotsA = (boardIndexA == 0) ? playSlots : opponentSlots;
+    const std::vector<SDL_Rect>& slotsB = (boardIndexB == 0) ? playSlots : opponentSlots;
+
+    const std::size_t laneIndex = static_cast<std::size_t>(lane);
+    if (laneIndex >= slotsA.size() || laneIndex >= slotsB.size()) {
+        return;
+    }
+
+    const auto& creatureA = board.getZone(lane, boardIndexA);
+    const auto& creatureB = board.getZone(lane, boardIndexB);
+    if (!creatureA.has_value() || !creatureA.value() || !creatureB.has_value() || !creatureB.value()) {
+        return;
+    }
+
+    auto attackGroup = std::make_shared<AnimationGroup>();
+    attackGroup->add(std::make_shared<AttackAnimation>(
+        lane,
+        boardIndexA == 0,
+        playSlots,
+        opponentSlots,
+        420U
+    ));
+    attackGroup->add(std::make_shared<AttackAnimation>(
+        lane,
+        boardIndexB == 0,
+        playSlots,
+        opponentSlots,
+        420U
+    ));
+    animationQueue.enqueue(attackGroup);
 }
 void Playing::resolveDirectCombat(int playerId, int lane, int damage) {
-    //can call animation here ig
+    (void)damage;
+
+    if (!renderer || lane < 0) {
+        return;
+    }
+
+    const int boardIndex = (playerId == localPlayer.id) ? 0 : 1;
+    const std::vector<SDL_Rect>& sourceSlots = (boardIndex == 0) ? playSlots : opponentSlots;
+
+    const std::size_t laneIndex = static_cast<std::size_t>(lane);
+    if (laneIndex >= sourceSlots.size()) {
+        return;
+    }
+
+    int screenW = 0;
+    int screenH = 0;
+    if (SDL_GetRendererOutputSize(renderer, &screenW, &screenH) != 0) {
+        return;
+    }
+
+    SDL_Rect targetRect{};
+    if (boardIndex == 0) {
+        targetRect = SDL_Rect{
+            (screenW - Theme::Playing::OPPONENT_BAR_WIDTH) / 2,
+            Theme::Playing::OPPONENT_BAR_TOP,
+            Theme::Playing::OPPONENT_BAR_WIDTH,
+            Theme::Playing::OPPONENT_BAR_HEIGHT
+        };
+    } else {
+        targetRect = SDL_Rect{
+            (screenW - Theme::Playing::PLAYER_BAR_WIDTH) / 2,
+            screenH - Theme::Playing::PLAYER_BAR_HEIGHT - Theme::Playing::PLAYER_BAR_BOTTOM_MARGIN,
+            Theme::Playing::PLAYER_BAR_WIDTH,
+            Theme::Playing::PLAYER_BAR_HEIGHT
+        };
+    }
+
+    animationQueue.enqueue(std::make_shared<AttackAnimation>(
+        lane,
+        boardIndex == 0,
+        playSlots,
+        opponentSlots,
+        420U,
+        &targetRect
+    ));
 }
 void Playing::augmentHP(int playerId, int delta) {
     //get player object reference, change HP according to delta

@@ -1,5 +1,9 @@
 ﻿#include "render/RenderPLaying.hpp"
 
+#include "animation/AnimationGroup.hpp"
+#include "animation/AttackAnimation.hpp"
+#include "animation/DeathAnimation.hpp"
+#include "animation/DrawCardAnimation.hpp"
 #include "core/Game.hpp"
 #include "render/RenderBoard.hpp"
 #include "render/RenderButton.hpp"
@@ -14,9 +18,97 @@
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_ttf.h>
 #include <algorithm>
+#include <memory>
 #include <string>
+#include <vector>
 
 namespace {
+	struct AttackRenderFrame {
+		SDL_Rect rect{0, 0, 0, 0};
+		Uint8 alpha{0};
+		int lane{-1};
+		bool selfPlayer{false};
+	};
+
+	struct DeathRenderFrame {
+		SDL_Rect rect{0, 0, 0, 0};
+		Uint8 alpha{0};
+	};
+
+	void collectAttackFrames(const std::shared_ptr<const AnimationInterface>& animation,
+							std::vector<AttackRenderFrame>& frames) {
+		if (!animation) {
+			return;
+		}
+
+		if (const auto attack = std::dynamic_pointer_cast<const AttackAnimation>(animation)) {
+			if (!attack->isFinished()) {
+				frames.push_back(AttackRenderFrame{
+					attack->getCurrentRect(),
+					attack->getAlpha(),
+					attack->getLane(),
+					attack->isSelfPlayer()
+				});
+			}
+			return;
+		}
+
+		const auto group = std::dynamic_pointer_cast<const AnimationGroup>(animation);
+		if (!group) {
+			return;
+		}
+
+		for (const auto& child : group->getAnimations()) {
+			collectAttackFrames(child, frames);
+		}
+	}
+
+	void collectDeathFrames(const std::shared_ptr<const AnimationInterface>& animation,
+						   std::vector<DeathRenderFrame>& frames) {
+		if (!animation) {
+			return;
+		}
+
+		if (const auto death = std::dynamic_pointer_cast<const DeathAnimation>(animation)) {
+			if (!death->isFinished()) {
+				frames.push_back(DeathRenderFrame{death->getRect(), death->getAlpha()});
+			}
+			return;
+		}
+
+		const auto group = std::dynamic_pointer_cast<const AnimationGroup>(animation);
+		if (!group) {
+			return;
+		}
+
+		for (const auto& child : group->getAnimations()) {
+			collectDeathFrames(child, frames);
+		}
+	}
+
+	std::shared_ptr<const DrawCardAnimation> findDrawAnimation(const std::shared_ptr<const AnimationInterface>& animation) {
+		if (!animation) {
+			return nullptr;
+		}
+
+		if (const auto draw = std::dynamic_pointer_cast<const DrawCardAnimation>(animation)) {
+			return draw;
+		}
+
+		const auto group = std::dynamic_pointer_cast<const AnimationGroup>(animation);
+		if (!group) {
+			return nullptr;
+		}
+
+		for (const auto& child : group->getAnimations()) {
+			if (const auto draw = findDrawAnimation(child)) {
+				return draw;
+			}
+		}
+
+		return nullptr;
+	}
+
 	void drawOpponentDeckAndDiscard(SDL_Renderer* renderer, RenderText& textRenderer,
 			const std::vector<SDL_Rect>& opponentSlots,
 			std::size_t deckSize, int screenW, TTF_Font* fontSmall) {
@@ -142,9 +234,17 @@ void RenderPlaying::render(Playing& playing, const Game& game) {
 	const bool hoveringDiscard = RenderUtil::pointInRect(playing.discardZone, mouseX, mouseY);
 	const bool hoveringMenu = RenderUtil::pointInRect(playing.menuButton, mouseX, mouseY);
 
+	const std::shared_ptr<const AnimationInterface> activeAnimation = playing.animationQueue.getActiveAnimation();
+	const std::shared_ptr<const DrawCardAnimation> activeDrawAnimation = findDrawAnimation(activeAnimation);
+
 	const bool draggingCard = playing.drag.active && playing.drag.index < playing.localPlayer.hand.size();
-	const bool hasActiveDrawCard = playing.animationQueue.hasActiveDrawCard();
-	const std::size_t activeDrawCardIndex = playing.animationQueue.getActiveDrawCardHandIndex();
+	const bool hasActiveDrawCard = static_cast<bool>(activeDrawAnimation);
+	const std::size_t activeDrawCardIndex = hasActiveDrawCard ? activeDrawAnimation->getHandIndex() : static_cast<std::size_t>(-1);
+
+	std::vector<AttackRenderFrame> activeAttackFrames;
+	std::vector<DeathRenderFrame> activeDeathFrames;
+	collectAttackFrames(activeAnimation, activeAttackFrames);
+	collectDeathFrames(activeAnimation, activeDeathFrames);
 
 	std::size_t newHoverIndex = static_cast<std::size_t>(-1);
 	if (!draggingCard) {
@@ -324,10 +424,46 @@ void RenderPlaying::render(Playing& playing, const Game& game) {
 	}
 
 	if (hasActiveDrawCard) {
-		RenderCard::drawCardBack(renderer, playing.animationQueue.getActiveDrawCardRect());
+		RenderCard::drawCardBack(renderer, activeDrawAnimation->getCurrentRect());
+	}
+
+	if (!activeDeathFrames.empty()) {
+		SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+		for (const auto& frame : activeDeathFrames) {
+			SDL_SetRenderDrawColor(renderer, 25, 25, 25, static_cast<Uint8>(frame.alpha / 2));
+			SDL_RenderFillRect(renderer, &frame.rect);
+
+			SDL_SetRenderDrawColor(renderer, 255, 70, 70, frame.alpha);
+			const int x1 = frame.rect.x + 8;
+			const int y1 = frame.rect.y + 8;
+			const int x2 = frame.rect.x + frame.rect.w - 8;
+			const int y2 = frame.rect.y + frame.rect.h - 8;
+			SDL_RenderDrawLine(renderer, x1, y1, x2, y2);
+			SDL_RenderDrawLine(renderer, x1, y2, x2, y1);
+		}
 	}
 
 	RenderBoard::drawBoardState(renderer, textRenderer, playing.board, playing.playSlots, playing.opponentSlots, uiFonts.tiny, uiFonts.small);
+
+	if (!activeAttackFrames.empty()) {
+		SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+		for (const auto& frame : activeAttackFrames) {
+			if (frame.lane < 0) {
+				continue;
+			}
+
+			const int boardIndex = frame.selfPlayer ? 0 : 1;
+			const auto& zone = playing.board.getZone(frame.lane, boardIndex);
+			if (!zone.has_value() || !zone.value()) {
+				continue;
+			}
+
+			RenderCard::drawBoardCard(renderer, textRenderer, *zone.value(), frame.rect, uiFonts.tiny, uiFonts.small);
+
+			SDL_SetRenderDrawColor(renderer, 255, 255, 255, static_cast<Uint8>(std::min<int>(frame.alpha, 160)));
+			SDL_RenderDrawRect(renderer, &frame.rect);
+		}
+	}
 
 	if (draggingCard && playing.drag.index < playing.cardRects.size()) {
 		SDL_Rect floating = playing.cardRects[playing.drag.index];

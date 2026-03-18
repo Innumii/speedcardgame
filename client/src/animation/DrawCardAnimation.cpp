@@ -3,46 +3,49 @@
 #include <algorithm>
 
 namespace {
-    float easeOutQuad(float t) {
-        return 1.0f - (1.0f - t) * (1.0f - t);
+int lerpInt(int a, int b, float t) {
+    return static_cast<int>(a + (b - a) * t);
+}
+}
+
+DrawCardAnimation::DrawCardAnimation(const SDL_Rect& fromRect, const SDL_Rect& toRect,
+                                     std::size_t handIndexValue, Uint32 durationMs)
+    : startRect(fromRect),
+      endRect(toRect),
+      currentRect(fromRect),
+      handIndex(handIndexValue),
+      durationSeconds(static_cast<float>(std::max<Uint32>(durationMs, 1U)) / 1000.0F) {}
+
+void DrawCardAnimation::start() {
+    elapsedSeconds = 0.0F;
+    finished = false;
+    currentRect = startRect;
+}
+
+void DrawCardAnimation::update(float dt) {
+    if (finished) {
+        return;
     }
 
-    int lerpInt(int from, int to, float t) {
-        return static_cast<int>(from + (to - from) * t);
-    }
+    elapsedSeconds += std::max(dt, 0.0F);
+    const float t = std::clamp(elapsedSeconds / durationSeconds, 0.0F, 1.0F);
+
+    currentRect.x = lerpInt(startRect.x, endRect.x, t);
+    currentRect.y = lerpInt(startRect.y, endRect.y, t);
+    currentRect.w = lerpInt(startRect.w, endRect.w, t);
+    currentRect.h = lerpInt(startRect.h, endRect.h, t);
+
+    finished = (t >= 1.0F);
 }
 
-void DrawCardAnimation::start(const SDL_Rect& from, const SDL_Rect& to, Uint32 now, Uint32 duration) {
-    fromRect = from;
-    toRect = to;
-    currentRect = from;
-    startTick = now;
-    durationMs = duration > 0 ? duration : 1;
-    active = true;
+bool DrawCardAnimation::isFinished() const {
+    return finished;
 }
 
-void DrawCardAnimation::update(Uint32 now) {
-    if (!active) return;
-
-    float t = static_cast<float>(now - startTick) / static_cast<float>(durationMs);
-    t = std::max(0.0f, std::min(t, 1.0f));
-    const float eased = easeOutQuad(t);
-
-    currentRect.x = lerpInt(fromRect.x, toRect.x, eased);
-    currentRect.y = lerpInt(fromRect.y, toRect.y, eased);
-    currentRect.w = lerpInt(fromRect.w, toRect.w, eased);
-    currentRect.h = lerpInt(fromRect.h, toRect.h, eased);
-
-    if (t >= 1.0f) {
-        currentRect = toRect;
-        active = false;
-    }
-}
-
-bool DrawCardAnimation::isActive() const {
-    return active;
-}
-
-const SDL_Rect& DrawCardAnimation::getCurrentRect() const {
+SDL_Rect DrawCardAnimation::getCurrentRect() const {
     return currentRect;
+}
+
+std::size_t DrawCardAnimation::getHandIndex() const {
+    return handIndex;
 }

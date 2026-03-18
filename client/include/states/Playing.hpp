@@ -12,7 +12,7 @@
 #include "objects/Deck.h"
 #include "core/Board.hpp"
 #include "render/RenderText.hpp"
-#include "animation/animationQueue.hpp"
+#include "animation/AnimationQueue.hpp"
 #include "gameplay/GameAuthority.hpp"
 
 class Game;
@@ -98,6 +98,13 @@ private:
     bool surrendered{false};
     AnimationQueue animationQueue;
 
+    struct PendingDestroyState {
+        int boardIndex{0};
+        int lane{-1};
+        Uint32 executeAt{0};
+    };
+    std::vector<PendingDestroyState> pendingDestroys;
+
     // -------------------------
     // Pending action (targeting system)
     // -------------------------
@@ -124,6 +131,7 @@ private:
     // Helpers
     // -------------------------
     bool resolvePendingActionAt(int x, int y);
+    void processPendingDestroys(Uint32 now);
 
     std::vector<SDL_Rect> computeCardLayout(std::size_t count, int screenW, int screenH) const;
     void computeZones(int screenW, int screenH);

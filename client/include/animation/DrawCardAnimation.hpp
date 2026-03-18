@@ -1,22 +1,31 @@
 #ifndef DRAW_CARD_ANIMATION_HPP
 #define DRAW_CARD_ANIMATION_HPP
 
+#include "AnimationInterface.hpp"
+
 #include <SDL2/SDL.h>
+#include <cstddef>
 
-class DrawCardAnimation {
+class DrawCardAnimation : public AnimationInterface {
+	SDL_Rect startRect{0, 0, 0, 0};
+	SDL_Rect endRect{0, 0, 0, 0};
+	SDL_Rect currentRect{0, 0, 0, 0};
+
+	std::size_t handIndex{0};
+	float durationSeconds{0.0F};
+	float elapsedSeconds{0.0F};
+	bool finished{false};
+
 public:
-    void start(const SDL_Rect& from, const SDL_Rect& to, Uint32 now, Uint32 duration);
-    void update(Uint32 now);
-    bool isActive() const;
-    const SDL_Rect& getCurrentRect() const;
+	DrawCardAnimation(const SDL_Rect& fromRect, const SDL_Rect& toRect,
+					  std::size_t handIndex, Uint32 durationMs);
 
-private:
-    SDL_Rect fromRect{0, 0, 0, 0};
-    SDL_Rect toRect{0, 0, 0, 0};
-    SDL_Rect currentRect{0, 0, 0, 0};
-    Uint32 startTick{0};
-    Uint32 durationMs{1};
-    bool active{false};
+	void start() override;
+	void update(float dt) override;
+	bool isFinished() const override;
+
+	SDL_Rect getCurrentRect() const;
+	std::size_t getHandIndex() const;
 };
 
 #endif

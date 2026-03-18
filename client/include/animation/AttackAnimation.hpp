@@ -1,22 +1,39 @@
 #ifndef ATTACK_ANIMATION_HPP
 #define ATTACK_ANIMATION_HPP
 
+#include "AnimationInterface.hpp"
+
 #include <SDL2/SDL.h>
+#include <vector>
 
-class AttackAnimation {
+class AttackAnimation : public AnimationInterface {
+	SDL_Rect startRect{0, 0, 0, 0};
+	SDL_Rect targetRect{0, 0, 0, 0};
+	SDL_Rect currentRect{0, 0, 0, 0};
+	int lane{-1};
+	bool selfPlayer{false};
+	bool canAnimate{false};
+
+	float durationSeconds{0.0F};
+	float elapsedSeconds{0.0F};
+	bool finished{false};
+
 public:
-    void start(const SDL_Rect& from, const SDL_Rect& to, Uint32 now, Uint32 duration);
-    void update(Uint32 now);
-    bool isActive() const;
-    const SDL_Rect& getCurrentRect() const;
+	AttackAnimation(int lane,
+					bool isSelfPlayer,
+					const std::vector<SDL_Rect>& selfSlots,
+					const std::vector<SDL_Rect>& opponentSlots,
+					Uint32 durationMs,
+					const SDL_Rect* explicitTargetRect = nullptr);
 
-private:
-    SDL_Rect fromRect{0, 0, 0, 0};
-    SDL_Rect toRect{0, 0, 0, 0};
-    SDL_Rect currentRect{0, 0, 0, 0};
-    Uint32 startTick{0};
-    Uint32 durationMs{1};
-    bool active{false};
+	void start() override;
+	void update(float dt) override;
+	bool isFinished() const override;
+
+	SDL_Rect getCurrentRect() const;
+	Uint8 getAlpha() const;
+	int getLane() const;
+	bool isSelfPlayer() const;
 };
 
 #endif
