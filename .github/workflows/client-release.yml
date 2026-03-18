@@ -91,7 +91,7 @@ jobs:
           export CPPFLAGS="-I$(brew --prefix openssl@3)/include ${CPPFLAGS:-}"
           export LDFLAGS="-L$(brew --prefix openssl@3)/lib ${LDFLAGS:-}"
           cd client
-          make clean
+          make -f Makefile.mac clean
           make -f Makefile.mac
 
       - name: Bundle artifact
