@@ -165,6 +165,9 @@ Playing::~Playing() = default;
 // Setup
 // -------------------------
 void Playing::setup(const Game& game) {
+    board = Board();
+    state = PlayingGameState::Playing;
+
     renderer = game.getRenderer();
     if (!renderer)
         throw std::runtime_error("Renderer not available");
@@ -175,7 +178,7 @@ void Playing::setup(const Game& game) {
     menuOpen = false;
     pauseModalOpen = false;
     exitModalOpen = false;
-    surrendered = false;
+    // surrendered = false;
     animationQueue.clear();
     pendingAction.clear();
     running = true;
@@ -267,9 +270,9 @@ void Playing::handleEvents(Game& game, const SDL_Event& event) {
         const int mouseX = event.button.x;
         const int mouseY = event.button.y;
 
-        if (surrendered) {
+        if (state != PlayingGameState::Playing){
             if (RenderUtil::pointInRect(returnToTitleButton, mouseX, mouseY)) {
-                surrendered = false;
+                // surrendered = false;
                 pauseModalOpen = false;
                 exitModalOpen = false;
                 game.setNextState(GameState::Title);
@@ -280,7 +283,7 @@ void Playing::handleEvents(Game& game, const SDL_Event& event) {
         if (exitModalOpen) {
             if (RenderUtil::pointInRect(saveExitButton, mouseX, mouseY)) {
                 authority->surrender();
-                surrendered = true;
+                // surrendered = true;
                 pauseModalOpen = false;
                 exitModalOpen = false;
                 return;
@@ -324,7 +327,7 @@ void Playing::handleEvents(Game& game, const SDL_Event& event) {
         }
     }
 
-    if (surrendered) return;
+    if (state != PlayingGameState::Playing) return;
 
     if (pendingAction.active) {
         if (event.type == SDL_MOUSEBUTTONDOWN && event.button.button == SDL_BUTTON_LEFT) {
@@ -437,7 +440,7 @@ void Playing::run() {
 
 void Playing::update(Game& game) {
     if (!renderer) return;
-    if (surrendered) return;
+    if (state != PlayingGameState::Playing) return;
 
     auto& net = game.getNetworkClient();
 
@@ -586,6 +589,13 @@ bool Playing::handleServerMessage(const std::string& msg) {
         augmentHP(playerId, delta);
 
     } //add a mana command later -> decouple discard logic to offload to mana logic
+    else if (cmd == "MATCH_LOST") {
+        state = PlayingGameState::Lost;
+        std::cout << "[Playing] Lost Match!\n";
+    } else if (cmd == "MATCH_WON") {
+        state = PlayingGameState::Won;
+        std::cout << "[Playing] Won Match!\n";
+    }
 
     return true;
 }
@@ -884,4 +894,8 @@ void Playing::computeUiRects(int screenW, int screenH) {
     const int returnW = Theme::Playing::RETURN_BUTTON_WIDTH;
     const int returnH = Theme::Playing::RETURN_BUTTON_HEIGHT;
     returnToTitleButton = SDL_Rect{(screenW - returnW) / 2, (screenH / 2) + 24, returnW, returnH};
+}
+
+PlayingGameState Playing::getState() const {
+    return state;
 }

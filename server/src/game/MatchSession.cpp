@@ -725,6 +725,16 @@ void MatchSession::augmentHP(int playerIndex, int amount){
                     + std::to_string(amount)+ "\n";
     playerA->send(msg);
     playerB->send(msg);
+
+    if (players[playerIndex].health <= 0) { //end match
+            std::shared_ptr<PlayerConnection> winner = playerA;
+        std::shared_ptr<PlayerConnection> loser = playerB;
+        if (playerIndex == 1) {
+            winner = playerB;
+            loser = playerA;
+        }
+        endMatch(winner, loser);
+    }
 } 
 
 void MatchSession::setHP(int playerIndex, int amount){
@@ -912,6 +922,4 @@ void MatchSession::endMatch(std::shared_ptr<PlayerConnection> winner,
     // ---- Reset player states ----
     if (winner) winner->state = ConnectionState::Waiting;
     if (loser) loser->state = ConnectionState::Waiting;
-
-    // Notify any listener (usually MatchManager)
 }

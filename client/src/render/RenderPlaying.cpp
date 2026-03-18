@@ -353,7 +353,7 @@ void RenderPlaying::render(Playing& playing, const Game& game) {
 	}
 
 	// ── menu button - top right ──────────────────────────────────────
-	if (!playing.surrendered && !playing.pauseModalOpen && !playing.exitModalOpen) {
+	if (playing.getState() == PlayingGameState::Playing && !playing.pauseModalOpen && !playing.exitModalOpen) {
 		RenderUtil::drawRoundedRect(renderer, playing.menuButton,
 		            Theme::Board::DISCARD_CORNER_RADIUS,
 		            Theme::Playing::MENU_BUTTON_FILL,
@@ -370,7 +370,7 @@ void RenderPlaying::render(Playing& playing, const Game& game) {
 	}
 
 	// ── pause modal ──────────────────────────────────────────────────
-	if (playing.pauseModalOpen && !playing.surrendered) {
+	if (playing.pauseModalOpen && playing.getState() == PlayingGameState::Playing) {
 		SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
 		SDL_SetRenderDrawColor(renderer, Theme::Playing::PAUSE_OVERLAY.r, Theme::Playing::PAUSE_OVERLAY.g, Theme::Playing::PAUSE_OVERLAY.b, Theme::Playing::PAUSE_OVERLAY.a);
 		SDL_RenderFillRect(renderer, nullptr);
@@ -421,7 +421,7 @@ void RenderPlaying::render(Playing& playing, const Game& game) {
 	}
 
 	// ── exit confirmation modal ──────────────────────────────────────
-	if (playing.exitModalOpen && !playing.surrendered) {
+	if (playing.exitModalOpen && playing.getState() == PlayingGameState::Playing) {
 		SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
 		SDL_SetRenderDrawColor(renderer, Theme::Playing::EXIT_OVERLAY.r, Theme::Playing::EXIT_OVERLAY.g, Theme::Playing::EXIT_OVERLAY.b, Theme::Playing::EXIT_OVERLAY.a);
 		SDL_RenderFillRect(renderer, nullptr);
@@ -481,8 +481,13 @@ void RenderPlaying::render(Playing& playing, const Game& game) {
 		                      playing.noSaveExitButton.y + (playing.noSaveExitButton.h - noSaveTextH) / 2);
 	}
 
-	// ── surrender screen ─────────────────────────────────────────────
-	if (playing.surrendered) {
+	// ── Game End Screen (need a button for requeue)─────────────────────────────────────────────
+	//Currently, game end does NOT mean disconnect from server. They are still in the server.
+	if (playing.getState() != PlayingGameState::Playing) {
+		std::string msg = "Defeat";
+		if (playing.getState() == PlayingGameState::Won) {
+			msg = "Victory";
+		}
 		SDL_Rect overlay{0, 0, screenW, screenH};
 		SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
 		SDL_SetRenderDrawColor(renderer, Theme::Playing::SURRENDER_OVERLAY.r, Theme::Playing::SURRENDER_OVERLAY.g, Theme::Playing::SURRENDER_OVERLAY.b, Theme::Playing::SURRENDER_OVERLAY.a);
@@ -491,12 +496,12 @@ void RenderPlaying::render(Playing& playing, const Game& game) {
 		int loseTextW = 0;
 		int loseTextH = 0;
 		if (titleFonts.large) {
-			TTF_SizeText(titleFonts.large, "You Lose", &loseTextW, &loseTextH);
+			TTF_SizeText(titleFonts.large, msg.data(), &loseTextW, &loseTextH);
 		}
 
 		textRenderer.drawText(
 			renderer,
-			"You Lose",
+			msg,
 			titleFonts.large,
 			Theme::TEXT_PRIMARY,
 			(screenW - loseTextW) / 2,
