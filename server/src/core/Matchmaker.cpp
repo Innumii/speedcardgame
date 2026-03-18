@@ -31,11 +31,12 @@ void Matchmaker::removePlayer(const std::shared_ptr<PlayerConnection>& player) {
         if (p != player) {
             std::cout << "keep\n";
             tempQueue.push(p);
+        } else {
+            std::cout << "[Matchmaker]" << player->getUsername() << " removed from Queue\n";
         }
     }
 
     std::swap(playerQueue, tempQueue);
-    std::cout << "[Matchmaker]" << player->getUsername() << " removed from Queue\n";
     std::cout << "[Matchmaker] Updated queue size: " << playerQueue.size() << "\n";
 
 }

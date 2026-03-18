@@ -12,6 +12,11 @@
 #include <openssl/ssl.h>
 #include <openssl/err.h>
 
+enum class ConnectionState {
+    Waiting,
+    Playing
+};
+
 //1 object means 1 player connection from client -> server
 //need callback runs for this
 //can form shared pointer to itself
@@ -41,7 +46,18 @@ public:
 
     int getPlayerId() const;
     const std::string& getUsername() const;
-private:
+
+    //Callback settings
+    using MsgCallback = std::function<void(const std::shared_ptr<PlayerConnection>&, const std::string&)>;
+    ConnectionState state = ConnectionState::Waiting;
+    void setMessageHandler(ConnectionState state, MsgCallback cb);
+
+private:    
+
+    std::unordered_map<ConnectionState, MsgCallback> stateHandlers;
+    void dispatchMessage(const std::vector<char>& rawMsg);
+
+
     //reads incoming data from client's socket and stores
     void readLoop();
     int playerId = -1;

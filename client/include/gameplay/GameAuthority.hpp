@@ -8,4 +8,5 @@ public:
 
     virtual void playCard(int cardId, int lane, std::optional<int> targetLane, std::optional<int> targetIndex) = 0;
     virtual void discardCard(int cardId) = 0;
+    virtual void surrender() = 0;
 };

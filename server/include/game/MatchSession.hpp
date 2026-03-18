@@ -9,6 +9,7 @@
 #include <unordered_map>
 #include <mutex>
 #include <queue>
+#include <functional>
 
 #include "objects/ServerDeck.h"
 #include "objects/ServerCard.h"
@@ -91,6 +92,8 @@ public:
     void handleSpell(int playerIndex, int cardId, int lane, std::optional<int> targetLane = std::nullopt, std::optional<int> targetIndex = std::nullopt);
     //DISCARD <playerId> <cardId>
     void handleDiscard(int playerIndex, int cardId);
+    //SURRENDER <playerId>
+    void handleSurrender(int playerIndex);
     //--------------player actions--------------
 
     const ServerCard* getCard(int id) const;
@@ -121,14 +124,16 @@ public:
     int getCreaturePower(int playerIndex, int lane);
     int getCreatureToughness(int playerIndex, int lane);
 
-
+    //callback for ending match
+    std::function<void(std::shared_ptr<MatchSession>)> onMatchEnd;
+    void endMatch(std::shared_ptr<PlayerConnection> winner, std::shared_ptr<PlayerConnection> loser);
 private:
     const int handLimit = 7;
     const int drawInterval = 5;
     const int attackInterval = 5; 
 
     void gameLoop();
-    void handleDisconnect();
+    void handleDisconnect(const std::shared_ptr<PlayerConnection>&);
 
     // Players
     std::shared_ptr<PlayerConnection> playerA;

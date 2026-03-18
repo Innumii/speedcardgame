@@ -37,6 +37,7 @@ MatchSession::MatchSession(
 }
 
 MatchSession::~MatchSession() {
+    std::cout << "[MatchSession] Destroying..." << "\n";
     stop();
 }
 
@@ -46,35 +47,58 @@ MatchSession::~MatchSession() {
 bool MatchSession::start() {
     if (running.load()) return false;
 
-    auto weakSelf = std::weak_ptr<MatchSession>(shared_from_this());
-    playerA->onMessageReceived = [weakSelf](const std::vector<char>& raw) {
-        if (auto self = weakSelf.lock()) {
-            self->handlePlayerMessage(0, raw);
-        }
-    };
-    playerB->onMessageReceived = [weakSelf](const std::vector<char>& raw) {
-        if (auto self = weakSelf.lock()) {
-            self->handlePlayerMessage(1, raw);
-        }
-    };
+    auto weakSession = std::weak_ptr<MatchSession>(shared_from_this());
+    // Set the Playing callback for Player A
+    playerA->setMessageHandler(ConnectionState::Playing,
+        [weakSession](const std::shared_ptr<PlayerConnection>& /*p*/, const std::string& msg) {
+            if (auto session = weakSession.lock()) {
+                // convert string back to vector<char> for handlePlayerMessage
+                std::vector<char> raw(msg.begin(), msg.end());
+                session->handlePlayerMessage(0, raw);
+            }
+        });
+
+    // Set the Playing callback for Player B
+    playerB->setMessageHandler(ConnectionState::Playing,
+        [weakSession](const std::shared_ptr<PlayerConnection>& /*p*/, const std::string& msg) {
+            if (auto session = weakSession.lock()) {
+                std::vector<char> raw(msg.begin(), msg.end());
+                session->handlePlayerMessage(1, raw);
+            }
+        });
+
+    // Switch the players into Playing state
+    playerA->state = ConnectionState::Playing;
+    playerB->state = ConnectionState::Playing;
+    
+    running = true;
 
     try {
         gameThread = std::thread(&MatchSession::gameLoop, this);
     } catch (const std::exception& e) {
         std::cerr << "Failed to start match thread: " << e.what() << "\n";
+        running = false;
         return false;
     }
 
-    running = true;
     return true;
 }
 
 void MatchSession::stop() {
-    if (!running.exchange(false)) return;
+    std::cout  << "[MatchSession] Executing stop()...\n";
+
+    // if (!running.exchange(false)) return;
 
     if (gameThread.joinable()) {
-        gameThread.join();
+        if (std::this_thread::get_id() == gameThread.get_id()) {
+            std::cout  << "[MatchSession] Detaching Thread...\n";
+            gameThread.detach();
+        } else {
+            std::cout  << "[MatchSession] Joining Thread...\n";
+            gameThread.join();
+        }
     }
+    std::cout  << "[MatchSession] Stopped.\n";
 }
 
 // --------------------------------------------------
@@ -247,8 +271,13 @@ void MatchSession::gameLoop() {
 
     while (running.load()) {
 
-        if (!playerA->isAlive() || !playerB->isAlive()) {
-            handleDisconnect();
+        if (!playerA->isAlive()) {
+            handleDisconnect(playerA);
+            break;
+        }
+
+        if (!playerB->isAlive()) {
+            handleDisconnect(playerB);
             break;
         }
 
@@ -270,6 +299,7 @@ void MatchSession::gameLoop() {
         std::this_thread::sleep_for(10ms);
     }
 
+    if (onMatchEnd) onMatchEnd(shared_from_this());
     std::cout << "[MatchSession] Exiting Match Game Loop...\n";
 }
 
@@ -306,6 +336,7 @@ void MatchSession::handlePlayerMessage(int playerIndex, const std::vector<char>&
 }
 
 void MatchSession::processActions() {
+    if (!running.load()) return;
     std::queue<PlayerAction> localQueue;
 
     {
@@ -348,9 +379,32 @@ void MatchSession::processActions() {
             if (!action.args.empty())
                 handleDiscard(action.playerIndex, action.args[0]);
         }
+        else if (action.type == "SURRENDER") {
+            handleSurrender(action.playerIndex);
+            return;
+        }
 
         localQueue.pop();
     }
+}
+
+void MatchSession::handleSurrender(int surrenderingPlayerIndex) {
+    if (!running.load()) return; // already ended
+
+    std::shared_ptr<PlayerConnection> winner;
+    std::shared_ptr<PlayerConnection> loser;
+
+    if (surrenderingPlayerIndex == 0) {
+        loser = playerA;
+        winner = playerB;
+    } else if (surrenderingPlayerIndex == 1) {
+        loser = playerB;
+        winner = playerA;
+    } else {
+        std::cerr << "[MatchSession] Invalid player index for surrender\n";
+        return;
+    }
+    endMatch(winner, loser);
 }
 
 void MatchSession::handleSummon(int playerIndex, int cardId, int lane) {
@@ -500,17 +554,30 @@ void MatchSession::handleDiscard(int playerIndex, int cardId) {
 // --------------------------------------------------
 // Disconnect Handling
 // --------------------------------------------------
-void MatchSession::handleDisconnect() {
+void MatchSession::handleDisconnect(const std::shared_ptr<PlayerConnection>& player) {
+    if (!running.load()) return;
+
     std::cout << "[MatchSession]: Player disconnected\n";
 
-    if (playerA->isAlive()) {
-        playerA->send("OPPONENT_DISCONNECTED\n");
-    }
-    if (playerB->isAlive()) {
-        playerB->send("OPPONENT_DISCONNECTED\n");
+    std::shared_ptr<PlayerConnection> winner;
+    std::shared_ptr<PlayerConnection> loser = player;
+
+    if (player == playerA) {
+        winner = playerB;
+    } else if (player == playerB) {
+        winner = playerA;
+    } else {
+        std::cerr << "[MatchSession] Unknown player in disconnect\n";
+        return;
     }
 
-    running = false;
+    // Notify the remaining player, may not be needed?
+    if (winner && winner->isAlive()) {
+        winner->send("OPPONENT_DISCONNECTED\n");
+    }
+
+    // End match properly (this handles cleanup + callbacks)
+    endMatch(winner, loser);
 }
 
 const ServerCard* MatchSession::getCard(int id) const {
@@ -658,6 +725,16 @@ void MatchSession::augmentHP(int playerIndex, int amount){
                     + std::to_string(amount)+ "\n";
     playerA->send(msg);
     playerB->send(msg);
+
+    if (players[playerIndex].health <= 0) { //end match
+            std::shared_ptr<PlayerConnection> loser = playerA;
+            std::shared_ptr<PlayerConnection> winner = playerB;
+        if (playerIndex == 1) {
+            loser = playerB;
+            winner = playerA;
+        }
+        endMatch(winner, loser);
+    }
 } 
 
 void MatchSession::setHP(int playerIndex, int amount){
@@ -724,24 +801,23 @@ void MatchSession::resolveAttackPhase() {
     }
 
     // After combat, check deaths
-    for (int p = 0; p < 2; p++) {
-        for (int lane = 0; lane < board.laneCount; lane++) {
-            auto& cardOpt = board.lanes[p][lane];
-            if (!cardOpt) continue;
+    // for (int p = 0; p < 2; p++) {
+    //     for (int lane = 0; lane < board.laneCount; lane++) {
+    //         auto& cardOpt = board.lanes[p][lane];
+    //         if (!cardOpt) continue;
 
-            int toughness = getCreatureToughness(p, lane);
+    //         int toughness = getCreatureToughness(p, lane);
 
-            if (toughness <= 0) {
-                destroyCreature(p, lane);
-            }
-        }
-    }
+    //         if (toughness <= 0) {
+    //             destroyCreature(p, lane);
+    //         }
+    //     }
+    // }
 }
 
 // COMBAT <lane> <playerA's card power> <playerB's card power>
 // DIRECT <attacker ID> <lane> <damage>
 void MatchSession::resolveLaneCombat(int lane) {
-
     auto& cardA = board.lanes[0][lane];
     auto& cardB = board.lanes[1][lane];
 
@@ -750,17 +826,6 @@ void MatchSession::resolveLaneCombat(int lane) {
     auto hasEffect = [this](int playerIndex, int laneIndex, int effectBit) {
         const auto& effectMaskOpt = board.continuousEffects[playerIndex][laneIndex];
         return CombatEffects::hasEffect(effectMaskOpt, effectBit);
-    };
-
-    auto checkLaneDeaths = [this, lane]() {
-        for (int p = 0; p < 2; ++p) {
-            const auto& maybeCard = board.lanes[p][lane];
-            if (!maybeCard) continue;
-
-            if (getCreatureToughness(p, lane) <= 0) {
-                destroyCreature(p, lane);
-            }
-        }
     };
 
     auto sendDirectDamage = [this, lane](int attackerIndex, int damage) {
@@ -781,66 +846,80 @@ void MatchSession::resolveLaneCombat(int lane) {
         augmentHP(1 - attackerIndex, -damage);
     };
 
-    auto resolveCombatWindow = [&](bool allowA, bool allowB) {
-        const bool aAlive = board.lanes[0][lane].has_value();
-        const bool bAlive = board.lanes[1][lane].has_value();
-
-        if (!aAlive && !bAlive) return;
-
-        if (aAlive && bAlive) {
-            int powerA = allowA ? getCreaturePower(0, lane) : 0;
-            int powerB = allowB ? getCreaturePower(1, lane) : 0;
-            int toughnessA = getCreatureToughness(0, lane);
-            int toughnessB = getCreatureToughness(1, lane);
-
-            if (powerA <= 0 && powerB <= 0) return;
-
-            std::cout << "[Combat] Lane " << lane
-                      << " A(" << powerA << ") vs B(" << powerB << ")\n";
-
-            if (powerB > 0) {
-                augmentCreature(0, lane, {0, -powerB});
-            }
-            if (powerA > 0) {
-                augmentCreature(1, lane, {0, -powerA});
-            }
-
-            std::ostringstream ss;
-            ss << "COMBAT "
-               << players[0].id << " "
-               << players[1].id << " "
-               << lane << " "
-               << powerA << " "
-               << powerB << "\n";
-            playerA->send(ss.str());
-            playerB->send(ss.str());
-
-            if (powerA > 0 && hasEffect(0, lane, CombatEffects::kTrample) && toughnessB > 0) {
-                const int overflow = std::max(0, powerA - toughnessB);
-                sendDirectDamage(0, overflow);
-            }
-            if (powerB > 0 && hasEffect(1, lane, CombatEffects::kTrample) && toughnessA > 0) {
-                const int overflow = std::max(0, powerB - toughnessA);
-                sendDirectDamage(1, overflow);
-            }
-            return;
-        }
-
-        const int attackerIndex = aAlive ? 0 : 1;
-        const bool canStrike = (attackerIndex == 0) ? allowA : allowB;
-        if (!canStrike) return;
-
-        int power = getCreaturePower(attackerIndex, lane);
-        sendDirectDamage(attackerIndex, power);
-    };
-
     const bool hasDoubleStrikeA = hasEffect(0, lane, CombatEffects::kDoubleStrike);
     const bool hasDoubleStrikeB = hasEffect(1, lane, CombatEffects::kDoubleStrike);
 
+    auto resolveCombatOnce = [&](bool allowDoubleStrikePhase) {
+        // Check if creatures are still alive
+        bool aAlive = board.lanes[0][lane].has_value();
+        bool bAlive = board.lanes[1][lane].has_value();
+        if (!aAlive && !bAlive) return;
+
+        int powerA = aAlive ? getCreaturePower(0, lane) : 0;
+        int powerB = bAlive ? getCreaturePower(1, lane) : 0;
+
+        if (aAlive && !bAlive) {
+            sendDirectDamage(0, powerA);
+            return;
+        }
+        if (!aAlive && bAlive) {
+            sendDirectDamage(1, powerB);
+            return;
+        }
+
+        std::cout << "[Combat] Lane " << lane
+                  << " A(" << powerA << ") vs B(" << powerB << ")\n";
+
+        // Apply damage
+        if (aAlive && powerA > 0) augmentCreature(1, lane, {0, -powerA});
+        if (bAlive && powerB > 0) augmentCreature(0, lane, {0, -powerB});
+
+        // Handle trample / overflow damage after instant augments
+        aAlive = board.lanes[0][lane].has_value();
+        bAlive = board.lanes[1][lane].has_value();
+
+        if (aAlive && bAlive) {
+            int toughnessA = getCreatureToughness(0, lane);
+            int toughnessB = getCreatureToughness(1, lane);
+
+            if (hasEffect(0, lane, CombatEffects::kTrample) && toughnessB <= 0) {
+                sendDirectDamage(0, powerA - toughnessB);
+            }
+            if (hasEffect(1, lane, CombatEffects::kTrample) && toughnessA <= 0) {
+                sendDirectDamage(1, powerB - toughnessA);
+            }
+        }
+
+        // Broadcast combat event
+        std::ostringstream ss;
+        ss << "COMBAT "
+           << players[0].id << " "
+           << players[1].id << " "
+           << lane << " "
+           << powerA << " "
+           << powerB << "\n";
+        playerA->send(ss.str());
+        playerB->send(ss.str());
+    };
+
+    // Double strike phase first
     if (hasDoubleStrikeA || hasDoubleStrikeB) {
-        resolveCombatWindow(hasDoubleStrikeA, hasDoubleStrikeB);
-        checkLaneDeaths();
+        resolveCombatOnce(true);
     }
 
-    resolveCombatWindow(true, true);
+    // Normal combat phase
+    resolveCombatOnce(false);
+}
+
+void MatchSession::endMatch(std::shared_ptr<PlayerConnection> winner,
+                            std::shared_ptr<PlayerConnection> loser) {
+    // Update game state, send messages
+    if (winner) winner->send("MATCH_WON\n");
+    if (loser) loser->send("MATCH_LOST\n");
+
+    running = false; // stop game loop
+
+    // ---- Reset player states ----
+    if (winner) winner->state = ConnectionState::Waiting;
+    if (loser) loser->state = ConnectionState::Waiting;
 }

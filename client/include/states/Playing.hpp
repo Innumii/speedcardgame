@@ -21,7 +21,7 @@ class RenderTargeting;
 class Playing;
 
 std::vector<int> getValidTargets(const Playing& playing, const Card& card, int sourceLane);
-
+enum class PlayingGameState {Playing, Won, Lost};
 class Playing {
     friend class RenderPlaying;
     friend class RenderTargeting;
@@ -44,6 +44,8 @@ public:
     void update(Game& game);
     void render(const Game&);
 
+    PlayingGameState getState() const;
+
 private:
     static constexpr Uint32 COMBAT_CYCLE_DURATION_MS = 5000U;
     static constexpr Uint32 COMBAT_PHASE_DURATION_MS = 900U;
@@ -60,6 +62,7 @@ private:
     int drawIntervalSeconds;
     Uint32 lastDrawTick{0};
     bool running{false};
+    PlayingGameState state = PlayingGameState::Playing;
     std::string recvBuffer; // handles partial TCP messages
 
     // -------------------------
@@ -99,7 +102,7 @@ private:
     bool menuOpen{false};
     bool pauseModalOpen{false};
     bool exitModalOpen{false};
-    bool surrendered{false};
+    // bool surrendered{false};
     Uint32 combatCycleStartTick{0};
     Uint32 lastCombatSyncTick{0};
     AnimationQueue animationQueue;
