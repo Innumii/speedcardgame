@@ -788,6 +788,15 @@ void MatchSession::resolveLaneCombat(int lane) {
         int powerA = aAlive ? getCreaturePower(0, lane) : 0;
         int powerB = bAlive ? getCreaturePower(1, lane) : 0;
 
+        if (aAlive && !bAlive) {
+            sendDirectDamage(0, powerA);
+            return;
+        }
+        if (!aAlive && bAlive) {
+            sendDirectDamage(1, powerB);
+            return;
+        }
+
         std::cout << "[Combat] Lane " << lane
                   << " A(" << powerA << ") vs B(" << powerB << ")\n";
 
