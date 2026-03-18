@@ -1,17 +1,16 @@
 ﻿#include "render/RenderPLaying.hpp"
 
-#include "animation/AnimationGroup.hpp"
-#include "animation/AttackAnimation.hpp"
-#include "animation/DeathAnimation.hpp"
 #include "animation/DrawCardAnimation.hpp"
 #include "core/Game.hpp"
 #include "render/RenderBoard.hpp"
 #include "render/RenderButton.hpp"
 #include "render/RenderCard.hpp"
+#include "render/RenderCombatPhaseWidget.hpp"
 #include "render/RenderTargeting.hpp"
 #include "render/RenderText.hpp"
 #include "render/Theme.hpp"
 #include "utils/PlayingLayoutUtil.hpp"
+#include "utils/PlayingRenderUtil.hpp"
 #include "utils/RenderUtil.hpp"
 #include "states/Playing.hpp"
 
@@ -19,210 +18,8 @@
 #include <SDL2/SDL_image.h>
 #include <SDL2/SDL_ttf.h>
 #include <algorithm>
-#include <memory>
 #include <string>
 #include <vector>
-
-namespace {
-	struct AttackRenderFrame {
-		SDL_Rect rect{0, 0, 0, 0};
-		Uint8 alpha{0};
-		int lane{-1};
-		bool selfPlayer{false};
-	};
-
-	struct DeathRenderFrame {
-		SDL_Rect rect{0, 0, 0, 0};
-		Uint8 alpha{0};
-	};
-
-	void collectAttackFrames(const std::shared_ptr<const AnimationInterface>& animation,
-							std::vector<AttackRenderFrame>& frames) {
-		if (!animation) {
-			return;
-		}
-
-		if (const auto attack = std::dynamic_pointer_cast<const AttackAnimation>(animation)) {
-			if (!attack->isFinished()) {
-				frames.push_back(AttackRenderFrame{
-					attack->getCurrentRect(),
-					attack->getAlpha(),
-					attack->getLane(),
-					attack->isSelfPlayer()
-				});
-			}
-			return;
-		}
-
-		const auto group = std::dynamic_pointer_cast<const AnimationGroup>(animation);
-		if (!group) {
-			return;
-		}
-
-		for (const auto& child : group->getAnimations()) {
-			collectAttackFrames(child, frames);
-		}
-	}
-
-	void collectDeathFrames(const std::shared_ptr<const AnimationInterface>& animation,
-						   std::vector<DeathRenderFrame>& frames) {
-		if (!animation) {
-			return;
-		}
-
-		if (const auto death = std::dynamic_pointer_cast<const DeathAnimation>(animation)) {
-			if (!death->isFinished()) {
-				frames.push_back(DeathRenderFrame{death->getRect(), death->getAlpha()});
-			}
-			return;
-		}
-
-		const auto group = std::dynamic_pointer_cast<const AnimationGroup>(animation);
-		if (!group) {
-			return;
-		}
-
-		for (const auto& child : group->getAnimations()) {
-			collectDeathFrames(child, frames);
-		}
-	}
-
-	std::shared_ptr<const DrawCardAnimation> findDrawAnimation(const std::shared_ptr<const AnimationInterface>& animation) {
-		if (!animation) {
-			return nullptr;
-		}
-
-		if (const auto draw = std::dynamic_pointer_cast<const DrawCardAnimation>(animation)) {
-			return draw;
-		}
-
-		const auto group = std::dynamic_pointer_cast<const AnimationGroup>(animation);
-		if (!group) {
-			return nullptr;
-		}
-
-		for (const auto& child : group->getAnimations()) {
-			if (const auto draw = findDrawAnimation(child)) {
-				return draw;
-			}
-		}
-
-		return nullptr;
-	}
-
-	SDL_Texture* getCombatIconTexture(SDL_Renderer* renderer) {
-		if (!renderer) {
-			return nullptr;
-		}
-
-		static SDL_Texture* cachedTexture = nullptr;
-		static SDL_Renderer* cachedRenderer = nullptr;
-
-		if (cachedTexture && cachedRenderer == renderer) {
-			return cachedTexture;
-		}
-
-		if (cachedTexture) {
-			SDL_DestroyTexture(cachedTexture);
-			cachedTexture = nullptr;
-			cachedRenderer = nullptr;
-		}
-
-		SDL_Surface* surface = IMG_Load("assets/images/combat.png");
-		if (!surface) {
-			return nullptr;
-		}
-
-		cachedTexture = SDL_CreateTextureFromSurface(renderer, surface);
-		SDL_FreeSurface(surface);
-		if (!cachedTexture) {
-			return nullptr;
-		}
-
-		cachedRenderer = renderer;
-		return cachedTexture;
-	}
-
-	void drawOpponentDeckAndDiscard(SDL_Renderer* renderer, RenderText& textRenderer,
-			const std::vector<SDL_Rect>& opponentSlots,
-			std::size_t deckSize, int screenW, TTF_Font* fontSmall) {
-		if (!renderer || !fontSmall) return;
-		if (opponentSlots.empty()) return;
-
-		const SDL_Rect opponentDiscard = PlayingLayoutUtil::computeDiscardRect(
-			opponentSlots,
-			Theme::Playing::CARD_WIDTH,
-			Theme::Playing::CARD_HEIGHT,
-			Theme::Playing::OPPONENT_SIDE_GAP,
-			Theme::Playing::SIDE_ZONE_MARGIN
-		);
-		const SDL_Rect deckBase = PlayingLayoutUtil::computeDeckRect(
-			opponentSlots,
-			screenW,
-			Theme::Playing::CARD_WIDTH,
-			Theme::Playing::CARD_HEIGHT,
-			Theme::Playing::OPPONENT_SIDE_GAP,
-			Theme::Playing::SIDE_ZONE_MARGIN
-		);
-
-		SDL_SetRenderDrawColor(renderer, Theme::Playing::OPPONENT_DISCARD_FILL.r, Theme::Playing::OPPONENT_DISCARD_FILL.g, Theme::Playing::OPPONENT_DISCARD_FILL.b, Theme::Playing::OPPONENT_DISCARD_FILL.a);
-		SDL_RenderFillRect(renderer, &opponentDiscard);
-		SDL_SetRenderDrawColor(renderer, Theme::Playing::OPPONENT_DISCARD_BORDER.r, Theme::Playing::OPPONENT_DISCARD_BORDER.g, Theme::Playing::OPPONENT_DISCARD_BORDER.b, Theme::Playing::OPPONENT_DISCARD_BORDER.a);
-		SDL_RenderDrawRect(renderer, &opponentDiscard);
-		textRenderer.drawText(
-			renderer,
-			"Opponent Discard",
-			fontSmall,
-			Theme::TEXT_PRIMARY,
-			opponentDiscard.x + Theme::Playing::ZONE_TEXT_PADDING,
-			opponentDiscard.y + Theme::Playing::ZONE_TEXT_PADDING
-		);
-
-		const int stackCount = static_cast<int>(std::min<std::size_t>(deckSize, static_cast<std::size_t>(Theme::Playing::DECK_STACK_MAX_CARDS)));
-		for (int i = 0; i < stackCount; ++i) {
-			SDL_Rect card{deckBase.x + i * Theme::Playing::DECK_STACK_X_OFFSET, deckBase.y - i * Theme::Playing::DECK_STACK_Y_OFFSET, deckBase.w, deckBase.h};
-			RenderCard::drawCardBack(renderer, card);
-		}
-		textRenderer.drawText(
-			renderer,
-			"Deck: " + std::to_string(deckSize),
-			fontSmall,
-			Theme::TEXT_PRIMARY,
-			deckBase.x + Theme::Playing::ZONE_TEXT_PADDING,
-			deckBase.y + Theme::Playing::ZONE_TEXT_PADDING
-		);
-	}
-
-	void drawSelfDeck(SDL_Renderer* renderer, RenderText& textRenderer,
-			const std::vector<SDL_Rect>& playSlots,
-			int deckSize, int screenW, TTF_Font* fontSmall) {
-		if (!renderer || !fontSmall) return;
-		if (playSlots.empty()) return;
-
-		const SDL_Rect deckBase = PlayingLayoutUtil::computeDeckRect(
-			playSlots,
-			screenW,
-			Theme::Playing::CARD_WIDTH,
-			Theme::Playing::CARD_HEIGHT,
-			Theme::Playing::SELF_DECK_GAP,
-			Theme::Playing::SIDE_ZONE_MARGIN
-		);
-		const int stackCount = std::min(deckSize, Theme::Playing::DECK_STACK_MAX_CARDS);
-		for (int i = 0; i < stackCount; ++i) {
-			SDL_Rect card{deckBase.x + i * Theme::Playing::DECK_STACK_X_OFFSET, deckBase.y - i * Theme::Playing::DECK_STACK_Y_OFFSET, deckBase.w, deckBase.h};
-			RenderCard::drawCardBack(renderer, card);
-		}
-		textRenderer.drawText(
-			renderer,
-			"Deck: " + std::to_string(deckSize),
-			fontSmall,
-			Theme::TEXT_PRIMARY,
-			deckBase.x + Theme::Playing::ZONE_TEXT_PADDING,
-			deckBase.y + Theme::Playing::ZONE_TEXT_PADDING
-		);
-	}
-
-}
 
 void RenderPlaying::render(Playing& playing, const Game& game) {
 	SDL_Renderer* renderer = game.getRenderer();
@@ -269,16 +66,16 @@ void RenderPlaying::render(Playing& playing, const Game& game) {
 	const bool hoveringMenu = RenderUtil::pointInRect(playing.menuButton, mouseX, mouseY);
 
 	const std::shared_ptr<const AnimationInterface> activeAnimation = playing.animationQueue.getActiveAnimation();
-	const std::shared_ptr<const DrawCardAnimation> activeDrawAnimation = findDrawAnimation(activeAnimation);
+	const std::shared_ptr<const DrawCardAnimation> activeDrawAnimation = PlayingRenderUtil::findDrawAnimation(activeAnimation);
 
 	const bool draggingCard = playing.drag.active && playing.drag.index < playing.localPlayer.hand.size();
 	const bool hasActiveDrawCard = static_cast<bool>(activeDrawAnimation);
 	const std::size_t activeDrawCardIndex = hasActiveDrawCard ? activeDrawAnimation->getHandIndex() : static_cast<std::size_t>(-1);
 
-	std::vector<AttackRenderFrame> activeAttackFrames;
-	std::vector<DeathRenderFrame> activeDeathFrames;
-	collectAttackFrames(activeAnimation, activeAttackFrames);
-	collectDeathFrames(activeAnimation, activeDeathFrames);
+	std::vector<PlayingRenderUtil::AttackRenderFrame> activeAttackFrames;
+	std::vector<PlayingRenderUtil::DeathRenderFrame> activeDeathFrames;
+	PlayingRenderUtil::collectAttackFrames(activeAnimation, activeAttackFrames);
+	PlayingRenderUtil::collectDeathFrames(activeAnimation, activeDeathFrames);
 
 	std::size_t newHoverIndex = static_cast<std::size_t>(-1);
 	if (!draggingCard) {
@@ -304,7 +101,7 @@ void RenderPlaying::render(Playing& playing, const Game& game) {
 	// ── draw zones ───────────────────────────────────────────────────
 	RenderBoard::drawOpponentPlayZones(renderer, textRenderer, playing.opponentSlots, uiFonts.small);
 	const int opponentDeckCount = playing.remotePlayer.getDeck().size();
-	drawOpponentDeckAndDiscard(
+	PlayingRenderUtil::drawOpponentDeckAndDiscard(
 		renderer,
 		textRenderer,
 		playing.opponentSlots,
@@ -315,7 +112,7 @@ void RenderPlaying::render(Playing& playing, const Game& game) {
 	RenderBoard::drawPlayZones(renderer, textRenderer, playing.playSlots, uiFonts.small);
 	RenderBoard::drawDiscardZone(renderer, textRenderer, playing.discardZone, hoveringDiscard, uiFonts.small);
 	const int selfDeckCount = playing.localPlayer.getDeck().size();
-	drawSelfDeck(
+	PlayingRenderUtil::drawSelfDeck(
 		renderer,
 		textRenderer,
 		playing.playSlots,
@@ -385,57 +182,18 @@ void RenderPlaying::render(Playing& playing, const Game& game) {
 	}
 
 	const std::string combatLabel = combatPhaseActive ? "Combat Phase" : "Combat Soon";
-	int combatTextW = 0;
-	int combatTextH = 0;
-	if (uiFonts.small) {
-		TTF_SizeText(uiFonts.small, combatLabel.c_str(), &combatTextW, &combatTextH);
-	}
-
-	const int iconSize = 30;
-	const int barWidth = 170;
-	const int barHeight = 9;
-	const int iconGap = 8;
-	const int textBarGap = 4;
-	const int widgetHeight = std::max(iconSize, combatTextH + textBarGap + barHeight);
-	const int widgetWidth = iconSize + iconGap + std::max(combatTextW, barWidth);
-	const int widgetX = (screenW - widgetWidth) / 2;
-
-	int widgetY = (screenH - widgetHeight) / 2;
-	if (!playing.opponentSlots.empty() && !playing.playSlots.empty()) {
-		const int gapTop = playing.opponentSlots.front().y + playing.opponentSlots.front().h;
-		const int gapBottom = playing.playSlots.front().y;
-		if (gapBottom > gapTop) {
-			widgetY = gapTop + (gapBottom - gapTop - widgetHeight) / 2;
-		}
-	}
-
-	const SDL_Rect iconRect{widgetX, widgetY + (widgetHeight - iconSize) / 2, iconSize, iconSize};
-	const int contentX = iconRect.x + iconRect.w + iconGap;
-	const SDL_Rect textRect{contentX, widgetY, std::max(combatTextW, barWidth), combatTextH};
-	const SDL_Rect barOuter{contentX, textRect.y + textRect.h + textBarGap, barWidth, barHeight};
-	const int barInnerWidth = std::max(0, static_cast<int>(static_cast<float>(barOuter.w - 2) * barProgress));
-	const SDL_Rect barInner{barOuter.x + 1, barOuter.y + 1, barInnerWidth, std::max(0, barOuter.h - 2)};
-
-	if (SDL_Texture* combatIcon = getCombatIconTexture(renderer)) {
-		SDL_RenderCopy(renderer, combatIcon, nullptr, &iconRect);
-	}
-
-	if (uiFonts.small) {
-		textRenderer.drawText(renderer, combatLabel, uiFonts.small, Theme::TEXT_PRIMARY, textRect.x, textRect.y);
-	}
-
-	SDL_SetRenderDrawColor(renderer, 34, 38, 44, 210);
-	SDL_RenderFillRect(renderer, &barOuter);
-	SDL_SetRenderDrawColor(renderer, 190, 200, 210, 255);
-	SDL_RenderDrawRect(renderer, &barOuter);
-
-	if (barInner.w > 0 && barInner.h > 0) {
-		const SDL_Color fillColor = combatPhaseActive
-			? SDL_Color{120, 205, 120, 235}
-			: SDL_Color{220, 170, 80, 235};
-		SDL_SetRenderDrawColor(renderer, fillColor.r, fillColor.g, fillColor.b, fillColor.a);
-		SDL_RenderFillRect(renderer, &barInner);
-	}
+	RenderCombatPhaseWidget::draw(
+		renderer,
+		textRenderer,
+		uiFonts.small,
+		screenW,
+		screenH,
+		playing.opponentSlots,
+		playing.playSlots,
+		combatPhaseActive,
+		barProgress,
+		combatLabel
+	);
 
 	// ── player stats - bottom center horizontal bar with GLOW ────────
 	const std::string healthText = "Health: " + std::to_string(playing.localPlayer.health);
