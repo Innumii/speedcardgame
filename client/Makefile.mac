@@ -1,7 +1,7 @@
 CXX      := g++
 STD      := -std=c++17
 INCLUDES := -I include $(shell pkg-config --cflags sdl2 SDL2_ttf SDL2_image openssl)
-LIBS     := $(shell pkg-config --libs   sdl2 SDL2_ttf SDL2_image openssl)
+LIBS     := $(shell pkg-config --libs   sdl2 SDL2_ttf SDL2_image openssl) -framework Security -framework CoreFoundation
 BUILD_DIR := build
 MKDIR_P  := mkdir -p
 
