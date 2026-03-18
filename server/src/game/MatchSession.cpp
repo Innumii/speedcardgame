@@ -46,17 +46,29 @@ MatchSession::~MatchSession() {
 bool MatchSession::start() {
     if (running.load()) return false;
 
-    auto weakSelf = std::weak_ptr<MatchSession>(shared_from_this());
-    playerA->onMessageReceived = [weakSelf](const std::vector<char>& raw) {
-        if (auto self = weakSelf.lock()) {
-            self->handlePlayerMessage(0, raw);
-        }
-    };
-    playerB->onMessageReceived = [weakSelf](const std::vector<char>& raw) {
-        if (auto self = weakSelf.lock()) {
-            self->handlePlayerMessage(1, raw);
-        }
-    };
+    auto weakSession = std::weak_ptr<MatchSession>(shared_from_this());
+    // Set the Playing callback for Player A
+    playerA->setMessageHandler(ConnectionState::Playing,
+        [weakSession](const std::shared_ptr<PlayerConnection>& /*p*/, const std::string& msg) {
+            if (auto session = weakSession.lock()) {
+                // convert string back to vector<char> for handlePlayerMessage
+                std::vector<char> raw(msg.begin(), msg.end());
+                session->handlePlayerMessage(0, raw);
+            }
+        });
+
+    // Set the Playing callback for Player B
+    playerB->setMessageHandler(ConnectionState::Playing,
+        [weakSession](const std::shared_ptr<PlayerConnection>& /*p*/, const std::string& msg) {
+            if (auto session = weakSession.lock()) {
+                std::vector<char> raw(msg.begin(), msg.end());
+                session->handlePlayerMessage(1, raw);
+            }
+        });
+        
+    // Switch the players into Playing state
+    playerA->state = ConnectionState::Playing;
+    playerB->state = ConnectionState::Playing;
 
     try {
         gameThread = std::thread(&MatchSession::gameLoop, this);

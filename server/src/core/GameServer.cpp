@@ -85,19 +85,16 @@ bool GameServer::start() {
             };
 
             // Message-received callback
-            player->onMessageReceived = [this, weakPlayer](const std::vector<char>& rawMsg) {
-                if (auto p = weakPlayer.lock()) {
-                    std::string msg(rawMsg.begin(), rawMsg.end());
-
+            player->setMessageHandler(ConnectionState::Waiting,
+                [this](const std::shared_ptr<PlayerConnection>& p, const std::string& msg) {
                     if (msg == "MATCH_ACCEPT\n") {
                         if (matchManager) matchManager->onAccept(p);
                     } else if (msg.find("{\"type\":\"player_info\"") != std::string::npos) {
-                            if (loadPlayerInfo(p, msg) && matchmaker) matchmaker->enqueuePlayer(p);
-                    } else {
-
+                        if (loadPlayerInfo(p, msg) && matchmaker) {
+                            matchmaker->enqueuePlayer(p);
+                        }
                     }
-                }
-            };
+                });
 
             // Start the read thread
             if (!player->start())

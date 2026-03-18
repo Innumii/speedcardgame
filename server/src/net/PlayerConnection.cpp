@@ -119,12 +119,30 @@ void PlayerConnection::readLoop() {
         }
 
         std::vector<char> msg(buffer, buffer + bytes);
-        if (onMessageReceived) {
-            try { onMessageReceived(msg); }
-            catch (...) { std::cerr << "[PlayerConnection] Exception in callback\n"; }
+
+        try {
+            dispatchMessage(msg);
+        } catch (const std::exception& e) {
+            std::cerr << "[PlayerConnection] Exception in dispatchMessage: " << e.what() << "\n";
+        } catch (...) {
+            std::cerr << "[PlayerConnection] Unknown exception in dispatchMessage\n";
         }
+
     }
 
     // fire disconnect once
     if (onDisconnected) onDisconnected();
+}
+
+void PlayerConnection::dispatchMessage(const std::vector<char>& rawMsg) {
+    std::string msg(rawMsg.begin(), rawMsg.end());
+    if (auto it = stateHandlers.find(state); it != stateHandlers.end()) {
+        it->second(shared_from_this(), msg);  // call the callback for the current state
+    } else {
+        std::cerr << "[PlayerConnection] No handler for state " << int(state) << "\n";
+    }
+}
+
+void PlayerConnection::setMessageHandler(ConnectionState state, MsgCallback cb) {
+        stateHandlers[state] = std::move(cb);
 }
