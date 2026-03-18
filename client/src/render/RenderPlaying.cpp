@@ -1,4 +1,4 @@
-﻿#include "render/RenderPLaying.hpp"
+﻿#include "render/RenderPlaying.hpp"
 
 #include "animation/DrawCardAnimation.hpp"
 #include "core/Game.hpp"
