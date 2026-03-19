@@ -93,6 +93,8 @@ bool GameServer::start() {
                         if (loadPlayerInfo(p, msg) && matchmaker) {
                             matchmaker->enqueuePlayer(p);
                         }
+                    } else if (msg == "QUEUE\n") {
+                        if (matchmaker) matchmaker->enqueuePlayer(p);
                     }
                 });
 

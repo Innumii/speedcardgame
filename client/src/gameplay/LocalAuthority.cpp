@@ -26,3 +26,9 @@ void LocalAuthority::surrender() {
     std::string msg = "SURRENDER\n";
     network->sendString(msg);
 }
+
+void LocalAuthority::queue() {
+    if (!network) return;
+    std::string msg = "QUEUE\n";
+    network->sendString(msg);
+}

@@ -538,6 +538,27 @@ void RenderPlaying::render(Playing& playing, const Game& game) {
 		                      Theme::TEXT_PRIMARY,
 		                      playing.returnToTitleButton.x + (playing.returnToTitleButton.w - returnTextW) / 2,
 		                      playing.returnToTitleButton.y + (playing.returnToTitleButton.h - returnTextH) / 2);
+
+		// ── Requeue button ───────────────────────────────────────────────
+		const bool hoveringRequeue = RenderUtil::pointInRect(playing.requeueButton, mouseX, mouseY);
+		RenderUtil::drawRoundedRect(renderer, playing.requeueButton,
+					10,
+					hoveringRequeue ? Theme::Playing::RETURN_BUTTON_FILL_HOVER : Theme::Playing::RETURN_BUTTON_FILL,
+					hoveringRequeue ? Theme::Playing::RETURN_BUTTON_BORDER_HOVER : Theme::Playing::RETURN_BUTTON_BORDER);
+
+		int requeueTextW = 0, requeueTextH = 0;
+		const std::string requeueText = "Requeue";
+		if (uiFonts.large) {
+			TTF_SizeText(uiFonts.large, requeueText.c_str(), &requeueTextW, &requeueTextH);
+		}
+		textRenderer.drawText(
+			renderer,
+			requeueText,
+			uiFonts.large,
+			Theme::TEXT_PRIMARY,
+			playing.requeueButton.x + (playing.requeueButton.w - requeueTextW) / 2,
+			playing.requeueButton.y + (playing.requeueButton.h - requeueTextH) / 2
+		);
 	}
 
 	SDL_RenderPresent(renderer);
