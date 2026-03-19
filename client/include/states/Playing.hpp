@@ -96,6 +96,7 @@ private:
     SDL_Rect saveExitButton{0, 0, 0, 0};
     SDL_Rect noSaveExitButton{0, 0, 0, 0};
     SDL_Rect returnToTitleButton{0, 0, 0, 0};
+    SDL_Rect requeueButton{0, 0, 0, 0};
     
     std::size_t hoverIndex{static_cast<std::size_t>(-1)};
     Uint32 hoverStartTick{0};

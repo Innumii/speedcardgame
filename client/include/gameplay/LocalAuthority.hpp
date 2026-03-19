@@ -17,6 +17,7 @@ public:
     // Discard card from hand
     void discardCard(int cardId) override;
     void surrender() override;
+    void queue() override;
 
 
 private:

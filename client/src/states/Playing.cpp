@@ -283,6 +283,11 @@ void Playing::handleEvents(Game& game, const SDL_Event& event) {
                 pauseModalOpen = false;
                 exitModalOpen = false;
                 game.setNextState(GameState::Title);
+            } else if (RenderUtil::pointInRect(requeueButton, mouseX, mouseY)) {
+                authority->queue();
+                pauseModalOpen = false;
+                exitModalOpen = false;
+                game.setNextState(GameState::Waiting);
             }
             return;
         }
@@ -1035,6 +1040,7 @@ void Playing::computeUiRects(int screenW, int screenH) {
         saveExitButton = SDL_Rect{0, 0, 0, 0};
         noSaveExitButton = SDL_Rect{0, 0, 0, 0};
         returnToTitleButton = SDL_Rect{0, 0, 0, 0};
+        requeueButton = SDL_Rect{0,0,0,0};
         return;
     }
 
@@ -1071,7 +1077,26 @@ void Playing::computeUiRects(int screenW, int screenH) {
     
     const int returnW = Theme::Playing::RETURN_BUTTON_WIDTH;
     const int returnH = Theme::Playing::RETURN_BUTTON_HEIGHT;
-    returnToTitleButton = SDL_Rect{(screenW - returnW) / 2, (screenH / 2) + 24, returnW, returnH};
+    const int spacing = 20;
+
+    const int totalWidth = returnW * 2 + spacing;
+    const int startX = (screenW - totalWidth) / 2;
+    const int y = (screenH / 2) + 24;
+
+    returnToTitleButton = SDL_Rect{
+        startX,
+        y,
+        returnW,
+        returnH
+    };
+
+    requeueButton = SDL_Rect{
+        startX + returnW + spacing,
+        y,
+        returnW,
+        returnH
+    };
+
 }
 
 PlayingGameState Playing::getState() const {
