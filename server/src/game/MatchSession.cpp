@@ -639,7 +639,7 @@ void MatchSession::augmentCreature(int targetPlayerIndex, int lane, std::pair<in
         existingAugment = augment;
     }
 
-    // If augment reaches 0, destroy and return
+    // If value reaches 0, destroy and return
     if (existingAugment->second + creature->getToughness() <= 0) {
         destroyCreature(targetPlayerIndex, lane);
         return;
@@ -670,14 +670,41 @@ void MatchSession::setCreature(int targetPlayerIndex, int lane, std::pair<int,in
         return;
     }
 
+    //Card
+    int cardId = *cardOpt;            // get the integer card ID
+    const ServerCard* card = getCard(cardId); // retrieve the card object from the catalog
+    if (!card) {
+        std::cerr << "[setCreature] Card ID " << cardId << " not found in catalog\n";
+        return;
+    }
+    // Cast to CreatureCard
+    const CreatureCard* creature = dynamic_cast<const CreatureCard*>(card);
+    if (!creature) {
+        std::cerr << "[setCreature] Card ID " << cardId << " is not a creature\n";
+        return;
+    }
+    int power = creature->getPower();
+    int toughness = creature->getToughness();
+    int totalPower = power;
+    int totalToughness = toughness;
+    int setPower = augment.first;
+    int setToughness = augment.second;
+
     // Reference to the existing augment pair
     auto& existingAugment = board.augments[targetPlayerIndex][lane];
+    if (existingAugment.has_value()) {
+        totalPower += existingAugment->first;
+        totalToughness += existingAugment->second;
+    }
+
+    augment.first -= power;
+    augment.second -= toughness;
     existingAugment = augment;
    
-    std::string msg = "SET " + std::to_string(players[targetPlayerIndex].id) + " "
+    std::string msg = "AUGMENT " + std::to_string(players[targetPlayerIndex].id) + " "
                     + std::to_string(lane) + " "
-                    + std::to_string(augment.first) + " "
-                    + std::to_string(augment.second) + "\n";
+                    + std::to_string(setPower - totalPower) + " "
+                    + std::to_string(setToughness - totalToughness) + "\n";
     playerA->send(msg);
     playerB->send(msg);
 }
@@ -769,7 +796,12 @@ int MatchSession::getCreaturePower(int playerIndex, int lane) {
     int power = creature->getPower();    
 
     auto& aug = board.augments[playerIndex][lane];
-    if (aug) power += aug->first;
+    if (aug) {
+        power += aug->first;
+        std::cout << "[getCreaturePower] Augment Power: " << std::to_string(aug->first) << "\n";
+
+    }
+    std::cout << "[getCreaturePower] Final Power: " << std::to_string(power) << "\n";
 
     return power;
 }
@@ -858,11 +890,11 @@ void MatchSession::resolveLaneCombat(int lane) {
         int powerA = aAlive ? getCreaturePower(0, lane) : 0;
         int powerB = bAlive ? getCreaturePower(1, lane) : 0;
 
-        if (aAlive && !bAlive) {
+        if (aAlive && !bAlive && powerA > 0) {
             sendDirectDamage(0, powerA);
             return;
         }
-        if (!aAlive && bAlive) {
+        if (!aAlive && bAlive && powerB > 0) {
             sendDirectDamage(1, powerB);
             return;
         }

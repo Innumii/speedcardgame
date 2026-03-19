@@ -119,6 +119,9 @@ void DeckBuilding::handleEvents(Game& game, const SDL_Event& event) {
         } else {
             setStatusMessage("Failed to save deck.", 2000);
         }
+        if (!game.refreshPlayerDeckFromService()) {
+            setStatusMessage("Failed to load deck.", 2000);
+        }
         return;
     }
 
@@ -141,7 +144,7 @@ void DeckBuilding::handleEvents(Game& game, const SDL_Event& event) {
             setStatusMessage("Failed to save deck.", 2000);
             return;
         }
-
+        
         game.setNextState(GameState::Connecting);
         return;
     }

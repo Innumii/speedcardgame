@@ -75,9 +75,9 @@ const std::vector<CardEffectEntry>* Effects::getCardEffects(int cardId) {
 }
 
 const std::unordered_map<int, std::vector<CardEffectEntry>> Effects::cardToEffectsMap = {
-    {1, {CardEffectEntry{0, std::nullopt, std::make_pair(0,-3)} }},
+    {1, {CardEffectEntry{0, std::nullopt, std::make_pair(0,-3)} }}, //done
     {4, { CardEffectEntry{0, std::nullopt, std::make_pair(2,2)} }}, //add conditional augment
-    {10, { CardEffectEntry{4, std::nullopt, std::make_pair(0,0)}}},
+    {10, { CardEffectEntry{4, std::nullopt, std::make_pair(0,1)}}}, //done
     {11, { CardEffectEntry{2, std::nullopt, std::make_pair(0,-1)}}},
     {13, { CardEffectEntry{0, std::nullopt, std::make_pair(1,1)}}}, //conditonal +5/-1
     {14, { CardEffectEntry{0, std::nullopt, std::make_pair(2,-1)}}},

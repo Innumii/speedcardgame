@@ -18,6 +18,7 @@ struct CardEffectEntry {
     int effectId;
     std::optional<int> amount;
     std::optional<std::pair<int,int>> augment;
+    // std::optional<int> targetIndex;
 };
 
 class Effects {

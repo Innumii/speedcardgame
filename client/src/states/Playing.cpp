@@ -616,7 +616,8 @@ bool Playing::handleServerMessage(const std::string& msg) {
         iss >> playerId >> delta;
         augmentHP(playerId, delta);
 
-    } //add a mana command later -> decouple discard logic to offload to mana logic
+    }
+    //add a mana command later -> decouple discard logic to offload to mana logic
     else if (cmd == "MATCH_LOST") {
         state = PlayingGameState::Lost;
         std::cout << "[Playing] Lost Match!\n";

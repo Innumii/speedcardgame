@@ -8,7 +8,7 @@ cid,name,type,cost,value,power,toughness,effect
 7,Jew,Creature,3,2,1,1,"When this creature enters the battlefield, Steal 1 mana from your opponent."
 8,Grizzly Bear,Creature,2,2,2,2,
 9,Russian,Creature,3,2,3,3,
-10,Flashbang,Spell,3,1,0,0,Target creature becomes 0/0.
+10,Flashbang,Spell,3,1,0,0,Target creature becomes 0/1.
 11,Fan The Hammer,Spell,2,1,0,0,Deal 1 damage to all creatures opponents control. 
 12,Potential Man,Creature,3,2,2,2,
 13,With This Sacred Treasure,Spell,2,2,0,0,"Give target creature +1/+1, if the creature is named 'Potential Man', give it +5/-1 instead."
