@@ -17,3 +17,8 @@ output "nlb_dns_name" {
   description = "Server NLB DNS name"
   value       = aws_lb.this.dns_name
 }
+
+output "game_domain_name" {
+  description = "Route53 endpoint for game server"
+  value       = trimsuffix(aws_route53_record.game.fqdn, ".")
+}

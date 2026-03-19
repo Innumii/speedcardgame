@@ -42,6 +42,8 @@ data "terraform_remote_state" "alb" {
 
 locals {
   alb_outputs                  = local.use_alb_remote_state ? data.terraform_remote_state.alb[0].outputs : {}
+  route53_zone_name            = "${trimsuffix(var.base_domain, ".")}."
+  game_domain_name             = "game.${trimsuffix(var.base_domain, ".")}"
   cards_service_base_url_local = var.cards_service_base_url != null ? var.cards_service_base_url : try(local.alb_outputs.api_base_url, null)
   cards_service_host = var.cards_service_host != null ? var.cards_service_host : (
     local.cards_service_base_url_local != null ? replace(replace(local.cards_service_base_url_local, "https://", ""), "http://", "") : try(local.alb_outputs.api_domain_name, null)
@@ -51,6 +53,11 @@ locals {
       startswith(local.cards_service_base_url_local, "https://") ? 443 : 80
     ) : 443
   )
+}
+
+data "aws_route53_zone" "primary" {
+  name         = local.route53_zone_name
+  private_zone = false
 }
 
 data "aws_secretsmanager_secret" "game_tls" {
@@ -80,6 +87,18 @@ resource "aws_lb_listener" "tcp" {
   default_action {
     type             = "forward"
     target_group_arn = aws_lb_target_group.this.arn
+  }
+}
+
+resource "aws_route53_record" "game" {
+  zone_id = data.aws_route53_zone.primary.zone_id
+  name    = local.game_domain_name
+  type    = "A"
+
+  alias {
+    evaluate_target_health = true
+    name                   = aws_lb.this.dns_name
+    zone_id                = aws_lb.this.zone_id
   }
 }
 

@@ -83,3 +83,9 @@ variable "cards_service_base_url" {
   type        = string
   default     = null
 }
+
+variable "base_domain" {
+  description = "Base public domain used for DNS records and endpoints"
+  type        = string
+  sensitive   = true
+}
