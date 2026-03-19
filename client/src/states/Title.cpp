@@ -118,7 +118,12 @@ void Title::render(const Game& game) {
     SDL_Renderer*              renderer   = game.getRenderer();
     const RenderText::FontSet& titleFonts = game.getTitleFonts();
     const RenderText::FontSet& uiFonts    = game.getUIFonts();
-    updateLayout(renderer);
+
+    // ── initialize layout once ────────────────────────────────────────
+    if (!layoutInitialized) {
+        updateLayout(renderer);
+        layoutInitialized = true;
+    }
 
     int screenW, screenH;
     SDL_GetRendererOutputSize(renderer, &screenW, &screenH);
@@ -131,10 +136,12 @@ void Title::render(const Game& game) {
     Uint32 now     = SDL_GetTicks();
     float  elapsed = (now - animStartTick) / 1000.0f;
 
-    // ── background + vignette ────────────────────────────────────────
+    // ── clear background ─────────────────────────────────────────────
+    SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
     SDL_SetRenderDrawColor(renderer, Theme::BG.r, Theme::BG.g, Theme::BG.b, 255);
     SDL_RenderClear(renderer);
 
+    // ── draw vignette ────────────────────────────────────────────────
     SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
     for (int i = 0; i < 80; i++) {
         Uint8 alpha = (Uint8)(120 - i * 1.5f);
@@ -143,15 +150,30 @@ void Title::render(const Game& game) {
         SDL_RenderDrawRect(renderer, &edge);
     }
 
-    // ── animation values ─────────────────────────────────────────────
-
-    // banner slides in from above
+    // ── banner animation ─────────────────────────────────────────────
     float bannerT     = std::min(elapsed / 0.6f, 1.0f);
     float bannerEase  = 1.0f - (1.0f - bannerT) * (1.0f - bannerT);
     Uint8 bannerAlpha = (Uint8)(bannerEase * 255);
     int   bannerOffY  = (int)((1.0f - bannerEase) * -40);
 
-    // buttons slide in staggered
+    SDL_Rect  animBanner     = {titleBanner.x, titleBanner.y + bannerOffY,
+                                titleBanner.w, titleBanner.h};
+    SDL_Color animBannerFill = {Theme::BANNER_FILL.r, Theme::BANNER_FILL.g,
+                                Theme::BANNER_FILL.b, bannerAlpha};
+    SDL_Color animGold       = {Theme::BANNER_BORDER.r, Theme::BANNER_BORDER.g,
+                                Theme::BANNER_BORDER.b, bannerAlpha};
+    SDL_Color animText       = {Theme::BANNER_TEXT.r, Theme::BANNER_TEXT.g,
+                                Theme::BANNER_TEXT.b, bannerAlpha};
+    SDL_Color animGlow       = {Theme::BANNER_GLOW.r, Theme::BANNER_GLOW.g,
+                                Theme::BANNER_GLOW.b, bannerAlpha};
+
+    if (bannerAlpha > 0) {
+        RenderBanner::drawBanner(renderer, animBanner, "Mana Kaisen",
+                                 titleFonts.large, animBannerFill, animGold,
+                                 animText, animGlow);
+    }
+
+    // ── button animation ─────────────────────────────────────────────
     auto buttonSlide = [&](int index) -> std::pair<Uint8, int> {
         float delay = 0.3f + index * 0.15f;
         float t     = std::min(std::max((elapsed - delay) / 0.5f, 0.0f), 1.0f);
@@ -159,35 +181,17 @@ void Title::render(const Game& game) {
         return {(Uint8)(ease * 255), (int)((1.0f - ease) * -40)};
     };
 
-    // ── draw banner ──────────────────────────────────────────────────
-    SDL_Rect  animBanner     = {titleBanner.x, titleBanner.y + bannerOffY,
-                                titleBanner.w, titleBanner.h};
-    SDL_Color animBannerFill = {Theme::BANNER_FILL.r,   Theme::BANNER_FILL.g,
-                                Theme::BANNER_FILL.b,   bannerAlpha};
-    SDL_Color animGold       = {Theme::BANNER_BORDER.r, Theme::BANNER_BORDER.g,
-                                Theme::BANNER_BORDER.b, bannerAlpha};
-    SDL_Color animText       = {Theme::BANNER_TEXT.r,   Theme::BANNER_TEXT.g,
-                                Theme::BANNER_TEXT.b,   bannerAlpha};
-    SDL_Color animGlow       = {Theme::BANNER_GLOW.r,   Theme::BANNER_GLOW.g,
-                                Theme::BANNER_GLOW.b,   bannerAlpha};
-
-    RenderBanner::drawBanner(renderer, animBanner, "Ryan The Gathering",
-                              titleFonts.large, animBannerFill, animGold,
-                              animText, animGlow);
-
-    // ── draw buttons ─────────────────────────────────────────────────
     auto drawBtn = [&](const SDL_Rect& rect, SDL_Color fill,
                         const std::string& text, int index) {
         auto [alpha, offY] = buttonSlide(index);
+        if (alpha == 0) return; // skip invisible buttons
+
         SDL_Rect animRect  = {rect.x, rect.y + offY, rect.w, rect.h};
-
-        // fade colors with slide-in alpha
-        SDL_Color f = {fill.r,              fill.g,              fill.b,              alpha};
+        SDL_Color f = {fill.r, fill.g, fill.b, alpha};
         SDL_Color b = {Theme::BTN_BORDER.r, Theme::BTN_BORDER.g, Theme::BTN_BORDER.b, alpha};
-        SDL_Color t = {Theme::BTN_TEXT.r,   Theme::BTN_TEXT.g,   Theme::BTN_TEXT.b,   alpha};
+        SDL_Color t = {Theme::BTN_TEXT.r, Theme::BTN_TEXT.g, Theme::BTN_TEXT.b, alpha};
 
-        RenderButton::drawButton(renderer, animRect, text, uiFonts.large,
-                                  f, b, t, hoveredButton == index);
+        RenderButton::drawButton(renderer, animRect, text, uiFonts.large, f, b, t, hoveredButton == index);
     };
 
     drawBtn(startButton,     Theme::BTN_START,   "Start Game", 0);

@@ -227,7 +227,7 @@ void Login::render(const Game& game) {
     // ── banner ───────────────────────────────────────────────────────
     SDL_Rect bannerRect = {screenW/2 - Theme::BANNER_W/2, 30,
                            Theme::BANNER_W, Theme::BANNER_H};
-    RenderBanner::drawBanner(r, bannerRect, "Speed Card Game",
+    RenderBanner::drawBanner(r, bannerRect, "Mana Kaisen",
                               titleFonts.large,
                               Theme::BANNER_FILL,  Theme::BANNER_BORDER,
                               Theme::BANNER_TEXT,  Theme::BANNER_GLOW);

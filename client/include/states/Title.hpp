@@ -24,6 +24,8 @@ private:
     // animation state
     Uint32 animStartTick  {0};
     bool   animInitialized{false};
+    bool layoutInitialized{false};
+
     int    hoveredButton  {-1};
 };
 

@@ -38,24 +38,29 @@ void RenderDeckBuilding::render(DeckBuilding& deckBuilding, Game& game) {
     // ── menu buttons ─────────────────────────────────────────────────
     const bool canPlay = Deck::hasFullDeck(deckBuilding.deckCopies);
     const bool canSave = Deck::hasFullDeck(deckBuilding.deckCopies);
+    const bool hoverTitle = SDL_PointInRect(&mousePoint, &deckBuilding.TitleButton) == SDL_TRUE;
+    const bool hoverPlay = SDL_PointInRect(&mousePoint, &deckBuilding.PlayButton) == SDL_TRUE;
+    const bool hoverSave = SDL_PointInRect(&mousePoint, &deckBuilding.SaveButton) == SDL_TRUE;
+
+
 
     RenderButton::drawButton(renderer, deckBuilding.PlayButton,
                               "Play", buttonFont,
                               canPlay ? Theme::BTN_START     : Theme::BTN_SECONDARY,
                               Theme::BTN_BORDER, Theme::BTN_TEXT,
-                              false, !canPlay);
+                              hoverPlay, !canPlay);
 
     RenderButton::drawButton(renderer, deckBuilding.SaveButton,
                               "Save Deck", buttonFont,
                               canSave ? Theme::BTN_BUILD     : Theme::BTN_SECONDARY,
                               Theme::BTN_BORDER, Theme::BTN_TEXT,
-                              false, !canSave);
+                              hoverSave, !canSave);
 
     RenderButton::drawButton(renderer, deckBuilding.TitleButton,
                               "Return to Title", buttonFont,
                               Theme::BTN_CONNECT,
                               Theme::BTN_BORDER, Theme::BTN_TEXT,
-                              false, false);
+                              hoverTitle, false);
 
     if (fontSmall && deckBuilding.isStatusMessageActive(now)) {
         int msgX = layout.collectionArea.x;

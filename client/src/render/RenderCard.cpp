@@ -456,9 +456,31 @@ namespace {
             SDL_RenderSetClipRect(renderer, nullptr);
         }
 
-        SDL_SetRenderDrawColor(renderer, Theme::Card::BOTTOM_BAR_FILL.r, Theme::Card::BOTTOM_BAR_FILL.g, Theme::Card::BOTTOM_BAR_FILL.b, Theme::Card::BOTTOM_BAR_FILL.a);
-        SDL_RenderFillRect(renderer, &bottomRect);
+        // SDL_SetRenderDrawColor(renderer, Theme::Card::BOTTOM_BAR_FILL.r, Theme::Card::BOTTOM_BAR_FILL.g, Theme::Card::BOTTOM_BAR_FILL.b, Theme::Card::BOTTOM_BAR_FILL.a);
+        // SDL_RenderFillRect(renderer, &bottomRect);
+        const int bottomCornerRadius = std::max(2, bottomRect.w / 10);
 
+        for (int row = 0; row < bottomRect.h; ++row) {
+            const int y = bottomRect.y + row;
+            int indent = 0;
+            if (row >= bottomRect.h - bottomCornerRadius) {  // only round the bottom corners
+                const int dy = row - (bottomRect.h - bottomCornerRadius - 1);
+                indent = bottomCornerRadius - static_cast<int>(
+                    std::sqrt(static_cast<double>(bottomCornerRadius * bottomCornerRadius - dy * dy)));
+            }
+
+            const SDL_Rect rowClip{bottomRect.x + indent, y,
+                                std::max(1, bottomRect.w - indent * 2), 1};
+            SDL_RenderSetClipRect(renderer, &rowClip);
+            SDL_SetRenderDrawColor(renderer, Theme::Card::BOTTOM_BAR_FILL.r,
+                                            Theme::Card::BOTTOM_BAR_FILL.g,
+                                            Theme::Card::BOTTOM_BAR_FILL.b,
+                                            Theme::Card::BOTTOM_BAR_FILL.a);
+            SDL_RenderFillRect(renderer, &bottomRect);
+        }
+
+        SDL_RenderSetClipRect(renderer, nullptr);
+        
         const int valueRadius = showManaValue
             ? std::max(11, std::min(bottomRect.h / 2 - 3, rect.w / 10))
             : 0;
