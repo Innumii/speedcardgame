@@ -16,6 +16,7 @@ void Loading::enter(Game& game) {
     (void)game;
     cardsPrepared = false;
     deckPrepared = false;
+    retryRounds = 0;
     currentCardIndex = 0;
     totalCards = 0;
     statusMessage = "Loading assets...";
@@ -48,15 +49,38 @@ void Loading::update(Game& game) {
 
     if (currentCardIndex < totalCards) {
         SDL_Renderer* renderer = game.getRenderer();
-        if (renderer) {
-            const auto& availableCards = LoadAvailableCardsUtil::getAvailableCards();
-            const Card* card = availableCards[currentCardIndex].get();
-            if (card) {
-                RenderCard::preloadCardArt(renderer, card->getId());
-            }
+        if (!renderer) {
+            statusMessage = "Waiting for renderer...";
+            return;
         }
+
+        const auto& availableCards = LoadAvailableCardsUtil::getAvailableCards();
+        const Card* card = availableCards[currentCardIndex].get();
+        if (card) {
+            (void)RenderCard::preloadCardArt(renderer, card->getId());
+        }
+
         ++currentCardIndex;
         return;
+    }
+
+    if (totalCards > 0) {
+        const auto& availableCards = LoadAvailableCardsUtil::getAvailableCards();
+        std::size_t cachedCount = 0;
+        for (const auto& cardPtr : availableCards) {
+            const Card* card = cardPtr.get();
+            if (card && RenderCard::isCardArtCached(card->getId())) {
+                ++cachedCount;
+            }
+        }
+
+        if (cachedCount < totalCards) {
+            ++retryRounds;
+            currentCardIndex = 0;
+            statusMessage = "Caching card art... (" + std::to_string(cachedCount) + "/" +
+                std::to_string(totalCards) + ", retry " + std::to_string(retryRounds) + ")";
+            return;
+        }
     }
 
     game.setNextState(GameState::Title);

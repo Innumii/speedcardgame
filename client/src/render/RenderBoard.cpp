@@ -100,7 +100,8 @@ void RenderBoard::drawDiscardZone(SDL_Renderer* renderer, RenderText& textRender
 void RenderBoard::drawBoardState(SDL_Renderer* renderer, RenderText& textRenderer, 
                                  const Board& board, const std::vector<SDL_Rect>& playSlots,
                                  const std::vector<SDL_Rect>& opponentSlots,
-                                 TTF_Font* fontTitle, TTF_Font* fontBody) {
+								 TTF_Font* fontTitle, TTF_Font* fontBody,
+								 const std::set<std::pair<int, int>>* skippedSlots) {
 	if (!renderer || !fontTitle || !fontBody) return;
 	if (playSlots.empty()) return;
 	const std::size_t laneCount = std::min(playSlots.size(), static_cast<std::size_t>(board.getLaneCount()));
@@ -108,6 +109,10 @@ void RenderBoard::drawBoardState(SDL_Renderer* renderer, RenderText& textRendere
     // Loop over board indices: 0 = local, 1 = remote
     for (int boardIndex = 0; boardIndex <= 1; ++boardIndex) {
 				for (std::size_t lane = 0; lane < laneCount; ++lane) {
+			if (skippedSlots && skippedSlots->count({static_cast<int>(lane), boardIndex}) > 0) {
+				continue;
+			}
+
             const auto& optCard = board.getZone(static_cast<int>(lane), boardIndex);
             if (!optCard || !*optCard) continue;
 

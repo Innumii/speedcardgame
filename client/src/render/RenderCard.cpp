@@ -28,8 +28,29 @@
 
 namespace {
     std::unordered_map<int, SDL_Texture*> gCardImageCache;
-    std::unordered_set<int> gMissingCardImages;
+    std::unordered_map<int, int> gCardImageFailureCount;
+    std::unordered_map<int, Uint32> gCardImageNextRetryTick;
     Uint32 gNextCardImageFetchTick = 0;
+
+    constexpr Uint32 kBaseCardImageRetryDelayMs = 120;
+    constexpr Uint32 kMaxCardImageRetryDelayMs = 1500;
+
+    void scheduleCardImageRetry(int cardId, Uint32 now) {
+        int& failureCount = gCardImageFailureCount[cardId];
+        ++failureCount;
+
+        Uint32 delay = kBaseCardImageRetryDelayMs;
+        int backoffSteps = std::max(0, std::min(failureCount - 1, 4));
+        for (int i = 0; i < backoffSteps; ++i) {
+            if (delay >= kMaxCardImageRetryDelayMs / 2) {
+                delay = kMaxCardImageRetryDelayMs;
+                break;
+            }
+            delay *= 2;
+        }
+
+        gCardImageNextRetryTick[cardId] = now + std::min(delay, kMaxCardImageRetryDelayMs);
+    }
 
     //switch out
     bool downloadImageBody(const std::string& host, int port, int cardId,
@@ -85,11 +106,13 @@ namespace {
             return cacheIt->second;
         }
 
-        if (gMissingCardImages.find(cardId) != gMissingCardImages.end()) {
+        const Uint32 now = SDL_GetTicks();
+
+        const auto retryIt = gCardImageNextRetryTick.find(cardId);
+        if (throttleFetches && retryIt != gCardImageNextRetryTick.end() && now < retryIt->second) {
             return nullptr;
         }
 
-        const Uint32 now = SDL_GetTicks();
         if (throttleFetches) {
             if (now < gNextCardImageFetchTick) {
                 return nullptr;
@@ -123,30 +146,32 @@ namespace {
         }
 
         if (!loaded) {
-            gMissingCardImages.insert(cardId);
+            scheduleCardImageRetry(cardId, now);
             return nullptr;
         }
 
         SDL_RWops* rw = SDL_RWFromConstMem(imageBytes.data(), static_cast<int>(imageBytes.size()));
         if (!rw) {
-            gMissingCardImages.insert(cardId);
+            scheduleCardImageRetry(cardId, now);
             return nullptr;
         }
 
         SDL_Surface* surface = IMG_Load_RW(rw, 1);
         if (!surface) {
-            gMissingCardImages.insert(cardId);
+            scheduleCardImageRetry(cardId, now);
             return nullptr;
         }
 
         SDL_Texture* texture = SDL_CreateTextureFromSurface(renderer, surface);
         SDL_FreeSurface(surface);
         if (!texture) {
-            gMissingCardImages.insert(cardId);
+            scheduleCardImageRetry(cardId, now);
             return nullptr;
         }
 
         gCardImageCache[cardId] = texture;
+        gCardImageFailureCount.erase(cardId);
+        gCardImageNextRetryTick.erase(cardId);
         return texture;
     }
 
@@ -613,8 +638,12 @@ void RenderCard::drawCardBack(SDL_Renderer* renderer, const SDL_Rect& cardRect) 
     }
 }
 
-void RenderCard::preloadCardArt(SDL_Renderer* renderer, int cardId) {
-    (void)getCardImageTexture(renderer, cardId, false);
+bool RenderCard::preloadCardArt(SDL_Renderer* renderer, int cardId) {
+    return getCardImageTexture(renderer, cardId, false) != nullptr;
+}
+
+bool RenderCard::isCardArtCached(int cardId) {
+    return gCardImageCache.find(cardId) != gCardImageCache.end();
 }
 
 void RenderCard::clearImageCache() {
@@ -624,6 +653,7 @@ void RenderCard::clearImageCache() {
         }
     }
     gCardImageCache.clear();
-    gMissingCardImages.clear();
+    gCardImageFailureCount.clear();
+    gCardImageNextRetryTick.clear();
     gNextCardImageFetchTick = 0;
 }
