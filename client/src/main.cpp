@@ -27,7 +27,7 @@ int main(int argc, char** argv) {
         // const int drawInterval = parseDrawInterval(argc, argv).value_or(defaultDrawIntervalSeconds);
         const bool fullscreen = parseFullscreenFlag(argc, argv);
 
-        Game game("SpeedCardGame", 100, 100, 1200, 800, fullscreen);
+        Game game("SpeedCardGame", 100, 100, 1200, 850, fullscreen);
         while (game.running()) {
             game.handleEvents();
             game.commitStateChange();
