@@ -167,9 +167,9 @@ namespace Theme {
         constexpr SDL_Color MENU_BUTTON_BORDER_HOVER   = {120, 120, 140, 255};
         constexpr SDL_Color MENU_BUTTON_TEXT           = {220, 220, 230, 255};
 
-        constexpr SDL_Color PAUSE_OVERLAY              = {0, 0, 0, 180};
-        constexpr SDL_Color EXIT_OVERLAY               = {0, 0, 0, 200};
-        constexpr SDL_Color SURRENDER_OVERLAY          = {0, 0, 0, 190};
+        constexpr SDL_Color PAUSE_OVERLAY              = {0, 0, 0, 190};
+        constexpr SDL_Color EXIT_OVERLAY               = {0, 0, 0, 190};
+        constexpr SDL_Color SURRENDER_OVERLAY          = {0, 0, 0, 220};
 
         constexpr SDL_Color PAUSE_MODAL_BORDER         = {160, 120, 200, 255};
         constexpr SDL_Color EXIT_MODAL_BORDER          = {240, 192, 64, 150};

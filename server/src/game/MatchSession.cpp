@@ -914,7 +914,12 @@ void MatchSession::resolveLaneCombat(int lane) {
 void MatchSession::endMatch(std::shared_ptr<PlayerConnection> winner,
                             std::shared_ptr<PlayerConnection> loser) {
     // Update game state, send messages
-    if (winner) winner->send("MATCH_WON\n");
+    if (winner) {
+        std::string msg = "MATCH_WON " + std::to_string(coinReward) + "\n";
+        winner->send(msg);
+        if (!giveRewards(winner)) std::cout << "[DEBUG] Failed to give rewards\n";
+    }
+
     if (loser) loser->send("MATCH_LOST\n");
 
     running = false; // stop game loop
@@ -922,4 +927,26 @@ void MatchSession::endMatch(std::shared_ptr<PlayerConnection> winner,
     // ---- Reset player states ----
     if (winner) winner->state = ConnectionState::Waiting;
     if (loser) loser->state = ConnectionState::Waiting;
+}
+
+//Give rewards to winner of match (eg. coins)
+bool MatchSession::giveRewards(std::shared_ptr<PlayerConnection> winner) {
+
+    const std::string cardsHost = EnvUtil::getServiceHost("CARDS_SERVICE", "127.0.0.1", "api.myapp.com");
+    const int cardsPort = EnvUtil::getServicePort("CARDS_SERVICE", 8082, 443);
+
+    std::string path = "/cards/inventories/coins/add";
+    const int userId = winner->getPlayerId();
+
+    if (userId <= 0) return false;
+    std::ostringstream payload;
+    payload << "{\"uid\":" << userId << ",\"coins\":" << coinReward << "}";
+
+    int statusCode = -1;
+    std::string responseBody;
+    if (!HttpUtil::sendHttp(cardsHost, cardsPort, "PUT", path, payload.str(), statusCode, responseBody)) {
+        return false;
+    }
+    return statusCode >= 200 && statusCode < 300;
+
 }

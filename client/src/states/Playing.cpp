@@ -616,6 +616,7 @@ bool Playing::handleServerMessage(const std::string& msg) {
         state = PlayingGameState::Lost;
         std::cout << "[Playing] Lost Match!\n";
     } else if (cmd == "MATCH_WON") {
+        iss >> coinReward;
         state = PlayingGameState::Won;
         std::cout << "[Playing] Won Match!\n";
     }
@@ -1075,4 +1076,8 @@ void Playing::computeUiRects(int screenW, int screenH) {
 
 PlayingGameState Playing::getState() const {
     return state;
+}
+
+int Playing::getCoinReward() const {
+    return coinReward;
 }
