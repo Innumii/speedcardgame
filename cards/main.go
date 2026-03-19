@@ -132,6 +132,7 @@ func main() {
 	r.Get("/inventories/{uid}", services.GetInventoryByUserID) // Get inventory by user ID
 	r.Put("/inventories", services.UpdateInventory)            // Update inventory by user ID
 	r.Put("/inventories/coins", services.UpdateInventoryCoins)    // Update inventory coins by user ID
+	r.Put("/inventories/coins/add", services.AddInventoryCoins)    // Add coins/subtract
 
 	// router.Mount("/cardbase", r) //api prefix
 	router.Mount("/cards", r)

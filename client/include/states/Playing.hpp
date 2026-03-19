@@ -43,6 +43,7 @@ public:
     void run();
     void update(Game& game);
     void render(const Game&);
+    int getCoinReward() const;
 
     PlayingGameState getState() const;
 
@@ -64,6 +65,7 @@ private:
     bool running{false};
     PlayingGameState state = PlayingGameState::Playing;
     std::string recvBuffer; // handles partial TCP messages
+    int coinReward{0};
 
     // -------------------------
     // Dragging cards

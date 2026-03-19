@@ -127,10 +127,14 @@ public:
     //callback for ending match
     std::function<void(std::shared_ptr<MatchSession>)> onMatchEnd;
     void endMatch(std::shared_ptr<PlayerConnection> winner, std::shared_ptr<PlayerConnection> loser);
+
+    //end of match
+    bool giveRewards(std::shared_ptr<PlayerConnection> winner);
 private:
     const int handLimit = 7;
     const int drawInterval = 5;
     const int attackInterval = 5; 
+    const int coinReward = 50;
 
     void gameLoop();
     void handleDisconnect(const std::shared_ptr<PlayerConnection>&);

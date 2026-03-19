@@ -480,6 +480,7 @@ void RenderPlaying::render(Playing& playing, const Game& game) {
 	//Currently, game end does NOT mean disconnect from server. They are still in the server.
 	if (playing.getState() != PlayingGameState::Playing) {
 		std::string msg = "Defeat";
+		int coinReward = playing.getCoinReward();
 		if (playing.getState() == PlayingGameState::Won) {
 			msg = "Victory";
 		}
@@ -502,6 +503,26 @@ void RenderPlaying::render(Playing& playing, const Game& game) {
 			(screenW - loseTextW) / 2,
 			(screenH / 2) - loseTextH - 26
 		);
+
+		if (coinReward > 0) {
+			std::string coinsMsg = std::to_string(coinReward) + " Coins Earned!";
+			int coinsTextW = 0;
+			int coinsTextH = 0;
+			if (uiFonts.large) {
+				TTF_SizeText(uiFonts.large, coinsMsg.c_str(), &coinsTextW, &coinsTextH);
+			}
+
+			textRenderer.drawText(
+				renderer,
+				coinsMsg,
+				uiFonts.large,
+				Theme::TEXT_PRIMARY,
+				(screenW - coinsTextW) / 2,
+				(screenH / 2) - 16   //
+			);
+		}
+
+
 
 		const bool hoveringReturn = RenderUtil::pointInRect(playing.returnToTitleButton, mouseX, mouseY);
 		RenderUtil::drawRoundedRect(renderer, playing.returnToTitleButton,

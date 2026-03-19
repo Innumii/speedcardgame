@@ -233,3 +233,27 @@ func UpdateInventoryCoins(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 }
+
+func AddInventoryCoins(w http.ResponseWriter, r *http.Request) {
+
+	// Decode the incoming request body
+	if err := json.NewDecoder(r.Body).Decode(&inputInventory); err != nil {
+		http.Error(w, "Invalid inputDeck", http.StatusBadRequest)
+		return
+	}
+
+	uid := inputInventory.Uid
+	coins := inputInventory.Coins
+	var inventory models.Inventory
+	if err := config.DB.Where("uid = ?", uid).First(&inventory).Error; err != nil {
+		http.Error(w, fmt.Sprintf("Failed to retrieve inventory: %v", err), http.StatusInternalServerError)
+		return
+	}
+	inventory.Coins += coins
+
+	// Save the updated inventory
+	if err := config.DB.Save(&inventory).Error; err != nil {
+		http.Error(w, fmt.Sprintf("Failed to update inventory: %v", err), http.StatusInternalServerError)
+		return
+	}
+}
