@@ -242,20 +242,6 @@ void DeckBuilding::render(Game& game) {
     const auto layout = buildLayout(game);
     updateMenuButtons(layout);
 
-    // return to title menu
-    SDL_SetRenderDrawColor(renderer,
-                           Theme::DeckBuilding::PRE_CLEAR_TITLE_FILL.r,
-                           Theme::DeckBuilding::PRE_CLEAR_TITLE_FILL.g,
-                           Theme::DeckBuilding::PRE_CLEAR_TITLE_FILL.b,
-                           Theme::DeckBuilding::PRE_CLEAR_TITLE_FILL.a);
-    SDL_RenderFillRect(renderer, &TitleButton);
-    SDL_SetRenderDrawColor(renderer,
-                           Theme::DeckBuilding::PRE_CLEAR_TITLE_BORDER.r,
-                           Theme::DeckBuilding::PRE_CLEAR_TITLE_BORDER.g,
-                           Theme::DeckBuilding::PRE_CLEAR_TITLE_BORDER.b,
-                           Theme::DeckBuilding::PRE_CLEAR_TITLE_BORDER.a);
-    SDL_RenderDrawRect(renderer, &TitleButton);
-
     // render cards and deck building UI
     RenderDeckBuilding::render(*this, game);
 }
