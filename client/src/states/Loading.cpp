@@ -69,25 +69,32 @@ void Loading::render(const Game& game) {
     const RenderText::FontSet& titleFonts = game.getTitleFonts();
     const RenderText::FontSet& uiFonts = game.getUIFonts();
 
-    int screenW = 800;
-    int screenH = 600;
+    int screenW = Theme::SCREEN_DEFAULT_WIDTH;
+    int screenH = Theme::SCREEN_DEFAULT_HEIGHT;
     SDL_GetRendererOutputSize(renderer, &screenW, &screenH);
 
     SDL_SetRenderDrawColor(renderer, Theme::BG.r, Theme::BG.g, Theme::BG.b, 255);
     SDL_RenderClear(renderer);
 
     SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
-    for (int i = 0; i < 80; ++i) {
-        SDL_SetRenderDrawColor(renderer, 0, 0, 0, static_cast<Uint8>(120 - i * 1.5f));
+    for (int i = 0; i < Theme::Loading::VIGNETTE_LAYERS; ++i) {
+        const Uint8 alpha = static_cast<Uint8>(
+            Theme::Loading::VIGNETTE_MAX_ALPHA - i * Theme::Loading::VIGNETTE_ALPHA_FALLOFF
+        );
+        SDL_SetRenderDrawColor(renderer,
+                               Theme::Loading::VIGNETTE_COLOR.r,
+                               Theme::Loading::VIGNETTE_COLOR.g,
+                               Theme::Loading::VIGNETTE_COLOR.b,
+                               alpha);
         SDL_Rect edge{i, i, screenW - 2 * i, screenH - 2 * i};
         SDL_RenderDrawRect(renderer, &edge);
     }
 
     SDL_Rect panel{
-        screenW / 2 - 260,
-        screenH / 2 - 110,
-        520,
-        220
+        screenW / 2 - (Theme::Loading::PANEL_WIDTH / 2),
+        screenH / 2 - Theme::Loading::PANEL_OFFSET_Y,
+        Theme::Loading::PANEL_WIDTH,
+        Theme::Loading::PANEL_HEIGHT
     };
 
     RenderBanner::drawBanner(
@@ -101,15 +108,19 @@ void Loading::render(const Game& game) {
         Theme::BANNER_GLOW
     );
 
-    const int barMargin = 42;
+    const int barMargin = Theme::Loading::BAR_MARGIN_X;
     SDL_Rect barBg{
         panel.x + barMargin,
-        panel.y + panel.h - 45,
+        panel.y + panel.h - Theme::Loading::BAR_OFFSET_FROM_BOTTOM,
         panel.w - (barMargin * 2),
-        24
+        Theme::Loading::BAR_HEIGHT
     };
 
-    SDL_SetRenderDrawColor(renderer, 32, 32, 40, 255);
+    SDL_SetRenderDrawColor(renderer,
+                           Theme::Loading::BAR_BACKGROUND.r,
+                           Theme::Loading::BAR_BACKGROUND.g,
+                           Theme::Loading::BAR_BACKGROUND.b,
+                           Theme::Loading::BAR_BACKGROUND.a);
     SDL_RenderFillRect(renderer, &barBg);
     SDL_SetRenderDrawColor(renderer, Theme::BTN_BORDER.r, Theme::BTN_BORDER.g, Theme::BTN_BORDER.b, 255);
     SDL_RenderDrawRect(renderer, &barBg);
@@ -118,10 +129,10 @@ void Loading::render(const Game& game) {
         ? (cardsPrepared ? 1.0f : 0.0f)
         : static_cast<float>(currentCardIndex) / static_cast<float>(totalCards);
     SDL_Rect fillRect = barBg;
-    fillRect.w = static_cast<int>((barBg.w - 2) * std::clamp(progress, 0.0f, 1.0f));
-    fillRect.x += 1;
-    fillRect.y += 1;
-    fillRect.h -= 2;
+    fillRect.w = static_cast<int>((barBg.w - (Theme::Loading::BAR_INNER_INSET * 2)) * std::clamp(progress, 0.0f, 1.0f));
+    fillRect.x += Theme::Loading::BAR_INNER_INSET;
+    fillRect.y += Theme::Loading::BAR_INNER_INSET;
+    fillRect.h -= Theme::Loading::BAR_INNER_HEIGHT_REDUCTION;
     SDL_SetRenderDrawColor(renderer, Theme::BTN_START.r, Theme::BTN_START.g, Theme::BTN_START.b, 255);
     SDL_RenderFillRect(renderer, &fillRect);
 
@@ -131,8 +142,8 @@ void Loading::render(const Game& game) {
             statusMessage,
             uiFonts.large,
             Theme::BTN_TEXT,
-            panel.x + 42,
-            panel.y + 150
+            panel.x + Theme::Loading::STATUS_TEXT_OFFSET_X,
+            panel.y + Theme::Loading::STATUS_TEXT_OFFSET_Y
         );
     }
 }

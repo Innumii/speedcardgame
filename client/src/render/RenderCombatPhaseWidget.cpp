@@ -1,6 +1,7 @@
 #include "render/RenderCombatPhaseWidget.hpp"
 
 #include "render/RenderText.hpp"
+#include "render/Theme.hpp"
 
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_image.h>
@@ -57,11 +58,11 @@ void RenderCombatPhaseWidget::draw(SDL_Renderer* renderer, RenderText& textRende
         TTF_SizeText(font, combatLabel.c_str(), &combatTextW, &combatTextH);
     }
 
-    const int iconSize = 30;
-    const int barWidth = 170;
-    const int barHeight = 9;
-    const int iconGap = 8;
-    const int textBarGap = 4;
+    const int iconSize = Theme::CombatWidget::ICON_SIZE;
+    const int barWidth = Theme::CombatWidget::BAR_WIDTH;
+    const int barHeight = Theme::CombatWidget::BAR_HEIGHT;
+    const int iconGap = Theme::CombatWidget::ICON_GAP;
+    const int textBarGap = Theme::CombatWidget::TEXT_BAR_GAP;
     const int widgetHeight = std::max(iconSize, combatTextH + textBarGap + barHeight);
     const int widgetWidth = iconSize + iconGap + std::max(combatTextW, barWidth);
     const int widgetX = (screenW - widgetWidth) / 2;
@@ -87,18 +88,26 @@ void RenderCombatPhaseWidget::draw(SDL_Renderer* renderer, RenderText& textRende
     }
 
     if (font) {
-        textRenderer.drawText(renderer, combatLabel, font, SDL_Color{241, 237, 227, 255}, textRect.x, textRect.y);
+        textRenderer.drawText(renderer, combatLabel, font, Theme::CombatWidget::LABEL_TEXT, textRect.x, textRect.y);
     }
 
-    SDL_SetRenderDrawColor(renderer, 34, 38, 44, 210);
+    SDL_SetRenderDrawColor(renderer,
+                           Theme::CombatWidget::BAR_BACKGROUND.r,
+                           Theme::CombatWidget::BAR_BACKGROUND.g,
+                           Theme::CombatWidget::BAR_BACKGROUND.b,
+                           Theme::CombatWidget::BAR_BACKGROUND.a);
     SDL_RenderFillRect(renderer, &barOuter);
-    SDL_SetRenderDrawColor(renderer, 190, 200, 210, 255);
+    SDL_SetRenderDrawColor(renderer,
+                           Theme::CombatWidget::BAR_BORDER.r,
+                           Theme::CombatWidget::BAR_BORDER.g,
+                           Theme::CombatWidget::BAR_BORDER.b,
+                           Theme::CombatWidget::BAR_BORDER.a);
     SDL_RenderDrawRect(renderer, &barOuter);
 
     if (barInner.w > 0 && barInner.h > 0) {
         const SDL_Color fillColor = combatPhaseActive
-            ? SDL_Color{120, 205, 120, 235}
-            : SDL_Color{220, 170, 80, 235};
+            ? Theme::CombatWidget::BAR_FILL_ACTIVE
+            : Theme::CombatWidget::BAR_FILL_INACTIVE;
         SDL_SetRenderDrawColor(renderer, fillColor.r, fillColor.g, fillColor.b, fillColor.a);
         SDL_RenderFillRect(renderer, &barInner);
     }

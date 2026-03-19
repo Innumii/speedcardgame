@@ -154,36 +154,64 @@ namespace {
         return card.getType() == CardType::Creature ? "CREATURE" : "SPELL";
     }
 
-    void drawArtPanel(SDL_Renderer* renderer, const SDL_Rect& artRect, int cardId,
-                      SDL_Color fallbackColor) {
-        SDL_Texture* cardImage = getCardImageTexture(renderer, cardId);
-        if (cardImage) {
-            SDL_Rect clipRect{artRect.x + Theme::Card::ART_INSET, artRect.y + Theme::Card::ART_INSET,
-                              artRect.w - Theme::Card::ART_INSET * 2, artRect.h - Theme::Card::ART_INSET * 2};
-            SDL_RenderSetClipRect(renderer, &clipRect);
+   void drawArtPanel(SDL_Renderer* renderer, const SDL_Rect& artRect, int cardId,
+                  SDL_Color fallbackColor) {
+    const int inset = Theme::Card::ART_INSET;
+    const SDL_Rect clipRect{artRect.x + inset, artRect.y + inset,
+                            artRect.w - inset * 2, artRect.h - inset * 2};
 
-            int imgW = 0;
-            int imgH = 0;
-            SDL_QueryTexture(cardImage, nullptr, nullptr, &imgW, &imgH);
+    const int cornerRadius = std::max(2, clipRect.w / 10);
 
-            if (imgW > 0 && imgH > 0) {
-                const float scale = static_cast<float>(clipRect.w) / static_cast<float>(imgW);
-                const int scaledH = static_cast<int>(imgH * scale);
-                const int renderY = clipRect.y + std::max(0, (clipRect.h - scaledH) / 2);
-                SDL_Rect imgRect{clipRect.x, renderY, clipRect.w, scaledH};
-                SDL_RenderCopy(renderer, cardImage, nullptr, &imgRect);
-            }
+    SDL_Texture* cardImage = getCardImageTexture(renderer, cardId);
+    if (cardImage) {
+        int imgW = 0;
+        int imgH = 0;
+        SDL_QueryTexture(cardImage, nullptr, nullptr, &imgW, &imgH);
 
-            SDL_RenderSetClipRect(renderer, nullptr);
-        } else {
-            SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
-            SDL_SetRenderDrawColor(renderer, fallbackColor.r, fallbackColor.g, fallbackColor.b, fallbackColor.a);
-            SDL_RenderFillRect(renderer, &artRect);
+        // "Cover" scaling — fill the panel entirely, cropping whichever axis overflows.
+        SDL_Rect imgRect = clipRect;
+        if (imgW > 0 && imgH > 0) {
+            const float scaleX = static_cast<float>(clipRect.w) / static_cast<float>(imgW);
+            const float scaleY = static_cast<float>(clipRect.h) / static_cast<float>(imgH);
+            const float scale  = std::max(scaleX, scaleY);   // max = cover, min = contain
+            const int scaledW  = static_cast<int>(imgW * scale);
+            const int scaledH  = static_cast<int>(imgH * scale);
+            imgRect = {
+                clipRect.x + (clipRect.w - scaledW) / 2,
+                clipRect.y + (clipRect.h - scaledH) / 2,
+                scaledW,
+                scaledH
+            };
         }
 
-        SDL_SetRenderDrawColor(renderer, Theme::Card::ART_BORDER.r, Theme::Card::ART_BORDER.g, Theme::Card::ART_BORDER.b, Theme::Card::ART_BORDER.a);
-        SDL_RenderDrawRect(renderer, &artRect);
+        // Row-by-row rounded clip mask.
+        for (int row = 0; row < clipRect.h; ++row) {
+            const int y = clipRect.y + row;
+
+            int indent = 0;
+            if (row < cornerRadius) {
+                const int dy = cornerRadius - row;
+                indent = cornerRadius - static_cast<int>(
+                    std::sqrt(static_cast<double>(cornerRadius * cornerRadius - dy * dy)));
+            } else if (row >= clipRect.h - cornerRadius) {
+                const int dy = row - (clipRect.h - cornerRadius - 1);
+                indent = cornerRadius - static_cast<int>(
+                    std::sqrt(static_cast<double>(cornerRadius * cornerRadius - dy * dy)));
+            }
+
+            const SDL_Rect rowClip{clipRect.x + indent, y,
+                                   std::max(1, clipRect.w - indent * 2), 1};
+            SDL_RenderSetClipRect(renderer, &rowClip);
+            SDL_RenderCopy(renderer, cardImage, nullptr, &imgRect);
+        }
+
+        SDL_RenderSetClipRect(renderer, nullptr);
+    } else {
+        SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+        RenderUtil::fillRoundedRect(renderer, clipRect, cornerRadius, fallbackColor);
     }
+    // Border draw removed.
+}
 
     void drawCircularBadge(SDL_Renderer* renderer, RenderText& textRenderer, TTF_Font* font,
                            int cx, int cy, int radius, SDL_Color fill, SDL_Color border,

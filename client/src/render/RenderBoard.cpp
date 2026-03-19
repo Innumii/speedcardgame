@@ -90,7 +90,7 @@ void RenderBoard::drawDiscardZone(SDL_Renderer* renderer, RenderText& textRender
 		renderer,
 		"Drop cards to gain mana",
 		fontSmall,
-		SDL_Color{180, 200, 230, 255},
+		Theme::Board::DISCARD_DESCRIPTION_TEXT,
 		discardZone.x + textPadding,
 		discardZone.y + 26,
 		maxTextWidth

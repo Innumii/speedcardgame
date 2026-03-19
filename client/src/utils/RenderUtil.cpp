@@ -1,4 +1,5 @@
 #include "utils/RenderUtil.hpp"
+#include "render/Theme.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -111,7 +112,7 @@ void RenderUtil::drawRoundedGlow(SDL_Renderer* renderer, const SDL_Rect& rect, i
         const Uint8 alpha = static_cast<Uint8>((static_cast<int>(maxAlpha) * (layers - i + 1)) / layers);
         SDL_Color halo{glowColor.r, glowColor.g, glowColor.b, alpha};
         SDL_Rect haloRect{rect.x - i, rect.y - i, rect.w + i * 2, rect.h + i * 2};
-        drawRoundedRect(renderer, haloRect, radius, SDL_Color{0, 0, 0, 0}, halo);
+        drawRoundedRect(renderer, haloRect, radius, Theme::Effects::CLEAR_COLOR, halo);
     }
 }
 

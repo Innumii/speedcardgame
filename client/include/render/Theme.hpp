@@ -55,9 +55,12 @@ namespace Theme {
     constexpr int PANEL_RADIUS              = 16;
     constexpr int BANNER_W                  = 640;
     constexpr int BANNER_H                  = 100;
+    constexpr int SCREEN_DEFAULT_WIDTH      = 900;
+    constexpr int SCREEN_DEFAULT_HEIGHT     = 700;
 
     namespace Effects {
         constexpr SDL_Color SHADOW_COLOR                = {0, 0, 0, 90};
+        constexpr SDL_Color CLEAR_COLOR                 = {0, 0, 0, 0};
         constexpr int SHADOW_OFFSET                     = 5;
         constexpr int BUTTON_GLOW_LAYERS               = 6;
         constexpr Uint8 BUTTON_GLOW_MAX_ALPHA          = 42;
@@ -219,6 +222,121 @@ namespace Theme {
         constexpr SDL_Color DISCARD_BORDER_HOVER       = {120, 150, 200, 255};
         constexpr SDL_Color DISCARD_TITLE_TEXT         = {220, 230, 255, 255};
         constexpr SDL_Color DISCARD_DESCRIPTION_TEXT   = {180, 200, 230, 255};
+    }
+
+    namespace CombatWidget {
+        constexpr int ICON_SIZE                        = 30;
+        constexpr int BAR_WIDTH                        = 170;
+        constexpr int BAR_HEIGHT                       = 9;
+        constexpr int ICON_GAP                         = 8;
+        constexpr int TEXT_BAR_GAP                     = 4;
+
+        constexpr SDL_Color LABEL_TEXT                 = {241, 237, 227, 255};
+        constexpr SDL_Color BAR_BACKGROUND             = {34, 38, 44, 210};
+        constexpr SDL_Color BAR_BORDER                 = {190, 200, 210, 255};
+        constexpr SDL_Color BAR_FILL_ACTIVE            = {120, 205, 120, 235};
+        constexpr SDL_Color BAR_FILL_INACTIVE          = {220, 170, 80, 235};
+    }
+
+    namespace DeckBuilding {
+        constexpr SDL_Color STATUS_ERROR_TEXT          = {220, 80, 80, 255};
+        constexpr SDL_Color COLLECTION_FILL            = {40, 40, 50, 255};
+        constexpr SDL_Color COLLECTION_BORDER          = {255, 255, 255, 255};
+        constexpr SDL_Color COLLECTION_TITLE_TEXT      = {255, 255, 255, 255};
+        constexpr SDL_Color QUANTITY_TEXT_DIM          = {160, 160, 160, 255};
+        constexpr SDL_Color QUANTITY_TEXT              = {235, 235, 235, 255};
+        constexpr SDL_Color PAGER_TEXT                 = {255, 255, 255, 255};
+        constexpr SDL_Color PAGER_DISABLED_TEXT        = {140, 140, 140, 255};
+        constexpr SDL_Color PAGE_LABEL_TEXT            = {230, 230, 230, 255};
+        constexpr SDL_Color DECK_FILL                  = {30, 30, 30, 255};
+        constexpr SDL_Color DECK_BORDER                = {255, 255, 255, 255};
+        constexpr SDL_Color DECK_COUNT_TEXT            = {255, 255, 255, 255};
+        constexpr SDL_Color ENTRY_FILL                 = {70, 70, 90, 255};
+        constexpr SDL_Color ENTRY_BORDER               = {0, 0, 0, 255};
+        constexpr SDL_Color ENTRY_NAME_TEXT            = {255, 255, 255, 255};
+        constexpr SDL_Color ENTRY_COST_TEXT            = {200, 200, 200, 255};
+        constexpr SDL_Color ENTRY_COUNT_TEXT           = {255, 255, 255, 255};
+
+        constexpr int STATUS_MSG_TOP_OFFSET            = 22;
+        constexpr int STATUS_MSG_MIN_Y                 = 10;
+        constexpr int STATUS_MSG_FALLBACK_Y_OFFSET     = 6;
+        constexpr int SECTION_TITLE_X_OFFSET           = 10;
+        constexpr int SECTION_TITLE_Y_OFFSET           = 10;
+        constexpr int CARD_QTY_X_OFFSET                = 6;
+        constexpr int CARD_QTY_Y_OFFSET                = 2;
+        constexpr int PAGE_LABEL_X_OFFSET              = 6;
+        constexpr int PAGE_LABEL_Y_OFFSET              = 4;
+        constexpr int ENTRY_TEXT_X_OFFSET              = 6;
+        constexpr int ENTRY_TEXT_Y_OFFSET              = 6;
+        constexpr int ENTRY_COST_X_OFFSET              = 130;
+        constexpr int ENTRY_COUNT_X_RIGHT_INSET        = 30;
+        constexpr int DRAG_FALLBACK_WIDTH              = 110;
+        constexpr int DRAG_FALLBACK_HEIGHT             = 150;
+        constexpr int DEFAULT_SCREEN_WIDTH             = 800;
+        constexpr int DEFAULT_SCREEN_HEIGHT            = 600;
+
+        constexpr Uint32 HOVER_PREVIEW_DELAY_MS        = 350;
+        constexpr float PREVIEW_ASPECT_RATIO           = 1.4f;
+        constexpr int PREVIEW_MAX_WIDTH                = 360;
+        constexpr int PREVIEW_SCREEN_WIDTH_RATIO_DIV   = 2;
+        constexpr int PREVIEW_EDGE_MARGIN              = 20;
+        constexpr int PREVIEW_DECK_GAP                 = 16;
+
+        constexpr int CARD_WIDTH                       = 140;
+        constexpr int CARD_HEIGHT                      = 200;
+        constexpr int GRID_MARGIN_X                    = 16;
+        constexpr int GRID_MARGIN_Y                    = 16;
+        constexpr int GRID_ROWS                        = 2;
+        constexpr int RIGHT_PADDING                    = 20;
+        constexpr int DECK_GAP                         = 12;
+        constexpr int DECK_WIDTH                       = 240;
+        constexpr int GRID_EXTRA_WIDTH                 = 40;
+        constexpr int GRID_MAX_COLS                    = 4;
+        constexpr int GRID_MIN_COLS                    = 1;
+        constexpr int PAGER_HEIGHT                     = 24;
+        constexpr int PAGER_SPACING                    = 8;
+        constexpr int BOTTOM_PADDING                   = 20;
+        constexpr int COLLECTION_EXTRA_HEIGHT          = 60;
+        constexpr int COLLECTION_MIN_TOP               = 20;
+        constexpr int PANEL_MIN_LEFT                   = 20;
+        constexpr int GRID_START_X_PADDING             = 20;
+        constexpr int GRID_START_Y_PADDING             = 40;
+        constexpr int PREV_BUTTON_WIDTH                = 70;
+        constexpr int PREV_BUTTON_X_OFFSET             = 10;
+        constexpr int NEXT_BUTTON_WIDTH                = 70;
+        constexpr int NEXT_BUTTON_X_INSET              = 80;
+        constexpr int PAGE_LABEL_LEFT_GAP              = 8;
+        constexpr int PAGE_LABEL_RIGHT_GAP             = 16;
+        constexpr int ENTRY_HEIGHT                     = 28;
+        constexpr int ENTRY_START_Y_PADDING            = 40;
+        constexpr int ENTRY_X_PADDING                  = 10;
+        constexpr int ENTRY_X_TOTAL_PADDING            = 20;
+        constexpr int ENTRY_SPACING                    = 6;
+        constexpr int MENU_BUTTON_GAP                  = 12;
+        constexpr int MENU_MIN_LEFT                    = 20;
+        constexpr int MENU_TOP_GAP                     = 12;
+        constexpr int MENU_MIN_TOP                     = 20;
+        constexpr SDL_Color PRE_CLEAR_TITLE_FILL       = {25, 25, 25, 255};
+        constexpr SDL_Color PRE_CLEAR_TITLE_BORDER     = {255, 255, 255, 255};
+    }
+
+    namespace Loading {
+        constexpr int VIGNETTE_LAYERS                 = 80;
+        constexpr Uint8 VIGNETTE_MAX_ALPHA            = 120;
+        constexpr float VIGNETTE_ALPHA_FALLOFF        = 1.5f;
+        constexpr SDL_Color VIGNETTE_COLOR            = {0, 0, 0, 255};
+
+        constexpr int PANEL_WIDTH                     = 520;
+        constexpr int PANEL_HEIGHT                    = 220;
+        constexpr int PANEL_OFFSET_Y                  = 110;
+        constexpr int BAR_MARGIN_X                    = 42;
+        constexpr int BAR_OFFSET_FROM_BOTTOM          = 45;
+        constexpr int BAR_HEIGHT                      = 24;
+        constexpr SDL_Color BAR_BACKGROUND            = {32, 32, 40, 255};
+        constexpr int BAR_INNER_INSET                = 1;
+        constexpr int BAR_INNER_HEIGHT_REDUCTION      = 2;
+        constexpr int STATUS_TEXT_OFFSET_X            = 42;
+        constexpr int STATUS_TEXT_OFFSET_Y            = 150;
     }
 
     namespace Card {

@@ -12,6 +12,7 @@
 #include "core/NetworkClient.hpp"
 #include "objects/Card.h"
 #include "objects/Inventory.hpp"
+#include "render/Theme.hpp"
 #include "utils/LoadAvailableCards.hpp"
 #include <SDL2/SDL.h>
 #include <iostream>
@@ -242,9 +243,17 @@ void DeckBuilding::render(Game& game) {
     updateMenuButtons(layout);
 
     // return to title menu
-    SDL_SetRenderDrawColor(renderer, 25, 25, 25, 255);
+    SDL_SetRenderDrawColor(renderer,
+                           Theme::DeckBuilding::PRE_CLEAR_TITLE_FILL.r,
+                           Theme::DeckBuilding::PRE_CLEAR_TITLE_FILL.g,
+                           Theme::DeckBuilding::PRE_CLEAR_TITLE_FILL.b,
+                           Theme::DeckBuilding::PRE_CLEAR_TITLE_FILL.a);
     SDL_RenderFillRect(renderer, &TitleButton);
-    SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
+    SDL_SetRenderDrawColor(renderer,
+                           Theme::DeckBuilding::PRE_CLEAR_TITLE_BORDER.r,
+                           Theme::DeckBuilding::PRE_CLEAR_TITLE_BORDER.g,
+                           Theme::DeckBuilding::PRE_CLEAR_TITLE_BORDER.b,
+                           Theme::DeckBuilding::PRE_CLEAR_TITLE_BORDER.a);
     SDL_RenderDrawRect(renderer, &TitleButton);
 
     // render cards and deck building UI
@@ -254,49 +263,49 @@ void DeckBuilding::render(Game& game) {
 DeckBuilding::Layout DeckBuilding::buildLayout(const Game& game) const {
     Layout layout;
 
-    int screenW = 800;
-    int screenH = 600;
+    int screenW = Theme::SCREEN_DEFAULT_WIDTH;
+    int screenH = Theme::SCREEN_DEFAULT_HEIGHT;
     if (SDL_Renderer* renderer = game.getRenderer()) {
         SDL_GetRendererOutputSize(renderer, &screenW, &screenH);
     }
 
-    const int cardWidth = 140;
-    const int cardHeight = 200;
-    const int marginX = 16;
-    const int marginY = 16;
-    const int gridRows = 2;
+    const int cardWidth = Theme::DeckBuilding::CARD_WIDTH;
+    const int cardHeight = Theme::DeckBuilding::CARD_HEIGHT;
+    const int marginX = Theme::DeckBuilding::GRID_MARGIN_X;
+    const int marginY = Theme::DeckBuilding::GRID_MARGIN_Y;
+    const int gridRows = Theme::DeckBuilding::GRID_ROWS;
 
-    const int rightPadding = 20;
-    const int deckGap = 12;
-    const int deckWidth = 240;
+    const int rightPadding = Theme::DeckBuilding::RIGHT_PADDING;
+    const int deckGap = Theme::DeckBuilding::DECK_GAP;
+    const int deckWidth = Theme::DeckBuilding::DECK_WIDTH;
 
     const int maxContentWidth = screenW - (rightPadding * 2);
-    const int availableGridWidth = maxContentWidth - deckWidth - deckGap - 40;
+    const int availableGridWidth = maxContentWidth - deckWidth - deckGap - Theme::DeckBuilding::GRID_EXTRA_WIDTH;
     int gridCols = (availableGridWidth + marginX) / (cardWidth + marginX);
-    if (gridCols < 1) gridCols = 1;
-    if (gridCols > 4) gridCols = 4;
+    if (gridCols < Theme::DeckBuilding::GRID_MIN_COLS) gridCols = Theme::DeckBuilding::GRID_MIN_COLS;
+    if (gridCols > Theme::DeckBuilding::GRID_MAX_COLS) gridCols = Theme::DeckBuilding::GRID_MAX_COLS;
     const int maxSlots = gridCols * gridRows;
 
     const int gridWidth = gridCols * cardWidth + (gridCols - 1) * marginX;
     const int gridHeight = gridRows * cardHeight + (gridRows - 1) * marginY;
 
-    const int pagerHeight = 24;
-    const int pagerSpacing = 8;
-    const int bottomPadding = 20;
-    const int collectionHeight = gridHeight + 60;
+    const int pagerHeight = Theme::DeckBuilding::PAGER_HEIGHT;
+    const int pagerSpacing = Theme::DeckBuilding::PAGER_SPACING;
+    const int bottomPadding = Theme::DeckBuilding::BOTTOM_PADDING;
+    const int collectionHeight = gridHeight + Theme::DeckBuilding::COLLECTION_EXTRA_HEIGHT;
     const int totalHeight = collectionHeight + pagerSpacing + pagerHeight;
     const int maxTop = screenH - bottomPadding - totalHeight;
     int collectionY = (screenH - totalHeight) / 2;
     if (collectionY > maxTop) {
         collectionY = maxTop;
     }
-    if (collectionY < 20) collectionY = 20;
+    if (collectionY < Theme::DeckBuilding::COLLECTION_MIN_TOP) collectionY = Theme::DeckBuilding::COLLECTION_MIN_TOP;
 
-    const int totalWidth = (gridWidth + 40) + deckGap + deckWidth;
+    const int totalWidth = (gridWidth + Theme::DeckBuilding::GRID_EXTRA_WIDTH) + deckGap + deckWidth;
     int leftPadding = (screenW - totalWidth) / 2;
-    if (leftPadding < 20) leftPadding = 20;
+    if (leftPadding < Theme::DeckBuilding::PANEL_MIN_LEFT) leftPadding = Theme::DeckBuilding::PANEL_MIN_LEFT;
 
-    layout.collectionArea = SDL_Rect{leftPadding, collectionY, gridWidth + 40, collectionHeight};
+    layout.collectionArea = SDL_Rect{leftPadding, collectionY, gridWidth + Theme::DeckBuilding::GRID_EXTRA_WIDTH, collectionHeight};
 
     int deckX = layout.collectionArea.x + layout.collectionArea.w + deckGap;
     int deckY = layout.collectionArea.y;
@@ -325,8 +334,8 @@ DeckBuilding::Layout DeckBuilding::buildLayout(const Game& game) const {
     layout.pageIndex = pageIndex;
     layout.collectionCardRects.reserve(slotCount);
     layout.collectionCardIndices.reserve(slotCount);
-    const int startX = layout.collectionArea.x + 20;
-    const int startY = layout.collectionArea.y + 40;
+    const int startX = layout.collectionArea.x + Theme::DeckBuilding::GRID_START_X_PADDING;
+    const int startY = layout.collectionArea.y + Theme::DeckBuilding::GRID_START_Y_PADDING;
     for (int i = 0; i < slotCount; ++i) {
         int row = i / gridCols;
         int col = i % gridCols;
@@ -341,21 +350,21 @@ DeckBuilding::Layout DeckBuilding::buildLayout(const Game& game) const {
     }
 
     const int pagerY = layout.collectionArea.y + layout.collectionArea.h + pagerSpacing;
-    layout.prevPageButton = SDL_Rect{layout.collectionArea.x + 10, pagerY, 70, pagerHeight};
-    layout.nextPageButton = SDL_Rect{layout.collectionArea.x + layout.collectionArea.w - 80, pagerY, 70, pagerHeight};
-    layout.pageLabelRect = SDL_Rect{layout.prevPageButton.x + layout.prevPageButton.w + 8, pagerY, layout.nextPageButton.x - (layout.prevPageButton.x + layout.prevPageButton.w + 16), pagerHeight};
+    layout.prevPageButton = SDL_Rect{layout.collectionArea.x + Theme::DeckBuilding::PREV_BUTTON_X_OFFSET, pagerY, Theme::DeckBuilding::PREV_BUTTON_WIDTH, pagerHeight};
+    layout.nextPageButton = SDL_Rect{layout.collectionArea.x + layout.collectionArea.w - Theme::DeckBuilding::NEXT_BUTTON_X_INSET, pagerY, Theme::DeckBuilding::NEXT_BUTTON_WIDTH, pagerHeight};
+    layout.pageLabelRect = SDL_Rect{layout.prevPageButton.x + layout.prevPageButton.w + Theme::DeckBuilding::PAGE_LABEL_LEFT_GAP, pagerY, layout.nextPageButton.x - (layout.prevPageButton.x + layout.prevPageButton.w + Theme::DeckBuilding::PAGE_LABEL_RIGHT_GAP), pagerHeight};
 
     const auto deckOrder = getDeckEntryOrder();
     layout.deckEntryCardIndices = deckOrder;
     layout.deckEntryRects.reserve(deckOrder.size());
 
-    const int entryHeight = 28;
-    const int entryStartY = layout.deckArea.y + 40;
+    const int entryHeight = Theme::DeckBuilding::ENTRY_HEIGHT;
+    const int entryStartY = layout.deckArea.y + Theme::DeckBuilding::ENTRY_START_Y_PADDING;
     for (std::size_t i = 0; i < deckOrder.size(); ++i) {
         SDL_Rect entryRect{
-            layout.deckArea.x + 10,
-            entryStartY + static_cast<int>(i) * (entryHeight + 6),
-            layout.deckArea.w - 20,
+            layout.deckArea.x + Theme::DeckBuilding::ENTRY_X_PADDING,
+            entryStartY + static_cast<int>(i) * (entryHeight + Theme::DeckBuilding::ENTRY_SPACING),
+            layout.deckArea.w - Theme::DeckBuilding::ENTRY_X_TOTAL_PADDING,
             entryHeight
         };
         layout.deckEntryRects.push_back(entryRect);
@@ -369,13 +378,13 @@ void DeckBuilding::updateMenuButtons(const Layout& layout) {
     const int contentRight = layout.deckArea.x + layout.deckArea.w;
     const int contentW = contentRight - contentX;
 
-    const int buttonGap = 12;
+    const int buttonGap = Theme::DeckBuilding::MENU_BUTTON_GAP;
     const int totalButtonsW = TitleButton.w + SaveButton.w + PlayButton.w + (buttonGap * 2);
     int startX = contentX + (contentW - totalButtonsW) / 2;
-    if (startX < 20) startX = 20;
+    if (startX < Theme::DeckBuilding::MENU_MIN_LEFT) startX = Theme::DeckBuilding::MENU_MIN_LEFT;
 
-    int buttonY = layout.collectionArea.y - TitleButton.h - 12;
-    if (buttonY < 20) buttonY = 20;
+    int buttonY = layout.collectionArea.y - TitleButton.h - Theme::DeckBuilding::MENU_TOP_GAP;
+    if (buttonY < Theme::DeckBuilding::MENU_MIN_TOP) buttonY = Theme::DeckBuilding::MENU_MIN_TOP;
 
     TitleButton.x = startX;
     TitleButton.y = buttonY;

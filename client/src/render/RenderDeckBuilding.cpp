@@ -59,23 +59,31 @@ void RenderDeckBuilding::render(DeckBuilding& deckBuilding, Game& game) {
 
     if (fontSmall && deckBuilding.isStatusMessageActive(now)) {
         int msgX = layout.collectionArea.x;
-        int msgY = layout.collectionArea.y - 22;
-        if (msgY < 10) {
-            msgY = layout.collectionArea.y + 6;
+        int msgY = layout.collectionArea.y - Theme::DeckBuilding::STATUS_MSG_TOP_OFFSET;
+        if (msgY < Theme::DeckBuilding::STATUS_MSG_MIN_Y) {
+            msgY = layout.collectionArea.y + Theme::DeckBuilding::STATUS_MSG_FALLBACK_Y_OFFSET;
         }
         textRenderer.drawText(
             renderer,
             deckBuilding.getStatusMessage(),
             fontSmall,
-            SDL_Color{220, 80, 80, 255},
+            Theme::DeckBuilding::STATUS_ERROR_TEXT,
             msgX,
             msgY
         );
     }
 
-    SDL_SetRenderDrawColor(renderer, 40, 40, 50, 255);
+    SDL_SetRenderDrawColor(renderer,
+                           Theme::DeckBuilding::COLLECTION_FILL.r,
+                           Theme::DeckBuilding::COLLECTION_FILL.g,
+                           Theme::DeckBuilding::COLLECTION_FILL.b,
+                           Theme::DeckBuilding::COLLECTION_FILL.a);
     SDL_RenderFillRect(renderer, &layout.collectionArea);
-    SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
+    SDL_SetRenderDrawColor(renderer,
+                           Theme::DeckBuilding::COLLECTION_BORDER.r,
+                           Theme::DeckBuilding::COLLECTION_BORDER.g,
+                           Theme::DeckBuilding::COLLECTION_BORDER.b,
+                           Theme::DeckBuilding::COLLECTION_BORDER.a);
     SDL_RenderDrawRect(renderer, &layout.collectionArea);
 
     if (fontSmall) {
@@ -83,9 +91,9 @@ void RenderDeckBuilding::render(DeckBuilding& deckBuilding, Game& game) {
             renderer,
             "Collection",
             fontSmall,
-            SDL_Color{255, 255, 255, 255},
-            layout.collectionArea.x + 10,
-            layout.collectionArea.y + 10
+            Theme::DeckBuilding::COLLECTION_TITLE_TEXT,
+            layout.collectionArea.x + Theme::DeckBuilding::SECTION_TITLE_X_OFFSET,
+            layout.collectionArea.y + Theme::DeckBuilding::SECTION_TITLE_Y_OFFSET
         );
     }
 
@@ -108,18 +116,12 @@ void RenderDeckBuilding::render(DeckBuilding& deckBuilding, Game& game) {
 
         if (fontTiny) {
             const std::string qtyText = "x" + std::to_string(remaining);
-            const SDL_Color qtyColor = dimmed ? SDL_Color{160, 160, 160, 255} : SDL_Color{235, 235, 235, 255};
-            textRenderer.drawText(renderer, qtyText, fontTiny, qtyColor, cardRect.x + 6, cardRect.y + cardRect.h + 2);
+            const SDL_Color qtyColor = dimmed ? Theme::DeckBuilding::QUANTITY_TEXT_DIM : Theme::DeckBuilding::QUANTITY_TEXT;
+            textRenderer.drawText(renderer, qtyText, fontTiny, qtyColor, cardRect.x + Theme::DeckBuilding::CARD_QTY_X_OFFSET, cardRect.y + cardRect.h + Theme::DeckBuilding::CARD_QTY_Y_OFFSET);
         }
     }
 
     if (layout.pageCount > 1) {
-        const SDL_Color pagerBase{60, 60, 70, 255};
-        const SDL_Color pagerHighlight{80, 80, 95, 255};
-        const SDL_Color pagerPressed{40, 40, 55, 255};
-        const SDL_Color pagerText{255, 255, 255, 255};
-        const SDL_Color pagerDisabled{140, 140, 140, 255};
-
         const bool canPrev = layout.pageIndex > 0;
         const bool canNext = layout.pageIndex < layout.pageCount - 1;
         const bool hoverPrev = canPrev && SDL_PointInRect(&mousePoint, &layout.prevPageButton) == SDL_TRUE;
@@ -129,25 +131,33 @@ void RenderDeckBuilding::render(DeckBuilding& deckBuilding, Game& game) {
                                   "Prev", fontTiny,
                                   canPrev ? Theme::BTN_CONNECT : Theme::BTN_SECONDARY,
                                   Theme::BTN_BORDER,
-                                  canPrev ? pagerText : pagerDisabled,
+                                  canPrev ? Theme::DeckBuilding::PAGER_TEXT : Theme::DeckBuilding::PAGER_DISABLED_TEXT,
                                   hoverPrev, !canPrev);
 
         RenderButton::drawButton(renderer, layout.nextPageButton,
                                   "Next", fontTiny,
                                   canNext ? Theme::BTN_CONNECT : Theme::BTN_SECONDARY,
                                   Theme::BTN_BORDER,
-                                  canNext ? pagerText : pagerDisabled,
+                                  canNext ? Theme::DeckBuilding::PAGER_TEXT : Theme::DeckBuilding::PAGER_DISABLED_TEXT,
                                   hoverNext, !canNext);
 
         if (fontTiny) {
             const std::string pageText = "Page " + std::to_string(layout.pageIndex + 1) + " / " + std::to_string(layout.pageCount);
-            textRenderer.drawText(renderer, pageText, fontTiny, SDL_Color{230, 230, 230, 255}, layout.pageLabelRect.x + 6, layout.pageLabelRect.y + 4);
+            textRenderer.drawText(renderer, pageText, fontTiny, Theme::DeckBuilding::PAGE_LABEL_TEXT, layout.pageLabelRect.x + Theme::DeckBuilding::PAGE_LABEL_X_OFFSET, layout.pageLabelRect.y + Theme::DeckBuilding::PAGE_LABEL_Y_OFFSET);
         }
     }
 
-    SDL_SetRenderDrawColor(renderer, 30, 30, 30, 255);
+    SDL_SetRenderDrawColor(renderer,
+                           Theme::DeckBuilding::DECK_FILL.r,
+                           Theme::DeckBuilding::DECK_FILL.g,
+                           Theme::DeckBuilding::DECK_FILL.b,
+                           Theme::DeckBuilding::DECK_FILL.a);
     SDL_RenderFillRect(renderer, &layout.deckArea);
-    SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
+    SDL_SetRenderDrawColor(renderer,
+                           Theme::DeckBuilding::DECK_BORDER.r,
+                           Theme::DeckBuilding::DECK_BORDER.g,
+                           Theme::DeckBuilding::DECK_BORDER.b,
+                           Theme::DeckBuilding::DECK_BORDER.a);
     SDL_RenderDrawRect(renderer, &layout.deckArea);
 
     if (fontSmall) {
@@ -158,9 +168,9 @@ void RenderDeckBuilding::render(DeckBuilding& deckBuilding, Game& game) {
             renderer,
             deckCountText,
             fontSmall,
-            SDL_Color{255, 255, 255, 255},
-            layout.deckArea.x + 10,
-            layout.deckArea.y + 10
+            Theme::DeckBuilding::DECK_COUNT_TEXT,
+            layout.deckArea.x + Theme::DeckBuilding::SECTION_TITLE_X_OFFSET,
+            layout.deckArea.y + Theme::DeckBuilding::SECTION_TITLE_Y_OFFSET
         );
     }
 
@@ -170,22 +180,30 @@ void RenderDeckBuilding::render(DeckBuilding& deckBuilding, Game& game) {
         const Card& card = *deckBuilding.availableCards[cardIndex];
         const int copies = deckBuilding.deckCopies[cardIndex];
 
-        SDL_SetRenderDrawColor(renderer, 70, 70, 90, 255);
+        SDL_SetRenderDrawColor(renderer,
+                               Theme::DeckBuilding::ENTRY_FILL.r,
+                               Theme::DeckBuilding::ENTRY_FILL.g,
+                               Theme::DeckBuilding::ENTRY_FILL.b,
+                               Theme::DeckBuilding::ENTRY_FILL.a);
         SDL_RenderFillRect(renderer, &entryRect);
-        SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
+        SDL_SetRenderDrawColor(renderer,
+                               Theme::DeckBuilding::ENTRY_BORDER.r,
+                               Theme::DeckBuilding::ENTRY_BORDER.g,
+                               Theme::DeckBuilding::ENTRY_BORDER.b,
+                               Theme::DeckBuilding::ENTRY_BORDER.a);
         SDL_RenderDrawRect(renderer, &entryRect);
 
         if (fontTiny) {
-            textRenderer.drawText(renderer, card.getName(), fontTiny, SDL_Color{255, 255, 255, 255}, entryRect.x + 6, entryRect.y + 6);
-            textRenderer.drawText(renderer, "Cost: " + std::to_string(card.getManaCost()), fontTiny, SDL_Color{200, 200, 200, 255}, entryRect.x + 130, entryRect.y + 6);
-            textRenderer.drawText(renderer, "x" + std::to_string(copies), fontTiny, SDL_Color{255, 255, 255, 255}, entryRect.x + entryRect.w - 30, entryRect.y + 6);
+            textRenderer.drawText(renderer, card.getName(), fontTiny, Theme::DeckBuilding::ENTRY_NAME_TEXT, entryRect.x + Theme::DeckBuilding::ENTRY_TEXT_X_OFFSET, entryRect.y + Theme::DeckBuilding::ENTRY_TEXT_Y_OFFSET);
+            textRenderer.drawText(renderer, "Cost: " + std::to_string(card.getManaCost()), fontTiny, Theme::DeckBuilding::ENTRY_COST_TEXT, entryRect.x + Theme::DeckBuilding::ENTRY_COST_X_OFFSET, entryRect.y + Theme::DeckBuilding::ENTRY_TEXT_Y_OFFSET);
+            textRenderer.drawText(renderer, "x" + std::to_string(copies), fontTiny, Theme::DeckBuilding::ENTRY_COUNT_TEXT, entryRect.x + entryRect.w - Theme::DeckBuilding::ENTRY_COUNT_X_RIGHT_INSET, entryRect.y + Theme::DeckBuilding::ENTRY_TEXT_Y_OFFSET);
         }
     }
 
     if (deckBuilding.dragging && deckBuilding.draggedCardIndex >= 0 && deckBuilding.draggedCardIndex < static_cast<int>(deckBuilding.availableCards.size())) {
         const Card& card = *deckBuilding.availableCards[deckBuilding.draggedCardIndex];
-        int dragW = 110;
-        int dragH = 150;
+        int dragW = Theme::DeckBuilding::DRAG_FALLBACK_WIDTH;
+        int dragH = Theme::DeckBuilding::DRAG_FALLBACK_HEIGHT;
         if (!layout.collectionCardRects.empty()) {
             dragW = layout.collectionCardRects.front().w;
             dragH = layout.collectionCardRects.front().h;
@@ -231,31 +249,31 @@ void RenderDeckBuilding::render(DeckBuilding& deckBuilding, Game& game) {
         deckBuilding.hoverStartTick = now;
     }
 
-    constexpr Uint32 hoverDelayMs = 350;
+    constexpr Uint32 hoverDelayMs = Theme::DeckBuilding::HOVER_PREVIEW_DELAY_MS;
     const bool showPreview =
         deckBuilding.hoverIndex != static_cast<std::size_t>(-1) &&
         deckBuilding.hoverIndex < deckBuilding.availableCards.size() &&
         now - deckBuilding.hoverStartTick >= hoverDelayMs;
 
     if (showPreview) {
-        int screenW = 800;
-        int screenH = 600;
+        int screenW = Theme::DeckBuilding::DEFAULT_SCREEN_WIDTH;
+        int screenH = Theme::DeckBuilding::DEFAULT_SCREEN_HEIGHT;
         SDL_GetRendererOutputSize(renderer, &screenW, &screenH);
 
-        int previewWidth = std::min(360, screenW / 2);
-        int previewHeight = static_cast<int>(previewWidth * 1.4f);
-        if (previewHeight > screenH - 40) {
-            previewHeight = screenH - 40;
-            previewWidth = static_cast<int>(previewHeight / 1.4f);
+        int previewWidth = std::min(Theme::DeckBuilding::PREVIEW_MAX_WIDTH, screenW / Theme::DeckBuilding::PREVIEW_SCREEN_WIDTH_RATIO_DIV);
+        int previewHeight = static_cast<int>(previewWidth * Theme::DeckBuilding::PREVIEW_ASPECT_RATIO);
+        if (previewHeight > screenH - (Theme::DeckBuilding::PREVIEW_EDGE_MARGIN * 2)) {
+            previewHeight = screenH - (Theme::DeckBuilding::PREVIEW_EDGE_MARGIN * 2);
+            previewWidth = static_cast<int>(previewHeight / Theme::DeckBuilding::PREVIEW_ASPECT_RATIO);
         }
 
-        int previewX = layout.deckArea.x - previewWidth - 16;
-        if (previewX < 20) previewX = 20;
+        int previewX = layout.deckArea.x - previewWidth - Theme::DeckBuilding::PREVIEW_DECK_GAP;
+        if (previewX < Theme::DeckBuilding::PREVIEW_EDGE_MARGIN) previewX = Theme::DeckBuilding::PREVIEW_EDGE_MARGIN;
         int previewY = layout.deckArea.y;
-        if (previewY + previewHeight > screenH - 20) {
-            previewY = screenH - previewHeight - 20;
+        if (previewY + previewHeight > screenH - Theme::DeckBuilding::PREVIEW_EDGE_MARGIN) {
+            previewY = screenH - previewHeight - Theme::DeckBuilding::PREVIEW_EDGE_MARGIN;
         }
-        if (previewY < 20) previewY = 20;
+        if (previewY < Theme::DeckBuilding::PREVIEW_EDGE_MARGIN) previewY = Theme::DeckBuilding::PREVIEW_EDGE_MARGIN;
 
         SDL_Rect panel{previewX, previewY, previewWidth, previewHeight};
         RenderCard::drawPreview(
