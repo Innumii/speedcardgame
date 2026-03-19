@@ -18,6 +18,7 @@ public:
 private:
     bool cardsPrepared{false};
     bool deckPrepared{false};
+    std::size_t retryRounds{0};
     std::size_t currentCardIndex{0};
     std::size_t totalCards{0};
     std::string statusMessage{"Loading cards..."};

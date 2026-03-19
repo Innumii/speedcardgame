@@ -18,7 +18,9 @@
 #include <SDL2/SDL_image.h>
 #include <SDL2/SDL_ttf.h>
 #include <algorithm>
+#include <set>
 #include <string>
+#include <utility>
 #include <vector>
 
 void RenderPlaying::render(Playing& playing, const Game& game) {
@@ -76,6 +78,15 @@ void RenderPlaying::render(Playing& playing, const Game& game) {
 	std::vector<PlayingRenderUtil::DeathRenderFrame> activeDeathFrames;
 	PlayingRenderUtil::collectAttackFrames(activeAnimation, activeAttackFrames);
 	PlayingRenderUtil::collectDeathFrames(activeAnimation, activeDeathFrames);
+
+	std::set<std::pair<int, int>> attackingSlots;
+	for (const auto& frame : activeAttackFrames) {
+		if (frame.lane < 0) {
+			continue;
+		}
+
+		attackingSlots.emplace(frame.lane, frame.selfPlayer ? 0 : 1);
+	}
 
 	std::size_t newHoverIndex = static_cast<std::size_t>(-1);
 	if (!draggingCard) {
@@ -302,7 +313,16 @@ void RenderPlaying::render(Playing& playing, const Game& game) {
 		}
 	}
 
-	RenderBoard::drawBoardState(renderer, textRenderer, playing.board, playing.playSlots, playing.opponentSlots, uiFonts.tiny, uiFonts.small);
+	RenderBoard::drawBoardState(
+		renderer,
+		textRenderer,
+		playing.board,
+		playing.playSlots,
+		playing.opponentSlots,
+		uiFonts.tiny,
+		uiFonts.small,
+		attackingSlots.empty() ? nullptr : &attackingSlots
+	);
 
 	if (!activeAttackFrames.empty()) {
 		SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
@@ -318,9 +338,6 @@ void RenderPlaying::render(Playing& playing, const Game& game) {
 			}
 
 			RenderCard::drawBoardCard(renderer, textRenderer, *zone.value(), frame.rect, uiFonts.tiny, uiFonts.small);
-
-			SDL_SetRenderDrawColor(renderer, 255, 255, 255, static_cast<Uint8>(std::min<int>(frame.alpha, 160)));
-			SDL_RenderDrawRect(renderer, &frame.rect);
 		}
 	}
 
