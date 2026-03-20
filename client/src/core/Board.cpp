@@ -18,7 +18,6 @@ bool Board::isZoneEmpty(int lane, int playerId) const {
 
 bool Board::addToPlay(int lane, int playerId, std::unique_ptr<Card> card) {
     if (!isZoneEmpty(lane, playerId) || !card) return false;
-    if (playerId < 0 || playerId > 1 || lane < 0 || lane >= laneCount) return false;
 
     try {
         lanes[playerId][lane] = std::move(card);
@@ -68,6 +67,13 @@ void Board::displayPlay(int playerId) {
 }
 
 const std::optional<std::unique_ptr<Card>>& Board::getZone(int lane, int playerId) const {
+    if (playerId < 0 || playerId > 1 || lane < 0 || lane >= laneCount) {
+        throw std::out_of_range("Invalid lane or playerId");
+    }
+    return lanes[playerId][lane];
+}
+
+std::optional<std::unique_ptr<Card>>& Board::getZoneMutable(int lane, int playerId) {
     if (playerId < 0 || playerId > 1 || lane < 0 || lane >= laneCount) {
         throw std::out_of_range("Invalid lane or playerId");
     }

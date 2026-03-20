@@ -31,3 +31,6 @@ cid,name,type,cost,value,power,toughness,effect
 30,Dynamic Duo,Creature,5,3,3,5,Double Strike
 31,Ratatouille,Creature,2,1,1,1,"Deathtouch"
 32,Cheese Touch,Spell,1,1,0,0,"Target creature gains Deathtouch."
+33,Wall,Creature,2,2,0,5,"regen 2"
+34,Australian Spider,Creature,4,2,1,6,"Deathtouch"
+35,The Great Wall,Creature,8,4,2,10,"regen 4"

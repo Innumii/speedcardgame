@@ -452,9 +452,12 @@ namespace {
             surfaces.reserve(textLines.size());
             int totalTextHeight = 0;
             const int lineGap = Theme::Card::TEXT_LINE_GAP;
+            const SDL_Color textBodyColor = card.hasGrantedEffects()
+                ? Theme::Card::STAT_VALUE_BUFFED
+                : Theme::Card::TEXT_BODY;
             for (const std::string& line : textLines) {
                 SDL_Surface* s = TTF_RenderUTF8_Blended_Wrapped(
-                    uiFont, line.c_str(), Theme::Card::TEXT_BODY, static_cast<Uint32>(textClip.w));
+                    uiFont, line.c_str(), textBodyColor, static_cast<Uint32>(textClip.w));
                 if (!s) continue;
                 surfaces.push_back(s);
                 totalTextHeight += s->h;

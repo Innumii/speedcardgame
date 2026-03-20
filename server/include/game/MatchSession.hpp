@@ -24,6 +24,7 @@ struct ServerBoard {
     std::vector<std::optional<int>> lanes[2]; // card IDs
     std::vector<std::optional<std::pair<int, int>>> augments[2]; // buffs/debuffs (eg. 1,2 , 3,-1 , etc.)
     std::vector<std::optional<int>> continuousEffects[2]; // continuous effects (eg. 1:Trample, 2:Double Strike, etc.)
+    std::vector<std::optional<std::pair<int, int>>> regen[2]; // {regenValue, combatsUntilTrigger}
 
     std::vector<int> discard[2];
 
@@ -35,6 +36,8 @@ struct ServerBoard {
         augments[1].resize(laneCount);
         continuousEffects[0].resize(laneCount);
         continuousEffects[1].resize(laneCount);
+        regen[0].resize(laneCount);
+        regen[1].resize(laneCount);
     }
 };
 
@@ -114,6 +117,12 @@ public:
     void setHP(int playerIndex, int amount);
     //MANA <playerId> <delta>
     void augmentMana(int playerIndex, int amount);
+    //EFFECT_ADD <playerId> <lane> <effectBit>
+    void addCreatureEffect(int targetPlayerIndex, int lane, int effectBit);
+    //EFFECT_REMOVE <playerId> <lane> <effectBit>
+    void removeCreatureEffect(int targetPlayerIndex, int lane, int effectBit);
+    //REGEN_SET <playerId> <lane> <value>
+    void setCreatureRegen(int targetPlayerIndex, int lane, int regenValue);
     //--------------board actions--------------
 
     //Battle Phase
