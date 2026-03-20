@@ -796,9 +796,7 @@ bool Playing::drawCard(int playerId, int cardId) {
     }
 
     // Recompute all draw destinations now that hand is fully populated
-    SDL_GetRendererOutputSize(renderer, &screenW, &screenH);
-    auto finalLayout = computeCardLayout(localPlayer.hand.size(), screenW, screenH);
-    animationQueue.updateDrawDestinations(finalLayout);
+    animationQueue.updateDrawDestinations(cardRects);
 
     return true;
 }
