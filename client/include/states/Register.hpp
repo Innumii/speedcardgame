@@ -28,9 +28,7 @@ private:
     };
 
     void updateLayout(SDL_Renderer* renderer);
-    void ensureFonts();
     void setActiveField(Field field);
-    bool pointInRect(const SDL_Rect& rect, int x, int y) const;
 
     SDL_Rect panelRect{0, 0, 0, 0};
     SDL_Rect emailRect{0, 0, 0, 0};
@@ -50,8 +48,6 @@ private:
     bool createHover{false};
     bool backHover{false};
 
-    bool fontsReady{false};
-    RenderText::FontSet fonts{};
 };
 
 #endif

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/gin-contrib/cors"
@@ -175,9 +176,27 @@ func seedDevUsers(authService *services.AuthService) {
 		{Name: "test", Email: "test@example.com", Password: "test"},
 	}
 
+	const maxAttempts = 8
+	const retryDelay = 2 * time.Second
+
 	for _, user := range devUsers {
-		if _, err := authService.RegisterDevUser(user); err != nil {
-			log.Printf("Dev user seed skipped for %s: %v", user.Email, err)
+		for attempt := 1; attempt <= maxAttempts; attempt++ {
+			_, err := authService.RegisterDevUser(user)
+			if err == nil {
+				break
+			}
+
+			if strings.Contains(strings.ToLower(err.Error()), "email already taken") {
+				break
+			}
+
+			if attempt == maxAttempts {
+				log.Printf("Dev user seed failed for %s after %d attempts: %v", user.Email, maxAttempts, err)
+				break
+			}
+
+			log.Printf("Dev user seed retry %d/%d for %s: %v", attempt, maxAttempts, user.Email, err)
+			time.Sleep(retryDelay)
 		}
 	}
 }

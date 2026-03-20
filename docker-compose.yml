@@ -25,6 +25,8 @@ services:
         condition: service_healthy
       auth-redis:
         condition: service_healthy
+      cards:
+        condition: service_started
 
   auth-db:
     image: postgres:16

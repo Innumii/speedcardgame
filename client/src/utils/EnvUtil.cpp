@@ -98,7 +98,6 @@ namespace EnvUtil {
     bool isAwsEnabled() {
         return getEnvBoolOrDefault("USE_AWS_SERVICES", false);
     }
-
     std::string resolveEndpoint(const std::string& dockerKey, const std::string& awsKey) {
 
         if (!isAwsEnabled()) {

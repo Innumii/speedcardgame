@@ -79,6 +79,10 @@ public:
     void setPlayerId(int playerId);
     const std::string& getPlayerUsername() const;
     void setPlayerUsername(std::string username);
+    const std::string& getAuthSessionId() const;
+    void setAuthSessionId(std::string sessionId);
+    bool hasActiveAuthSession() const;
+    bool endUserSession();
 
     Player& getPlayer();
     // const Deck& getDeck(const Player& player) const;
@@ -101,6 +105,7 @@ private:
     Player player;
     // Player remotePlayer;
     std::string playerUsername{"Player"};
+    std::string authSessionId;
 
     int drawIntervalSeconds{3};
     int packRefundCoins{0};
