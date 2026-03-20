@@ -4,6 +4,8 @@
 #include <string>
 #include <vector>
 
+#include "render/Theme.hpp"
+
 class Game;
 
 class Waiting {
@@ -21,8 +23,18 @@ private:
     bool accepted = false;
     bool declined = false;
 
-    SDL_Rect acceptRect{300, 450, 280, 75};
-    SDL_Rect declineRect{430, 250, 150, 50};
+    SDL_Rect acceptRect{
+        Theme::Waiting::ACCEPT_BUTTON_INITIAL_X,
+        Theme::Waiting::ACCEPT_BUTTON_INITIAL_Y,
+        Theme::Waiting::ACCEPT_BUTTON_WIDTH,
+        Theme::Waiting::ACCEPT_BUTTON_HEIGHT
+    };
+    SDL_Rect declineRect{
+        Theme::Waiting::DECLINE_BUTTON_INITIAL_X,
+        Theme::Waiting::DECLINE_BUTTON_INITIAL_Y,
+        Theme::Waiting::DECLINE_BUTTON_WIDTH,
+        Theme::Waiting::DECLINE_BUTTON_HEIGHT
+    };
     bool acceptHovered = false;
     bool declineHovered = false;
     bool acceptPressed = false;

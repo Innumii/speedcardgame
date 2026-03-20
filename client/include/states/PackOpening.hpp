@@ -7,6 +7,8 @@
 #include <unordered_map>
 #include <vector>
 
+#include "render/Theme.hpp"
+
 class Game;
 class Card;
 
@@ -34,8 +36,18 @@ private:
     std::vector<int> inventoryCopies;
     std::vector<OpenedCardResult> lastOpenedCards;
 
-    SDL_Rect backButton{20, 20, 180, 56};
-    SDL_Rect openPackButton{220, 20, 220, 56};
+    SDL_Rect backButton{
+        Theme::PackOpening::BACK_BUTTON_INITIAL_X,
+        Theme::PackOpening::BACK_BUTTON_INITIAL_Y,
+        Theme::PackOpening::BACK_BUTTON_WIDTH,
+        Theme::PackOpening::BACK_BUTTON_HEIGHT
+    };
+    SDL_Rect openPackButton{
+        Theme::PackOpening::OPEN_BUTTON_INITIAL_X,
+        Theme::PackOpening::OPEN_BUTTON_INITIAL_Y,
+        Theme::PackOpening::OPEN_BUTTON_WIDTH,
+        Theme::PackOpening::OPEN_BUTTON_HEIGHT
+    };
 
     std::string statusMessage;
     int lastRefundCoins{0};

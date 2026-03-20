@@ -21,7 +21,14 @@ void RenderDeckBuilding::render(DeckBuilding& deckBuilding, Game& game) {
     if (!renderer) return;
 
     RenderText textRenderer;
-    const auto layout = deckBuilding.buildLayout(game);
+    auto layout = deckBuilding.buildLayout(game);
+    if (deckBuilding.deckScrollOffset < 0) {
+        deckBuilding.deckScrollOffset = 0;
+        layout = deckBuilding.buildLayout(game);
+    } else if (deckBuilding.deckScrollOffset > layout.maxDeckScrollOffset) {
+        deckBuilding.deckScrollOffset = layout.maxDeckScrollOffset;
+        layout = deckBuilding.buildLayout(game);
+    }
     int mouseX = 0;
     int mouseY = 0;
     SDL_GetMouseState(&mouseX, &mouseY);
@@ -179,8 +186,14 @@ void RenderDeckBuilding::render(DeckBuilding& deckBuilding, Game& game) {
         );
     }
 
+    SDL_RenderSetClipRect(renderer, &layout.deckEntriesClipRect);
     for (std::size_t i = 0; i < layout.deckEntryRects.size(); ++i) {
         const SDL_Rect entryRect = layout.deckEntryRects[i];
+        if (entryRect.y + entryRect.h <= layout.deckEntriesClipRect.y ||
+            entryRect.y >= layout.deckEntriesClipRect.y + layout.deckEntriesClipRect.h) {
+            continue;
+        }
+
         const int cardIndex = layout.deckEntryCardIndices[i];
         const Card& card = *deckBuilding.availableCards[cardIndex];
         const int copies = deckBuilding.deckCopies[cardIndex];
@@ -203,6 +216,41 @@ void RenderDeckBuilding::render(DeckBuilding& deckBuilding, Game& game) {
             textRenderer.drawText(renderer, "Cost: " + std::to_string(card.getManaCost()), fontTiny, Theme::DeckBuilding::ENTRY_COST_TEXT, entryRect.x + Theme::DeckBuilding::ENTRY_COST_X_OFFSET, entryRect.y + Theme::DeckBuilding::ENTRY_TEXT_Y_OFFSET);
             textRenderer.drawText(renderer, "x" + std::to_string(copies), fontTiny, Theme::DeckBuilding::ENTRY_COUNT_TEXT, entryRect.x + entryRect.w - Theme::DeckBuilding::ENTRY_COUNT_X_RIGHT_INSET, entryRect.y + Theme::DeckBuilding::ENTRY_TEXT_Y_OFFSET);
         }
+    }
+    SDL_RenderSetClipRect(renderer, nullptr);
+
+    if (layout.maxDeckScrollOffset > 0 && layout.deckEntriesClipRect.h > 0) {
+        const SDL_Rect trackRect{
+            layout.deckArea.x + layout.deckArea.w - Theme::DeckBuilding::SCROLLBAR_WIDTH - 4,
+            layout.deckEntriesClipRect.y,
+            Theme::DeckBuilding::SCROLLBAR_WIDTH,
+            layout.deckEntriesClipRect.h
+        };
+        SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+        SDL_SetRenderDrawColor(renderer,
+                               Theme::DeckBuilding::SCROLLBAR_TRACK.r,
+                               Theme::DeckBuilding::SCROLLBAR_TRACK.g,
+                               Theme::DeckBuilding::SCROLLBAR_TRACK.b,
+                               Theme::DeckBuilding::SCROLLBAR_TRACK.a);
+        SDL_RenderFillRect(renderer, &trackRect);
+
+        const int thumbHeight = std::max(
+            Theme::DeckBuilding::SCROLLBAR_THUMB_MIN_H,
+            (trackRect.h * trackRect.h) / (trackRect.h + layout.maxDeckScrollOffset)
+        );
+        const int maxThumbTravel = std::max(0, trackRect.h - thumbHeight);
+        const int thumbY = trackRect.y +
+            (layout.maxDeckScrollOffset > 0
+                ? (deckBuilding.deckScrollOffset * maxThumbTravel) / layout.maxDeckScrollOffset
+                : 0);
+        const SDL_Rect thumbRect{trackRect.x, thumbY, trackRect.w, thumbHeight};
+        SDL_SetRenderDrawColor(renderer,
+                               Theme::DeckBuilding::SCROLLBAR_THUMB.r,
+                               Theme::DeckBuilding::SCROLLBAR_THUMB.g,
+                               Theme::DeckBuilding::SCROLLBAR_THUMB.b,
+                               Theme::DeckBuilding::SCROLLBAR_THUMB.a);
+        SDL_RenderFillRect(renderer, &thumbRect);
+        SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
     }
 
     if (deckBuilding.dragging && deckBuilding.draggedCardIndex >= 0 && deckBuilding.draggedCardIndex < static_cast<int>(deckBuilding.availableCards.size())) {
@@ -241,7 +289,8 @@ void RenderDeckBuilding::render(DeckBuilding& deckBuilding, Game& game) {
 
         if (newHoverIndex == static_cast<std::size_t>(-1)) {
             for (std::size_t i = 0; i < layout.deckEntryRects.size(); ++i) {
-                if (SDL_PointInRect(&mousePoint, &layout.deckEntryRects[i]) == SDL_TRUE) {
+                if (SDL_PointInRect(&mousePoint, &layout.deckEntriesClipRect) == SDL_TRUE &&
+                    SDL_PointInRect(&mousePoint, &layout.deckEntryRects[i]) == SDL_TRUE) {
                     newHoverIndex = static_cast<std::size_t>(layout.deckEntryCardIndices[i]);
                     break;
                 }

@@ -7,6 +7,8 @@
 #include <string>
 #include <vector>
 
+#include "render/Theme.hpp"
+
 class Game;
 class RenderDeckBuilding;
 class Card;
@@ -35,6 +37,7 @@ private:
 		SDL_Rect prevPageButton{};
 		SDL_Rect nextPageButton{};
 		SDL_Rect pageLabelRect{};
+		SDL_Rect deckEntriesClipRect{};
 		std::vector<SDL_Rect> collectionCardRects;
 		std::vector<int> collectionCardIndices;
 		std::vector<SDL_Rect> deckEntryRects;
@@ -42,6 +45,7 @@ private:
 		int maxSlots{0};
 		int pageCount{1};
 		int pageIndex{0};
+		int maxDeckScrollOffset{0};
 	};
 
 	Layout buildLayout(const Game& game) const;
@@ -49,9 +53,24 @@ private:
 	std::vector<int> getDeckEntryOrder() const;
 	void setStatusMessage(const std::string& message, Uint32 durationMs);
 
-	SDL_Rect TitleButton{20, 20, 140, 50};
-	SDL_Rect SaveButton{20, 80, 140, 50};
-	SDL_Rect PlayButton{20, 140, 140, 50};
+	SDL_Rect TitleButton{
+		Theme::DeckBuilding::MENU_BUTTON_INITIAL_X,
+		Theme::DeckBuilding::MENU_BUTTON_INITIAL_Y,
+		Theme::DeckBuilding::MENU_BUTTON_WIDTH,
+		Theme::DeckBuilding::MENU_BUTTON_HEIGHT
+	};
+	SDL_Rect SaveButton{
+		Theme::DeckBuilding::MENU_BUTTON_INITIAL_X,
+		Theme::DeckBuilding::MENU_BUTTON_INITIAL_Y,
+		Theme::DeckBuilding::MENU_BUTTON_WIDTH,
+		Theme::DeckBuilding::MENU_BUTTON_HEIGHT
+	};
+	SDL_Rect PlayButton{
+		Theme::DeckBuilding::MENU_BUTTON_INITIAL_X,
+		Theme::DeckBuilding::MENU_BUTTON_INITIAL_Y,
+		Theme::DeckBuilding::MENU_BUTTON_WIDTH,
+		Theme::DeckBuilding::MENU_BUTTON_HEIGHT
+	};
 	std::vector<std::unique_ptr<Card>> availableCards; //stores card templates owned by the user
 	std::vector<int> deckCopies; //st
 	std::vector<int> inventoryCopies;
@@ -68,6 +87,8 @@ private:
 	int collectionPage{0};
 	std::string statusMessage{};
 	Uint32 statusMessageUntil{0};
+
+	int deckScrollOffset = 0;
 };
 
 #endif
