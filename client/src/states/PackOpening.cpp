@@ -18,6 +18,7 @@
 #include <SDL2/SDL_ttf.h>
 #include <algorithm>
 #include <cstdlib>
+#include <cmath>
 #include <random>
 #include <sstream>
 #include <unordered_map>
@@ -47,6 +48,7 @@ void PackOpening::enter(Game& game) {
     statusMessage.clear();
     lastOpenedCards.clear();
     lastRefundCoins = 0;
+    hoveredOpenedCard = -1;
 
     if (!loadAvailableCards(game)) {
         statusMessage = "Failed to load card list.";
@@ -84,6 +86,45 @@ void PackOpening::handleEvents(Game& game, const SDL_Event& event) {
         openHovered = (x >= openPackButton.x && x <= openPackButton.x + openPackButton.w &&
                        y >= openPackButton.y && y <= openPackButton.y + openPackButton.h &&
                        canOpenPack);
+
+        hoveredOpenedCard = -1;
+        if (!lastOpenedCards.empty()) {
+            int screenW = Theme::SCREEN_DEFAULT_WIDTH;
+            int screenH = Theme::SCREEN_DEFAULT_HEIGHT;
+            if (SDL_Renderer* renderer = game.getRenderer()) {
+                SDL_GetRendererOutputSize(renderer, &screenW, &screenH);
+            }
+
+            const int sidePad = Theme::PackOpening::CARD_SIDE_PADDING;
+            const int cardGap = Theme::PackOpening::CARD_GAP;
+            const int usableW  = screenW - 2 * sidePad;
+            const int cardW    = (usableW - (PackSize - 1) * cardGap) / PackSize;
+            const int cardH    = cardW * 3 / 2;
+            const int totalW   = PackSize * cardW + (PackSize - 1) * cardGap;
+            const int startX   = (screenW - totalW) / 2;
+
+            const int badgeH    = Theme::PackOpening::CARD_BADGE_HEIGHT;
+            const int summaryH  = Theme::PackOpening::SUMMARY_HEIGHT;
+            const int summaryGap = Theme::PackOpening::SUMMARY_GAP;
+            const int groupH    = summaryH + summaryGap + cardH + Theme::PackOpening::SUMMARY_CARD_GAP + badgeH;
+            const int headerY = Theme::PackOpening::HEADER_Y;
+            const int topClear    = headerY + Theme::PackOpening::HEADER_CLEARANCE;
+            const int bottomClear = backButton.y;
+            const int groupY      = topClear + std::max(0, (bottomClear - topClear - groupH) / 2);
+            const int cardY = groupY + summaryH + summaryGap;
+
+            for (int i = 0; i < static_cast<int>(lastOpenedCards.size()); ++i) {
+                if (i >= revealedCount) {
+                    break;
+                }
+
+                const SDL_Rect cardRect{startX + i * (cardW + cardGap), cardY, cardW, cardH};
+                if (x >= cardRect.x && x <= cardRect.x + cardRect.w && y >= cardRect.y && y <= cardRect.y + cardRect.h) {
+                    hoveredOpenedCard = i;
+                    break;
+                }
+            }
+        }
     }
 
     if (event.type == SDL_MOUSEBUTTONDOWN && event.button.button == SDL_BUTTON_LEFT) {
@@ -135,7 +176,7 @@ void PackOpening::render(Game& game) {
     SDL_RenderClear(renderer);
 
     // ── Top strip: title (centred) + coins (top-right), same baseline ───────
-    const int headerY = 14;
+    const int headerY = Theme::PackOpening::HEADER_Y;
     {
         int titleW = 0, titleH = 0;
         RenderText::measureText(titleFonts.large, "Pack Opening", titleW, titleH);
@@ -177,8 +218,8 @@ void PackOpening::render(Game& game) {
     }
 
     // ── Dynamic card sizing (fit all 5 cards on screen) ──────────────────────
-    const int sidePad = 24;
-    const int cardGap = 10;
+    const int sidePad = Theme::PackOpening::CARD_SIDE_PADDING;
+    const int cardGap = Theme::PackOpening::CARD_GAP;
     const int usableW  = screenW - 2 * sidePad;
     const int cardW    = (usableW - (PackSize - 1) * cardGap) / PackSize;
     const int cardH    = cardW * 3 / 2;
@@ -186,13 +227,13 @@ void PackOpening::render(Game& game) {
     const int startX   = (screenW - totalW) / 2;
 
     // ── Layout: summary panel above cards ────────────────────────────────────
-    const int badgeH    = 26;
-    const int summaryH  = 42;
-    const int summaryGap = 10;
-    const int groupH    = summaryH + summaryGap + cardH + 4 + badgeH;
+    const int badgeH    = Theme::PackOpening::CARD_BADGE_HEIGHT;
+    const int summaryH  = Theme::PackOpening::SUMMARY_HEIGHT;
+    const int summaryGap = Theme::PackOpening::SUMMARY_GAP;
+    const int groupH    = summaryH + summaryGap + cardH + Theme::PackOpening::SUMMARY_CARD_GAP + badgeH;
 
     // Vertically centre the group between header strip and buttons
-    const int topClear    = headerY + 44;   // a bit below the title row
+    const int topClear    = headerY + Theme::PackOpening::HEADER_CLEARANCE;   // a bit below the title row
     const int bottomClear = backButton.y;   // top of buttons
     const int groupY      = topClear + std::max(0, (bottomClear - topClear - groupH) / 2);
 
@@ -220,9 +261,9 @@ void PackOpening::render(Game& game) {
 
         // ── Qty chip (top-right corner of card) ──────────────────────────────
         const std::string qtyStr = std::to_string(result.resultingCopies) + "/" + std::to_string(MaxCardCopies);
-        const int chipW = 34;
-        const int chipH = 18;
-        SDL_Rect chip{cardRect.x + cardRect.w - chipW - 2, cardRect.y + 2, chipW, chipH};
+        const int chipW = Theme::PackOpening::QTY_CHIP_WIDTH;
+        const int chipH = Theme::PackOpening::QTY_CHIP_HEIGHT;
+        SDL_Rect chip{cardRect.x + cardRect.w - chipW - Theme::PackOpening::QTY_CHIP_MARGIN, cardRect.y + Theme::PackOpening::QTY_CHIP_MARGIN, chipW, chipH};
         SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
         SDL_SetRenderDrawColor(renderer, Theme::PackOpening::QTY_CHIP_BG.r,
                                Theme::PackOpening::QTY_CHIP_BG.g,
@@ -238,7 +279,7 @@ void PackOpening::render(Game& game) {
         const std::string badgeLabel = result.refunded
             ? ("DUPE  +" + std::to_string(RefundCoinsPerExtra) + "c")
             : "NEW!";
-        SDL_Rect badge{cardRect.x, cardRect.y + cardRect.h + 4, cardRect.w, badgeH};
+        SDL_Rect badge{cardRect.x, cardRect.y + cardRect.h + Theme::PackOpening::SUMMARY_CARD_GAP, cardRect.w, badgeH};
         SDL_SetRenderDrawColor(renderer, badgeFill.r, badgeFill.g, badgeFill.b, 255);
         SDL_RenderFillRect(renderer, &badge);
         drawCenteredText(renderer, badgeLabel, uiFonts.small, Theme::PackOpening::BADGE_TEXT, badge);
@@ -260,6 +301,45 @@ void PackOpening::render(Game& game) {
         SDL_RenderDrawRect(renderer, &panel);
         drawCenteredText(renderer, statusMessage, uiFonts.large, Theme::BANNER_BORDER, panel);
     }
+
+    if (hoveredOpenedCard >= 0 && hoveredOpenedCard < revealedCount && hoveredOpenedCard < static_cast<int>(lastOpenedCards.size())) {
+        const OpenedCardResult& hoveredResult = lastOpenedCards[hoveredOpenedCard];
+        if (hoveredResult.cardIndex >= 0 && hoveredResult.cardIndex < static_cast<int>(availableCards.size())) {
+            const std::unique_ptr<Card>& hoveredCard = availableCards[hoveredResult.cardIndex];
+            if (hoveredCard) {
+                const SDL_Rect hoveredRect{
+                    startX + hoveredOpenedCard * (cardW + cardGap),
+                    cardY,
+                    cardW,
+                    cardH
+                };
+
+                int previewW = static_cast<int>(std::round(cardW * Theme::PackOpening::HOVER_PREVIEW_SCALE));
+                const int maxPreviewW = screenW - (Theme::PackOpening::PREVIEW_MARGIN * 2);
+                previewW = std::min(previewW, maxPreviewW);
+                const int previewH = static_cast<int>(std::round(previewW * Theme::PackOpening::PREVIEW_ASPECT_RATIO));
+
+                int previewX = hoveredRect.x + (hoveredRect.w - previewW) / 2;
+                int previewY = hoveredRect.y + (hoveredRect.h - previewH) / 2;
+
+                if (previewX < Theme::PackOpening::PREVIEW_MARGIN) {
+                    previewX = Theme::PackOpening::PREVIEW_MARGIN;
+                }
+                if (previewX + previewW > screenW - Theme::PackOpening::PREVIEW_MARGIN) {
+                    previewX = screenW - Theme::PackOpening::PREVIEW_MARGIN - previewW;
+                }
+                if (previewY < Theme::PackOpening::PREVIEW_MARGIN) {
+                    previewY = Theme::PackOpening::PREVIEW_MARGIN;
+                }
+                if (previewY + previewH > screenH - Theme::PackOpening::PREVIEW_MARGIN) {
+                    previewY = screenH - Theme::PackOpening::PREVIEW_MARGIN - previewH;
+                }
+
+                const SDL_Rect previewRect{previewX, previewY, previewW, previewH};
+                RenderCard::drawPreview(renderer, textRenderer, *hoveredCard, previewRect, uiFonts.large, titleFonts.medium);
+            }
+        }
+    }
 }
 
 void PackOpening::updateLayout(SDL_Renderer* renderer) {
@@ -273,7 +353,7 @@ void PackOpening::updateLayout(SDL_Renderer* renderer) {
     const int groupW = backButton.w + gap + openPackButton.w;
     const int maxButtonH = std::max(backButton.h, openPackButton.h);
     const int startX = (screenW - groupW) / 2;
-    const int y = screenH - maxButtonH - 24;
+    const int y = screenH - maxButtonH - Theme::PackOpening::BUTTON_BOTTOM_MARGIN;
 
     backButton.x = startX;
     backButton.y = y;
@@ -364,6 +444,7 @@ void PackOpening::openPack(Game& game) {
     lastRefundCoins = refundCoins;
     revealedCount = 0;
     revealStartTick = SDL_GetTicks();
+    hoveredOpenedCard = -1;
 
     int cardsAdded = 0;
     for (const auto& pair : deltaByCardId) {

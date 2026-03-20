@@ -104,10 +104,53 @@ void RenderPlaying::render(Playing& playing, const Game& game) {
 	}
 
 	constexpr Uint32 hoverDelayMs = Theme::Playing::HOVER_PREVIEW_DELAY_MS;
-	const bool showPreview =
+	const bool showHandPreview =
 		(playing.hoverIndex != static_cast<std::size_t>(-1) &&
 		 playing.hoverIndex < playing.localPlayer.hand.size() &&
 		 now - playing.hoverStartTick >= hoverDelayMs) || playing.previewLocked;
+
+	int hoveredBoardLane = -1;
+	int hoveredBoardIndex = -1;
+	if (!draggingCard && newHoverIndex == static_cast<std::size_t>(-1)) {
+		for (std::size_t slot = 0; slot < playing.playSlots.size(); ++slot) {
+			if (!RenderUtil::pointInRect(playing.playSlots[slot], mouseX, mouseY)) {
+				continue;
+			}
+
+			const auto& localZone = playing.board.getZone(static_cast<int>(slot), 0);
+			if (localZone.has_value() && localZone.value()) {
+				hoveredBoardLane = static_cast<int>(slot);
+				hoveredBoardIndex = 0;
+			}
+			break;
+		}
+
+		if (hoveredBoardLane < 0) {
+			for (std::size_t slot = 0; slot < playing.opponentSlots.size(); ++slot) {
+				if (!RenderUtil::pointInRect(playing.opponentSlots[slot], mouseX, mouseY)) {
+					continue;
+				}
+
+				const auto& oppZone = playing.board.getZone(static_cast<int>(slot), 1);
+				if (oppZone.has_value() && oppZone.value()) {
+					hoveredBoardLane = static_cast<int>(slot);
+					hoveredBoardIndex = 1;
+				}
+				break;
+			}
+		}
+	}
+
+	if (hoveredBoardLane != playing.boardHoverLane || hoveredBoardIndex != playing.boardHoverIndex) {
+		playing.boardHoverLane = hoveredBoardLane;
+		playing.boardHoverIndex = hoveredBoardIndex;
+		playing.boardHoverStartTick = now;
+	}
+
+	const bool showBoardPreview =
+		playing.boardHoverLane >= 0 &&
+		playing.boardHoverIndex >= 0 &&
+		now - playing.boardHoverStartTick >= hoverDelayMs;
 
 	// ── draw zones ───────────────────────────────────────────────────
 	RenderBoard::drawOpponentPlayZones(renderer, textRenderer, playing.opponentSlots, uiFonts.small);
@@ -349,18 +392,53 @@ void RenderPlaying::render(Playing& playing, const Game& game) {
 		                         floating, uiFonts.tiny, uiFonts.small);
 	}
 
-	// ── card preview (left docked, non-blocking) ─────────────────────
-	if (showPreview && playing.hoverIndex < playing.localPlayer.hand.size() && !playing.pauseModalOpen && !playing.exitModalOpen) {
-		if (const auto& cardPtr = playing.localPlayer.hand[playing.hoverIndex]) {
-			const int previewW = std::min(Theme::Playing::PREVIEW_MAX_WIDTH, screenW - Theme::Playing::PREVIEW_MARGIN * 2);
-			const int previewH = static_cast<int>(previewW * 1.5f);
+	// ── side preview (left docked, non-blocking) ─────────────────────
+	if (!playing.pauseModalOpen && !playing.exitModalOpen) {
+		const Card* previewCard = nullptr;
+
+		if (const Card* pendingSpell = playing.findPendingActionCard()) {
+			previewCard = pendingSpell;
+		} else if (playing.recentSpellPreview && now < playing.recentSpellPreviewUntil) {
+			previewCard = playing.recentSpellPreview.get();
+		} else if (showHandPreview && playing.hoverIndex < playing.localPlayer.hand.size()) {
+			if (const auto& cardPtr = playing.localPlayer.hand[playing.hoverIndex]) {
+				previewCard = cardPtr.get();
+			}
+		} else if (showBoardPreview) {
+			const auto& boardZone = playing.board.getZone(playing.boardHoverLane, playing.boardHoverIndex);
+			if (boardZone.has_value() && boardZone.value()) {
+				previewCard = boardZone.value().get();
+			}
+		}
+
+		if (previewCard) {
+			int maxPreviewW = Theme::Playing::SIDE_PREVIEW_MAX_WIDTH;
+			if (!playing.playSlots.empty()) {
+				maxPreviewW = std::min(maxPreviewW, playing.playSlots.front().x - Theme::Playing::PREVIEW_MARGIN * 2);
+			}
+			if (!playing.opponentSlots.empty()) {
+				maxPreviewW = std::min(maxPreviewW, playing.opponentSlots.front().x - Theme::Playing::PREVIEW_MARGIN * 2);
+			}
+			maxPreviewW = std::max(Theme::Playing::PREVIEW_MIN_WIDTH, maxPreviewW);
+
+			const int previewW = std::min(maxPreviewW, screenW - Theme::Playing::PREVIEW_MARGIN * 2);
+			const int previewH = static_cast<int>(previewW * Theme::Playing::PREVIEW_ASPECT_RATIO);
 			const int previewX = Theme::Playing::PREVIEW_MARGIN;
-			const int previewY = std::max(Theme::Playing::PREVIEW_MARGIN, (screenH - previewH) / 2);
+			int previewY = Theme::Playing::PREVIEW_MARGIN + Theme::Playing::OPPONENT_BAR_HEIGHT + Theme::Playing::SIDE_PREVIEW_TOP_OFFSET;
+			if (previewY + previewH > screenH - Theme::Playing::PREVIEW_MARGIN) {
+				previewY = screenH - previewH - Theme::Playing::PREVIEW_MARGIN;
+			}
 
 			SDL_Rect panel{previewX, previewY, previewW, previewH};
-			
-			RenderCard::drawPreview(renderer, textRenderer, *cardPtr, panel, 
-			                        uiFonts.large, titleFonts.medium, playing.previewScrollOffset);
+			RenderCard::drawPreview(
+				renderer,
+				textRenderer,
+				*previewCard,
+				panel,
+				uiFonts.large,
+				titleFonts.medium,
+				playing.previewScrollOffset
+			);
 		}
 	}
 

@@ -20,6 +20,19 @@ int CreatureCard::getToughness() const { return toughness; }
 int CreatureCard::getBasePower() const { return basePower; }
 int CreatureCard::getBaseToughness() const { return baseToughness; }
 
+std::string CreatureCard::getText() const {
+    std::string fullText = text;
+    if (hasGrantedEffects()) {
+        for (const std::string& effect : grantedEffects) {
+            if (!fullText.empty() && fullText.back() != '\n') {
+                fullText += "\n";
+            }
+            fullText += effect;
+        }
+    }
+    return fullText;
+}
+
 void CreatureCard::drawExtraInfo() const {
     std::cout << "  " << power << "/" << toughness << "\n";
 }

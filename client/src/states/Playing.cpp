@@ -39,6 +39,26 @@ std::string effectBitToLabel(int effectBit) {
 
 }
 
+const Card* Playing::findPendingActionCard() const {
+    if (!pendingAction.active) {
+        return nullptr;
+    }
+
+    auto cardIt = std::find_if(
+        localPlayer.hand.begin(),
+        localPlayer.hand.end(),
+        [&](const std::unique_ptr<Card>& card) {
+            return card && card->getId() == pendingAction.cardId;
+        }
+    );
+
+    if (cardIt == localPlayer.hand.end() || !*cardIt) {
+        return nullptr;
+    }
+
+    return cardIt->get();
+}
+
 bool Playing::resolvePendingActionAt(int x, int y) {
     if (!pendingAction.active)
         return false;
@@ -197,6 +217,9 @@ void Playing::setup(const Game& game) {
     drag = DragState{};
     hoverIndex = static_cast<std::size_t>(-1);
     hoverStartTick = 0;
+    boardHoverLane = -1;
+    boardHoverIndex = -1;
+    boardHoverStartTick = 0;
     menuOpen = false;
     pauseModalOpen = false;
     exitModalOpen = false;
@@ -204,6 +227,8 @@ void Playing::setup(const Game& game) {
     animationQueue.clear();
     pendingDestroys.clear();
     pendingAction.clear();
+    recentSpellPreview.reset();
+    recentSpellPreviewUntil = 0;
     running = true;
     lastDrawTick = SDL_GetTicks();
     combatCycleStartTick = lastDrawTick;
@@ -569,6 +594,11 @@ void Playing::update(Game& game) {
         now - hoverStartTick >= hoverDelayMs;
 
     previewLocked = false;
+
+    if (recentSpellPreviewUntil != 0 && now >= recentSpellPreviewUntil) {
+        recentSpellPreview.reset();
+        recentSpellPreviewUntil = 0;
+    }
 }
 
 //need to refactor into command map at some point. Current method is repetitive
@@ -746,6 +776,9 @@ void Playing::playSpell(int playerId, std::unique_ptr<Card> card, int sourceLane
 
     if (card->getType() != CardType::Spell) return;
     // std::cout<< "[Playing] Casting from playSpell!\n";
+
+    recentSpellPreview = card->clone();
+    recentSpellPreviewUntil = SDL_GetTicks() + Theme::Playing::SPELL_CAST_PREVIEW_DURATION_MS;
 
     std::string name = card->getName();
     player.mana -= card->getManaCost();

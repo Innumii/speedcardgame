@@ -95,7 +95,12 @@ namespace Theme {
 
         constexpr Uint32 HOVER_PREVIEW_DELAY_MS        = 1000;
         constexpr int PREVIEW_MAX_WIDTH                = 320;
+        constexpr int PREVIEW_MIN_WIDTH                = 180;
+        constexpr float PREVIEW_ASPECT_RATIO           = 1.5f;
         constexpr int PREVIEW_MARGIN                   = 20;
+        constexpr int SIDE_PREVIEW_MAX_WIDTH           = 260;
+        constexpr int SIDE_PREVIEW_TOP_OFFSET          = 8;
+        constexpr Uint32 SPELL_CAST_PREVIEW_DURATION_MS = 2000;
         constexpr int OVERLAY_MARGIN                   = 20;
 
         constexpr int OPPONENT_BAR_WIDTH               = 480;
@@ -436,6 +441,24 @@ namespace Theme {
         constexpr int OPEN_BUTTON_INITIAL_Y           = 20;
         constexpr int OPEN_BUTTON_WIDTH               = 220;
         constexpr int OPEN_BUTTON_HEIGHT              = 56;
+
+        constexpr int HEADER_Y                        = 14;
+        constexpr int HEADER_CLEARANCE                = 44;
+        constexpr int CARD_SIDE_PADDING               = 24;
+        constexpr int CARD_GAP                        = 10;
+        constexpr int CARD_BADGE_HEIGHT               = 26;
+        constexpr int SUMMARY_HEIGHT                  = 42;
+        constexpr int SUMMARY_GAP                     = 10;
+        constexpr int SUMMARY_CARD_GAP                = 4;
+        constexpr int BUTTON_BOTTOM_MARGIN            = 24;
+        constexpr int PREVIEW_MARGIN                  = 20;
+        constexpr int PREVIEW_TOP                     = 60;
+        constexpr int PREVIEW_WIDTH_RATIO_DIV         = 3;
+        constexpr float PREVIEW_ASPECT_RATIO          = 1.5f;
+        constexpr float HOVER_PREVIEW_SCALE           = 1.2f;
+        constexpr int QTY_CHIP_WIDTH                  = 34;
+        constexpr int QTY_CHIP_HEIGHT                 = 18;
+        constexpr int QTY_CHIP_MARGIN                 = 2;
     }
 
     namespace Title {

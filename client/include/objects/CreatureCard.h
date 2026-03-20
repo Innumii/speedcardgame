@@ -25,6 +25,7 @@ public:
     int getToughness() const;
     int getBasePower() const;
     int getBaseToughness() const;
+    std::string getText() const override;
     
     void augmentStats(int powerDelta, int toughnessDelta);
     void drawExtraInfo() const override;
