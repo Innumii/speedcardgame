@@ -22,7 +22,7 @@
             - 200 + lane index for opponent's creatures
         - For player targets: -1 for local player, -2 for opponent player
 */
-std::vector<int> getValidTargets(const Playing& playing, const Card& card, int sourceLane) {
+std::optional<std::vector<int>> getValidTargets(const Playing& playing, const Card& card, int sourceLane) {
     (void)sourceLane;
 
     std::vector<int> validTargets;
@@ -51,6 +51,7 @@ std::vector<int> getValidTargets(const Playing& playing, const Card& card, int s
     bool canTargetOpponentCreatures = cardText.find("target creature an opponent controls") != std::string::npos;
     bool canTargetSelfCreatures = cardText.find("target creature you control") != std::string::npos;
     bool canTargetHand = cardText.find("target card in opponent's hand") != std::string::npos;
+    bool hasTargeting = canTargetAll || canTargetCreatures || canTargetHand || canTargetOpponentCreatures || canTargetPlayers || canTargetSelfCreatures;
 
     if (isAllOpponent) {
         validTargets.push_back(903);
@@ -63,6 +64,10 @@ std::vector<int> getValidTargets(const Playing& playing, const Card& card, int s
         return validTargets;    
     }
 
+    if (!hasTargeting) {
+        return std::nullopt;
+    }
+    
     // Check hand targets
     if (canTargetHand) {
         int opponentHandSize = static_cast<int>(playing.remotePlayer.hand.size());

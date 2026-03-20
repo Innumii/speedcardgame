@@ -20,12 +20,12 @@ class Card;
 class RenderTargeting;
 class Playing;
 
-std::vector<int> getValidTargets(const Playing& playing, const Card& card, int sourceLane);
+std::optional<std::vector<int>> getValidTargets(const Playing& playing, const Card& card, int sourceLane);
 enum class PlayingGameState {Playing, Won, Lost};
 class Playing {
     friend class RenderPlaying;
     friend class RenderTargeting;
-    friend std::vector<int> getValidTargets(const Playing& playing, const Card& card, int sourceLane);
+    friend std::optional<std::vector<int>> getValidTargets(const Playing& playing, const Card& card, int sourceLane);
 
 public:
     explicit Playing(int drawIntervalSeconds = 3);

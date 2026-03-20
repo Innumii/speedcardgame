@@ -98,7 +98,12 @@ void RenderTargeting::drawPendingTargeting(SDL_Renderer* renderer, RenderText& t
         }
     }
 
-    std::vector<int> validTargets = getValidTargets(playing, **cardIt, playing.pendingAction.sourceLane);
+    auto validTargetsOpt = getValidTargets(playing, **cardIt, playing.pendingAction.sourceLane);
+    if (!validTargetsOpt.has_value()) {
+        return;
+    }
+
+    const std::vector<int>& validTargets = *validTargetsOpt;
     for (int target : validTargets) {
         if (target >= 0 && target < static_cast<int>(opponentHandRects.size())) {
             // Highlight opponent hand cards

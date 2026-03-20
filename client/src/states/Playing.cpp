@@ -42,7 +42,11 @@ bool Playing::resolvePendingActionAt(int x, int y) {
         return false;
     }
 
-    const std::vector<int> validTargets = getValidTargets(*this, **cardIt, pendingAction.sourceLane);
+    auto validTargetsOpt = getValidTargets(*this, **cardIt, pendingAction.sourceLane);
+    if (!validTargetsOpt.has_value()) {
+        return false;
+    }
+    const std::vector<int>& validTargets = *validTargetsOpt;
 
     int targetLane = -1;
     int targetIndex = -1;
@@ -410,35 +414,46 @@ void Playing::handleEvents(Game& game, const SDL_Event& event) {
                     } else if (card->getType() == CardType::Spell) {
                         if (localPlayer.mana >= card->getManaCost()) {
 
-                            auto validTargets = getValidTargets(*this, *card, pendingAction.sourceLane);
-                            if (!validTargets.empty()) {
-                                int allTarget = 0;
-                                switch (validTargets[0]) {
-                                    case 901: // All cards on board
-                                        allTarget = -1;
-                                        break;
-                                    case 902: // All your cards
-                                        allTarget = -2;
-                                        break;
-                                    case 903: // All opponent cards
-                                        allTarget = -3;
-                                        break;
-                                    default:
-                                        break;
-                                }
-                                if (allTarget != 0) {
-                                    authority->playCard(
+                            auto validTargetsOpt = getValidTargets(*this, *card, pendingAction.sourceLane);
+                            if (!validTargetsOpt.has_value()) {
+                                authority->playCard(
                                         card->getId(),
                                         laneIndex,
                                         -1, // no target lane
-                                        allTarget  // no target player
+                                        -1  // no target player
                                     );
-                                } else {
-                                    pendingAction.active = true;
-                                    pendingAction.cardId = card->getId();
-                                    pendingAction.sourceLane = laneIndex;
+                            } else {
+                                const std::vector<int>& validTargets = *validTargetsOpt;
+                                if (!validTargets.empty()) {
+                                    int allTarget = 0;
+                                    switch (validTargets[0]) {
+                                        case 901: // All cards on board
+                                            allTarget = -1;
+                                            break;
+                                        case 902: // All your cards
+                                            allTarget = -2;
+                                            break;
+                                        case 903: // All opponent cards
+                                            allTarget = -3;
+                                            break;
+                                        default:
+                                            break;
+                                    }
+                                    if (allTarget != 0) {
+                                        authority->playCard(
+                                            card->getId(),
+                                            laneIndex,
+                                            -1, // no target lane
+                                            allTarget  // no target player
+                                        );
+                                    } else {
+                                        pendingAction.active = true;
+                                        pendingAction.cardId = card->getId();
+                                        pendingAction.sourceLane = laneIndex;
+                                    }
                                 }
-                            } 
+                            }
+                             
                         }
                     }
                 }
