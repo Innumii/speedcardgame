@@ -85,8 +85,8 @@ const std::unordered_map<int, std::vector<CardEffectEntry>> TriggerEffects::card
     {17, { CardEffectEntry{0, std::nullopt, std::make_pair(-1,-1)}}}, //done
         {18, {}}, //Trample
     {20, { CardEffectEntry{0, std::nullopt, std::make_pair(0,3)} }}, //done
-    {23, { CardEffectEntry{3, -5, std::nullopt}, 
-           CardEffectEntry{5, 5, std::nullopt} }}, //done
+        {23, { CardEffectEntry{3, -5, std::nullopt}, 
+            CardEffectEntry{5, 5, std::nullopt} }}, //mana augment doesnt work
         {25, {}}, // Conditional splash HP augment
     {26, {CardEffectEntry{2, std::nullopt, std::make_pair(2,2)}}}, //done
     {29, { CardEffectEntry{6, 10, std::nullopt}}} // Deal difference as damage
