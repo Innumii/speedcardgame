@@ -131,14 +131,14 @@ bool Playing::resolvePendingActionAt(int x, int y) {
         targetLane = clickedTarget - 200;
         targetIndex = 1;
     } else if (clickedTarget == -1) {
-        targetLane = pendingAction.sourceLane;
+        targetLane = -1;
         targetIndex = 0;
     } else if (clickedTarget == -2) {
-        targetLane = pendingAction.sourceLane;
+        targetLane = -1;
         targetIndex = 1;
     }
 
-    if (targetLane >= 0 && targetIndex >= 0) {
+    if (targetIndex >= 0) {
         std::cout<< "[Playing] Casting at targetIndex: " + std::to_string(targetIndex) + "\n";
         std::cout<< "[Playing] Casting at targetLane: " + std::to_string(targetLane) + "\n";
 
@@ -702,6 +702,7 @@ void Playing::playSpell(int playerId, std::unique_ptr<Card> card, int sourceLane
     std::cout << "[Playing] Casted " << name
               << " by player " << playerId 
               << " at lane " << sourceLane 
+              << " targeting lane " << (targetLane.has_value() ? std::to_string(targetLane.value()) : "N/A")
               << " on " << side << "\n";
 }
 
