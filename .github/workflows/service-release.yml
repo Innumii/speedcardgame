@@ -5,7 +5,11 @@ on:
   push:
     branches:
       - main
-    workflow_dispatch:
+    paths:
+      - 'auth/**'
+      - 'cards/**'
+      - 'server/**'
+      - '.github/workflows/service-release.yml'
 
 jobs:
   build-and-push:

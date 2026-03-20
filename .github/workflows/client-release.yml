@@ -31,6 +31,14 @@ jobs:
             mingw-w64-x86_64-SDL2_image
             mingw-w64-x86_64-openssl
 
+      - name: Set USE_AWS_SERVICES to true in .env
+        shell: msys2 {0}
+        run: |
+          cd client/env
+          if [ -f .env ]; then
+            sed -i 's/^USE_AWS_SERVICES=.*/USE_AWS_SERVICES=true/' .env
+          fi
+
       - name: Build client
         shell: msys2 {0}
         run: |
@@ -84,6 +92,13 @@ jobs:
       - name: Install dependencies
         run: |
           brew install sdl2 sdl2_ttf sdl2_image openssl@3 pkg-config
+
+      - name: Set USE_AWS_SERVICES to true in .env
+        run: |
+          cd client/env
+          if [ -f .env ]; then
+            sed -i 's/^USE_AWS_SERVICES=.*/USE_AWS_SERVICES=true/' .env
+          fi
 
       - name: Build client
         run: |
