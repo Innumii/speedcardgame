@@ -1,12 +1,18 @@
 name: golangci-lint
 on:
   push:
-    branches: [ main, linus/anim ]
+    paths:
+      - 'auth/**'
+      - 'cards/**'
   pull_request:
-    branches: [ main ]
+    paths:
+      - 'auth/**'
+      - 'cards/**'
+
 permissions:
   contents: read
   pull-requests: read
+
 jobs:
   golangci-lint:
     runs-on: ubuntu-latest

@@ -1,11 +1,15 @@
 name: client-lint
 on:
   push:
-    branches: [ main, linus/anim, ryan/matchmake ]
+    paths:
+      - 'client/**'
   pull_request:
-    branches: [ main ]
+    paths:
+      - 'client/**'
+
 permissions:
   contents: read
+
 jobs:
   cppcheck:
     runs-on: ubuntu-latest
