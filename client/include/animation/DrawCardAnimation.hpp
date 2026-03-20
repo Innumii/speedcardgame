@@ -26,6 +26,8 @@ public:
 
 	SDL_Rect getCurrentRect() const;
 	std::size_t getHandIndex() const;
+	void updateDestination(SDL_Rect newDest);
+
 };
 
 #endif

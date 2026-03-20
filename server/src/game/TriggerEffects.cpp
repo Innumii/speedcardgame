@@ -108,6 +108,25 @@ const std::vector<EffectFunc> TriggerEffects::effects = {
         int totalAmount = creaturesOwned * (*amount);
         session.augmentHP(index, totalAmount);
     },
+
+    // 11: Final Gambit Unique Effect
+    [](MatchSession& session, int playerIndex, std::optional<int>,
+    std::optional<int> targetIndex, std::optional<int> amount,
+    std::optional<std::pair<int,int>> augment) {
+
+        if (!amount) return;
+        int self = playerIndex;
+        if (targetIndex.has_value() && *targetIndex != -1) {
+            self = *targetIndex;
+        }
+        int opponent = 1 - self;
+        int targetHP = *amount;
+        int delta = session.getPlayerHealth(self) - targetHP;
+        session.setHP(self, targetHP);
+        if (delta != 0) {
+            session.augmentHP(opponent, -delta);
+        }
+    }
 };
 
 EffectFunc TriggerEffects::getEffectById(int effectId) { //returns EffectFunc, but you still have to call it
@@ -182,7 +201,7 @@ const std::unordered_map<int, std::vector<CardEffectEntry>> TriggerEffects::card
     {26, {CardEffectEntry{2, std::nullopt, std::make_pair(2,2)}}}, //done
 
     //Final Gambit
-    {29, { CardEffectEntry{6, 10, std::nullopt, Target::Self}}}, // NOT DONE
+    {29, { CardEffectEntry{11, 10, std::nullopt, Target::Self}}}, // NOT DONE
 
     //Cheese Touch
     {32, { CardEffectEntry{7, CombatEffects::kDeathTouch, std::nullopt} }}

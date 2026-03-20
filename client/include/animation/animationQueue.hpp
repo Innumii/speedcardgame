@@ -5,11 +5,12 @@
 #include "AnimationGroup.hpp"
 #include <SDL2/SDL_stdinc.h>
 #include <memory>
-#include <queue>
+#include <deque>
 #include <vector>
+#include <SDL2/SDL.h>
 
 class AnimationQueue {
-	std::queue<std::shared_ptr<AnimationInterface>> animationQueue;
+	std::deque<std::shared_ptr<AnimationInterface>> animationQueue;
 	std::shared_ptr<AnimationInterface> activeAnimation;
 	Uint32 previousTick{0};
 
@@ -24,6 +25,9 @@ public:
 	bool hasActiveAnimation() const;
 	std::shared_ptr<AnimationInterface> getActiveAnimation();
 	std::shared_ptr<const AnimationInterface> getActiveAnimation() const;
+	bool hasPendingDrawForIndex(std::size_t index) const;
+	void updateDrawDestinations(const std::vector<SDL_Rect>& layout);
+
 };
 
 #endif

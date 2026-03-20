@@ -103,6 +103,8 @@ public:
     int getLaneCount() const;
     int getCreaturesOwned(int playerIndex) const;
     const std::string getUsername(int playerIndex) const;
+    const int getPlayerHealth(int playerIndex) const;
+
 
     //--------------board actions--------------
     //AUGMENT <playerId> <lane> <powerDelta> <toughnessDelta> 
