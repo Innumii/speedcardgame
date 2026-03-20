@@ -49,3 +49,7 @@ SDL_Rect DrawCardAnimation::getCurrentRect() const {
 std::size_t DrawCardAnimation::getHandIndex() const {
     return handIndex;
 }
+
+void DrawCardAnimation::updateDestination(SDL_Rect newDest) { 
+    endRect = newDest; 
+}

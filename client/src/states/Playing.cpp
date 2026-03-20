@@ -265,45 +265,6 @@ SDL_Rect Playing::computeSelfDeckRect(int screenW, int screenH) const {
     );
 }
 
-bool Playing::tryDrawCardWithAnimation(Uint32 now) {
-    if (localPlayer.hand.size() >= Theme::Playing::MAX_HAND_SIZE) {
-        return false;
-    }
-
-    if (deck.size() == 0) {
-        return false;
-    }
-
-    const std::size_t handSizeBefore = localPlayer.hand.size();
-    
-    auto card = deck.draw();
-    if (!card) {
-        return false;
-    }
-    localPlayer.addCardToHand(std::move(card));
-
-    if (localPlayer.hand.size() <= handSizeBefore || !renderer) {
-        return false;
-    }
-
-    int screenW = 0;
-    int screenH = 0;
-    if (SDL_GetRendererOutputSize(renderer, &screenW, &screenH) != 0) {
-        return false;
-    }
-
-    cardRects = computeCardLayout(localPlayer.hand.size(), screenW, screenH);
-    computeZones(screenW, screenH);
-
-    const SDL_Rect fromRect = computeSelfDeckRect(screenW, screenH);
-    const std::size_t handIndex = localPlayer.hand.size() - 1;
-    if (handIndex < cardRects.size()) {
-        animationQueue.enqueue(std::make_shared<DrawCardAnimation>(fromRect, cardRects[handIndex], handIndex, 320U));
-    }
-
-    return true;
-}
-
 // -------------------------
 // Event handling
 // -------------------------
@@ -555,6 +516,8 @@ void Playing::update(Game& game) {
             recvBuffer.erase(0, pos + 1);
             handleServerMessage(line);
         }
+
+        
     }
 
     const Uint32 now = SDL_GetTicks();
@@ -831,6 +794,11 @@ bool Playing::drawCard(int playerId, int cardId) {
     if (playerId == localPlayer.id && handIndex < cardRects.size()) {
         animationQueue.enqueue(std::make_shared<DrawCardAnimation>(fromRect, cardRects[handIndex], handIndex, 320U));
     }
+
+    // Recompute all draw destinations now that hand is fully populated
+    SDL_GetRendererOutputSize(renderer, &screenW, &screenH);
+    auto finalLayout = computeCardLayout(localPlayer.hand.size(), screenW, screenH);
+    animationQueue.updateDrawDestinations(finalLayout);
 
     return true;
 }

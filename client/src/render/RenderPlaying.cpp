@@ -329,7 +329,7 @@ void RenderPlaying::render(Playing& playing, const Game& game) {
 
 	for (std::size_t i = 0; i < playing.localPlayer.hand.size(); ++i) {
 		if (draggingCard && i == playing.drag.index) continue;
-		if (hasActiveDrawCard && i == activeDrawCardIndex) continue;
+		if (playing.animationQueue.hasPendingDrawForIndex(i)) continue;
 		if (i < playing.cardRects.size() && playing.localPlayer.hand[i]) {
 			RenderCard::drawHandCard(renderer, textRenderer, *playing.localPlayer.hand[i], 
 			                         playing.cardRects[i], uiFonts.tiny, uiFonts.small);
@@ -496,9 +496,9 @@ void RenderPlaying::render(Playing& playing, const Game& game) {
 
 		int exitTitleW = 0, exitTitleH = 0;
 		if (titleFonts.large) {
-			TTF_SizeText(titleFonts.large, "Surrender Match?", &exitTitleW, &exitTitleH);
+			TTF_SizeText(titleFonts.large, "Surrender?", &exitTitleW, &exitTitleH);
 		}
-		textRenderer.drawText(renderer, "Surrender Match?", titleFonts.large,
+		textRenderer.drawText(renderer, "Surrender?", titleFonts.large,
 		                      Theme::TEXT_IVORY,
 		                      playing.exitModal.x + (playing.exitModal.w - exitTitleW) / 2,
 		                      playing.exitModal.y + Theme::Playing::EXIT_MODAL_TITLE_TOP);

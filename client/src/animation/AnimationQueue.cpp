@@ -1,4 +1,5 @@
 #include "animation/AnimationQueue.hpp"
+#include "animation/DrawCardAnimation.hpp"
 
 #include <algorithm>
 
@@ -8,7 +9,7 @@ void AnimationQueue::startNextAnimation() {
 	}
 
 	activeAnimation = animationQueue.front();
-	animationQueue.pop();
+	animationQueue.pop_front();
 	if (activeAnimation) {
 		activeAnimation->start();
 	}
@@ -19,7 +20,7 @@ void AnimationQueue::enqueue(std::shared_ptr<AnimationInterface> animation) {
 		return;
 	}
 
-	animationQueue.push(std::move(animation));
+	animationQueue.push_back(std::move(animation));
 }
 
 void AnimationQueue::enqueueGroup(const std::vector<std::shared_ptr<AnimationInterface>>& animations) {
@@ -34,7 +35,7 @@ void AnimationQueue::enqueueGroup(const std::vector<std::shared_ptr<AnimationInt
 }
 void AnimationQueue::clear() {
 	while (!animationQueue.empty()) {
-		animationQueue.pop();
+		animationQueue.pop_front();
 	}
 
 	activeAnimation.reset();
@@ -74,4 +75,25 @@ std::shared_ptr<AnimationInterface> AnimationQueue::getActiveAnimation() {
 
 std::shared_ptr<const AnimationInterface> AnimationQueue::getActiveAnimation() const {
 	return activeAnimation;
+}
+
+bool AnimationQueue::hasPendingDrawForIndex(std::size_t index) const {
+    for (const auto& anim : animationQueue) { // iterate all queued, not just active
+        auto draw = std::dynamic_pointer_cast<const DrawCardAnimation>(anim);
+        if (draw && draw->getHandIndex() == index) return true;
+    }
+    // also check active
+    auto draw = std::dynamic_pointer_cast<const DrawCardAnimation>(activeAnimation);
+    return draw && draw->getHandIndex() == index;
+}
+
+void AnimationQueue::updateDrawDestinations(const std::vector<SDL_Rect>& layout) {
+    for (auto& anim : animationQueue) {
+        auto draw = std::dynamic_pointer_cast<DrawCardAnimation>(anim);
+        if (draw && draw->getHandIndex() < layout.size())
+            draw->updateDestination(layout[draw->getHandIndex()]);
+    }
+    auto draw = std::dynamic_pointer_cast<DrawCardAnimation>(activeAnimation);
+    if (draw && draw->getHandIndex() < layout.size())
+        draw->updateDestination(layout[draw->getHandIndex()]);
 }

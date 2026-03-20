@@ -667,6 +667,11 @@ const std::string MatchSession::getUsername(int playerIndex) const {
     return (playerIndex == 0) ? playerA->getUsername() : playerB->getUsername();
 }
 
+const int MatchSession::getPlayerHealth(int playerIndex) const {
+    return players[playerIndex].health;
+}
+
+
 std::vector<int>::iterator MatchSession::findCardInHand(PlayerState& player, int cardId) {
     return std::find(player.hand.begin(), player.hand.end(), cardId);
 }
