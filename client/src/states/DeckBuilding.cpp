@@ -30,6 +30,12 @@ namespace {
         return SDL_PointInRect(&point, &rect) == SDL_TRUE;
     }
 
+    int clampScrollOffset(int value, int maxValue) {
+        if (value < 0) return 0;
+        if (value > maxValue) return maxValue;
+        return value;
+    }
+
 }
 
 DeckBuilding::DeckBuilding() = default;
@@ -74,6 +80,7 @@ bool DeckBuilding::refreshFromService(Game& game) {
 void DeckBuilding::enter(Game& game) {
     refreshFromService(game);
     collectionPage = 0;
+    deckScrollOffset = 0;
     statusMessage.clear();
     statusMessageUntil = 0;
 }
@@ -87,8 +94,26 @@ void DeckBuilding::handleEvents(Game& game, const SDL_Event& event) {
         game.setNextState(GameState::Title);
     }
 
-    const auto layout = buildLayout(game);
+    auto layout = buildLayout(game);
+    const int previousScrollOffset = deckScrollOffset;
+    deckScrollOffset = clampScrollOffset(deckScrollOffset, layout.maxDeckScrollOffset);
+    if (deckScrollOffset != previousScrollOffset) {
+        layout = buildLayout(game);
+    }
     updateMenuButtons(layout);
+
+    if (event.type == SDL_MOUSEWHEEL) {
+        int mouseX = 0;
+        int mouseY = 0;
+        SDL_GetMouseState(&mouseX, &mouseY);
+        const SDL_Point mousePoint{mouseX, mouseY};
+
+        if (pointInRect(mousePoint, layout.deckArea) && layout.maxDeckScrollOffset > 0) {
+            deckScrollOffset -= event.wheel.y * Theme::DeckBuilding::SCROLL_STEP_PIXELS;
+            deckScrollOffset = clampScrollOffset(deckScrollOffset, layout.maxDeckScrollOffset);
+            return;
+        }
+    }
 
     // Further event handling for deck building would go here
     const bool inTitle = (event.type == SDL_MOUSEBUTTONDOWN) &&
@@ -189,7 +214,7 @@ void DeckBuilding::handleEvents(Game& game, const SDL_Event& event) {
         }
 
         for (std::size_t i = 0; i < layout.deckEntryRects.size(); ++i) {
-            if (pointInRect(point, layout.deckEntryRects[i])) {
+            if (pointInRect(point, layout.deckEntriesClipRect) && pointInRect(point, layout.deckEntryRects[i])) {
                 dragging = true;
                 draggingFromDeck = true;
                 draggedCardIndex = layout.deckEntryCardIndices[i];
@@ -349,10 +374,26 @@ DeckBuilding::Layout DeckBuilding::buildLayout(const Game& game) const {
 
     const int entryHeight = Theme::DeckBuilding::ENTRY_HEIGHT;
     const int entryStartY = layout.deckArea.y + Theme::DeckBuilding::ENTRY_START_Y_PADDING;
+    const int entriesBottom = layout.deckArea.y + layout.deckArea.h - Theme::DeckBuilding::ENTRY_BOTTOM_PADDING;
+    const int clipHeight = std::max(0, entriesBottom - entryStartY);
+    layout.deckEntriesClipRect = SDL_Rect{
+        layout.deckArea.x + Theme::DeckBuilding::ENTRY_X_PADDING,
+        entryStartY,
+        layout.deckArea.w - Theme::DeckBuilding::ENTRY_X_TOTAL_PADDING,
+        clipHeight
+    };
+
+    int contentHeight = 0;
+    if (!deckOrder.empty()) {
+        contentHeight = static_cast<int>(deckOrder.size()) * entryHeight +
+                        static_cast<int>(deckOrder.size() - 1) * Theme::DeckBuilding::ENTRY_SPACING;
+    }
+    layout.maxDeckScrollOffset = std::max(0, contentHeight - layout.deckEntriesClipRect.h);
+
     for (std::size_t i = 0; i < deckOrder.size(); ++i) {
         SDL_Rect entryRect{
             layout.deckArea.x + Theme::DeckBuilding::ENTRY_X_PADDING,
-            entryStartY + static_cast<int>(i) * (entryHeight + Theme::DeckBuilding::ENTRY_SPACING),
+            entryStartY + static_cast<int>(i) * (entryHeight + Theme::DeckBuilding::ENTRY_SPACING) - deckScrollOffset,
             layout.deckArea.w - Theme::DeckBuilding::ENTRY_X_TOTAL_PADDING,
             entryHeight
         };

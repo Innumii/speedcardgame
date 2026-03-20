@@ -69,7 +69,7 @@ bool Deck::loadDeckCopiesFromService(
     const std::string host = EnvUtil::getCardsServiceHost();
     const int port = EnvUtil::getCardsServicePort();
     const std::string path = "/cards/decks";
-    const int userId = EnvUtil::getEnvIntOrDefault("CARDS_SERVICE_UID", game.getPlayerId());
+    const int userId = game.getPlayerId();
 
     int statusCode = -1;
     std::string responseBody;
@@ -161,7 +161,7 @@ bool Deck::saveDeckCopiesToService(
     const std::string host = EnvUtil::getCardsServiceHost();
     const int port = EnvUtil::getCardsServicePort();
     const std::string path = "/cards/decks";
-    const int userId = EnvUtil::getEnvIntOrDefault("CARDS_SERVICE_UID", game.getPlayerId());
+    const int userId = game.getPlayerId();
 
     std::ostringstream payload;
     payload << "{\"uid\":" << userId << ",\"cards\":{";

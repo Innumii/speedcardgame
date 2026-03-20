@@ -309,15 +309,27 @@ namespace Theme {
         constexpr int PAGE_LABEL_RIGHT_GAP             = 16;
         constexpr int ENTRY_HEIGHT                     = 28;
         constexpr int ENTRY_START_Y_PADDING            = 40;
+        constexpr int ENTRY_BOTTOM_PADDING             = 10;
         constexpr int ENTRY_X_PADDING                  = 10;
         constexpr int ENTRY_X_TOTAL_PADDING            = 20;
         constexpr int ENTRY_SPACING                    = 6;
+        constexpr int SCROLL_STEP_PIXELS               = 24;
         constexpr int MENU_BUTTON_GAP                  = 12;
         constexpr int MENU_MIN_LEFT                    = 20;
         constexpr int MENU_TOP_GAP                     = 12;
         constexpr int MENU_MIN_TOP                     = 20;
+        constexpr int MENU_BUTTON_INITIAL_X            = 20;
+        constexpr int MENU_BUTTON_INITIAL_Y            = 20;
+        constexpr int MENU_BUTTON_WIDTH                = 140;
+        constexpr int MENU_BUTTON_HEIGHT               = 50;
         constexpr SDL_Color PRE_CLEAR_TITLE_FILL       = {25, 25, 25, 255};
         constexpr SDL_Color PRE_CLEAR_TITLE_BORDER     = {255, 255, 255, 255};
+
+        // Scrollbar
+        constexpr int   SCROLLBAR_WIDTH       = 6;
+        constexpr int   SCROLLBAR_THUMB_MIN_H = 20;
+        constexpr SDL_Color SCROLLBAR_TRACK   = {40,  40,  40,  180};
+        constexpr SDL_Color SCROLLBAR_THUMB   = {120, 120, 120, 220};
     }
 
     namespace Loading {
@@ -415,6 +427,45 @@ namespace Theme {
         constexpr SDL_Color NEW_FILL                  = {30,  155, 85,  255};
         constexpr SDL_Color BADGE_TEXT                = {255, 255, 255, 255};
         constexpr SDL_Color SUMMARY_FILL              = {50,  32,  85,  230};
+
+        constexpr int BACK_BUTTON_INITIAL_X           = 20;
+        constexpr int BACK_BUTTON_INITIAL_Y           = 20;
+        constexpr int BACK_BUTTON_WIDTH               = 180;
+        constexpr int BACK_BUTTON_HEIGHT              = 56;
+        constexpr int OPEN_BUTTON_INITIAL_X           = 220;
+        constexpr int OPEN_BUTTON_INITIAL_Y           = 20;
+        constexpr int OPEN_BUTTON_WIDTH               = 220;
+        constexpr int OPEN_BUTTON_HEIGHT              = 56;
+    }
+
+    namespace Title {
+        constexpr int START_BUTTON_INITIAL_X          = 300;
+        constexpr int START_BUTTON_INITIAL_Y          = 150;
+        constexpr int MAIN_BUTTON_WIDTH               = 280;
+        constexpr int MAIN_BUTTON_HEIGHT              = 75;
+        constexpr int BUILD_BUTTON_INITIAL_Y          = 250;
+        constexpr int OPEN_PACKS_BUTTON_INITIAL_Y     = 350;
+        constexpr int LOGOUT_BUTTON_INITIAL_X         = 300;
+        constexpr int LOGOUT_BUTTON_INITIAL_Y         = 450;
+        constexpr int SMALL_BUTTON_WIDTH              = 132;
+        constexpr int SMALL_BUTTON_HEIGHT             = 54;
+        constexpr int QUIT_BUTTON_INITIAL_X           = 448;
+        constexpr int QUIT_BUTTON_INITIAL_Y           = 450;
+        constexpr int BANNER_INITIAL_X                = 180;
+        constexpr int BANNER_INITIAL_Y                = 40;
+        constexpr int BANNER_WIDTH                    = 600;
+        constexpr int BANNER_HEIGHT                   = 100;
+    }
+
+    namespace Waiting {
+        constexpr int ACCEPT_BUTTON_INITIAL_X         = 300;
+        constexpr int ACCEPT_BUTTON_INITIAL_Y         = 450;
+        constexpr int ACCEPT_BUTTON_WIDTH             = 280;
+        constexpr int ACCEPT_BUTTON_HEIGHT            = 75;
+        constexpr int DECLINE_BUTTON_INITIAL_X        = 430;
+        constexpr int DECLINE_BUTTON_INITIAL_Y        = 250;
+        constexpr int DECLINE_BUTTON_WIDTH            = 150;
+        constexpr int DECLINE_BUTTON_HEIGHT           = 50;
     }
 }
 
