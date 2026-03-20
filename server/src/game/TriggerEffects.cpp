@@ -148,6 +148,7 @@ const std::unordered_map<int, std::vector<CardEffectEntry>> TriggerEffects::card
     {17, { CardEffectEntry{0, std::nullopt, std::make_pair(-1,-1)}}}, //done
     {18, { CardEffectEntry{7, CombatEffects::kTrample, std::nullopt} }}, // Give Trample
     {20, { CardEffectEntry{0, std::nullopt, std::make_pair(0,3)} }}, //done
+    {22, { CardEffectEntry{10, -1, std::nullopt}}}, // NOT WORKING YET
     {23, { CardEffectEntry{3, -5, std::nullopt}, //done
         CardEffectEntry{5, 5, std::nullopt} }}, 
     {25, { CardEffectEntry{10, 2, std::nullopt}}}, // Conditional splash HP augment
