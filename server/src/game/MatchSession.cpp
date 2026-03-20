@@ -551,6 +551,19 @@ void MatchSession::handleSpell(int playerIndex, int cardId, int lane, std::optio
             continue;
         }
 
+        if (entry.target.has_value()) {
+            switch (*entry.target) {
+                case Target::Self:
+                    serverTargetIndex = playerIndex;
+                    break;
+                case Target::Opponent:
+                    serverTargetIndex = 1 - playerIndex;
+                    break;
+                case Target::Nil:
+                    break;
+            }
+        }
+
         effect(
             *this,
             playerIndex,
@@ -895,9 +908,11 @@ void MatchSession::augmentHP(int playerIndex, int amount){
 } 
 
 void MatchSession::setHP(int playerIndex, int amount){
+    int delta = players[playerIndex].health - amount;
     players[playerIndex].health = amount;
-    std::string msg = "HP_SET " + std::to_string(players[playerIndex].id) + " "
-                    + std::to_string(amount)+ "\n";
+
+    std::string msg = "HP " + std::to_string(players[playerIndex].id) + " "
+                    + std::to_string(-delta)+ "\n";
     playerA->send(msg);
     playerB->send(msg);
 } 
