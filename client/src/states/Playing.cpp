@@ -657,6 +657,10 @@ bool Playing::handleServerMessage(const std::string& msg) {
         iss >> playerId >> delta;
         augmentHP(playerId, delta);
 
+    } else if (cmd == "MANA") { //use this to modify player health
+        int playerId, delta;
+        iss >> playerId >> delta;
+        augmentMana(playerId, delta); 
     }
     //add a mana command later -> decouple discard logic to offload to mana logic
     else if (cmd == "MATCH_LOST") {
@@ -975,6 +979,12 @@ void Playing::augmentHP(int playerId, int delta) {
     Player& player = (playerId == localPlayer.id) ? localPlayer : remotePlayer;
     player.health += delta;
 }
+
+void Playing::augmentMana(int playerId, int delta) {
+    Player& player = (playerId == localPlayer.id) ? localPlayer : remotePlayer;
+    player.mana += delta;
+}
+
 
 void Playing::render(const Game& game) {
     RenderPlaying::render(*this, game);

@@ -161,7 +161,8 @@ private:
     void resolveLaneCombat(int playerAId, int playerBId, int lane, int powerA, int powerB);
     void resolveDirectCombat(int playerId, int lane, int damage);
     void augmentHP(int playerId, int delta);
-    
+    void augmentMana(int playerId, int delta); 
+
     // Animation related
     bool tryDrawCardWithAnimation(Uint32 now);
 };
