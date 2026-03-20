@@ -9,6 +9,7 @@
 #include "game/TriggerEffects.hpp"
 
 #include <iostream>
+#include <algorithm>
 #include <chrono>
 #include <thread>
 #include <mutex>
@@ -443,6 +444,10 @@ void MatchSession::handleSummon(int playerIndex, int cardId, int lane) {
     const int combatEffectMask = CombatEffects::getMaskFromCard(card);
     board.continuousEffects[playerIndex][lane] =
         (combatEffectMask == 0) ? std::nullopt : std::optional<int>(combatEffectMask);
+    const int regenValue = CombatEffects::getRegenValueFromCard(card);
+    board.regen[playerIndex][lane] = (regenValue > 0)
+        ? std::optional<std::pair<int, int>>(std::make_pair(regenValue, 2))
+        : std::nullopt;
 
     // Send confirmation message
     std::cout << "[MatchSession] " << getUsername(playerIndex) << " Summons " << name << "\n";
@@ -649,18 +654,30 @@ void MatchSession::augmentCreature(int targetPlayerIndex, int lane, std::pair<in
     // Reference to the existing augment pair
     auto& existingAugment = board.augments[targetPlayerIndex][lane];
 
-    if (existingAugment.has_value()) {
-        // Stack augments: add to existing values
-        existingAugment->first  += augment.first;
-        existingAugment->second += augment.second;
-    } else {
-        // No existing augment: set initial values
-        existingAugment = augment;
-    }
+    const int prevPowerAug = existingAugment.has_value() ? existingAugment->first : 0;
+    const int prevToughnessAug = existingAugment.has_value() ? existingAugment->second : 0;
+
+    int nextPowerAug = prevPowerAug + augment.first;
+    int nextToughnessAug = prevToughnessAug + augment.second;
+
+    // Toughness cannot exceed printed/base toughness.
+    nextToughnessAug = std::min(nextToughnessAug, 0);
 
     // If value reaches 0, destroy and return
-    if (existingAugment->second + creature->getToughness() <= 0) {
+    if (nextToughnessAug + creature->getToughness() <= 0) {
         destroyCreature(targetPlayerIndex, lane);
+        return;
+    }
+
+    if (nextPowerAug == 0 && nextToughnessAug == 0) {
+        existingAugment = std::nullopt;
+    } else {
+        existingAugment = std::make_pair(nextPowerAug, nextToughnessAug);
+    }
+
+    const int appliedPowerDelta = nextPowerAug - prevPowerAug;
+    const int appliedToughnessDelta = nextToughnessAug - prevToughnessAug;
+    if (appliedPowerDelta == 0 && appliedToughnessDelta == 0) {
         return;
     }
 
@@ -668,8 +685,8 @@ void MatchSession::augmentCreature(int targetPlayerIndex, int lane, std::pair<in
     std::string msg = "AUGMENT "
         + std::to_string(players[targetPlayerIndex].id) + " "
         + std::to_string(lane) + " "
-        + std::to_string(augment.first) + " "
-        + std::to_string(augment.second) + "\n";
+        + std::to_string(appliedPowerDelta) + " "
+        + std::to_string(appliedToughnessDelta) + "\n";
 
     playerA->send(msg);
     playerB->send(msg);
@@ -707,7 +724,7 @@ void MatchSession::setCreature(int targetPlayerIndex, int lane, std::pair<int,in
     int totalPower = power;
     int totalToughness = toughness;
     int setPower = augment.first;
-    int setToughness = augment.second;
+    int setToughness = std::min(augment.second, toughness);
 
     // Reference to the existing augment pair
     auto& existingAugment = board.augments[targetPlayerIndex][lane];
@@ -717,13 +734,70 @@ void MatchSession::setCreature(int targetPlayerIndex, int lane, std::pair<int,in
     }
 
     augment.first -= power;
-    augment.second -= toughness;
-    existingAugment = augment;
+    augment.second = setToughness - toughness;
+    if (augment.first == 0 && augment.second == 0) {
+        existingAugment = std::nullopt;
+    } else {
+        existingAugment = augment;
+    }
    
     std::string msg = "AUGMENT " + std::to_string(players[targetPlayerIndex].id) + " "
                     + std::to_string(lane) + " "
                     + std::to_string(setPower - totalPower) + " "
                     + std::to_string(setToughness - totalToughness) + "\n";
+    playerA->send(msg);
+    playerB->send(msg);
+}
+
+void MatchSession::addCreatureEffect(int targetPlayerIndex, int lane, int effectBit) {
+    if (targetPlayerIndex < 0 || targetPlayerIndex >= 2) return;
+    if (lane < 0 || lane >= board.laneCount) return;
+    if (!board.lanes[targetPlayerIndex][lane].has_value()) return;
+
+    const int currentMask = board.continuousEffects[targetPlayerIndex][lane].value_or(0);
+    const int updatedMask = currentMask | effectBit;
+    board.continuousEffects[targetPlayerIndex][lane] = (updatedMask == 0) ? std::nullopt : std::optional<int>(updatedMask);
+
+    std::string msg = "EFFECT_ADD " + std::to_string(players[targetPlayerIndex].id) + " "
+                    + std::to_string(lane) + " " + std::to_string(effectBit) + "\n";
+    playerA->send(msg);
+    playerB->send(msg);
+}
+
+void MatchSession::removeCreatureEffect(int targetPlayerIndex, int lane, int effectBit) {
+    if (targetPlayerIndex < 0 || targetPlayerIndex >= 2) return;
+    if (lane < 0 || lane >= board.laneCount) return;
+    if (!board.lanes[targetPlayerIndex][lane].has_value()) return;
+
+    const int currentMask = board.continuousEffects[targetPlayerIndex][lane].value_or(0);
+    const int updatedMask = currentMask & (~effectBit);
+    board.continuousEffects[targetPlayerIndex][lane] = (updatedMask == 0) ? std::nullopt : std::optional<int>(updatedMask);
+
+    std::string msg = "EFFECT_REMOVE " + std::to_string(players[targetPlayerIndex].id) + " "
+                    + std::to_string(lane) + " " + std::to_string(effectBit) + "\n";
+    playerA->send(msg);
+    playerB->send(msg);
+}
+
+void MatchSession::setCreatureRegen(int targetPlayerIndex, int lane, int regenValue) {
+    if (targetPlayerIndex < 0 || targetPlayerIndex >= 2) return;
+    if (lane < 0 || lane >= board.laneCount) return;
+    if (!board.lanes[targetPlayerIndex][lane].has_value()) return;
+    if (regenValue <= 0) return;
+
+    const int currentMask = board.continuousEffects[targetPlayerIndex][lane].value_or(0);
+    const int updatedMask = currentMask | CombatEffects::kRegen;
+    board.continuousEffects[targetPlayerIndex][lane] = std::optional<int>(updatedMask);
+
+    board.regen[targetPlayerIndex][lane] = std::make_pair(regenValue, 2);
+
+    std::string effectMsg = "EFFECT_ADD " + std::to_string(players[targetPlayerIndex].id) + " "
+                         + std::to_string(lane) + " " + std::to_string(CombatEffects::kRegen) + "\n";
+    playerA->send(effectMsg);
+    playerB->send(effectMsg);
+
+    std::string msg = "REGEN_SET " + std::to_string(players[targetPlayerIndex].id) + " "
+                    + std::to_string(lane) + " " + std::to_string(regenValue) + "\n";
     playerA->send(msg);
     playerB->send(msg);
 }
@@ -751,6 +825,7 @@ void MatchSession::destroyCreature(int targetPlayerIndex, int lane) {
     board.lanes[targetPlayerIndex][lane] = std::nullopt;
     board.augments[targetPlayerIndex][lane] = std::nullopt;
     board.continuousEffects[targetPlayerIndex][lane] = std::nullopt;
+    board.regen[targetPlayerIndex][lane] = std::nullopt;
 
     std::cout << "[MatchSession::destroyCreature] Destroyed creature "
               << cardId << " on lane " << lane
@@ -874,6 +949,9 @@ void MatchSession::resolveLaneCombat(int lane) {
 
     if (!cardA && !cardB) return;
 
+    const bool startedWithA = cardA.has_value();
+    const bool startedWithB = cardB.has_value();
+
     auto hasEffect = [this](int playerIndex, int laneIndex, int effectBit) {
         const auto& effectMaskOpt = board.continuousEffects[playerIndex][laneIndex];
         return CombatEffects::hasEffect(effectMaskOpt, effectBit);
@@ -899,8 +977,14 @@ void MatchSession::resolveLaneCombat(int lane) {
 
     const bool hasDoubleStrikeA = hasEffect(0, lane, CombatEffects::kDoubleStrike);
     const bool hasDoubleStrikeB = hasEffect(1, lane, CombatEffects::kDoubleStrike);
+    const bool hasTrampleA = hasEffect(0, lane, CombatEffects::kTrample);
+    const bool hasTrampleB = hasEffect(1, lane, CombatEffects::kTrample);
+    const bool hasDeathTouchA = hasEffect(0, lane, CombatEffects::kDeathTouch);
+    const bool hasDeathTouchB = hasEffect(1, lane, CombatEffects::kDeathTouch);
 
     auto resolveCombatOnce = [&](bool allowDoubleStrikePhase) {
+        (void)allowDoubleStrikePhase;
+
         // Check if creatures are still alive
         bool aAlive = board.lanes[0][lane].has_value();
         bool bAlive = board.lanes[1][lane].has_value();
@@ -908,6 +992,8 @@ void MatchSession::resolveLaneCombat(int lane) {
 
         int powerA = aAlive ? getCreaturePower(0, lane) : 0;
         int powerB = bAlive ? getCreaturePower(1, lane) : 0;
+        int toughnessA = aAlive ? getCreatureToughness(0, lane) : 0;
+        int toughnessB = bAlive ? getCreatureToughness(1, lane) : 0;
 
         if (aAlive && !bAlive && powerA > 0) {
             sendDirectDamage(0, powerA);
@@ -921,25 +1007,40 @@ void MatchSession::resolveLaneCombat(int lane) {
         std::cout << "[Combat] Lane " << lane
                   << " A(" << powerA << ") vs B(" << powerB << ")\n";
 
-        // Apply damage
-        if (aAlive && powerA > 0) augmentCreature(1, lane, {0, -powerA});
-        if (bAlive && powerB > 0) augmentCreature(0, lane, {0, -powerB});
-
-        // Handle trample / overflow damage after instant augments
-        aAlive = board.lanes[0][lane].has_value();
-        bAlive = board.lanes[1][lane].has_value();
-
-        if (aAlive && bAlive) {
-            int toughnessA = getCreatureToughness(0, lane);
-            int toughnessB = getCreatureToughness(1, lane);
-
-            if (hasEffect(0, lane, CombatEffects::kTrample) && toughnessB <= 0) {
-                sendDirectDamage(0, powerA - toughnessB);
-            }
-            if (hasEffect(1, lane, CombatEffects::kTrample) && toughnessA <= 0) {
-                sendDirectDamage(1, powerB - toughnessA);
-            }
+        // Trample overflow is based on lethal damage assignment against the current blocker.
+        int overflowA = 0;
+        int overflowB = 0;
+        if (aAlive && bAlive && hasTrampleA && powerA > 0) {
+            int lethalToB = hasDeathTouchA ? 1 : toughnessB;
+            if (lethalToB < 0) lethalToB = 0;
+            overflowA = powerA - lethalToB;
+            if (overflowA < 0) overflowA = 0;
         }
+        if (aAlive && bAlive && hasTrampleB && powerB > 0) {
+            int lethalToA = hasDeathTouchB ? 1 : toughnessA;
+            if (lethalToA < 0) lethalToA = 0;
+            overflowB = powerB - lethalToA;
+            if (overflowB < 0) overflowB = 0;
+        }
+
+        // Apply damage
+        if (aAlive && powerA > 0) {
+            augmentCreature(1, lane, {0, -(hasDeathTouchA ? 1 : powerA)});
+        }
+        if (bAlive && powerB > 0) {
+            augmentCreature(0, lane, {0, -(hasDeathTouchB ? 1 : powerB)});
+        }
+
+        // Deathtouch: any positive combat damage is lethal to creatures.
+        if (aAlive && bAlive && hasDeathTouchA && powerA > 0 && board.lanes[1][lane].has_value()) {
+            destroyCreature(1, lane);
+        }
+        if (aAlive && bAlive && hasDeathTouchB && powerB > 0 && board.lanes[0][lane].has_value()) {
+            destroyCreature(0, lane);
+        }
+
+        if (overflowA > 0) sendDirectDamage(0, overflowA);
+        if (overflowB > 0) sendDirectDamage(1, overflowB);
 
         // Broadcast combat event
         std::ostringstream ss;
@@ -952,6 +1053,35 @@ void MatchSession::resolveLaneCombat(int lane) {
         playerA->send(ss.str());
         playerB->send(ss.str());
     };
+
+    // Regen ticks once per lane combat cycle; trigger heal after every 2 combats.
+    // This resolves before combat damage is assigned.
+    auto tickRegen = [this, lane](int playerIndex) {
+        auto& regenOpt = board.regen[playerIndex][lane];
+        if (!regenOpt.has_value()) return;
+        if (!board.lanes[playerIndex][lane].has_value()) {
+            regenOpt = std::nullopt;
+            return;
+        }
+
+        int regenValue = regenOpt->first;
+        int combatsUntilTrigger = regenOpt->second - 1;
+        if (combatsUntilTrigger <= 0) {
+            const auto& augOpt = board.augments[playerIndex][lane];
+            const int toughnessAug = augOpt.has_value() ? augOpt->second : 0;
+            const int missingToughness = (toughnessAug < 0) ? -toughnessAug : 0;
+            const int healAmount = std::min(regenValue, missingToughness);
+            if (healAmount > 0) {
+                // Regen only heals missing toughness; it never grants power.
+                augmentCreature(playerIndex, lane, {0, healAmount});
+            }
+            combatsUntilTrigger = 2;
+        }
+        regenOpt = std::make_pair(regenValue, combatsUntilTrigger);
+    };
+
+    if (startedWithA) tickRegen(0);
+    if (startedWithB) tickRegen(1);
 
     // Double strike phase first
     if (hasDoubleStrikeA || hasDoubleStrikeB) {

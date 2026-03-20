@@ -25,6 +25,20 @@
 // Helpers
 // -------------------------
 
+namespace {
+
+std::string effectBitToLabel(int effectBit) {
+    switch (effectBit) {
+        case 1: return "Double Strike";
+        case 2: return "Trample";
+        case 4: return "Deathtouch";
+        case 8: return "Regen";
+        default: return "Effect(" + std::to_string(effectBit) + ")";
+    }
+}
+
+}
+
 bool Playing::resolvePendingActionAt(int x, int y) {
     if (!pendingAction.active)
         return false;
@@ -661,6 +675,33 @@ bool Playing::handleServerMessage(const std::string& msg) {
         int playerId, delta;
         iss >> playerId >> delta;
         augmentMana(playerId, delta); 
+    } else if (cmd == "EFFECT_ADD") {
+        int playerId, lane, effectBit;
+        iss >> playerId >> lane >> effectBit;
+
+        int boardIndex = (playerId == localPlayer.id) ? 0 : 1;
+        auto& zone = board.getZoneMutable(lane, boardIndex);
+        if (zone.has_value() && zone.value()) {
+            zone.value()->addGrantedEffect(effectBitToLabel(effectBit));
+        }
+    } else if (cmd == "EFFECT_REMOVE") {
+        int playerId, lane, effectBit;
+        iss >> playerId >> lane >> effectBit;
+
+        int boardIndex = (playerId == localPlayer.id) ? 0 : 1;
+        auto& zone = board.getZoneMutable(lane, boardIndex);
+        if (zone.has_value() && zone.value()) {
+            zone.value()->removeGrantedEffect(effectBitToLabel(effectBit));
+        }
+    } else if (cmd == "REGEN_SET") {
+        int playerId, lane, regenValue;
+        iss >> playerId >> lane >> regenValue;
+
+        int boardIndex = (playerId == localPlayer.id) ? 0 : 1;
+        auto& zone = board.getZoneMutable(lane, boardIndex);
+        if (zone.has_value() && zone.value()) {
+            zone.value()->addGrantedEffect("Regen " + std::to_string(regenValue));
+        }
     }
     //add a mana command later -> decouple discard logic to offload to mana logic
     else if (cmd == "MATCH_LOST") {

@@ -3,6 +3,7 @@
 
 #include <string>
 #include <memory>
+#include <vector>
 
 enum class CardType {
     Creature,
@@ -26,6 +27,7 @@ protected:
     int manaCost;
     CardType type;
     Rarity rarity = Rarity::Common;
+    std::vector<std::string> grantedEffects;
 
 public:
     Card(std::string name,
@@ -47,6 +49,10 @@ public:
     CardType getType() const;
     int getId() const;
     Rarity getRarity() const;
+    bool hasGrantedEffects() const;
+    void addGrantedEffect(const std::string& effectText);
+    void removeGrantedEffect(const std::string& effectText);
+    void clearGrantedEffects();
 
     // Polymorphic draw hook
     virtual void drawExtraInfo() const = 0;

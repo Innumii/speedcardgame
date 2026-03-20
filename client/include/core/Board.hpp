@@ -17,6 +17,7 @@ public:
 
     //return reference to Card object, if card is present on the zone
     const std::optional<std::unique_ptr<Card>>& getZone(int lane, int playerId) const;
+    std::optional<std::unique_ptr<Card>>& getZoneMutable(int lane, int playerId);
     int getLaneCount() const;
 
     //Discard Zone interaction (id 0 for local, 1 for remote)
