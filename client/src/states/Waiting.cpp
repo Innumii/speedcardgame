@@ -109,6 +109,9 @@ void Waiting::update(Game& game) {
                 std::cout << "Match cancelled, back to queue\n";
             }
             else if (cmd == "MATCH_START") {
+                if (!game.refreshPlayerDeckFromService()) {
+                    std::cerr << "[Waiting] Failed to Load Player Deck";
+                }
                 int opponentId;
                 if (iss >> opponentId) {
 

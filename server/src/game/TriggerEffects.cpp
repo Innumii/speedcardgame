@@ -1,5 +1,6 @@
 #include "game/TriggerEffects.hpp"
 #include "game/MatchSession.hpp"
+#include <iostream>
 
 //Logic
 // Sequential list of effects (index = effectId)
@@ -32,11 +33,13 @@ const std::vector<EffectFunc> TriggerEffects::effects = {
     },
 
     // 3: Augment player health
-    [](MatchSession& session, int, std::optional<int>,
+    [](MatchSession& session, int playerIndex, std::optional<int>,
        std::optional<int> targetIndex, std::optional<int> amount, 
        std::optional<std::pair<int,int>>) {
-        if (!amount || !targetIndex) return;
-        session.augmentHP(*targetIndex, *amount);
+        if (!amount) return;
+        int index = playerIndex;
+        if (targetIndex.has_value() && *targetIndex != -1) index = *targetIndex;
+        session.augmentHP(index, *amount);
     },
 
     //4
@@ -47,11 +50,13 @@ const std::vector<EffectFunc> TriggerEffects::effects = {
         session.setCreature(*targetIndex, *targetLane, *augment);
     },
     //5: Mana augment
-    [](MatchSession& session, int, std::optional<int>,
+    [](MatchSession& session, int playerIndex, std::optional<int>,
        std::optional<int> targetIndex, std::optional<int> amount, 
        std::optional<std::pair<int,int>>) {
-        if (!amount || !targetIndex) return;
-        session.augmentMana(*targetIndex, *amount);
+        if (!amount) return;
+        int index = playerIndex;
+        if (targetIndex.has_value() && *targetIndex != -1) index = *targetIndex;
+        session.augmentMana(index, *amount);
     },
     // 6: set player health
     [](MatchSession& session, int playerIndex, std::optional<int>,
@@ -59,6 +64,24 @@ const std::vector<EffectFunc> TriggerEffects::effects = {
        std::optional<std::pair<int,int>>) {
         if (!amount) return;
         session.setHP(playerIndex, *amount);
+    },
+
+    // 7: augment HP stack from board count 
+    [](MatchSession& session, int playerIndex, std::optional<int>,
+       std::optional<int> targetIndex, std::optional<int> amount, 
+       std::optional<std::pair<int,int>>) {
+        if (!amount)  {
+            // std::cout << "[DEBUG] NO AMOUNT\n";
+            return;}
+        int index = playerIndex;
+        if (targetIndex.has_value() && *targetIndex != -1) index = *targetIndex; 
+        int creaturesOwned = session.getCreaturesOwned(index);
+        if (creaturesOwned <= 0) {
+            // std::cout << "[DEBUG] NO CREATURES\n";
+            return;
+        }
+        int totalAmount = creaturesOwned * (*amount);
+        session.augmentHP(index, totalAmount);
     },
 };
 
@@ -76,18 +99,37 @@ const std::vector<CardEffectEntry>* TriggerEffects::getCardEffects(int cardId) {
 
 const std::unordered_map<int, std::vector<CardEffectEntry>> TriggerEffects::cardToEffectsMap = {
     {1, {CardEffectEntry{0, std::nullopt, std::make_pair(0,-3)} }}, //done
-        {4, { CardEffectEntry{0, std::nullopt, std::make_pair(2,2)} }}, //add conditional augment
+        {4, { CardEffectEntry{0, std::nullopt, std::make_pair(4,4), //add conditional augment
+            [](const MatchSession& session, int cardId, int, int) {
+            // std::cout<< "[Effect Condition] Given Name: "<<session.getCard(cardId)->getName()<< "\n";
+            return session.getCard(cardId)->getName() == "Go";}},
+            CardEffectEntry{0, std::nullopt, std::make_pair(2,2), //add conditional augment
+            [](const MatchSession& session, int cardId, int, int) {
+            return session.getCard(cardId)->getName() != "Go";}} 
+            }
+        }, 
     {10, { CardEffectEntry{4, std::nullopt, std::make_pair(0,1)}}}, //done 
     {11, { CardEffectEntry{2, std::nullopt, std::make_pair(0,-1)}}}, //done
-        {13, { CardEffectEntry{0, std::nullopt, std::make_pair(1,1)}}}, //conditonal +5/-1
+        {13, { CardEffectEntry{0, std::nullopt, std::make_pair(5,-1),
+             [](const MatchSession& session, int cardId, int, int) {
+                return session.getCard(cardId)->getName() == "Potential Man";}},
+               CardEffectEntry{0, std::nullopt, std::make_pair(1,1),
+             [](const MatchSession& session, int cardId, int, int) {
+                return session.getCard(cardId)->getName() != "Potential Man";}}
+             }
+        }, //conditonal +5/-1
     {14, { CardEffectEntry{0, std::nullopt, std::make_pair(2,-1)}}}, //done
         {15, { }}, //Double Strike
     {17, { CardEffectEntry{0, std::nullopt, std::make_pair(-1,-1)}}}, //done
         {18, {}}, //Trample
     {20, { CardEffectEntry{0, std::nullopt, std::make_pair(0,3)} }}, //done
-        {23, { CardEffectEntry{3, -5, std::nullopt}, 
-            CardEffectEntry{5, 5, std::nullopt} }}, //mana augment doesnt work
-        {25, {}}, // Conditional splash HP augment
-    {26, {CardEffectEntry{2, std::nullopt, std::make_pair(2,2)}}}, //done
+    {23, { CardEffectEntry{3, -5, std::nullopt}, //done
+        CardEffectEntry{5, 5, std::nullopt} }}, 
+
+
+        {25, { CardEffectEntry{7, 2, std::nullopt}}}, // Conditional splash HP augment
+    
+    
+        {26, {CardEffectEntry{2, std::nullopt, std::make_pair(2,2)}}}, //done
         {29, { CardEffectEntry{6, 10, std::nullopt}}} // Deal difference as damage
 };

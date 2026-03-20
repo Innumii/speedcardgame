@@ -521,10 +521,31 @@ void MatchSession::handleSpell(int playerIndex, int cardId, int lane, std::optio
     auto effects = TriggerEffects::getCardEffects(cardId);
     std::cout << "CardID: " << cardId << "\n";
     if (!effects) return;
+    
 
     for (const auto& entry : *effects) {
         EffectFunc effect = TriggerEffects::getEffectById(entry.effectId);
         if (!effect) continue;
+
+        //get target for condition check
+        int targetCardId = -1;
+        if (serverTargetIndex.has_value() && targetLane.has_value()) {
+            int player = *serverTargetIndex;
+            int lane  = *targetLane;
+
+            if (player >= 0 && player < 2 && lane >= 0 && lane < board.laneCount) {
+                if (board.lanes[player][lane].has_value()) {
+                    targetCardId = *board.lanes[player][lane];
+                } else {
+                    continue;
+                }
+            }
+        }
+
+        if (!entry.condition(*this, targetCardId, targetLane.value_or(-1), serverTargetIndex.value_or(-1))) {
+            continue;
+        }
+
         effect(
             *this,
             playerIndex,
@@ -605,6 +626,24 @@ const ServerCard* MatchSession::getCard(int id) const {
 int MatchSession::getLaneCount() const {
     return board.laneCount;
 }
+
+int MatchSession::getCreaturesOwned(int playerIndex) const {
+    if (playerIndex < 0 || playerIndex >= 2) {
+        std::cout << "[DEBUG] WRONG INDEX\n";
+        return 0;} // safety check
+    int count = 0;
+    for (int i = 0; i < board.laneCount; i++) {
+        if (board.lanes[playerIndex][i].has_value()) {
+            std::cout << "[DEBUG] PROC\n";
+
+            ++count;
+        }
+    }
+    std::cout << "[DEBUG] COUNT: " << count << "\n";
+
+    return count;
+}
+
 
 const std::string MatchSession::getUsername(int playerIndex) const {
     return (playerIndex == 0) ? playerA->getUsername() : playerB->getUsername();

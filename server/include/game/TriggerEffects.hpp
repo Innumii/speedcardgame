@@ -19,6 +19,7 @@ struct CardEffectEntry {
     std::optional<int> amount;
     std::optional<std::pair<int,int>> augment;
     // std::optional<int> targetIndex;
+    std::function<bool(const MatchSession&, int cardId, int targetLane, int targetIndex)> condition =  [](const MatchSession&, int, int, int){ return true; };
 };
 
 class TriggerEffects {

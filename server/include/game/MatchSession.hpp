@@ -98,6 +98,7 @@ public:
 
     const ServerCard* getCard(int id) const;
     int getLaneCount() const;
+    int getCreaturesOwned(int playerIndex) const;
     const std::string getUsername(int playerIndex) const;
 
     //--------------board actions--------------

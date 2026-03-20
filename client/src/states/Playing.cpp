@@ -199,6 +199,7 @@ void Playing::setup(const Game& game) {
         authority = std::make_unique<LocalAuthority>(
             &const_cast<Game&>(game).getNetworkClient());
     }
+
 }
 
 void Playing::setDeck(Deck newDeck) {
