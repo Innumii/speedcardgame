@@ -15,17 +15,49 @@ void RenderButton::drawButton(
     bool hovered,
     bool pressed
 ) {
+    Style style{};
+    style.fill = fill;
+    style.border = border;
+    style.text = textColor;
+    drawButton(renderer, rect, text, font, style, hovered, pressed);
+}
+
+void RenderButton::drawButton(
+    SDL_Renderer* renderer,
+    const SDL_Rect& rect,
+    const std::string& text,
+    TTF_Font* font,
+    const Style& style,
+    bool hovered,
+    bool pressed
+) {
     if (!renderer) return;
 
-    const int rad = Theme::BTN_RADIUS;
+    const int rad = style.radius >= 0 ? style.radius : Theme::BTN_RADIUS;
 
-    // resolve final fill based on state
-    SDL_Color finalFill = pressed  ? RenderUtil::darken(fill, 30)
-                        : hovered  ? RenderUtil::brighten(fill, 45)
-                        : fill;
+    SDL_Color finalFill = style.fill;
+    SDL_Color finalBorder = style.border;
+    SDL_Color finalText = style.text;
 
-    // hover glow halo
-    if (hovered) {
+    if (pressed) {
+        if (style.hasPressedOverride) {
+            finalFill = style.pressedFill;
+            finalBorder = style.pressedBorder;
+            finalText = style.pressedText;
+        } else {
+            finalFill = RenderUtil::darken(style.fill, 30);
+        }
+    } else if (hovered) {
+        if (style.hasHoverOverride) {
+            finalFill = style.hoverFill;
+            finalBorder = style.hoverBorder;
+            finalText = style.hoverText;
+        } else {
+            finalFill = RenderUtil::brighten(style.fill, 45);
+        }
+    }
+
+    if (hovered && style.drawGlowOnHover) {
         RenderUtil::drawRoundedGlow(
             renderer,
             rect,
@@ -36,20 +68,18 @@ void RenderButton::drawButton(
         );
     }
 
-    // shadow
-    RenderUtil::drawRoundedShadow(renderer, rect, rad, Theme::Effects::SHADOW_OFFSET, Theme::Effects::SHADOW_COLOR);
+    if (style.drawShadow) {
+        RenderUtil::drawRoundedShadow(renderer, rect, rad, Theme::Effects::SHADOW_OFFSET, Theme::Effects::SHADOW_COLOR);
+    }
 
-    // button body
-    RenderUtil::drawRoundedRect(renderer, rect, rad, finalFill, border);
+    RenderUtil::drawRoundedRect(renderer, rect, rad, finalFill, finalBorder);
 
-    // pressed — slight inset effect via darker top border
-    if (pressed) {
-        SDL_Color inset = RenderUtil::darken(border, 40);
+    if (pressed && !style.hasPressedOverride) {
+        SDL_Color inset = RenderUtil::darken(finalBorder, 40);
         SDL_SetRenderDrawColor(renderer, inset.r, inset.g, inset.b, inset.a);
         SDL_RenderDrawLine(renderer, rect.x + rad, rect.y + 1,
                            rect.x + rect.w - rad, rect.y + 1);
     }
 
-    // centered text
-    RenderUtil::drawCenteredText(renderer, font, text, rect, textColor);
+    RenderUtil::drawCenteredText(renderer, font, text, rect, finalText);
 }

@@ -170,37 +170,12 @@ namespace Theme {
         constexpr SDL_Color TARGET_HIGHLIGHT           = {250, 220, 90, 255};
         constexpr SDL_Color TARGET_PROMPT_TEXT         = {250, 240, 180, 255};
 
-        constexpr SDL_Color MENU_BUTTON_FILL           = {50, 50, 60, 200};
-        constexpr SDL_Color MENU_BUTTON_BORDER         = {90, 90, 110, 255};
-        constexpr SDL_Color MENU_BUTTON_BORDER_HOVER   = {120, 120, 140, 255};
-        constexpr SDL_Color MENU_BUTTON_TEXT           = {220, 220, 230, 255};
-
         constexpr SDL_Color PAUSE_OVERLAY              = {0, 0, 0, 190};
         constexpr SDL_Color EXIT_OVERLAY               = {0, 0, 0, 190};
         constexpr SDL_Color SURRENDER_OVERLAY          = {0, 0, 0, 220};
 
         constexpr SDL_Color PAUSE_MODAL_BORDER         = {160, 120, 200, 255};
         constexpr SDL_Color EXIT_MODAL_BORDER          = {240, 192, 64, 150};
-
-        constexpr SDL_Color RESUME_BUTTON_FILL         = {35, 160, 130, 240};
-        constexpr SDL_Color RESUME_BUTTON_FILL_HOVER   = {50, 180, 120, 255};
-        constexpr SDL_Color RESUME_BUTTON_BORDER       = {80, 200, 140, 255};
-        constexpr SDL_Color RESUME_BUTTON_BORDER_HOVER = {100, 220, 160, 255};
-
-        constexpr SDL_Color DANGER_BUTTON_FILL         = {185, 50, 70, 240};
-        constexpr SDL_Color DANGER_BUTTON_FILL_HOVER   = {220, 70, 90, 255};
-        constexpr SDL_Color DANGER_BUTTON_BORDER       = {220, 90, 110, 255};
-        constexpr SDL_Color DANGER_BUTTON_BORDER_HOVER = {255, 120, 140, 255};
-
-        constexpr SDL_Color PRIMARY_ACTION_FILL        = {70, 120, 200, 240};
-        constexpr SDL_Color PRIMARY_ACTION_FILL_HOVER  = {90, 140, 220, 255};
-        constexpr SDL_Color PRIMARY_ACTION_BORDER      = {110, 160, 240, 255};
-        constexpr SDL_Color PRIMARY_ACTION_BORDER_HOVER = {140, 180, 255, 255};
-
-        constexpr SDL_Color RETURN_BUTTON_FILL         = {60, 100, 140, 220};
-        constexpr SDL_Color RETURN_BUTTON_FILL_HOVER   = {100, 160, 220, 255};
-        constexpr SDL_Color RETURN_BUTTON_BORDER       = {80, 130, 180, 255};
-        constexpr SDL_Color RETURN_BUTTON_BORDER_HOVER = {100, 160, 220, 255};
     }
 
     namespace Board {

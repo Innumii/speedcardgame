@@ -444,19 +444,12 @@ void RenderPlaying::render(Playing& playing, const Game& game) {
 
 	// ── menu button - top right ──────────────────────────────────────
 	if (playing.getState() == PlayingGameState::Playing && !playing.pauseModalOpen && !playing.exitModalOpen) {
-		RenderUtil::drawRoundedRect(renderer, playing.menuButton,
-		            Theme::Board::DISCARD_CORNER_RADIUS,
-		            Theme::Playing::MENU_BUTTON_FILL,
-		            hoveringMenu ? Theme::Playing::MENU_BUTTON_BORDER_HOVER : Theme::Playing::MENU_BUTTON_BORDER);
-		
-		int menuTextW = 0, menuTextH = 0;
-		if (uiFonts.medium) {
-			TTF_SizeText(uiFonts.medium, "Menu", &menuTextW, &menuTextH);
-		}
-		textRenderer.drawText(renderer, "Menu", uiFonts.medium,
-		                      Theme::Playing::MENU_BUTTON_TEXT,
-		                      playing.menuButton.x + (playing.menuButton.w - menuTextW) / 2,
-		                      playing.menuButton.y + (playing.menuButton.h - menuTextH) / 2);
+		RenderButton::Style menuStyle{};
+		menuStyle.fill = Theme::BTN_SECONDARY;
+		menuStyle.border = Theme::BTN_BORDER;
+		menuStyle.text = Theme::BTN_TEXT;
+		menuStyle.radius = Theme::Board::DISCARD_CORNER_RADIUS;
+		RenderButton::drawButton(renderer, playing.menuButton, "Menu", uiFonts.medium, menuStyle, hoveringMenu, false);
 	}
 
 	// ── pause modal ──────────────────────────────────────────────────
@@ -480,34 +473,14 @@ void RenderPlaying::render(Playing& playing, const Game& game) {
 		                      playing.pauseModal.y + Theme::Playing::PAUSE_MODAL_TITLE_TOP);
 
 		const bool hoveringResume = RenderUtil::pointInRect(playing.resumeButton, mouseX, mouseY);
-		RenderUtil::drawRoundedRect(renderer, playing.resumeButton,
-		            8,
-		            hoveringResume ? Theme::Playing::RESUME_BUTTON_FILL_HOVER : Theme::Playing::RESUME_BUTTON_FILL,
-		            hoveringResume ? Theme::Playing::RESUME_BUTTON_BORDER_HOVER : Theme::Playing::RESUME_BUTTON_BORDER);
-		
-		int resumeTextW = 0, resumeTextH = 0;
-		if (uiFonts.large) {
-			TTF_SizeText(uiFonts.large, "Resume", &resumeTextW, &resumeTextH);
-		}
-		textRenderer.drawText(renderer, "Resume", uiFonts.large,
-		                      Theme::BTN_TEXT,
-		                      playing.resumeButton.x + (playing.resumeButton.w - resumeTextW) / 2,
-		                      playing.resumeButton.y + (playing.resumeButton.h - resumeTextH) / 2);
+		RenderButton::drawButton(renderer, playing.resumeButton, "Resume", uiFonts.large,
+		                       Theme::BTN_START, Theme::BTN_BORDER, Theme::BTN_TEXT,
+		                       hoveringResume, false);
 
 		const bool hoveringPauseExit = RenderUtil::pointInRect(playing.pauseExitButton, mouseX, mouseY);
-		RenderUtil::drawRoundedRect(renderer, playing.pauseExitButton,
-		            8,
-		            hoveringPauseExit ? Theme::Playing::DANGER_BUTTON_FILL_HOVER : Theme::Playing::DANGER_BUTTON_FILL,
-		            hoveringPauseExit ? Theme::Playing::DANGER_BUTTON_BORDER_HOVER : Theme::Playing::DANGER_BUTTON_BORDER);
-		
-		int exitTextW = 0, exitTextH = 0;
-		if (uiFonts.large) {
-			TTF_SizeText(uiFonts.large, "Exit Game", &exitTextW, &exitTextH);
-		}
-		textRenderer.drawText(renderer, "Exit Game", uiFonts.large,
-		                      Theme::BTN_TEXT,
-		                      playing.pauseExitButton.x + (playing.pauseExitButton.w - exitTextW) / 2,
-		                      playing.pauseExitButton.y + (playing.pauseExitButton.h - exitTextH) / 2);
+		RenderButton::drawButton(renderer, playing.pauseExitButton, "Exit Game", uiFonts.large,
+		                       Theme::BTN_QUIT, Theme::BTN_BORDER, Theme::BTN_TEXT,
+		                       hoveringPauseExit, false);
 	}
 
 	// ── exit confirmation modal ──────────────────────────────────────
@@ -541,34 +514,14 @@ void RenderPlaying::render(Playing& playing, const Game& game) {
 		                      playing.exitModal.y + Theme::Playing::EXIT_MODAL_QUESTION_TOP);
 
 		const bool hoveringSave = RenderUtil::pointInRect(playing.saveExitButton, mouseX, mouseY);
-		RenderUtil::drawRoundedRect(renderer, playing.saveExitButton,
-		            8,
-		            hoveringSave ? Theme::Playing::PRIMARY_ACTION_FILL_HOVER : Theme::Playing::PRIMARY_ACTION_FILL,
-		            hoveringSave ? Theme::Playing::PRIMARY_ACTION_BORDER_HOVER : Theme::Playing::PRIMARY_ACTION_BORDER);
-		
-		int saveTextW = 0, saveTextH = 0;
-		if (uiFonts.medium) {
-			TTF_SizeText(uiFonts.medium, "Yes, Surrender", &saveTextW, &saveTextH);
-		}
-		textRenderer.drawText(renderer, "Yes, Surrender", uiFonts.medium,
-		                      Theme::BTN_TEXT,
-		                      playing.saveExitButton.x + (playing.saveExitButton.w - saveTextW) / 2,
-		                      playing.saveExitButton.y + (playing.saveExitButton.h - saveTextH) / 2);
+		RenderButton::drawButton(renderer, playing.saveExitButton, "Yes, Surrender", uiFonts.medium,
+		                       Theme::BTN_PRIMARY, Theme::BTN_BORDER, Theme::BTN_TEXT,
+		                       hoveringSave, false);
 
 		const bool hoveringNoSave = RenderUtil::pointInRect(playing.noSaveExitButton, mouseX, mouseY);
-		RenderUtil::drawRoundedRect(renderer, playing.noSaveExitButton,
-		            8,
-		            hoveringNoSave ? Theme::Playing::DANGER_BUTTON_FILL_HOVER : Theme::Playing::DANGER_BUTTON_FILL,
-		            hoveringNoSave ? Theme::Playing::DANGER_BUTTON_BORDER_HOVER : Theme::Playing::DANGER_BUTTON_BORDER);
-		
-		int noSaveTextW = 0, noSaveTextH = 0;
-		if (uiFonts.medium) {
-			TTF_SizeText(uiFonts.medium, "Cancel", &noSaveTextW, &noSaveTextH);
-		}
-		textRenderer.drawText(renderer, "Cancel", uiFonts.medium,
-		                      Theme::BTN_TEXT,
-		                      playing.noSaveExitButton.x + (playing.noSaveExitButton.w - noSaveTextW) / 2,
-		                      playing.noSaveExitButton.y + (playing.noSaveExitButton.h - noSaveTextH) / 2);
+		RenderButton::drawButton(renderer, playing.noSaveExitButton, "Cancel", uiFonts.medium,
+		                       Theme::BTN_QUIT, Theme::BTN_BORDER, Theme::BTN_TEXT,
+		                       hoveringNoSave, false);
 	}
 
 	// ── Game End Screen (need a button for requeue)─────────────────────────────────────────────
@@ -618,42 +571,18 @@ void RenderPlaying::render(Playing& playing, const Game& game) {
 		}
 
 
+		RenderButton::Style returnStyle{};
+		returnStyle.fill = Theme::BTN_START;
+		returnStyle.border = Theme::BTN_BORDER;
+		returnStyle.text = Theme::BTN_TEXT;
+		returnStyle.radius = 10;
 
 		const bool hoveringReturn = RenderUtil::pointInRect(playing.returnToTitleButton, mouseX, mouseY);
-		RenderUtil::drawRoundedRect(renderer, playing.returnToTitleButton,
-		            10,
-		            hoveringReturn ? Theme::Playing::RETURN_BUTTON_FILL_HOVER : Theme::Playing::RETURN_BUTTON_FILL,
-		            hoveringReturn ? Theme::Playing::RETURN_BUTTON_BORDER_HOVER : Theme::Playing::RETURN_BUTTON_BORDER);
-		
-		int returnTextW = 0, returnTextH = 0;
-		if (uiFonts.large) {
-			TTF_SizeText(uiFonts.large, "Return to Title", &returnTextW, &returnTextH);
-		}
-		textRenderer.drawText(renderer, "Return to Title", uiFonts.large,
-		                      Theme::TEXT_PRIMARY,
-		                      playing.returnToTitleButton.x + (playing.returnToTitleButton.w - returnTextW) / 2,
-		                      playing.returnToTitleButton.y + (playing.returnToTitleButton.h - returnTextH) / 2);
+		RenderButton::drawButton(renderer, playing.returnToTitleButton, "Return to Title", uiFonts.large, returnStyle, hoveringReturn, false);
 
 		// ── Requeue button ───────────────────────────────────────────────
 		const bool hoveringRequeue = RenderUtil::pointInRect(playing.requeueButton, mouseX, mouseY);
-		RenderUtil::drawRoundedRect(renderer, playing.requeueButton,
-					10,
-					hoveringRequeue ? Theme::Playing::RETURN_BUTTON_FILL_HOVER : Theme::Playing::RETURN_BUTTON_FILL,
-					hoveringRequeue ? Theme::Playing::RETURN_BUTTON_BORDER_HOVER : Theme::Playing::RETURN_BUTTON_BORDER);
-
-		int requeueTextW = 0, requeueTextH = 0;
-		const std::string requeueText = "Requeue";
-		if (uiFonts.large) {
-			TTF_SizeText(uiFonts.large, requeueText.c_str(), &requeueTextW, &requeueTextH);
-		}
-		textRenderer.drawText(
-			renderer,
-			requeueText,
-			uiFonts.large,
-			Theme::TEXT_PRIMARY,
-			playing.requeueButton.x + (playing.requeueButton.w - requeueTextW) / 2,
-			playing.requeueButton.y + (playing.requeueButton.h - requeueTextH) / 2
-		);
+		RenderButton::drawButton(renderer, playing.requeueButton, "Requeue", uiFonts.large, returnStyle, hoveringRequeue, false);
 	}
 
 	SDL_RenderPresent(renderer);

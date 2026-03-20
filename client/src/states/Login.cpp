@@ -5,6 +5,7 @@
 #include "utils/JsonUtil.hpp"
 #include "utils/EnvUtil.hpp"
 #include "utils/RenderUtil.hpp"
+#include "render/RenderButton.hpp"
 #include "render/RenderText.hpp"
 #include "render/RenderBanner.hpp"
 #include "render/Theme.hpp"
@@ -300,20 +301,11 @@ void Login::render(const Game& game) {
     }
 
     // ── buttons ──────────────────────────────────────────────────────
-    auto brighten = [](SDL_Color c, int amt) -> SDL_Color {
-        return {(Uint8)std::min(c.r + amt, 255),
-                (Uint8)std::min(c.g + amt, 255),
-                (Uint8)std::min(c.b + amt, 255), c.a};
-    };
+    RenderButton::drawButton(r, loginButtonRect, "Login", uiFonts.large,
+                             Theme::BTN_PRIMARY, Theme::BTN_BORDER,
+                             Theme::BTN_TEXT, loginHover, false);
 
-    SDL_Color loginFill    = loginHover ? brighten(Theme::BTN_PRIMARY,   40) : Theme::BTN_PRIMARY;
-    SDL_Color registerFill = backHover  ? brighten(Theme::BTN_SECONDARY, 40) : Theme::BTN_SECONDARY;
-
-    RenderUtil::drawRoundedShadow(r, loginButtonRect, Theme::BTN_RADIUS, Theme::Effects::SHADOW_OFFSET, Theme::Effects::SHADOW_COLOR);
-    RenderUtil::drawRoundedRect(r, loginButtonRect, Theme::BTN_RADIUS, loginFill, Theme::BTN_BORDER);
-    RenderUtil::drawCenteredText(r, uiFonts.large, "Login", loginButtonRect, Theme::BTN_TEXT);
-
-    RenderUtil::drawRoundedShadow(r, backButtonRect, Theme::BTN_RADIUS, Theme::Effects::SHADOW_OFFSET, Theme::Effects::SHADOW_COLOR);
-    RenderUtil::drawRoundedRect(r, backButtonRect, Theme::BTN_RADIUS, registerFill, Theme::BTN_BORDER);
-    RenderUtil::drawCenteredText(r, uiFonts.large, "Register", backButtonRect, Theme::BTN_TEXT);
+    RenderButton::drawButton(r, backButtonRect, "Register", uiFonts.large,
+                             Theme::BTN_SECONDARY, Theme::BTN_BORDER,
+                             Theme::BTN_TEXT, backHover, false);
 }
