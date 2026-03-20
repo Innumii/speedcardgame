@@ -14,12 +14,16 @@ using EffectFunc = std::function<void(
     std::optional<std::pair<int,int>> augment
 )>;
 
+enum class Target {Self, Opponent, Nil};
+
 struct CardEffectEntry {
     int effectId;
     std::optional<int> amount;
     std::optional<std::pair<int,int>> augment;
-    // std::optional<int> targetIndex;
+    std::optional<Target> target;
+
     std::function<bool(const MatchSession&, int cardId, int targetLane, int targetIndex)> condition =  [](const MatchSession&, int, int, int){ return true; };
+
 };
 
 class TriggerEffects {
