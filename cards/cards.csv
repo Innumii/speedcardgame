@@ -9,7 +9,7 @@ cid,name,type,cost,value,power,toughness,effect
 8,Grizzly Bear,Creature,2,2,2,2,
 9,Russian,Creature,3,2,3,3,
 10,Flashbang,Spell,3,1,0,0,Target creature becomes 0/1.
-11,Fan The Hammer,Spell,2,1,0,0,Deal 1 damage to all creatures opponents control. 
+11,Fan The Hammer,Spell,2,1,0,0,Deal 1 damage to all opponent creatures. 
 12,Potential Man,Creature,3,2,2,2,
 13,With This Sacred Treasure,Spell,2,2,0,0,"Give target creature +1/+1, if the creature is named 'Potential Man', give it +5/-1 instead."
 14,Black Flash,Spell,1,1,0,0,Give target creature +2/-1.
@@ -21,10 +21,10 @@ cid,name,type,cost,value,power,toughness,effect
 20,"Mr. President, Get Down!!",Spell,4,2,0,0,Give target creature +0/+3.
 21,Shawn,Creature,2,1,1,2,
 22,Grass Ain't Green,Spell,3,1,0,0,Your opponent takes 1 damage for each creature they control.
-23,Equivalent Exchange,Spell,1,1,0,0,"Target player takes 5 damage, they gain 5  mana."
+23,Equivalent Exchange,Spell,1,1,0,0,"Target player takes 5 damage, they gain 5 mana."
 24,Bushcamper,Creature,3,2,2,2,"When summoned, deal 2 damage to your opponent."
 25,Holy Blessing,Spell,2,2,0,0,Gain 2 health for each creature you control.
-26,Aura,Spell,6,3,0,0,Give all creatures you control +2/+2.
+26,Aura,Spell,6,3,0,0,Give all your creatures +2/+2.
 27,Gun,Creature,3,1,3,1,"When this creature kills another creature, deal 1 damage to your opponent."
 28,Ay Lmao,Creature,2,2,5,1,"When summoned, you take 5 damage."
 29,Final Gambit,Spell,6,3,0,0,"Reduce your HP to 10, deal the difference to your opponent as damage."

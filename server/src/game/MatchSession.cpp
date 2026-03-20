@@ -6,7 +6,7 @@
 #include "utils/EnvUtil.hpp"
 #include "utils/HttpUtil.hpp"
 #include "utils/JsonUtil.hpp"
-#include "game/SpellEffects.hpp"
+#include "game/TriggerEffects.hpp"
 
 #include <iostream>
 #include <chrono>
@@ -475,7 +475,23 @@ void MatchSession::handleSpell(int playerIndex, int cardId, int lane, std::optio
     // if 1 == targetIndex -> target opponent
     if (targetIndex.has_value()) {
         //serverTargetIndex: the player affected by the spell, relative to server logic
-        serverTargetIndex = (*targetIndex == 0) ? playerIndex : 1 - playerIndex;
+        serverTargetIndex = (*targetIndex == 0) ? playerIndex : 1 - playerIndex; //if targetIndex is -1 it automatically assumes it is for opponent
+
+        //if targetIndex <0, means it is either universal, 0 side, or 1 side.
+        if (*targetIndex < 0) {
+            switch (*targetIndex) {
+                case -1:
+                    serverTargetIndex = -1; //ALL
+                    break;
+                case -2:
+                    serverTargetIndex = playerIndex; //Target Caster
+                    break;
+                case -3:
+                    serverTargetIndex = 1 - playerIndex; //Target Caster's Opponent
+                    break;
+            }
+        }
+
     }    
     
     // Remove card from hand after cast
@@ -502,12 +518,12 @@ void MatchSession::handleSpell(int playerIndex, int cardId, int lane, std::optio
     playerB->send(spellMsg);
 
     // Call Effect
-    auto effects = Effects::getCardEffects(cardId);
+    auto effects = TriggerEffects::getCardEffects(cardId);
     std::cout << "CardID: " << cardId << "\n";
     if (!effects) return;
 
     for (const auto& entry : *effects) {
-        EffectFunc effect = Effects::getEffectById(entry.effectId);
+        EffectFunc effect = TriggerEffects::getEffectById(entry.effectId);
         if (!effect) continue;
         effect(
             *this,
@@ -602,7 +618,10 @@ std::vector<int>::iterator MatchSession::findCardInHand(PlayerState& player, int
 //AUGMENT <playerId> <lane> <powerDelta> <toughnessDelta>
 void MatchSession::augmentCreature(int targetPlayerIndex, int lane, std::pair<int,int> augment) {
     // Safety checks
-    if (targetPlayerIndex < 0 || targetPlayerIndex >= 2) return;
+    if (targetPlayerIndex < 0 || targetPlayerIndex >= 2) {
+        std::cout << "[augmentCreature] targetPlayerIndex: " << std::to_string(targetPlayerIndex) << "\n";
+        return;
+    }
     if (lane < 0 || lane >= board.laneCount) return;
 
     // Check if there's a creature on that lane

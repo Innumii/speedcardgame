@@ -407,13 +407,39 @@ void Playing::handleEvents(Game& game, const SDL_Event& event) {
 
                             );
                         }
-                    } else if (card->getType() == CardType::Spell) { // Spell enters targeting mode, may need some logic to skip targeting for universal target spells
+                    } else if (card->getType() == CardType::Spell) {
                         if (localPlayer.mana >= card->getManaCost()) {
-                            pendingAction.active = true;
-                            pendingAction.cardId = card->getId();
-                            pendingAction.sourceLane = laneIndex; // store where it was dropped
-                        } //Check if player has sufficient mana
 
+                            auto validTargets = getValidTargets(*this, *card, pendingAction.sourceLane);
+                            if (!validTargets.empty()) {
+                                int allTarget = 0;
+                                switch (validTargets[0]) {
+                                    case 901: // All cards on board
+                                        allTarget = -1;
+                                        break;
+                                    case 902: // All your cards
+                                        allTarget = -2;
+                                        break;
+                                    case 903: // All opponent cards
+                                        allTarget = -3;
+                                        break;
+                                    default:
+                                        break;
+                                }
+                                if (allTarget != 0) {
+                                    authority->playCard(
+                                        card->getId(),
+                                        laneIndex,
+                                        -1, // no target lane
+                                        allTarget  // no target player
+                                    );
+                                } else {
+                                    pendingAction.active = true;
+                                    pendingAction.cardId = card->getId();
+                                    pendingAction.sourceLane = laneIndex;
+                                }
+                            } 
+                        }
                     }
                 }
 

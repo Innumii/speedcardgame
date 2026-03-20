@@ -37,12 +37,31 @@ std::vector<int> getValidTargets(const Playing& playing, const Card& card, int s
     constexpr int opponentBoardIndex = 1;
 
     // Determine targeting options based on card text
+    /* -1: target all opponent cards
+       -2: target all local cards
+       -3: target all cards on board
+    */
+    bool isAllOpponent = cardText.find("all opponent") != std::string::npos; //let server resolve
+    bool isAllSelf = cardText.find("all your") != std::string::npos; //let server resolve
+    bool isAll = cardText.find("all") != std::string::npos; //let server resolve
+
     bool canTargetAll = cardText.find("any target") != std::string::npos;
     bool canTargetPlayers = cardText.find("target player") != std::string::npos;
     bool canTargetCreatures = cardText.find("target creature") != std::string::npos;
     bool canTargetOpponentCreatures = cardText.find("target creature an opponent controls") != std::string::npos;
     bool canTargetSelfCreatures = cardText.find("target creature you control") != std::string::npos;
     bool canTargetHand = cardText.find("target card in opponent's hand") != std::string::npos;
+
+    if (isAllOpponent) {
+        validTargets.push_back(903);
+        return validTargets;
+    } else if (isAllSelf) {
+        validTargets.push_back(902);
+        return validTargets;
+    } else if (isAll) {
+        validTargets.push_back(901);
+        return validTargets;    
+    }
 
     // Check hand targets
     if (canTargetHand) {

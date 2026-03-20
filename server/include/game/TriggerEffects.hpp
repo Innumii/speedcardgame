@@ -21,7 +21,7 @@ struct CardEffectEntry {
     // std::optional<int> targetIndex;
 };
 
-class Effects {
+class TriggerEffects {
 public:
     static EffectFunc getEffectById(int effectId);
     static const std::vector<CardEffectEntry>* getCardEffects(int cardId);
