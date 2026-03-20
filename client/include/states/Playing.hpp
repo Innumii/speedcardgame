@@ -100,6 +100,9 @@ private:
     
     std::size_t hoverIndex{static_cast<std::size_t>(-1)};
     Uint32 hoverStartTick{0};
+    int boardHoverLane{-1};
+    int boardHoverIndex{-1};
+    Uint32 boardHoverStartTick{0};
     bool previewLocked{false};
     int previewScrollOffset{0};
     bool menuOpen{false};
@@ -116,6 +119,8 @@ private:
         Uint32 executeAt{0};
     };
     std::vector<PendingDestroyState> pendingDestroys;
+    std::unique_ptr<Card> recentSpellPreview;
+    Uint32 recentSpellPreviewUntil{0};
 
     // -------------------------
     // Pending action (targeting system)
@@ -156,6 +161,7 @@ private:
     void discardCard(int playerId, int cardId);
     void playCreature(int playerId, std::unique_ptr<Card> card, int lane);
     void playSpell(int playerId, std::unique_ptr<Card> card, int sourceLane, std::optional<int> targetLane, std::optional<int> targetIndex);
+    const Card* findPendingActionCard() const;
     void augmentCreature(int playerId, int lane, int powerDelta, int toughnessDelta);
     void destroyCreature(int playerId, int lane);
     void resolveLaneCombat(int playerAId, int playerBId, int lane, int powerA, int powerB);

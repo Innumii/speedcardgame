@@ -712,9 +712,6 @@ void MatchSession::augmentCreature(int targetPlayerIndex, int lane, std::pair<in
     int nextPowerAug = prevPowerAug + augment.first;
     int nextToughnessAug = prevToughnessAug + augment.second;
 
-    // Toughness cannot exceed printed/base toughness.
-    nextToughnessAug = std::min(nextToughnessAug, 0);
-
     // If value reaches 0, destroy and return
     if (nextToughnessAug + creature->getToughness() <= 0) {
         destroyCreature(targetPlayerIndex, lane);

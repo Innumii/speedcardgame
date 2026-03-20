@@ -53,6 +53,7 @@ private:
     int lastRefundCoins{0};
     bool backHovered{false};
     bool openHovered{false};
+    int hoveredOpenedCard{-1};
 
     // Reveal animation
     int revealedCount{0};

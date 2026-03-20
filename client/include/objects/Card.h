@@ -43,7 +43,7 @@ public:
 
     // Getters
     std::string getName() const;
-    std::string getText() const;
+    virtual std::string getText() const;
     int getManaCost() const;
     int getManaValue() const;
     CardType getType() const;

@@ -325,7 +325,7 @@ namespace {
 
         if (expandedMode && showTextBox) {
             const int halvedNameH = std::max(1, nameH / 2);
-            const int halvedTextH = std::max(1, textH / 2);
+            const int halvedTextH = std::max(1, textH);
             const int reclaimedHeight = (nameH - halvedNameH) + (textH - halvedTextH);
             nameH = halvedNameH;
             textH = halvedTextH;
