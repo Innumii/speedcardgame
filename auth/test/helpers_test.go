@@ -1,6 +1,9 @@
 package services_test
 
 import (
+	"net/http"
+	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/Ryanljk/speedcardgame/auth/services"
@@ -35,4 +38,23 @@ func hashedPassword(t *testing.T, plain string) string {
 		t.Fatalf("failed to hash password: %v", err)
 	}
 	return h
+}
+
+func fakeServerHostPort(rawURL string) (host, port string) {
+	rawURL = strings.TrimPrefix(rawURL, "http://")
+	parts := strings.SplitN(rawURL, ":", 2)
+	return parts[0], parts[1]
+}
+
+func newFakeInventoryServer(t *testing.T, succeed bool) (*httptest.Server, string, string) {
+	t.Helper()
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if succeed {
+			w.WriteHeader(http.StatusCreated)
+		} else {
+			w.WriteHeader(http.StatusInternalServerError)
+		}
+	}))
+	host, port := fakeServerHostPort(server.URL)
+	return server, host, port
 }

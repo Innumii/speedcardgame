@@ -30,14 +30,14 @@ jobs:
       - name: Run unit tests with coverage
         working-directory: auth
         run: |
-          go test ./test \
+          go test ./test/... \
+            -p=1 \
+            -count=1 \
             -v \
             -coverpkg=./services/... \
             -coverprofile=coverage.out \
             -covermode=atomic \
             -race
-        env:
-          CARDS_SERVICE_BASE_URL: ""   # overridden per-test via t.Setenv
 
       - name: Print coverage summary
         working-directory: auth
@@ -54,12 +54,12 @@ jobs:
           path: auth/coverage.html
           retention-days: 14
 
-      - name: Enforce minimum coverage (80%)
+      - name: Enforce minimum coverage (90%)
         working-directory: auth
         run: |
           COVERAGE=$(go tool cover -func=coverage.out | grep total | awk '{print $3}' | tr -d '%')
           echo "Total coverage: ${COVERAGE}%"
-          if (( $(echo "$COVERAGE < 80" | bc -l) )); then
-            echo "Coverage ${COVERAGE}% is below the 80% threshold"
+          if (( $(echo "$COVERAGE < 90" | bc -l) )); then
+            echo "Coverage ${COVERAGE}% is below the 90% threshold"
             exit 1
           fi
