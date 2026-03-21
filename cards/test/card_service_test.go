@@ -146,7 +146,9 @@ func TestUpdateCard_UpdateCost(t *testing.T) {
 		t.Fatalf("expected 200, got %d", rr.Code)
 	}
 	var card models.Card
-	json.NewDecoder(rr.Body).Decode(&card)
+	if err := json.NewDecoder(rr.Body).Decode(&card); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
 	if card.Cost != 5 {
 		t.Errorf("expected cost 5, got %d", card.Cost)
 	}

@@ -94,7 +94,9 @@ func TestCreateDeck_ReplacesExisting(t *testing.T) {
 		t.Fatalf("expected 200, got %d", rr.Code)
 	}
 	var deck models.Deck
-	json.NewDecoder(rr.Body).Decode(&deck)
+	if err := json.NewDecoder(rr.Body).Decode(&deck); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
 	if _, ok := deck.Cards[1]; ok {
 		t.Error("expected old cards to be replaced")
 	}
@@ -258,7 +260,9 @@ func TestFillDeckForUser_ReplacesExisting(t *testing.T) {
 		t.Fatalf("expected 200, got %d", rr.Code)
 	}
 	var deck models.Deck
-	json.NewDecoder(rr.Body).Decode(&deck)
+	if err := json.NewDecoder(rr.Body).Decode(&deck); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
 	if _, ok := deck.Cards[9]; ok {
 		t.Error("expected old deck replaced")
 	}
