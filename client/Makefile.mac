@@ -3,16 +3,17 @@ CXX := g++
 STD := -std=c++17
 INCLUDES := -I include
 
-# Resolve Homebrew prefix at build time (works on Intel + Apple Silicon)
 BREW_PREFIX    := $(shell brew --prefix)
 OPENSSL_PREFIX := $(shell brew --prefix openssl@3)
 
-SDL2_CFLAGS := $(shell sdl2-config --cflags)
-SDL2_LIBS   := $(shell sdl2-config --libs)
+# Use pkg-config for SDL2_ttf and SDL2_image; manually set SDL2 include
+# to parent dir so <SDL2/SDL.h> style includes resolve correctly
+SDL2_CFLAGS := -I$(BREW_PREFIX)/include -D_THREAD_SAFE
+SDL2_LIBS   := -L$(BREW_PREFIX)/lib -lSDL2 -lSDL2_ttf -lSDL2_image
 
 CXXFLAGS := $(STD) $(INCLUDES) $(SDL2_CFLAGS) \
              -I$(OPENSSL_PREFIX)/include
-LDFLAGS  := $(SDL2_LIBS) -lSDL2_ttf -lSDL2_image \
+LDFLAGS  := $(SDL2_LIBS) \
              -L$(OPENSSL_PREFIX)/lib -lssl -lcrypto
 
 BUILD_DIR := build
