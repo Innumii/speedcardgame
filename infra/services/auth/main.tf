@@ -100,18 +100,18 @@ module "service" {
 
   environment = merge(
     {
-      POSTGRES_HOST      = local.postgres_host
-      POSTGRES_USER      = local.postgres_user
-      POSTGRES_DB        = local.postgres_db
-      POSTGRES_PORT      = tostring(local.postgres_port)
-      POSTGRES_SSLMODE   = var.postgres_sslmode
-      POSTGRES_TIMEZONE  = var.postgres_timezone
-      REDIS_HOST         = local.redis_host
-      REDIS_PORT         = tostring(local.redis_port)
-      AWS_ENABLED        = tostring(var.use_aws_services)
-      CARDS_SERVICE_HOST = local.cards_service_host
-      CARDS_SERVICE_PORT = tostring(var.cards_service_port)
-      DEBUG_LOG_ENABLED  = tostring(var.debug_log_enabled)
+      POSTGRES_HOST            = local.postgres_host
+      POSTGRES_USER            = local.postgres_user
+      POSTGRES_DB              = local.postgres_db
+      POSTGRES_PORT            = tostring(local.postgres_port)
+      POSTGRES_SSLMODE         = var.postgres_sslmode
+      POSTGRES_TIMEZONE        = var.postgres_timezone
+      REDIS_HOST               = local.redis_host
+      REDIS_PORT               = tostring(local.redis_port)
+      AWS_ENABLED              = tostring(var.use_aws_services)
+      CARDS_SERVICE_HOST       = local.cards_service_host
+      CARDS_SERVICE_PORT       = tostring(var.cards_service_port)
+      DEBUG_LOG_ENABLED        = tostring(var.debug_log_enabled)
       HTTP_REQUEST_LOG_ENABLED = tostring(var.http_request_log_enabled)
     },
     local.cards_service_base_url_secret_arn == null && local.cards_service_base_url != null ? {

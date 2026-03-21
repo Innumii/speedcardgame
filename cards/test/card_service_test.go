@@ -20,7 +20,9 @@ func TestCreateCard_Success(t *testing.T) {
 		t.Fatalf("expected 200, got %d: %s", rr.Code, rr.Body.String())
 	}
 	var card models.Card
-	json.NewDecoder(rr.Body).Decode(&card)
+	if err := json.NewDecoder(rr.Body).Decode(&card); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
 	if card.Name != "Fire Bolt" {
 		t.Errorf("expected 'Fire Bolt', got %q", card.Name)
 	}
@@ -52,7 +54,9 @@ func TestListCards_Empty(t *testing.T) {
 		t.Fatalf("expected 200, got %d", rr.Code)
 	}
 	var cards []models.Card
-	json.NewDecoder(rr.Body).Decode(&cards)
+	if err := json.NewDecoder(rr.Body).Decode(&cards); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
 	if len(cards) != 0 {
 		t.Errorf("expected empty, got %d", len(cards))
 	}
@@ -64,7 +68,9 @@ func TestListCards_ReturnsSeedData(t *testing.T) {
 	rr := httptest.NewRecorder()
 	cardservices.ListCards(rr, httptest.NewRequest(http.MethodGet, "/cards", nil))
 	var cards []models.Card
-	json.NewDecoder(rr.Body).Decode(&cards)
+	if err := json.NewDecoder(rr.Body).Decode(&cards); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
 	if len(cards) != 2 {
 		t.Errorf("expected 2, got %d", len(cards))
 	}

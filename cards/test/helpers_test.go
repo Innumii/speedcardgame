@@ -34,7 +34,9 @@ func setupTestDB(t *testing.T) *gorm.DB {
 func setupBrokenDB(t *testing.T) {
 	t.Helper()
 	db, _ := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{Logger: logger.Default.LogMode(logger.Silent)})
-	db.AutoMigrate(&models.Card{}, &models.Deck{}, &models.Inventory{})
+	if err := db.AutoMigrate(&models.Card{}, &models.Deck{}, &models.Inventory{}); err != nil {
+		t.Fatalf("failed to migrate: %v", err)
+	}
 	sqlDB, _ := db.DB()
 	sqlDB.Close()
 	prev := config.DB
@@ -46,7 +48,9 @@ func setupBrokenDB(t *testing.T) {
 func setupSeedThenBreak(t *testing.T, inv models.Inventory) {
 	t.Helper()
 	db, _ := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{Logger: logger.Default.LogMode(logger.Silent)})
-	db.AutoMigrate(&models.Card{}, &models.Deck{}, &models.Inventory{})
+	if err := db.AutoMigrate(&models.Card{}, &models.Deck{}, &models.Inventory{}); err != nil {
+		t.Fatalf("failed to migrate: %v", err)
+	}
 	db.Create(&inv)
 	sqlDB, _ := db.DB()
 	sqlDB.Close()

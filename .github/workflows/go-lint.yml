@@ -4,10 +4,16 @@ on:
     paths:
       - 'auth/**'
       - 'cards/**'
+      - '.github/workflows/auth-test.yml'
+      - '.github/workflows/cards-test.yml'
+      - '.github/workflows/go-lint.yml'
   pull_request:
     paths:
       - 'auth/**'
       - 'cards/**'
+      - '.github/workflows/auth-test.yml'
+      - '.github/workflows/cards-test.yml'
+      - '.github/workflows/go-lint.yml'
 
 permissions:
   contents: read

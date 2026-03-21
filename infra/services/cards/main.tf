@@ -96,19 +96,19 @@ module "service" {
 
   environment = merge(
     {
-      PORT               = tostring(8080)
-      POSTGRES_HOST      = local.postgres_host
-      POSTGRES_USER      = local.postgres_user
-      POSTGRES_DB        = local.postgres_db
-      POSTGRES_PORT      = tostring(local.postgres_port)
-      POSTGRES_SSLMODE   = var.postgres_sslmode
-      POSTGRES_TIMEZONE  = var.postgres_timezone
-      DATABASE_URL       = local.cards_database_url
-      REDIS_HOST         = local.redis_host
-      REDIS_PORT         = tostring(local.redis_port)
-      CARDS_SERVICE_HOST = var.cards_service_host
-      CARDS_SERVICE_PORT = tostring(var.cards_service_port)
-      DEBUG_LOG_ENABLED  = tostring(var.debug_log_enabled)
+      PORT                     = tostring(8080)
+      POSTGRES_HOST            = local.postgres_host
+      POSTGRES_USER            = local.postgres_user
+      POSTGRES_DB              = local.postgres_db
+      POSTGRES_PORT            = tostring(local.postgres_port)
+      POSTGRES_SSLMODE         = var.postgres_sslmode
+      POSTGRES_TIMEZONE        = var.postgres_timezone
+      DATABASE_URL             = local.cards_database_url
+      REDIS_HOST               = local.redis_host
+      REDIS_PORT               = tostring(local.redis_port)
+      CARDS_SERVICE_HOST       = var.cards_service_host
+      CARDS_SERVICE_PORT       = tostring(var.cards_service_port)
+      DEBUG_LOG_ENABLED        = tostring(var.debug_log_enabled)
       HTTP_REQUEST_LOG_ENABLED = tostring(var.http_request_log_enabled)
     },
     {}

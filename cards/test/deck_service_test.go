@@ -356,7 +356,9 @@ func TestFillDecksFromInventories_DBError(t *testing.T) {
 func TestFillDecksFromInventories_AllCardsQueryFails(t *testing.T) {
 	t.Setenv("DECK_SIZE", "3")
 	db, _ := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{Logger: logger.Default.LogMode(logger.Silent)})
-	db.AutoMigrate(&models.Card{}, &models.Deck{}, &models.Inventory{})
+	if err := db.AutoMigrate(&models.Card{}, &models.Deck{}, &models.Inventory{}); err != nil {
+		t.Fatalf("failed to migrate: %v", err)
+	}
 	db.Create(&models.Inventory{Uid: 1, Cards: models.CardCounts{1: 2}})
 	sqlDB, _ := db.DB()
 	sqlDB.Close()

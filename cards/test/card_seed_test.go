@@ -14,7 +14,9 @@ import (
 func writeTempCSV(t *testing.T, name, content string) string {
 	t.Helper()
 	f := t.TempDir() + "/" + name
-	os.WriteFile(f, []byte(content), 0644)
+	if err := os.WriteFile(f, []byte(content), 0644); err != nil {
+		t.Fatalf("failed to write temp csv: %v", err)
+	}
 	return f
 }
 
