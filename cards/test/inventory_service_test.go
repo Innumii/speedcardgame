@@ -157,7 +157,9 @@ func TestListInventories_NormalizesOnRead(t *testing.T) {
 	rr := httptest.NewRecorder()
 	cardservices.ListInventories(rr, httptest.NewRequest(http.MethodGet, "/inventories", nil))
 	var invs []models.Inventory
-	json.NewDecoder(rr.Body).Decode(&invs)
+	if err := json.NewDecoder(rr.Body).Decode(&invs); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
 	if invs[0].Cards[1] != 4 {
 		t.Errorf("expected 4, got %d", invs[0].Cards[1])
 	}
@@ -170,7 +172,9 @@ func TestListInventories_MultipleResults(t *testing.T) {
 	rr := httptest.NewRecorder()
 	cardservices.ListInventories(rr, httptest.NewRequest(http.MethodGet, "/inventories", nil))
 	var invs []models.Inventory
-	json.NewDecoder(rr.Body).Decode(&invs)
+	if err := json.NewDecoder(rr.Body).Decode(&invs); err != nil {
+	t.Fatalf("failed to decode response: %v", err)
+}
 	if len(invs) != 2 {
 		t.Errorf("expected 2, got %d", len(invs))
 	}
