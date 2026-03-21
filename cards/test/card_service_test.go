@@ -82,7 +82,9 @@ func TestListCards_OrderedByCid(t *testing.T) {
 	rr := httptest.NewRecorder()
 	cardservices.ListCards(rr, httptest.NewRequest(http.MethodGet, "/cards", nil))
 	var cards []models.Card
-	json.NewDecoder(rr.Body).Decode(&cards)
+	if err := json.NewDecoder(rr.Body).Decode(&cards); err != nil {
+    t.Fatalf("failed to decode response: %v", err)
+}
 	for i := 1; i < len(cards); i++ {
 		if cards[i].Cid < cards[i-1].Cid {
 			t.Errorf("cards not ordered by cid")
@@ -108,7 +110,9 @@ func TestUpdateCard_Success(t *testing.T) {
 		t.Fatalf("expected 200, got %d: %s", rr.Code, rr.Body.String())
 	}
 	var card models.Card
-	json.NewDecoder(rr.Body).Decode(&card)
+	if err := json.NewDecoder(rr.Body).Decode(&card); err != nil {
+    t.Fatalf("failed to decode response: %v", err)
+}
 	if card.Name != "New" {
 		t.Errorf("expected 'New', got %q", card.Name)
 	}
@@ -124,7 +128,10 @@ func TestUpdateCard_UpdateType(t *testing.T) {
 		t.Fatalf("expected 200, got %d", rr.Code)
 	}
 	var card models.Card
-	json.NewDecoder(rr.Body).Decode(&card)
+	if err := json.NewDecoder(rr.Body).Decode(&card); err != nil {
+    t.Fatalf("failed to decode response: %v", err)
+}
+invent
 	if card.Type != "NewType" {
 		t.Errorf("expected 'NewType', got %q", card.Type)
 	}
