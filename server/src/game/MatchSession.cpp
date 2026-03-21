@@ -6,7 +6,6 @@
 #include "utils/EnvUtil.hpp"
 #include "utils/HttpUtil.hpp"
 #include "utils/JsonUtil.hpp"
-#include "game/TriggerEffects.hpp"
 
 #include <iostream>
 #include <algorithm>
@@ -455,6 +454,10 @@ void MatchSession::handleSummon(int playerIndex, int cardId, int lane) {
     ss << "PLAY " << player.id << " " << cardId << " " << lane << "\n";
     playerA->send(ss.str());
     playerB->send(ss.str());
+
+    //Call effects, if any
+    triggerCardEffects(playerIndex, cardId, std::nullopt, std::nullopt);
+
 }
 
 // targetIndex: 0(casting player), 1(casting player's opponent), -1(all or none)
@@ -523,57 +526,7 @@ void MatchSession::handleSpell(int playerIndex, int cardId, int lane, std::optio
     playerB->send(spellMsg);
 
     // Call Effect
-    auto effects = TriggerEffects::getCardEffects(cardId);
-    std::cout << "CardID: " << cardId << "\n";
-    if (!effects) return;
-    
-
-    for (const auto& entry : *effects) {
-        EffectFunc effect = TriggerEffects::getEffectById(entry.effectId);
-        if (!effect) continue;
-
-        //get target for condition check
-        int targetCardId = -1;
-        if (serverTargetIndex.has_value() && targetLane.has_value()) {
-            int player = *serverTargetIndex;
-            int lane  = *targetLane;
-
-            if (player >= 0 && player < 2 && lane >= 0 && lane < board.laneCount) {
-                if (board.lanes[player][lane].has_value()) {
-                    targetCardId = *board.lanes[player][lane];
-                } else {
-                    continue;
-                }
-            }
-        }
-
-        if (!entry.condition(*this, targetCardId, targetLane.value_or(-1), serverTargetIndex.value_or(-1))) {
-            continue;
-        }
-
-        if (entry.target.has_value()) {
-            switch (*entry.target) {
-                case Target::Self:
-                    serverTargetIndex = playerIndex;
-                    break;
-                case Target::Opponent:
-                    serverTargetIndex = 1 - playerIndex;
-                    break;
-                case Target::Nil:
-                    break;
-            }
-        }
-
-        effect(
-            *this,
-            playerIndex,
-            targetLane,
-            serverTargetIndex,
-            entry.amount,
-            entry.augment
-        );
-    }
-
+    triggerCardEffects(playerIndex, cardId, targetLane, serverTargetIndex);
 }
 
 void MatchSession::handleDiscard(int playerIndex, int cardId) {
@@ -801,6 +754,50 @@ void MatchSession::setCreature(int targetPlayerIndex, int lane, std::pair<int,in
                     + std::to_string(setToughness - totalToughness) + "\n";
     playerA->send(msg);
     playerB->send(msg);
+}
+
+void MatchSession::triggerCardEffects(int playerIndex, int cardId, std::optional<int> targetLane, std::optional<int> serverTargetIndex, TriggerType triggerType) {
+    auto effects = TriggerEffects::getCardEffects(cardId);
+    std::cout << "CardID: " << cardId << "\n";
+    if (!effects) return;
+    for (const auto& entry : *effects) {
+        if (entry.trigger != triggerType) continue;
+
+        EffectFunc effect = TriggerEffects::getEffectById(entry.effectId);
+        if (!effect) continue;
+
+        int targetCardId = -1;
+        if (serverTargetIndex.has_value() && targetLane.has_value()) {
+            int tPlayer = *serverTargetIndex;
+            int tLane   = *targetLane;
+            if (tPlayer >= 0 && tPlayer < 2 && tLane >= 0 && tLane < board.laneCount) {
+                if (board.lanes[tPlayer][tLane].has_value()) {
+                    targetCardId = *board.lanes[tPlayer][tLane];
+                } else {
+                    continue;
+                }
+            }
+        }
+        if (!entry.condition(*this, targetCardId,
+                             targetLane.value_or(-1),
+                             serverTargetIndex.value_or(-1))) {
+            continue;
+        }
+        if (entry.target.has_value()) {
+            switch (*entry.target) {
+                case Target::Self:
+                    serverTargetIndex = playerIndex;
+                    break;
+                case Target::Opponent:
+                    serverTargetIndex = 1 - playerIndex;
+                    break;
+                case Target::Nil:
+                    break;
+            }
+        }
+        effect(*this, playerIndex, targetLane, serverTargetIndex,
+               entry.amount, entry.augment);
+    }
 }
 
 void MatchSession::addCreatureEffect(int targetPlayerIndex, int lane, int effectBit) {
@@ -1094,6 +1091,28 @@ void MatchSession::resolveLaneCombat(int lane) {
         if (aAlive && bAlive && hasDeathTouchB && powerB > 0 && board.lanes[0][lane].has_value()) {
             destroyCreature(0, lane);
         }
+
+        // Call effects proc'd by kills
+        if (aAlive && !board.lanes[1][lane].has_value()) {
+            // A was alive, B's lane is now empty -> A killed B
+            if (board.lanes[0][lane].has_value()) {
+                triggerCardEffects(0, *board.lanes[0][lane],
+                                std::optional<int>(lane),
+                                std::optional<int>(0),
+                                TriggerType::OnKill);
+            }
+        }
+        if (bAlive && !board.lanes[0][lane].has_value()) {
+            // B was alive, A's lane is now empty -> B killed A
+            if (board.lanes[1][lane].has_value()) {
+                triggerCardEffects(1, *board.lanes[1][lane],
+                                std::optional<int>(lane),
+                                std::optional<int>(1),
+                                TriggerType::OnKill);
+            }
+        }
+
+        
 
         if (overflowA > 0) sendDirectDamage(0, overflowA);
         if (overflowB > 0) sendDirectDamage(1, overflowB);

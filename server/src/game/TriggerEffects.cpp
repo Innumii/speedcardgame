@@ -43,7 +43,7 @@ const std::vector<EffectFunc> TriggerEffects::effects = {
         session.augmentHP(index, *amount);
     },
 
-    //4
+    //4: Set Creature Power/Toughness
     [](MatchSession& session, int, std::optional<int> targetLane,
        std::optional<int> targetIndex, std::optional<int> amount,
        std::optional<std::pair<int,int>> augment) {
@@ -127,6 +127,8 @@ const std::vector<EffectFunc> TriggerEffects::effects = {
             session.augmentHP(opponent, -delta);
         }
     }
+
+
 };
 
 EffectFunc TriggerEffects::getEffectById(int effectId) { //returns EffectFunc, but you still have to call it
@@ -143,66 +145,181 @@ const std::vector<CardEffectEntry>* TriggerEffects::getCardEffects(int cardId) {
 
 const std::unordered_map<int, std::vector<CardEffectEntry>> TriggerEffects::cardToEffectsMap = {
 
+//---------------------------------------------------------- SPELLS ----------------------------------------------------------
+
     //Fireball
-    {1, {CardEffectEntry{0, std::nullopt, std::make_pair(0,-3)} }}, //done
+    {1, { CardEffectEntry{
+        .effectId = 0,
+        .augment  = std::make_pair(0,-3)
+    }}},
 
     //Jo
-    {4, { CardEffectEntry{0, std::nullopt, std::make_pair(4,4), Target::Nil, //done
-        [](const MatchSession& session, int cardId, int, int) {
-        return session.getCard(cardId)->getName() == "Go";}},
-        CardEffectEntry{0, std::nullopt, std::make_pair(2,2), Target::Nil,
-        [](const MatchSession& session, int cardId, int, int) {
-        return session.getCard(cardId)->getName() != "Go";}} 
-        }
-    }, 
+    {4, { CardEffectEntry{
+            .effectId  = 0,
+            .augment   = std::make_pair(4,4),
+            .target    = Target::Nil,
+            .condition = [](const MatchSession& session, int cardId, int, int) {
+                return session.getCard(cardId)->getName() == "Go";
+            }
+          },
+          CardEffectEntry{
+            .effectId  = 0,
+            .augment   = std::make_pair(2,2),
+            .target    = Target::Nil,
+            .condition = [](const MatchSession& session, int cardId, int, int) {
+                return session.getCard(cardId)->getName() != "Go";
+            }
+          }
+    }},
 
     //Flashbang
-    {10, { CardEffectEntry{4, std::nullopt, std::make_pair(0,1)}}}, //done 
+    {10, { CardEffectEntry{
+        .effectId = 4,
+        .augment  = std::make_pair(0,1)
+    }}},
 
     //Fan The Hammer
-    {11, { CardEffectEntry{2, std::nullopt, std::make_pair(0,-1), Target::Opponent}}}, //done
+    {11, { CardEffectEntry{
+        .effectId = 2,
+        .augment  = std::make_pair(0,-1),
+        .target   = Target::Opponent
+    }}},
 
     //With This Sacred Treasure
-    {13, { CardEffectEntry{0, std::nullopt, std::make_pair(5,-1), Target::Nil, //done
-            [](const MatchSession& session, int cardId, int, int) {
-            return session.getCard(cardId)->getName() == "Potential Man";}},
-            CardEffectEntry{0, std::nullopt, std::make_pair(1,1), Target::Nil,
-            [](const MatchSession& session, int cardId, int, int) {
-            return session.getCard(cardId)->getName() != "Potential Man";}}
+    {13, { CardEffectEntry{
+            .effectId  = 0,
+            .augment   = std::make_pair(5,-1),
+            .target    = Target::Nil,
+            .condition = [](const MatchSession& session, int cardId, int, int) {
+                return session.getCard(cardId)->getName() == "Potential Man";
             }
-    }, //conditonal +5/-1
+          },
+          CardEffectEntry{
+            .effectId  = 0,
+            .augment   = std::make_pair(1,1),
+            .target    = Target::Nil,
+            .condition = [](const MatchSession& session, int cardId, int, int) {
+                return session.getCard(cardId)->getName() != "Potential Man";
+            }
+          }
+    }},
 
     //Black Flash
-    {14, { CardEffectEntry{0, std::nullopt, std::make_pair(2,-1)}}}, //done
+    {14, { CardEffectEntry{
+        .effectId = 0,
+        .augment  = std::make_pair(2,-1)
+    }}},
 
     //Do it Again
-    {15, { CardEffectEntry{7, CombatEffects::kDoubleStrike, std::nullopt} }}, // Give Double Strike
+    {15, { CardEffectEntry{
+        .effectId = 7,
+        .amount   = CombatEffects::kDoubleStrike
+    }}},
 
     //Knockout
-    {17, { CardEffectEntry{0, std::nullopt, std::make_pair(-1,-1)}}}, //done
+    {17, { CardEffectEntry{
+        .effectId = 0,
+        .augment  = std::make_pair(-1,-1)
+    }}},
 
     //The Pass
-    {18, { CardEffectEntry{7, CombatEffects::kTrample, std::nullopt} }}, // Give Trample
+    {18, { CardEffectEntry{
+        .effectId = 7,
+        .amount   = CombatEffects::kTrample
+    }}},
 
     //Mr President Get Down
-    {20, { CardEffectEntry{0, std::nullopt, std::make_pair(0,3)} }}, //done
+    {20, { CardEffectEntry{
+        .effectId = 0,
+        .augment  = std::make_pair(0,3)
+    }}},
 
     //Grass Aint Green
-    {22, { CardEffectEntry{10, -1, std::nullopt, Target::Opponent}}}, // NOT WORKING YET
+    {22, { CardEffectEntry{
+        .effectId = 10,
+        .amount   = -1,
+        .target   = Target::Opponent
+    }}},
 
     //Equivalent Exchange
-    {23, { CardEffectEntry{3, -5, std::nullopt}, //done
-           CardEffectEntry{5, 5, std::nullopt} }}, 
+    {23, { CardEffectEntry{
+            .effectId = 3,
+            .amount   = -5
+          },
+          CardEffectEntry{
+            .effectId = 5,
+            .amount   = 5
+          }
+    }},
 
     //Holy Blessing
-    {25, { CardEffectEntry{10, 2, std::nullopt, Target::Self}}},
+    {25, { CardEffectEntry{
+        .effectId = 10,
+        .amount   = 2,
+        .target   = Target::Self
+    }}},
 
     //Aura
-    {26, {CardEffectEntry{2, std::nullopt, std::make_pair(2,2)}}}, //done
+    {26, { CardEffectEntry{
+        .effectId = 2,
+        .augment  = std::make_pair(2,2)
+    }}},
 
     //Final Gambit
-    {29, { CardEffectEntry{11, 10, std::nullopt, Target::Self}}}, // NOT DONE
+    {29, { CardEffectEntry{
+        .effectId = 11,
+        .amount   = 10,
+        .target   = Target::Self
+    }}},
 
     //Cheese Touch
-    {32, { CardEffectEntry{7, CombatEffects::kDeathTouch, std::nullopt} }}
+    {32, { CardEffectEntry{
+        .effectId = 7,
+        .amount   = CombatEffects::kDeathTouch
+    }}},
+
+//---------------------------------------------------------- CREATURES ----------------------------------------------------------
+
+    //Kirby
+    {5, { CardEffectEntry{
+        .effectId = 0,
+        .augment  = std::make_pair(1,1),
+        .trigger  = TriggerType::OnKill
+    }}},
+
+    //Jew
+    {7, { CardEffectEntry{
+            .effectId = 5,
+            .amount   = -2,
+            .target   = Target::Opponent
+          },
+          CardEffectEntry{
+            .effectId = 5,
+            .amount   = 2,
+            .target   = Target::Self
+          }
+    }},
+
+    //Bushcamper
+    {24, { CardEffectEntry{
+        .effectId = 3,
+        .amount   = -2,
+        .target   = Target::Opponent
+    }}},
+
+    //Gun
+    {27, { CardEffectEntry{
+        .effectId = 3,
+        .amount   = -1,
+        .target   = Target::Opponent,
+        .trigger  = TriggerType::OnKill
+    }}},
+
+    //Ay Lmao
+    {28, { CardEffectEntry{
+        .effectId = 3,
+        .amount   = -5,
+        .target   = Target::Self
+    }}},
+
 };
