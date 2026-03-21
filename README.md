@@ -66,3 +66,60 @@ The `auth` and `cards` services support runtime logging toggles through environm
 - `DEBUG_LOG_ENABLED` (default `false`): enables verbose request diagnostics (user-agent and referer).
 
 These vars work in local `docker-compose` and deployed ECS tasks (via Terraform).
+
+## Unit tests
+#### Auth
+```bash 
+cd auth
+```
+1. Install dependencies (first time run)
+   ```bash
+   go get github.com/alicebob/miniredis/v2
+   go mod tidy
+   ```
+2. Run all unit tests
+```bash
+go test ./test/... -p=1 -count=1 -v
+```
+3. Run all tests with coverage
+```bash
+go test ./test/... -p=1 -count=1 -coverprofile=coverage.out -coverpkg=github.com/Ryanljk/speedcardgame/auth/services/...
+```
+4. View coverage summary
+```bash
+go tool cover -func=coverage.out
+```
+5. View coverage as HTML report
+```bash
+go tool cover -html=coverage.out -o coverage.html
+```
+
+#### Cards
+```bash 
+cd cards
+```
+1. Install dependencies (first time run)
+```bash
+go get gorm.io/driver/sqlite
+go get github.com/mattn/go-sqlite3
+go mod tidy
+```
+2. Run all unit tests
+```bash
+go test ./test/... -p=1 -count=1 -v
+```
+3. Run all tests with coverage
+```bash
+go test ./test/... -p=1 -count=1 -coverprofile=coverage.out -coverpkg=github.com/Ryanljk/speedcardgame/cards/services/...
+```
+4. View coverage summary
+```bash
+go tool cover -func=coverage.out
+```
+5. View coverage as HTML report
+```bash
+go tool cover -html=coverage.out -o coverage.html
+```
+
+
+
