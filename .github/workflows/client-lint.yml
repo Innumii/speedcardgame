@@ -3,9 +3,11 @@ on:
   push:
     paths:
       - 'client/**'
+      - '.github/workflows/client-lint.yml'
   pull_request:
     paths:
       - 'client/**'
+      - '.github/workflows/client-lint.yml'
 
 permissions:
   contents: read

@@ -10,9 +10,8 @@ import (
 func TestCreateSession_StoresAndReturnsSessionID(t *testing.T) {
 	_, redisClient := newTestRedis(t)
 	svc := services.NewSessionService(redisClient)
-	ctx := context.Background()
 
-	sessionID, err := svc.CreateSession(ctx, "user-1")
+	sessionID, err := svc.CreateSession(context.Background(), "user-1")
 	if err != nil {
 		t.Fatalf("expected no error, got: %v", err)
 	}
@@ -49,13 +48,23 @@ func TestCreateSession_RejectsExistingSession(t *testing.T) {
 	}
 }
 
+func TestCreateSession_SetFails(t *testing.T) {
+	mr, redisClient := newTestRedis(t)
+	svc := services.NewSessionService(redisClient)
+	mr.Close()
+
+	_, err := svc.CreateSession(context.Background(), "user-1")
+	if err == nil {
+		t.Error("expected error when Redis Set fails, got nil")
+	}
+}
+
 func TestGetSessionBySessionId_Success(t *testing.T) {
 	_, redisClient := newTestRedis(t)
 	svc := services.NewSessionService(redisClient)
 	ctx := context.Background()
 
 	sessionID, _ := svc.CreateSession(ctx, "user-42")
-
 	userID, err := svc.GetSessionBySessionId(ctx, sessionID)
 	if err != nil {
 		t.Fatalf("expected no error, got: %v", err)
@@ -81,7 +90,6 @@ func TestGetSessionByUserId_Success(t *testing.T) {
 	ctx := context.Background()
 
 	sessionID, _ := svc.CreateSession(ctx, "user-7")
-
 	gotSessionID, err := svc.GetSessionByUserId(ctx, "user-7")
 	if err != nil {
 		t.Fatalf("expected no error, got: %v", err)
@@ -97,21 +105,13 @@ func TestDeleteSession_RemovesBothMappings(t *testing.T) {
 	ctx := context.Background()
 
 	sessionID, _ := svc.CreateSession(ctx, "user-5")
-
-	err := svc.DeleteSession(ctx, sessionID)
-	if err != nil {
+	if err := svc.DeleteSession(ctx, sessionID); err != nil {
 		t.Fatalf("expected no error on delete, got: %v", err)
 	}
-
-	// session -> userID mapping should be gone
-	_, err = svc.GetSessionBySessionId(ctx, sessionID)
-	if err == nil {
+	if _, err := svc.GetSessionBySessionId(ctx, sessionID); err == nil {
 		t.Error("expected session->userID mapping to be deleted")
 	}
-
-	// userID -> sessionID mapping should be gone
-	_, err = svc.GetSessionByUserId(ctx, "user-5")
-	if err == nil {
+	if _, err := svc.GetSessionByUserId(ctx, "user-5"); err == nil {
 		t.Error("expected userID->sessionID mapping to be deleted")
 	}
 }
@@ -123,5 +123,19 @@ func TestDeleteSession_NonexistentIsNoop(t *testing.T) {
 	err := svc.DeleteSession(context.Background(), "ghost-session")
 	if err != nil {
 		t.Errorf("expected no error deleting nonexistent session, got: %v", err)
+	}
+}
+
+func TestDeleteSession_DelFails(t *testing.T) {
+	mr, redisClient := newTestRedis(t)
+	svc := services.NewSessionService(redisClient)
+	ctx := context.Background()
+
+	sessionID, _ := svc.CreateSession(ctx, "user-1")
+	mr.Close()
+
+	err := svc.DeleteSession(ctx, sessionID)
+	if err == nil {
+		t.Error("expected error when Redis Del fails, got nil")
 	}
 }

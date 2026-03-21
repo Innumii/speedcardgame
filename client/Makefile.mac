@@ -14,17 +14,32 @@ SDL2_LIBS   := -L$(BREW_PREFIX)/lib -lSDL2 -lSDL2_ttf -lSDL2_image
 CXXFLAGS := $(STD) $(INCLUDES) $(SDL2_CFLAGS) \
              -I$(OPENSSL_PREFIX)/include
 LDFLAGS  := $(SDL2_LIBS) \
-             -L$(OPENSSL_PREFIX)/lib -lssl -lcrypto
+			 -L$(OPENSSL_PREFIX)/lib -lssl -lcrypto \
+			 -framework CoreFoundation -framework Security
 
 BUILD_DIR := build
 SRCS      := $(wildcard src/*.cpp src/*/*.cpp src/*/*/*.cpp)
 OBJS      := $(patsubst src/%.cpp,$(BUILD_DIR)/%.o,$(SRCS))
 DEPS      := $(OBJS:.o=.d)
 
-all: main
+
+DYLIBS := \
+	$(BREW_PREFIX)/lib/libSDL2.dylib \
+	$(BREW_PREFIX)/lib/libSDL2_ttf.dylib \
+	$(BREW_PREFIX)/lib/libSDL2_image.dylib \
+	$(OPENSSL_PREFIX)/lib/libssl.dylib \
+	$(OPENSSL_PREFIX)/lib/libcrypto.dylib
+
+all: main copy-dylibs
+
 
 main: $(OBJS)
 	$(CXX) $(STD) -o $@ $^ $(LDFLAGS)
+
+copy-dylibs:
+	@for dylib in $(DYLIBS); do \
+	  cp -f $$dylib . 2>/dev/null || echo "Warning: $$dylib not found"; \
+	done
 
 $(BUILD_DIR)/%.o: src/%.cpp
 	@mkdir -p $(@D)
