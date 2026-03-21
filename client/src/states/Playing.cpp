@@ -612,7 +612,7 @@ bool Playing::handleServerMessage(const std::string& msg) {
 // std::cout << "[Playing]: " << msg << "\n";
     
     // Stat updates are applied only after combat animation work settles.
-    static const std::vector<std::string> statUpdateCmds = {"AUGMENT", "DESTROY", "HP", "EFFECT_ADD", "EFFECT_REMOVE", "REGEN_SET"};
+    static const std::vector<std::string> statUpdateCmds = {"AUGMENT", "DESTROY", "HP", "EFFECT_ADD", "EFFECT_REMOVE", "REGEN_SET", "MATCH_WON", "MATCH_LOST"};
     if (std::find(statUpdateCmds.begin(), statUpdateCmds.end(), cmd) != statUpdateCmds.end()) {
         if (animationsEnabled && (combatUpdateBarrierActive || animationQueue.hasActiveAnimation())) {
             deferredStatUpdates.push_back(msg);
