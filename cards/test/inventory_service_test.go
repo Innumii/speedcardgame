@@ -102,7 +102,9 @@ func TestCreateInventory_DefaultCards(t *testing.T) {
 		t.Fatalf("expected 200, got %d: %s", rr.Code, rr.Body.String())
 	}
 	var inv models.Inventory
-	json.NewDecoder(rr.Body).Decode(&inv)
+	if err := json.NewDecoder(rr.Body).Decode(&inv); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
 	if len(inv.Cards) == 0 {
 		t.Error("expected default cards")
 	}
@@ -201,7 +203,9 @@ func TestGetInventoryByUserID_NormalizesOnRead(t *testing.T) {
 	rr := httptest.NewRecorder()
 	cardservices.GetInventoryByUserID(rr, withChiParam(httptest.NewRequest(http.MethodGet, "/inventories/1", nil), "uid", "1"))
 	var inv models.Inventory
-	json.NewDecoder(rr.Body).Decode(&inv)
+	if err := json.NewDecoder(rr.Body).Decode(&inv); err != nil {
+	t.Fatalf("failed to decode response: %v", err)
+}
 	if inv.Cards[1] != 4 {
 		t.Errorf("expected 4, got %d", inv.Cards[1])
 	}
@@ -263,7 +267,9 @@ func TestUpdateInventory_AddsCards(t *testing.T) {
 		t.Fatalf("expected 200, got %d", rr.Code)
 	}
 	var inv models.Inventory
-	json.NewDecoder(rr.Body).Decode(&inv)
+	if err := json.NewDecoder(rr.Body).Decode(&inv); err != nil {
+	t.Fatalf("failed to decode response: %v", err)
+}
 	if inv.Cards[1] != 3 {
 		t.Errorf("expected 3, got %d", inv.Cards[1])
 	}
@@ -275,7 +281,9 @@ func TestUpdateInventory_ClampsAtMax(t *testing.T) {
 	rr := httptest.NewRecorder()
 	cardservices.UpdateInventory(rr, jsonRequest(t, http.MethodPut, "/inventories", map[string]interface{}{"uid": 1, "cards": map[string]int{"1": 4}}))
 	var inv models.Inventory
-	json.NewDecoder(rr.Body).Decode(&inv)
+	if err := json.NewDecoder(rr.Body).Decode(&inv); err != nil {
+	t.Fatalf("failed to decode response: %v", err)
+}
 	if inv.Cards[1] != 4 {
 		t.Errorf("expected 4, got %d", inv.Cards[1])
 	}

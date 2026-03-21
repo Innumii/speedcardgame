@@ -156,7 +156,9 @@ func TestListDecks_ReturnsSeedData(t *testing.T) {
 	rr := httptest.NewRecorder()
 	cardservices.ListDecks(rr, httptest.NewRequest(http.MethodGet, "/decks", nil))
 	var decks []models.Deck
-	json.NewDecoder(rr.Body).Decode(&decks)
+	if err := json.NewDecoder(rr.Body).Decode(&decks); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
 	if len(decks) != 2 {
 		t.Errorf("expected 2, got %d", len(decks))
 	}
