@@ -97,14 +97,11 @@ jobs:
         run: |
           cd client/env
           if [ -f .env ]; then
-            sed -i 's/^USE_AWS_SERVICES=.*/USE_AWS_SERVICES=true/' .env
+            sed -i '' 's/^USE_AWS_SERVICES=.*/USE_AWS_SERVICES=true/' .env
           fi
 
       - name: Build client
         run: |
-          export PKG_CONFIG_PATH="$(brew --prefix openssl@3)/lib/pkgconfig:${PKG_CONFIG_PATH:-}"
-          export CPPFLAGS="-I$(brew --prefix openssl@3)/include ${CPPFLAGS:-}"
-          export LDFLAGS="-L$(brew --prefix openssl@3)/lib ${LDFLAGS:-}"
           cd client
           make -f Makefile.mac clean
           make -f Makefile.mac
@@ -121,6 +118,21 @@ jobs:
           if [ -d assets ]; then
             cp -r assets dist/assets
           fi
+
+          # Copy all Homebrew dylibs that main links against
+          otool -L main \
+            | awk '/\/opt\/homebrew\/|\/usr\/local\// { print $1 }' \
+            | while read -r lib; do
+                [ -f "$lib" ] && cp "$lib" dist/
+              done
+
+          # Fix install names so bundled dylibs are found at runtime
+          for lib in dist/*.dylib; do
+            [ -f "$lib" ] || continue
+            orig=$(otool -D "$lib" | tail -1)
+            install_name_tool -change "$orig" \
+              "@executable_path/$(basename "$lib")" dist/main 2>/dev/null || true
+          done
 
           zip -r client-latest-macos.zip dist/
 

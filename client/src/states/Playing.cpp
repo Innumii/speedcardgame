@@ -5,6 +5,7 @@
 #include "animation/AttackAnimation.hpp"
 #include "animation/DeathAnimation.hpp"
 #include "animation/DrawCardAnimation.hpp"
+#include "featureFlag/AnimationFlag.hpp"
 #include "render/RenderPlaying.hpp"
 #include "render/RenderText.hpp"
 #include "render/Theme.hpp"
@@ -229,6 +230,7 @@ void Playing::setup(const Game& game) {
     pendingAction.clear();
     recentSpellPreview.reset();
     recentSpellPreviewUntil = 0;
+    animationsEnabled = AnimationFlag::getAnimationsEnabled();
     running = true;
     lastDrawTick = SDL_GetTicks();
     combatCycleStartTick = lastDrawTick;
@@ -488,7 +490,9 @@ void Playing::run() {
             }
         }
 
-        animationQueue.update(SDL_GetTicks());
+        if (animationsEnabled) {
+            animationQueue.update(SDL_GetTicks());
+        }
     }
 }
 
@@ -521,7 +525,9 @@ void Playing::update(Game& game) {
     }
 
     const Uint32 now = SDL_GetTicks();
-    animationQueue.update(now);
+    if (animationsEnabled) {
+        animationQueue.update(now);
+    }
     processPendingDestroys(now);
 
     int screenW = 0, screenH = 0;
@@ -791,7 +797,7 @@ bool Playing::drawCard(int playerId, int cardId) {
     const SDL_Rect fromRect = computeSelfDeckRect(screenW, screenH);
     const std::size_t handIndex = player.hand.size() - 1;
 
-    if (playerId == localPlayer.id && handIndex < cardRects.size()) {
+    if (animationsEnabled && playerId == localPlayer.id && handIndex < cardRects.size()) {
         animationQueue.enqueue(std::make_shared<DrawCardAnimation>(fromRect, cardRects[handIndex], handIndex, 320U));
     }
 
@@ -856,13 +862,15 @@ void Playing::destroyCreature(int playerId, int lane) {
             return;
         }
 
-        animationQueue.enqueue(std::make_shared<DeathAnimation>(
-            targetLane,
-            targetBoardIndex == 0,
-            playSlots,
-            opponentSlots,
-            260U
-        ));
+        if (animationsEnabled) {
+            animationQueue.enqueue(std::make_shared<DeathAnimation>(
+                targetLane,
+                targetBoardIndex == 0,
+                playSlots,
+                opponentSlots,
+                260U
+            ));
+        }
     };
 
     const auto& targetZone = board.getZone(lane, boardIndex);
@@ -891,6 +899,11 @@ void Playing::destroyCreature(int playerId, int lane) {
         return;
     }
 
+    if (!animationsEnabled) {
+        removeAndAnimate(boardIndex, lane);
+        return;
+    }
+
     static constexpr Uint32 destroyDelayMs = 520U;
     pendingDestroys.push_back(PendingDestroyState{boardIndex, lane, SDL_GetTicks() + destroyDelayMs});
 }
@@ -914,13 +927,15 @@ void Playing::processPendingDestroys(Uint32 now) {
             continue;
         }
 
-        animationQueue.enqueue(std::make_shared<DeathAnimation>(
-            pending.lane,
-            pending.boardIndex == 0,
-            playSlots,
-            opponentSlots,
-            260U
-        ));
+        if (animationsEnabled) {
+            animationQueue.enqueue(std::make_shared<DeathAnimation>(
+                pending.lane,
+                pending.boardIndex == 0,
+                playSlots,
+                opponentSlots,
+                260U
+            ));
+        }
     }
 
     pendingDestroys.swap(stillPending);
@@ -931,6 +946,10 @@ void Playing::resolveLaneCombat(int playerAId, int playerBId, int lane, int powe
     (void)powerB;
 
     if (lane < 0) {
+        return;
+    }
+
+    if (!animationsEnabled) {
         return;
     }
 
@@ -1006,14 +1025,16 @@ void Playing::resolveDirectCombat(int playerId, int lane, int damage) {
         };
     }
 
-    animationQueue.enqueue(std::make_shared<AttackAnimation>(
-        lane,
-        boardIndex == 0,
-        playSlots,
-        opponentSlots,
-        420U,
-        &targetRect
-    ));
+    if (animationsEnabled) {
+        animationQueue.enqueue(std::make_shared<AttackAnimation>(
+            lane,
+            boardIndex == 0,
+            playSlots,
+            opponentSlots,
+            420U,
+            &targetRect
+        ));
+    }
 }
 void Playing::augmentHP(int playerId, int delta) {
     //get player object reference, change HP according to delta

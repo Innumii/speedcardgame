@@ -1,12 +1,13 @@
 #include "states/Title.hpp"
 #include "core/Game.hpp"
+#include "featureFlag/AnimationFlag.hpp"
+#include "render/RenderBackdrop.hpp"
 #include "render/RenderText.hpp"
 #include "render/RenderBanner.hpp"
 #include "render/RenderButton.hpp"
 #include "render/Theme.hpp"
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_ttf.h>
-#include <iostream>
 #include <cmath>
 
 void Title::updateLayout(SDL_Renderer* renderer) {
@@ -81,8 +82,10 @@ void Title::handleEvents(Game& game, const SDL_Event& event) {
         } else if (inOpenPacks) {
             game.setNextState(GameState::PackOpening);
         } else if (inLogout) {
+            game.endUserSession();
             game.getNetworkClient().disconnect();
             game.setPlayerUsername("Player");
+
             game.setNextState(GameState::Login);
         } else if (inQuit) {
             game.setNextState(GameState::Quit);
@@ -128,27 +131,30 @@ void Title::render(const Game& game) {
     int screenW, screenH;
     SDL_GetRendererOutputSize(renderer, &screenW, &screenH);
 
+    const bool animationsEnabled = AnimationFlag::getAnimationsEnabled();
+
     // ── animation timer ──────────────────────────────────────────────
-    if (!animInitialized) {
-        animStartTick   = SDL_GetTicks();
-        animInitialized = true;
+    float elapsed = 999.0f;
+    if (animationsEnabled) {
+        if (!animInitialized) {
+            animStartTick   = SDL_GetTicks();
+            animInitialized = true;
+        }
+        Uint32 now = SDL_GetTicks();
+        elapsed = (now - animStartTick) / 1000.0f;
     }
-    Uint32 now     = SDL_GetTicks();
-    float  elapsed = (now - animStartTick) / 1000.0f;
 
     // ── clear background ─────────────────────────────────────────────
-    SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
-    SDL_SetRenderDrawColor(renderer, Theme::BG.r, Theme::BG.g, Theme::BG.b, 255);
-    SDL_RenderClear(renderer);
-
-    // ── draw vignette ────────────────────────────────────────────────
-    SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
-    for (int i = 0; i < 80; i++) {
-        Uint8 alpha = (Uint8)(120 - i * 1.5f);
-        SDL_SetRenderDrawColor(renderer, 0, 0, 0, alpha);
-        SDL_Rect edge = {i, i, screenW - 2*i, screenH - 2*i};
-        SDL_RenderDrawRect(renderer, &edge);
-    }
+    RenderBackdrop::drawBackgroundWithVignette(
+        renderer,
+        screenW,
+        screenH,
+        Theme::BG,
+        SDL_Color{0, 0, 0, 255},
+        80,
+        1.5f,
+        120
+    );
 
     // ── banner animation ─────────────────────────────────────────────
     float bannerT     = std::min(elapsed / 0.6f, 1.0f);

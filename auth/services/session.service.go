@@ -3,7 +3,6 @@ package services
 import (
 	"context"
 	"fmt"
-	"log"
 	"time"
 
 	"github.com/google/uuid"
@@ -28,12 +27,9 @@ func (s *SessionService) CreateSession(ctx context.Context, userID string) (stri
 	// Check if there's already an active session for this user
 	existingSessionID, err := s.RedisClient.Get(ctx, "userID:"+userID).Result()
 	if err == nil {
-		// Session exists, delete and create new session
-		fmt.Println("Existing session found for user:", existingSessionID, ", deleting...")
-		err = s.DeleteSession(ctx, existingSessionID)
-		if err != nil {
-			log.Printf("Failed to delete session: %v", err)
-		}
+		// Session exists, reject the new login attempt
+		fmt.Println("Existing session found for user:", existingSessionID)
+		return "", fmt.Errorf("you are already logged in")
 	}
 
 	// Generate a new session ID

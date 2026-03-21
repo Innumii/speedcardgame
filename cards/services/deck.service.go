@@ -203,14 +203,19 @@ func FillDecksFromInventories(db *gorm.DB) error {
 	}
 
 	for _, inventory := range inventories {
+		var existingDeck models.Deck
+		err := db.Where("uid = ?", inventory.Uid).First(&existingDeck).Error
+		if err == nil {
+			continue
+		}
+		if err != gorm.ErrRecordNotFound {
+			return err
+		}
+
 		deckCounts := BuildDeckCounts(inventory.Cards, allCards, deckSizeLimit)
 		deck := models.Deck{
 			Uid:   inventory.Uid,
 			Cards: deckCounts,
-		}
-
-		if err := db.Where("uid = ?", inventory.Uid).Delete(&models.Deck{}).Error; err != nil {
-			return err
 		}
 		if err := db.Create(&deck).Error; err != nil {
 			return err

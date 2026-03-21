@@ -111,6 +111,7 @@ private:
     // bool surrendered{false};
     Uint32 combatCycleStartTick{0};
     Uint32 lastCombatSyncTick{0};
+    bool animationsEnabled{true};
     AnimationQueue animationQueue;
 
     struct PendingDestroyState {

@@ -1,24 +1,38 @@
-CXX      := g++
-STD      := -std=c++17
-INCLUDES := -I include $(shell pkg-config --cflags sdl2 SDL2_ttf SDL2_image openssl)
-LIBS     := $(shell pkg-config --libs   sdl2 SDL2_ttf SDL2_image openssl) -framework Security -framework CoreFoundation
-BUILD_DIR := build
-MKDIR_P  := mkdir -p
+# Makefile.mac — macOS build using Homebrew SDL2 + OpenSSL
+CXX := g++
+STD := -std=c++17
+INCLUDES := -I include
 
-SRCS := $(wildcard src/*.cpp src/*/*.cpp src/*/*/*.cpp)
-OBJS := $(patsubst src/%.cpp,$(BUILD_DIR)/%.o,$(SRCS))
-DEPS := $(OBJS:.o=.d)
+BREW_PREFIX    := $(shell brew --prefix)
+OPENSSL_PREFIX := $(shell brew --prefix openssl@3)
+
+# Use pkg-config for SDL2_ttf and SDL2_image; manually set SDL2 include
+# to parent dir so <SDL2/SDL.h> style includes resolve correctly
+SDL2_CFLAGS := -I$(BREW_PREFIX)/include -D_THREAD_SAFE
+SDL2_LIBS   := -L$(BREW_PREFIX)/lib -lSDL2 -lSDL2_ttf -lSDL2_image
+
+CXXFLAGS := $(STD) $(INCLUDES) $(SDL2_CFLAGS) \
+             -I$(OPENSSL_PREFIX)/include
+LDFLAGS  := $(SDL2_LIBS) \
+             -L$(OPENSSL_PREFIX)/lib -lssl -lcrypto
+
+BUILD_DIR := build
+SRCS      := $(wildcard src/*.cpp src/*/*.cpp src/*/*/*.cpp)
+OBJS      := $(patsubst src/%.cpp,$(BUILD_DIR)/%.o,$(SRCS))
+DEPS      := $(OBJS:.o=.d)
 
 all: main
 
 main: $(OBJS)
-	$(CXX) $(STD) -o $@ $^ $(LIBS)
+	$(CXX) $(STD) -o $@ $^ $(LDFLAGS)
 
 $(BUILD_DIR)/%.o: src/%.cpp
-	$(MKDIR_P) $(@D)
-	$(CXX) $(STD) $(INCLUDES) -MMD -MP -c $< -o $@
+	@mkdir -p $(@D)
+	$(CXX) $(CXXFLAGS) -MMD -MP -c $< -o $@
 
 -include $(DEPS)
 
 clean:
-	$(RM) -r $(BUILD_DIR) main
+	rm -rf $(BUILD_DIR) main
+
+.PHONY: all clean
