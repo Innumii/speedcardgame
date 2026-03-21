@@ -5,6 +5,7 @@
 #include "utils/JsonUtil.hpp"
 #include "utils/EnvUtil.hpp"
 #include "utils/RenderUtil.hpp"
+#include "render/RenderBackdrop.hpp"
 #include "render/RenderButton.hpp"
 #include "render/RenderText.hpp"
 #include "render/RenderBanner.hpp"
@@ -35,7 +36,7 @@ namespace {
     }
 
     bool authenticate(const std::string& email, const std::string& password,
-                      int& outId, std::string& error) {
+                      int& outId, std::string& outSessionId, std::string& error) {
         if (email.empty() || password.empty()) {
             error = "email and password required";
             return false;
@@ -59,6 +60,11 @@ namespace {
                 error = "login failed";
             return false;
         }
+        if (!JsonUtil::readJsonStringField(responseBody, "session_id", outSessionId)) {
+            error = "missing session id";
+            return false;
+        }
+
         return parseUserId(responseBody, outId, error);
     }
 }
@@ -188,13 +194,15 @@ void Login::update(Game& game) {
 
         // authentication
         int userId = -1;
+        std::string sessionId;
         std::string error;
-        if (!authenticate(username, password, userId, error)) {
+        if (!authenticate(username, password, userId, sessionId, error)) {
             std::cerr << "Login failed: " << error << '\n';
             statusMessage = error;
             return;
         }
         game.setPlayerId(userId);
+        game.setAuthSessionId(sessionId);
         std::cout << game.getPlayer().id << "\n";
         game.setPlayerUsername(username);
         game.setNextState(GameState::Loading);
@@ -216,14 +224,16 @@ void Login::render(const Game& game) {
     SDL_GetRendererOutputSize(r, &screenW, &screenH);
 
     // ── background + vignette ────────────────────────────────────────
-    SDL_SetRenderDrawColor(r, Theme::BG.r, Theme::BG.g, Theme::BG.b, 255);
-    SDL_RenderClear(r);
-    SDL_SetRenderDrawBlendMode(r, SDL_BLENDMODE_BLEND);
-    for (int i = 0; i < 80; i++) {
-        SDL_SetRenderDrawColor(r, 0, 0, 0, (Uint8)(120 - i * 1.5f));
-        SDL_Rect edge = {i, i, screenW - 2*i, screenH - 2*i};
-        SDL_RenderDrawRect(r, &edge);
-    }
+    RenderBackdrop::drawBackgroundWithVignette(
+        r,
+        screenW,
+        screenH,
+        Theme::BG,
+        SDL_Color{0, 0, 0, 255},
+        80,
+        1.5f,
+        120
+    );
 
     // ── banner ───────────────────────────────────────────────────────
     SDL_Rect bannerRect = {screenW/2 - Theme::BANNER_W/2, 30,

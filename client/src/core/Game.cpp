@@ -9,6 +9,9 @@
 #include <SDL2/SDL_image.h>
 #include "utils/EnvUtil.hpp"
 #include "utils/LoadAvailableCards.hpp"
+#include "utils/HttpUtil.hpp"
+
+#include <map>
 
 namespace {
     int clampPositive(int value, int maxValue) {
@@ -274,6 +277,48 @@ void Game::setPlayerUsername(std::string username) {
     playerUsername = std::move(username);
 }
 
+const std::string& Game::getAuthSessionId() const {
+    return authSessionId;
+}
+
+void Game::setAuthSessionId(std::string sessionId) {
+    authSessionId = std::move(sessionId);
+}
+
+bool Game::hasActiveAuthSession() const {
+    return !authSessionId.empty();
+}
+
+bool Game::endUserSession() {
+    if (authSessionId.empty()) {
+        return true;
+    }
+
+    const std::string host = EnvUtil::getAuthServiceHost();
+    const int port = EnvUtil::getAuthServicePort();
+    std::map<std::string, std::string> headers{{"X-Session-ID", authSessionId}};
+
+    int statusCode = -1;
+    std::string responseBody;
+    const bool reachable = HttpUtil::sendHttpWithHeaders(
+        host,
+        port,
+        "POST",
+        "/auth/logout",
+        "{}",
+        headers,
+        statusCode,
+        responseBody
+    );
+
+    if (!reachable || (statusCode != 200 && statusCode != 401)) {
+        return false;
+    }
+
+    authSessionId.clear();
+    return true;
+}
+
 Playing& Game::getPlayingState() {
     return playingState;
 }
@@ -439,6 +484,7 @@ void Game::render() {
 }
 
 void Game::clean() {
+	endUserSession();
     RenderCard::clearImageCache();
     RenderText::closeFonts(titleFonts);
     RenderText::closeFonts(uiFonts);

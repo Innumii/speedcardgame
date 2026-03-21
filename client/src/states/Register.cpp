@@ -1,12 +1,14 @@
 #include "states/Register.hpp"
 #include "core/Game.hpp"
 #include "render/RenderButton.hpp"
+#include "render/RenderBackdrop.hpp"
 #include "render/RenderBanner.hpp"
 #include "render/RenderText.hpp"
 #include "render/Theme.hpp"
 #include "utils/HttpUtil.hpp"
 #include "utils/JsonUtil.hpp"
 #include "utils/EnvUtil.hpp"
+#include "utils/RenderUtil.hpp"
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_ttf.h>
 #include <algorithm>
@@ -91,11 +93,6 @@ void Register::exit(Game& game) {
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
-bool Register::pointInRect(const SDL_Rect& rect, int x, int y) const {
-    return x >= rect.x && x <= rect.x + rect.w &&
-           y >= rect.y && y <= rect.y + rect.h;
-}
-
 void Register::setActiveField(Field field) {
     activeField = field;
     activeField == Field::None ? SDL_StopTextInput() : SDL_StartTextInput();
@@ -140,19 +137,19 @@ void Register::handleEvents(Game& game, const SDL_Event& event) {
     }
 
     if (event.type == SDL_MOUSEMOTION) {
-        createHover = pointInRect(createButtonRect, event.motion.x, event.motion.y);
-        backHover   = pointInRect(backButtonRect,   event.motion.x, event.motion.y);
+        createHover = RenderUtil::pointInRect(createButtonRect, event.motion.x, event.motion.y);
+        backHover   = RenderUtil::pointInRect(backButtonRect,   event.motion.x, event.motion.y);
     }
 
     if (event.type == SDL_MOUSEBUTTONDOWN && event.button.button == SDL_BUTTON_LEFT) {
         const int mx = event.button.x, my = event.button.y;
-        if      (pointInRect(emailRect,    mx, my)) setActiveField(Field::Email);
-        else if (pointInRect(passwordRect, mx, my)) setActiveField(Field::Password);
-        else if (pointInRect(confirmRect,  mx, my)) setActiveField(Field::ConfirmPassword);
+        if      (RenderUtil::pointInRect(emailRect,    mx, my)) setActiveField(Field::Email);
+        else if (RenderUtil::pointInRect(passwordRect, mx, my)) setActiveField(Field::Password);
+        else if (RenderUtil::pointInRect(confirmRect,  mx, my)) setActiveField(Field::ConfirmPassword);
         else                                        setActiveField(Field::None);
 
-        if      (pointInRect(createButtonRect, mx, my)) createPressed = true;
-        else if (pointInRect(backButtonRect,   mx, my)) backPressed   = true;
+        if      (RenderUtil::pointInRect(createButtonRect, mx, my)) createPressed = true;
+        else if (RenderUtil::pointInRect(backButtonRect,   mx, my)) backPressed   = true;
     }
 
     if (event.type == SDL_TEXTINPUT) {
@@ -233,45 +230,17 @@ void Register::render(const Game& game) {
     int screenW, screenH;
     SDL_GetRendererOutputSize(renderer, &screenW, &screenH);
 
-    // ── rounded rect helper ──────────────────────────────────────────
-    auto fillCircle = [&](int cx, int cy, int r) {
-        for (int dy = -r; dy <= r; dy++) {
-            int dx = (int)sqrt((double)(r*r - dy*dy));
-            SDL_RenderDrawLine(renderer, cx-dx, cy+dy, cx+dx, cy+dy);
-        }
-    };
-
-    auto fillRounded = [&](const SDL_Rect& r, SDL_Color fill, SDL_Color border) {
-        const int rad = Theme::PANEL_RADIUS;
-        SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
-        SDL_SetRenderDrawColor(renderer, fill.r, fill.g, fill.b, fill.a);
-        SDL_Rect body  = {r.x + rad,        r.y,       r.w - 2*rad, r.h        };
-        SDL_Rect left  = {r.x,              r.y + rad, rad,         r.h - 2*rad};
-        SDL_Rect right = {r.x + r.w - rad,  r.y + rad, rad,         r.h - 2*rad};
-        SDL_RenderFillRect(renderer, &body);
-        SDL_RenderFillRect(renderer, &left);
-        SDL_RenderFillRect(renderer, &right);
-        fillCircle(r.x + rad,        r.y + rad,       rad);
-        fillCircle(r.x + r.w - rad,  r.y + rad,       rad);
-        fillCircle(r.x + rad,        r.y + r.h - rad, rad);
-        fillCircle(r.x + r.w - rad,  r.y + r.h - rad, rad);
-        SDL_SetRenderDrawColor(renderer, border.r, border.g, border.b, border.a);
-        SDL_RenderDrawLine(renderer, r.x + rad,    r.y,         r.x + r.w - rad, r.y            );
-        SDL_RenderDrawLine(renderer, r.x + rad,    r.y + r.h,   r.x + r.w - rad, r.y + r.h      );
-        SDL_RenderDrawLine(renderer, r.x,          r.y + rad,   r.x,             r.y + r.h - rad);
-        SDL_RenderDrawLine(renderer, r.x + r.w,    r.y + rad,   r.x + r.w,       r.y + r.h - rad);
-    };
-
     // ── background + vignette ────────────────────────────────────────
-    SDL_SetRenderDrawColor(renderer, Theme::BG.r, Theme::BG.g, Theme::BG.b, 255);
-    SDL_RenderClear(renderer);
-
-    SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
-    for (int i = 0; i < 80; i++) {
-        SDL_SetRenderDrawColor(renderer, 0, 0, 0, (Uint8)(120 - i * 1.5f));
-        SDL_Rect edge = {i, i, screenW - 2*i, screenH - 2*i};
-        SDL_RenderDrawRect(renderer, &edge);
-    }
+    RenderBackdrop::drawBackgroundWithVignette(
+        renderer,
+        screenW,
+        screenH,
+        Theme::BG,
+        SDL_Color{0, 0, 0, 255},
+        80,
+        1.5f,
+        120
+    );
 
     // ── banner ───────────────────────────────────────────────────────
     SDL_Rect bannerRect = {screenW / 2 - Theme::BANNER_W / 2, 30,
@@ -282,7 +251,8 @@ void Register::render(const Game& game) {
                               Theme::BANNER_TEXT,  Theme::BANNER_GLOW);
 
     // ── panel ────────────────────────────────────────────────────────
-    fillRounded(panelRect, Theme::PANEL_FILL, Theme::PANEL_BORDER);
+    RenderUtil::drawRoundedShadow(renderer, panelRect, Theme::PANEL_RADIUS, Theme::Effects::SHADOW_OFFSET, Theme::Effects::SHADOW_COLOR);
+    RenderUtil::drawRoundedRect(renderer, panelRect, Theme::PANEL_RADIUS, Theme::PANEL_FILL, Theme::PANEL_BORDER);
 
     // ── panel title ──────────────────────────────────────────────────
     if (titleFonts.medium) {

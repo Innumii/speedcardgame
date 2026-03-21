@@ -13,6 +13,7 @@ package controllers
 import (
 	"context"
 	"net/http"
+	"strings"
 
 	"github.com/Ryanljk/speedcardgame/auth/dtos"
 	"github.com/Ryanljk/speedcardgame/auth/services"
@@ -22,6 +23,20 @@ import (
 
 type AuthController struct {
 	AuthService *services.AuthService
+}
+
+func sessionIDFromRequest(c *gin.Context) (string, bool) {
+	sessionID, err := c.Cookie("session_id")
+	if err == nil && strings.TrimSpace(sessionID) != "" {
+		return sessionID, true
+	}
+
+	headerSessionID := strings.TrimSpace(c.GetHeader("X-Session-ID"))
+	if headerSessionID != "" {
+		return headerSessionID, true
+	}
+
+	return "", false
 }
 
 // Constructor function
@@ -77,6 +92,10 @@ func (controller *AuthController) Login(c *gin.Context) {
 
 	user, sessionID, err := controller.AuthService.Login(context.Background(), loginDTO)
 	if err != nil {
+		if err.Error() == "you are already logged in" {
+			c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
+			return
+		}
 		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
 		return
 	}
@@ -84,7 +103,7 @@ func (controller *AuthController) Login(c *gin.Context) {
 	// Set session ID as a cookie
 	c.SetCookie("session_id", sessionID, 3600*24, "/", "localhost", false, true)
 
-	c.JSON(http.StatusOK, gin.H{"message": "login successful", "user": user})
+	c.JSON(http.StatusOK, gin.H{"message": "login successful", "user": user, "session_id": sessionID})
 }
 
 // @Summary Logout user
@@ -96,15 +115,14 @@ func (controller *AuthController) Login(c *gin.Context) {
 // @Failure 500
 // @Router /logout [post]
 func (controller *AuthController) Logout(c *gin.Context) {
-	// Retrieve session ID from the cookie
-	sessionID, err := c.Cookie("session_id")
-	if err != nil {
+	sessionID, ok := sessionIDFromRequest(c)
+	if !ok {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "No session ID provided"})
 		return
 	}
 
 	// Call the AuthService to log out and delete the session
-	err = controller.AuthService.Logout(context.Background(), sessionID)
+	err := controller.AuthService.Logout(context.Background(), sessionID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to log out"})
 		return
@@ -125,9 +143,8 @@ func (controller *AuthController) Logout(c *gin.Context) {
 // @Failure 401
 // @Router /me [get]
 func (controller *AuthController) GetMe(c *gin.Context) {
-	// Retrieve session ID from the cookie
-	sessionID, err := c.Cookie("session_id")
-	if err != nil {
+	sessionID, ok := sessionIDFromRequest(c)
+	if !ok {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "No session ID provided"})
 		return
 	}

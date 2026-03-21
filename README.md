@@ -16,6 +16,9 @@
 
 The client now defaults to AWS service endpoints.
 
+- `ENABLE_ANIMATIONS=true` (default): enables menu and gameplay animations.
+- `ENABLE_ANIMATIONS=false`: disables all queued gameplay animations and menu intro motion.
+
 - `USE_AWS_SERVICES=true` (default): use AWS endpoint env vars
         - `AWS_AUTH_SERVICE_HOST` / `AWS_AUTH_SERVICE_PORT` (default port `443`)
         - `AWS_CARDS_SERVICE_HOST` / `AWS_CARDS_SERVICE_PORT` (default port `443`)

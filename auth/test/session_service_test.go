@@ -21,24 +21,31 @@ func TestCreateSession_StoresAndReturnsSessionID(t *testing.T) {
 	}
 }
 
-func TestCreateSession_ReplacesExistingSession(t *testing.T) {
+func TestCreateSession_RejectsExistingSession(t *testing.T) {
 	_, redisClient := newTestRedis(t)
 	svc := services.NewSessionService(redisClient)
 	ctx := context.Background()
 
-	firstID, _ := svc.CreateSession(ctx, "user-1")
-	secondID, err := svc.CreateSession(ctx, "user-1")
+	firstID, err := svc.CreateSession(ctx, "user-1")
 	if err != nil {
-		t.Fatalf("expected no error on second session create, got: %v", err)
-	}
-	if firstID == secondID {
-		t.Error("expected a new session ID to replace the old one")
+		t.Fatalf("expected no error on first session create, got: %v", err)
 	}
 
-	// Old session should no longer resolve
-	_, err = svc.GetSessionBySessionId(ctx, firstID)
+	secondID, err := svc.CreateSession(ctx, "user-1")
 	if err == nil {
-		t.Error("expected old session to be invalidated")
+		t.Fatal("expected error on second session create, got nil")
+	}
+	if err.Error() != "you are already logged in" {
+		t.Fatalf("expected 'you are already logged in', got: %v", err)
+	}
+	if secondID != "" {
+		t.Errorf("expected empty session ID on rejection, got %q", secondID)
+	}
+
+	// Existing session must remain valid.
+	_, err = svc.GetSessionBySessionId(ctx, firstID)
+	if err != nil {
+		t.Fatalf("expected original session to remain valid, got: %v", err)
 	}
 }
 

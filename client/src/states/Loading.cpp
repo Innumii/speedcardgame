@@ -3,6 +3,7 @@
 #include "core/Game.hpp"
 #include "objects/Card.h"
 #include "render/RenderBanner.hpp"
+#include "render/RenderBackdrop.hpp"
 #include "render/RenderCard.hpp"
 #include "render/RenderText.hpp"
 #include "render/Theme.hpp"
@@ -97,22 +98,16 @@ void Loading::render(const Game& game) {
     int screenH = Theme::SCREEN_DEFAULT_HEIGHT;
     SDL_GetRendererOutputSize(renderer, &screenW, &screenH);
 
-    SDL_SetRenderDrawColor(renderer, Theme::BG.r, Theme::BG.g, Theme::BG.b, 255);
-    SDL_RenderClear(renderer);
-
-    SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
-    for (int i = 0; i < Theme::Loading::VIGNETTE_LAYERS; ++i) {
-        const Uint8 alpha = static_cast<Uint8>(
-            Theme::Loading::VIGNETTE_MAX_ALPHA - i * Theme::Loading::VIGNETTE_ALPHA_FALLOFF
-        );
-        SDL_SetRenderDrawColor(renderer,
-                               Theme::Loading::VIGNETTE_COLOR.r,
-                               Theme::Loading::VIGNETTE_COLOR.g,
-                               Theme::Loading::VIGNETTE_COLOR.b,
-                               alpha);
-        SDL_Rect edge{i, i, screenW - 2 * i, screenH - 2 * i};
-        SDL_RenderDrawRect(renderer, &edge);
-    }
+    RenderBackdrop::drawBackgroundWithVignette(
+        renderer,
+        screenW,
+        screenH,
+        Theme::BG,
+        Theme::Loading::VIGNETTE_COLOR,
+        Theme::Loading::VIGNETTE_LAYERS,
+        Theme::Loading::VIGNETTE_ALPHA_FALLOFF,
+        Theme::Loading::VIGNETTE_MAX_ALPHA
+    );
 
     SDL_Rect panel{
         screenW / 2 - (Theme::Loading::PANEL_WIDTH / 2),
