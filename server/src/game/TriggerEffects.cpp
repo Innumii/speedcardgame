@@ -126,8 +126,15 @@ const std::vector<EffectFunc> TriggerEffects::effects = {
         if (delta != 0) {
             session.augmentHP(opponent, -delta);
         }
-    }
+    },
 
+    //12: Draw power
+    [](MatchSession& session, int playerIndex, std::optional<int>,
+       std::optional<int>, std::optional<int> amount,
+       std::optional<std::pair<int,int>>) {
+        if ( !amount) return;
+        for (int i = 0; i < *amount; i++) session.draw(playerIndex);
+    },
 
 };
 
@@ -276,6 +283,12 @@ const std::unordered_map<int, std::vector<CardEffectEntry>> TriggerEffects::card
     {32, { CardEffectEntry{
         .effectId = 7,
         .amount   = CombatEffects::kDeathTouch
+    }}},
+
+    //Pot of Greed
+    {36, { CardEffectEntry{
+        .effectId = 12,
+        .amount   = 2
     }}},
 
 //---------------------------------------------------------- CREATURES ----------------------------------------------------------

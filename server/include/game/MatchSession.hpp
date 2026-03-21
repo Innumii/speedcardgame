@@ -86,7 +86,7 @@ public:
     //setup phase
     void setupDecks();
     void sendOpeningHands();
-    bool drawAndSend(int playerIndex);
+    bool naturalDraw(int playerIndex);
     bool loadDeckForPlayer(int playerId, ServerDeck& outDeck);
 
     //--------------player actions--------------
@@ -128,6 +128,8 @@ public:
     void removeCreatureEffect(int targetPlayerIndex, int lane, int effectBit);
     //REGEN_SET <playerId> <lane> <value>
     void setCreatureRegen(int targetPlayerIndex, int lane, int regenValue);
+    //DRAW <playerId>
+    bool draw(int playerIndex);
     //--------------board actions--------------
 
     //Battle Phase

@@ -216,21 +216,17 @@ void MatchSession::setupDecks() {
 
 void MatchSession::sendOpeningHands() {
     for (int i = 0; i < 6; ++i) {
-        drawAndSend(0);
-        drawAndSend(1);
+        naturalDraw(0);
+        naturalDraw(1);
     }
 }
 
 
 //Draw function: playerIndex player draws 1 card, other player will also receive instruction that their opponent drew 1 card
-bool MatchSession::drawAndSend(int playerIndex) {
+
+bool MatchSession::draw(int playerIndex) {
     auto& player = players[playerIndex];
     auto& deck = player.deck;
-
-    int handSize = player.hand.size();
-    if (handSize >= handLimit) {
-        return false;
-    }
 
     auto cardIdOpt = deck.draw();
     if (!cardIdOpt) {
@@ -251,6 +247,15 @@ bool MatchSession::drawAndSend(int playerIndex) {
     playerB->send("DRAW " + std::to_string(player.id) + " " + std::to_string(cardId) + "\n");
 
     return true;
+}
+
+bool MatchSession::naturalDraw(int playerIndex) {
+    auto& player = players[playerIndex];
+    int handSize = player.hand.size();
+    if (handSize >= handLimit) {
+        return false;
+    }
+    return draw(playerIndex);
 }
 
 // --------------------------------------------------
@@ -290,8 +295,8 @@ void MatchSession::gameLoop() {
         auto now = steady_clock::now();
 
         if (duration_cast<seconds>(now - lastDrawTime).count() >= drawInterval) {
-            drawAndSend(0);
-            drawAndSend(1);
+            naturalDraw(0);
+            naturalDraw(1);
             lastDrawTime = now;
         }
 
