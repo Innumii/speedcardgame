@@ -131,7 +131,6 @@ func TestUpdateCard_UpdateType(t *testing.T) {
 	if err := json.NewDecoder(rr.Body).Decode(&card); err != nil {
     t.Fatalf("failed to decode response: %v", err)
 }
-invent
 	if card.Type != "NewType" {
 		t.Errorf("expected 'NewType', got %q", card.Type)
 	}
