@@ -113,6 +113,8 @@ private:
     Uint32 lastCombatSyncTick{0};
     bool animationsEnabled{true};
     AnimationQueue animationQueue;
+    bool combatUpdateBarrierActive{false};
+    std::vector<std::string> deferredStatUpdates;
 
     struct PendingDestroyState {
         int boardIndex{0};
@@ -150,6 +152,7 @@ private:
     // -------------------------
     bool resolvePendingActionAt(int x, int y);
     void processPendingDestroys(Uint32 now);
+    void flushDeferredStatUpdatesIfReady();
 
     std::vector<SDL_Rect> computeCardLayout(std::size_t count, int screenW, int screenH) const;
     void computeZones(int screenW, int screenH);

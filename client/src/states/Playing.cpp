@@ -529,6 +529,7 @@ void Playing::update(Game& game) {
         animationQueue.update(now);
     }
     processPendingDestroys(now);
+    flushDeferredStatUpdatesIfReady();
 
     int screenW = 0, screenH = 0;
     SDL_GetRendererOutputSize(renderer, &screenW, &screenH);
@@ -570,6 +571,24 @@ void Playing::update(Game& game) {
     }
 }
 
+void Playing::flushDeferredStatUpdatesIfReady() {
+    if (deferredStatUpdates.empty()) {
+        return;
+    }
+
+    if (animationsEnabled && animationQueue.hasActiveAnimation()) {
+        return;
+    }
+
+    combatUpdateBarrierActive = false;
+
+    auto updates = deferredStatUpdates;
+    deferredStatUpdates.clear();
+    for (const auto& msg : updates) {
+        handleServerMessage(msg);
+    }
+}
+
 //need to refactor into command map at some point. Current method is repetitive
 bool Playing::handleServerMessage(const std::string& msg) {
     std::istringstream iss(msg);
@@ -591,6 +610,15 @@ bool Playing::handleServerMessage(const std::string& msg) {
 
 // std::cout << "[Playing]: " << msg << "\n";
     
+    // Stat updates are applied only after combat animation work settles.
+    static const std::vector<std::string> statUpdateCmds = {"AUGMENT", "DESTROY", "HP", "EFFECT_ADD", "EFFECT_REMOVE", "REGEN_SET"};
+    if (std::find(statUpdateCmds.begin(), statUpdateCmds.end(), cmd) != statUpdateCmds.end()) {
+        if (animationsEnabled && (combatUpdateBarrierActive || animationQueue.hasActiveAnimation())) {
+            deferredStatUpdates.push_back(msg);
+            return true;
+        }
+    }
+
     if (cmd == "DRAW") {
         int playerId, cardId;
         iss >> playerId >> cardId;
@@ -647,12 +675,14 @@ bool Playing::handleServerMessage(const std::string& msg) {
     } else if (cmd == "COMBAT") { //use this to call rendering for the cards attacking each other
         int playerAId, playerBId, lane, powerA, powerB;
         iss >> playerAId >> playerBId >> lane >> powerA >> powerB;
+        combatUpdateBarrierActive = animationsEnabled;
         syncCombatTimeline();
         resolveLaneCombat(playerAId, playerBId, lane, powerA, powerB);
 
     } else if (cmd == "DIRECT") { //use this to call rendering for direct attack
         int playerId, lane, damage;
         iss >> playerId >> lane >> damage;
+        combatUpdateBarrierActive = animationsEnabled;
         syncCombatTimeline();
         resolveDirectCombat(playerId, lane, damage);
 
