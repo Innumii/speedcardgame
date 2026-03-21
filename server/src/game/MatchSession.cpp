@@ -1047,6 +1047,8 @@ void MatchSession::resolveLaneCombat(int lane) {
         int powerB = bAlive ? getCreaturePower(1, lane) : 0;
         int toughnessA = aAlive ? getCreatureToughness(0, lane) : 0;
         int toughnessB = bAlive ? getCreatureToughness(1, lane) : 0;
+        
+
 
         if (aAlive && !bAlive && powerA > 0) {
             sendDirectDamage(0, powerA);
@@ -1075,6 +1077,17 @@ void MatchSession::resolveLaneCombat(int lane) {
             overflowB = powerB - lethalToA;
             if (overflowB < 0) overflowB = 0;
         }
+
+        // Broadcast combat event
+        std::ostringstream ss;
+        ss << "COMBAT "
+           << players[0].id << " "
+           << players[1].id << " "
+           << lane << " "
+           << powerA << " "
+           << powerB << "\n";
+        playerA->send(ss.str());
+        playerB->send(ss.str());
 
         // Apply damage
         if (aAlive && powerA > 0) {
@@ -1111,22 +1124,9 @@ void MatchSession::resolveLaneCombat(int lane) {
                                 TriggerType::OnKill);
             }
         }
-
-        
-
         if (overflowA > 0) sendDirectDamage(0, overflowA);
         if (overflowB > 0) sendDirectDamage(1, overflowB);
 
-        // Broadcast combat event
-        std::ostringstream ss;
-        ss << "COMBAT "
-           << players[0].id << " "
-           << players[1].id << " "
-           << lane << " "
-           << powerA << " "
-           << powerB << "\n";
-        playerA->send(ss.str());
-        playerB->send(ss.str());
     };
 
     // Regen ticks once per lane combat cycle; trigger heal after every 2 combats.

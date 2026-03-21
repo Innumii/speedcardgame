@@ -792,6 +792,8 @@ bool Playing::drawCard(int playerId, int cardId) {
         return false;
     }
 
+    if (playerId != localPlayer.id) return true;
+
     cardRects = computeCardLayout(player.hand.size(), screenW, screenH);
     computeZones(screenW, screenH);
     const SDL_Rect fromRect = computeSelfDeckRect(screenW, screenH);
@@ -922,10 +924,7 @@ void Playing::processPendingDestroys(Uint32 now) {
             continue;
         }
 
-        std::unique_ptr<Card> card;
-        if (!board.removeFromPlay(pending.lane, pending.boardIndex, card)) {
-            continue;
-        }
+        
 
         if (animationsEnabled) {
             animationQueue.enqueue(std::make_shared<DeathAnimation>(
@@ -935,6 +934,10 @@ void Playing::processPendingDestroys(Uint32 now) {
                 opponentSlots,
                 260U
             ));
+        }
+        std::unique_ptr<Card> card;
+        if (!board.removeFromPlay(pending.lane, pending.boardIndex, card)) {
+            continue;
         }
     }
 

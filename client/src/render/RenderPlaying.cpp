@@ -67,17 +67,24 @@ void RenderPlaying::render(Playing& playing, const Game& game) {
 	const bool hoveringDiscard = RenderUtil::pointInRect(playing.discardZone, mouseX, mouseY);
 	const bool hoveringMenu = RenderUtil::pointInRect(playing.menuButton, mouseX, mouseY);
 
-	const std::shared_ptr<const AnimationInterface> activeAnimation = playing.animationQueue.getActiveAnimation();
-	const std::shared_ptr<const DrawCardAnimation> activeDrawAnimation = PlayingRenderUtil::findDrawAnimation(activeAnimation);
+	const auto& activeAnimations = playing.animationQueue.getActiveAnimations();
+
+	std::vector<std::shared_ptr<const DrawCardAnimation>> activeDrawAnimations;
+	for (const auto& anim : activeAnimations) {
+		auto found = PlayingRenderUtil::findDrawAnimation(anim);
+		if (found) activeDrawAnimations.push_back(found);
+	}
+
+	const bool hasActiveDrawCard = !activeDrawAnimations.empty();
 
 	const bool draggingCard = playing.drag.active && playing.drag.index < playing.localPlayer.hand.size();
-	const bool hasActiveDrawCard = static_cast<bool>(activeDrawAnimation);
-	const std::size_t activeDrawCardIndex = hasActiveDrawCard ? activeDrawAnimation->getHandIndex() : static_cast<std::size_t>(-1);
 
 	std::vector<PlayingRenderUtil::AttackRenderFrame> activeAttackFrames;
 	std::vector<PlayingRenderUtil::DeathRenderFrame> activeDeathFrames;
-	PlayingRenderUtil::collectAttackFrames(activeAnimation, activeAttackFrames);
-	PlayingRenderUtil::collectDeathFrames(activeAnimation, activeDeathFrames);
+	for (const auto& anim : activeAnimations) {
+		PlayingRenderUtil::collectAttackFrames(anim, activeAttackFrames);
+		PlayingRenderUtil::collectDeathFrames(anim, activeDeathFrames);
+	}
 
 	std::set<std::pair<int, int>> attackingSlots;
 	for (const auto& frame : activeAttackFrames) {
@@ -336,8 +343,8 @@ void RenderPlaying::render(Playing& playing, const Game& game) {
 		}
 	}
 
-	if (hasActiveDrawCard) {
-		RenderCard::drawCardBack(renderer, activeDrawAnimation->getCurrentRect());
+	for (const auto& drawAnim : activeDrawAnimations) {
+		RenderCard::drawCardBack(renderer, drawAnim->getCurrentRect());
 	}
 
 	if (!activeDeathFrames.empty()) {
