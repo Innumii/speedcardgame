@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/Ryanljk/speedcardgame/auth/models"
+	"github.com/Ryanljk/speedcardgame/auth/repositories"
 )
 
 // MockUserRepository implements repositories.UserRepository for testing
@@ -18,6 +19,8 @@ type MockUserRepository struct {
 	ClearPasswordResetTokenFn func(userID uint) error
 	ChangePasswordFn          func(userID uint, newPassword string) error
 }
+
+var _ repositories.UserRepository = (*MockUserRepository)(nil)
 
 func (m *MockUserRepository) FindByEmail(email string) (*models.User, error) {
 	return m.FindByEmailFn(email)

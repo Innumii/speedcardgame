@@ -13,7 +13,9 @@
 
 #include "objects/ServerDeck.h"
 #include "objects/ServerCard.h"
+#include "game/TriggerEffects.hpp"
 
+enum TriggerType;
 class PlayerConnection;
 
 // ----------------------------
@@ -104,6 +106,7 @@ public:
     int getCreaturesOwned(int playerIndex) const;
     const std::string getUsername(int playerIndex) const;
     const int getPlayerHealth(int playerIndex) const;
+    void triggerCardEffects(int playerIndex,int cardId, std::optional<int> targetLane, std::optional<int> serverTargetIndex, TriggerType triggerType = TriggerType::OnCast);
 
 
     //--------------board actions--------------
