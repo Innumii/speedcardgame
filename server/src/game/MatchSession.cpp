@@ -233,7 +233,11 @@ bool MatchSession::drawAndSend(int playerIndex) {
     }
 
     auto cardIdOpt = deck.draw();
-    if (!cardIdOpt) return false;
+    if (!cardIdOpt) {
+        augmentHP(playerIndex, -player.fatigueDamage);
+        player.fatigueDamage+=1;
+        return false;
+    }
 
     int cardId = *cardIdOpt;
 
@@ -408,6 +412,7 @@ void MatchSession::handleSurrender(int surrenderingPlayerIndex) {
 }
 
 void MatchSession::handleSummon(int playerIndex, int cardId, int lane) {
+    if (!running.load()) return;
     auto& player = players[playerIndex];
 
     if (lane < 0 || lane >= board.laneCount) return;
@@ -463,6 +468,7 @@ void MatchSession::handleSummon(int playerIndex, int cardId, int lane) {
 // targetIndex: 0(casting player), 1(casting player's opponent), -1(all or none)
 // targetLane: board lane selected as target
 void MatchSession::handleSpell(int playerIndex, int cardId, int lane, std::optional<int> targetLane, std::optional<int> targetIndex) {
+    if (!running.load()) return;
     PlayerState& player = players[playerIndex];
 
     const ServerCard* card = getCard(cardId);
@@ -530,6 +536,7 @@ void MatchSession::handleSpell(int playerIndex, int cardId, int lane, std::optio
 }
 
 void MatchSession::handleDiscard(int playerIndex, int cardId) {
+    if (!running.load()) return;
     auto& player = players[playerIndex];
 
     const ServerCard* card = getCard(cardId);
@@ -633,6 +640,7 @@ std::vector<int>::iterator MatchSession::findCardInHand(PlayerState& player, int
 //AUGMENT <playerId> <lane> <powerDelta> <toughnessDelta>
 void MatchSession::augmentCreature(int targetPlayerIndex, int lane, std::pair<int,int> augment) {
     // Safety checks
+    if (!running.load()) return;
     if (targetPlayerIndex < 0 || targetPlayerIndex >= 2) {
         std::cout << "[augmentCreature] targetPlayerIndex: " << std::to_string(targetPlayerIndex) << "\n";
         return;
@@ -702,6 +710,7 @@ void MatchSession::augmentCreature(int targetPlayerIndex, int lane, std::pair<in
 
 void MatchSession::setCreature(int targetPlayerIndex, int lane, std::pair<int,int> augment) {
     // Safety checks
+    if (!running.load()) return;
     if (targetPlayerIndex < 0 || targetPlayerIndex >= 2) return;
     if (lane < 0 || lane >= board.laneCount) return;
 
@@ -757,6 +766,8 @@ void MatchSession::setCreature(int targetPlayerIndex, int lane, std::pair<int,in
 }
 
 void MatchSession::triggerCardEffects(int playerIndex, int cardId, std::optional<int> targetLane, std::optional<int> serverTargetIndex, TriggerType triggerType) {
+    if (!running.load()) return;
+
     auto effects = TriggerEffects::getCardEffects(cardId);
     std::cout << "CardID: " << cardId << "\n";
     if (!effects) return;
@@ -801,6 +812,7 @@ void MatchSession::triggerCardEffects(int playerIndex, int cardId, std::optional
 }
 
 void MatchSession::addCreatureEffect(int targetPlayerIndex, int lane, int effectBit) {
+    if (!running.load()) return;
     if (targetPlayerIndex < 0 || targetPlayerIndex >= 2) return;
     if (lane < 0 || lane >= board.laneCount) return;
     if (!board.lanes[targetPlayerIndex][lane].has_value()) return;
@@ -816,6 +828,7 @@ void MatchSession::addCreatureEffect(int targetPlayerIndex, int lane, int effect
 }
 
 void MatchSession::removeCreatureEffect(int targetPlayerIndex, int lane, int effectBit) {
+    if (!running.load()) return;
     if (targetPlayerIndex < 0 || targetPlayerIndex >= 2) return;
     if (lane < 0 || lane >= board.laneCount) return;
     if (!board.lanes[targetPlayerIndex][lane].has_value()) return;
@@ -831,6 +844,7 @@ void MatchSession::removeCreatureEffect(int targetPlayerIndex, int lane, int eff
 }
 
 void MatchSession::setCreatureRegen(int targetPlayerIndex, int lane, int regenValue) {
+    if (!running.load()) return;
     if (targetPlayerIndex < 0 || targetPlayerIndex >= 2) return;
     if (lane < 0 || lane >= board.laneCount) return;
     if (!board.lanes[targetPlayerIndex][lane].has_value()) return;
@@ -857,6 +871,7 @@ void MatchSession::setCreatureRegen(int targetPlayerIndex, int lane, int regenVa
 //DESTROY <playerId> <lane>
 void MatchSession::destroyCreature(int targetPlayerIndex, int lane) {
     // Safety checks
+    if (!running.load()) return;
     if (targetPlayerIndex < 0 || targetPlayerIndex >= 2) return;
     if (lane < 0 || lane >= board.laneCount) return;
 
@@ -892,9 +907,13 @@ void MatchSession::destroyCreature(int targetPlayerIndex, int lane) {
 //raises or lowers player health 
 //HP <playerId> <delta>
 void MatchSession::augmentHP(int playerIndex, int amount){
+    if (!running.load()) return;
     players[playerIndex].health += amount;
     std::string msg = "HP " + std::to_string(players[playerIndex].id) + " "
                     + std::to_string(amount)+ "\n";
+
+    std::cout << "[augmentHP] " << msg;
+
     playerA->send(msg);
     playerB->send(msg);
 
@@ -910,6 +929,7 @@ void MatchSession::augmentHP(int playerIndex, int amount){
 } 
 
 void MatchSession::setHP(int playerIndex, int amount){
+    if (!running.load()) return;
     int delta = players[playerIndex].health - amount;
     players[playerIndex].health = amount;
 
@@ -920,6 +940,7 @@ void MatchSession::setHP(int playerIndex, int amount){
 } 
 
 void MatchSession::augmentMana(int playerIndex, int amount){
+    if (!running.load()) return;
     players[playerIndex].mana += amount;
     std::string msg = "MANA " + std::to_string(players[playerIndex].id) + " "
                     + std::to_string(amount)+ "\n";
@@ -929,6 +950,8 @@ void MatchSession::augmentMana(int playerIndex, int amount){
 
 //COMBAT FUNCTIONS GO HERE
 int MatchSession::getCreaturePower(int playerIndex, int lane) {
+    std::cout << "[getCreaturePower] running=" << running.load() << " player=" << playerIndex << " lane=" << lane << "\n";
+
     auto& cardOpt = board.lanes[playerIndex][lane];
     if (!cardOpt) return 0;
 
@@ -997,6 +1020,7 @@ void MatchSession::resolveAttackPhase() {
 // COMBAT <lane> <playerA's card power> <playerB's card power>
 // DIRECT <attacker ID> <lane> <damage>
 void MatchSession::resolveLaneCombat(int lane) {
+    if (!running.load()) return;
     auto& cardA = board.lanes[0][lane];
     auto& cardB = board.lanes[1][lane];
 
@@ -1011,6 +1035,7 @@ void MatchSession::resolveLaneCombat(int lane) {
     };
 
     auto sendDirectDamage = [this, lane](int attackerIndex, int damage) {
+        if (!running.load()) return;
         if (damage <= 0) return;
 
         std::cout << "[Combat] Direct attack: "
@@ -1036,6 +1061,7 @@ void MatchSession::resolveLaneCombat(int lane) {
     const bool hasDeathTouchB = hasEffect(1, lane, CombatEffects::kDeathTouch);
 
     auto resolveCombatOnce = [&](bool allowDoubleStrikePhase) {
+        if (!running.load()) return;
         (void)allowDoubleStrikePhase;
 
         // Check if creatures are still alive
@@ -1098,10 +1124,10 @@ void MatchSession::resolveLaneCombat(int lane) {
         }
 
         // Deathtouch: any positive combat damage is lethal to creatures.
-        if (aAlive && bAlive && hasDeathTouchA && powerA > 0 && board.lanes[1][lane].has_value()) {
+        if (aAlive && bAlive && hasDeathTouchA && powerA > 0) {
             destroyCreature(1, lane);
         }
-        if (aAlive && bAlive && hasDeathTouchB && powerB > 0 && board.lanes[0][lane].has_value()) {
+        if (aAlive && bAlive && hasDeathTouchB && powerB > 0) {
             destroyCreature(0, lane);
         }
 
@@ -1162,7 +1188,7 @@ void MatchSession::resolveLaneCombat(int lane) {
     if (hasDoubleStrikeA || hasDoubleStrikeB) {
         resolveCombatOnce(true);
     }
-
+    if (!running.load()) return; // THIS LINE
     // Normal combat phase
     resolveCombatOnce(false);
 }

@@ -235,6 +235,7 @@ void Playing::setup(const Game& game) {
     lastDrawTick = SDL_GetTicks();
     combatCycleStartTick = lastDrawTick;
     lastCombatSyncTick = 0;
+    deferredStatUpdates.clear(); // add this
 
     if (!authority) {
         authority = std::make_unique<LocalAuthority>(
@@ -1071,6 +1072,7 @@ void Playing::resolveDirectCombat(int playerId, int lane, int damage) {
 }
 void Playing::augmentHP(int playerId, int delta) {
     //get player object reference, change HP according to delta
+    // std::cout << "[DEBUG] AUGMENTING OF " << delta << "\n";
     Player& player = (playerId == localPlayer.id) ? localPlayer : remotePlayer;
     player.health += delta;
 }
