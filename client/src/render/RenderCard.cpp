@@ -455,6 +455,7 @@ namespace {
             const SDL_Color textBodyColor = card.hasGrantedEffects()
                 ? Theme::Card::STAT_VALUE_BUFFED
                 : Theme::Card::TEXT_BODY;
+            TTF_SetFontWrappedAlign(uiFont, TTF_WRAPPED_ALIGN_CENTER);
             for (const std::string& line : textLines) {
                 SDL_Surface* s = TTF_RenderUTF8_Blended_Wrapped(
                     uiFont, line.c_str(), textBodyColor, static_cast<Uint32>(textClip.w));

@@ -442,7 +442,7 @@ void RenderPlaying::render(Playing& playing, const Game& game) {
 				textRenderer,
 				*previewCard,
 				panel,
-				uiFonts.large,
+				uiFonts.small,
 				titleFonts.medium,
 				playing.previewScrollOffset
 			);
