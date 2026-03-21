@@ -23,7 +23,7 @@ const std::vector<EffectFunc> TriggerEffects::effects = {
         session.destroyCreature(*targetIndex, *targetLane);
     },
 
-    // 2: Splash augment (augment all lanes for one side)
+    // 2: Splash creature augment (augment all lanes for one side)
     [](MatchSession& session, int, std::optional<int>, 
        std::optional<int> targetIndex, std::optional<int>, 
        std::optional<std::pair<int,int>> augment) {
@@ -290,6 +290,26 @@ const std::unordered_map<int, std::vector<CardEffectEntry>> TriggerEffects::card
         .effectId = 12,
         .amount   = 2
     }}},
+
+    //Devil's Lettuce
+    {37, { CardEffectEntry{
+            .effectId = 9,
+            .amount   = 3
+          }
+        }},
+
+    //Mossad Mayhem
+    {38, { CardEffectEntry{
+            .effectId = 3,
+            .amount   = -10,
+            .target = Target::Self
+          },
+           CardEffectEntry{
+            .effectId = 2,
+            .augment  = std::make_pair(0,-5),
+            .target = Target::Opponent
+          },
+        }},
 
 //---------------------------------------------------------- CREATURES ----------------------------------------------------------
 

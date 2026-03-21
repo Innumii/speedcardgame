@@ -35,3 +35,5 @@ cid,name,type,cost,value,power,toughness,effect
 34,Australian Spider,Creature,4,2,1,6,"Deathtouch"
 35,The Great Wall,Creature,8,4,2,10,"regen 4"
 36,Pot of Greed,Spell,2,1,0,0,"Draw 2 Cards"
+37,Devil's Lettuce,Spell,4,2,0,0,"Target creature gains Regen 3"
+38,Mossad Mayhem,Spell,5,1,0,0,"Lose 10 HP, deal 5 damage to all opponent creatures"
