@@ -230,6 +230,7 @@ void Playing::setup(const Game& game) {
     pendingAction.clear();
     recentSpellPreview.reset();
     recentSpellPreviewUntil = 0;
+    recentSpellPreviewStartTick = 0;
     animationsEnabled = AnimationFlag::getAnimationsEnabled();
     running = true;
     lastDrawTick = SDL_GetTicks();
@@ -569,6 +570,7 @@ void Playing::update(Game& game) {
     if (recentSpellPreviewUntil != 0 && now >= recentSpellPreviewUntil) {
         recentSpellPreview.reset();
         recentSpellPreviewUntil = 0;
+        recentSpellPreviewStartTick = 0;
     }
 }
 
@@ -779,6 +781,7 @@ void Playing::playSpell(int playerId, std::unique_ptr<Card> card, int sourceLane
 
     recentSpellPreview = card->clone();
     recentSpellPreviewUntil = SDL_GetTicks() + Theme::Playing::SPELL_CAST_PREVIEW_DURATION_MS;
+    recentSpellPreviewStartTick = SDL_GetTicks();
 
     std::string name = card->getName();
     player.mana -= card->getManaCost();

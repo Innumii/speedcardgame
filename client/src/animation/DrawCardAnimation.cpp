@@ -50,6 +50,10 @@ std::size_t DrawCardAnimation::getHandIndex() const {
     return handIndex;
 }
 
+float DrawCardAnimation::getProgress() const {
+    return std::clamp(elapsedSeconds / durationSeconds, 0.0F, 1.0F);
+}
+
 void DrawCardAnimation::updateDestination(SDL_Rect newDest) { 
     endRect = newDest; 
 }

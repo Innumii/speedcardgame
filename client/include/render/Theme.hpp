@@ -100,7 +100,7 @@ namespace Theme {
         constexpr int PREVIEW_MARGIN                   = 20;
         constexpr int SIDE_PREVIEW_MAX_WIDTH           = 260;
         constexpr int SIDE_PREVIEW_TOP_OFFSET          = 8;
-        constexpr Uint32 SPELL_CAST_PREVIEW_DURATION_MS = 2000;
+        constexpr Uint32 SPELL_CAST_PREVIEW_DURATION_MS = 1000;
         constexpr int OVERLAY_MARGIN                   = 20;
 
         constexpr int OPPONENT_BAR_WIDTH               = 480;

@@ -22,6 +22,7 @@
 #include <string>
 #include <utility>
 #include <vector>
+#include <render/RenderCardOverlay.hpp>
 
 void RenderPlaying::render(Playing& playing, const Game& game) {
 	SDL_Renderer* renderer = game.getRenderer();
@@ -344,7 +345,35 @@ void RenderPlaying::render(Playing& playing, const Game& game) {
 	}
 
 	for (const auto& drawAnim : activeDrawAnimations) {
-		RenderCard::drawCardBack(renderer, drawAnim->getCurrentRect());
+		const SDL_Rect rect     = drawAnim->getCurrentRect();
+		const float    progress = drawAnim->getProgress();
+
+		constexpr float flipStartProgress = 0.55F;
+
+		if (progress < flipStartProgress) {
+			RenderCard::drawCardBack(renderer, rect);
+		} else {
+			const float t          = (progress - flipStartProgress) / (1.0F - flipStartProgress);
+			const float widthScale = std::abs(1.0F - 2.0F * t);
+			const int   scaledW    = std::max(1, static_cast<int>(rect.w * widthScale));
+			const SDL_Rect flipRect{
+				rect.x + (rect.w - scaledW) / 2,
+				rect.y,
+				scaledW,
+				rect.h
+			};
+
+			if (t < 0.5F) {
+				RenderCard::drawCardBack(renderer, flipRect);
+			} else {
+				const std::size_t idx = drawAnim->getHandIndex();
+				if (idx < playing.localPlayer.hand.size() && playing.localPlayer.hand[idx]) {
+					RenderCard::drawHandCard(renderer, textRenderer,
+											*playing.localPlayer.hand[idx],
+											flipRect, uiFonts.tiny, uiFonts.small);
+				}
+			}
+		}
 	}
 
 	if (!activeDeathFrames.empty()) {
@@ -437,6 +466,43 @@ void RenderPlaying::render(Playing& playing, const Game& game) {
 			}
 
 			SDL_Rect panel{previewX, previewY, previewW, previewH};
+
+			// Entrance + exit scale animation — only for spell previews
+			if (playing.recentSpellPreview && previewCard == playing.recentSpellPreview.get()) {
+				constexpr Uint32 entranceDurationMs = 180U;
+				constexpr Uint32 exitDurationMs     = 130U;
+				constexpr float  peakScale          = 1.12F;
+				constexpr float  exitMinScale       = 0.75F;
+
+				const Uint32 elapsed   = now - playing.recentSpellPreviewStartTick;
+				const Uint32 remaining = playing.recentSpellPreviewUntil > now
+									? playing.recentSpellPreviewUntil - now : 0;
+
+				float scale = 1.0F;
+
+				if (elapsed < entranceDurationMs) {
+					// Entrance: ease out from peakScale → 1.0
+					const float t     = static_cast<float>(elapsed) / static_cast<float>(entranceDurationMs);
+					const float eased = 1.0F - (1.0F - t) * (1.0F - t);
+					scale = peakScale - (peakScale - 1.0F) * eased;
+				} else if (remaining < exitDurationMs) {
+					// Exit: ease in from 1.0 → exitMinScale (shrinks away)
+					const float t     = 1.0F - static_cast<float>(remaining) / static_cast<float>(exitDurationMs);
+					const float eased = t * t;
+					scale = 1.0F - (1.0F - exitMinScale) * eased;
+				}
+
+				if (scale != 1.0F) {
+					const int scaledW = static_cast<int>(previewW * scale);
+					const int scaledH = static_cast<int>(previewH * scale);
+					panel = {
+						previewX - (scaledW - previewW) / 2,
+						previewY - (scaledH - previewH) / 2,
+						scaledW,
+						scaledH
+					};
+				}
+			}
 			RenderCard::drawPreview(
 				renderer,
 				textRenderer,
@@ -446,6 +512,11 @@ void RenderPlaying::render(Playing& playing, const Game& game) {
 				titleFonts.medium,
 				playing.previewScrollOffset
 			);
+
+			// Shimmer overlay — spell previews only
+			if (playing.recentSpellPreview && previewCard == playing.recentSpellPreview.get()) {
+    				RenderCardOverlay::overlayShimmer(renderer, panel, now);
+			}
 		}
 	}
 

@@ -124,6 +124,8 @@ private:
     std::vector<PendingDestroyState> pendingDestroys;
     std::unique_ptr<Card> recentSpellPreview;
     Uint32 recentSpellPreviewUntil{0};
+    Uint32 recentSpellPreviewStartTick{0};
+
 
     // -------------------------
     // Pending action (targeting system)
