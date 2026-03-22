@@ -1,6 +1,7 @@
 ﻿#include "render/RenderPlaying.hpp"
 
 #include "animation/DrawCardAnimation.hpp"
+#include "animation/DiscardAnimation.hpp"
 #include "core/Game.hpp"
 #include "render/RenderBoard.hpp"
 #include "render/RenderButton.hpp"
@@ -23,6 +24,7 @@
 #include <utility>
 #include <vector>
 #include <render/RenderCardOverlay.hpp>
+#include <iostream>
 
 void RenderPlaying::render(Playing& playing, const Game& game) {
 	SDL_Renderer* renderer = game.getRenderer();
@@ -339,8 +341,9 @@ void RenderPlaying::render(Playing& playing, const Game& game) {
 		if (draggingCard && i == playing.drag.index) continue;
 		if (playing.animationQueue.hasPendingDrawForIndex(i)) continue;
 		if (i < playing.cardRects.size() && playing.localPlayer.hand[i]) {
-			RenderCard::drawHandCard(renderer, textRenderer, *playing.localPlayer.hand[i], 
-			                         playing.cardRects[i], uiFonts.tiny, uiFonts.small);
+			if (DiscardAnimation::hasPending(playing.localPlayer.hand[i]->getId())) continue;
+			RenderCard::drawHandCard(renderer, textRenderer, *playing.localPlayer.hand[i],
+									playing.cardRects[i], uiFonts.tiny, uiFonts.small);
 		}
 	}
 
@@ -418,6 +421,36 @@ void RenderPlaying::render(Playing& playing, const Game& game) {
 
 			RenderCard::drawBoardCard(renderer, textRenderer, *zone.value(), frame.rect, uiFonts.tiny, uiFonts.small);
 		}
+	}
+
+	// collect active discard animations (same pattern as draw animations)
+	std::vector<std::shared_ptr< DiscardAnimation>> activeDiscardAnimations;
+	for (const auto& anim : activeAnimations) {
+		if (auto found = std::dynamic_pointer_cast< DiscardAnimation>(anim))
+			activeDiscardAnimations.push_back(found);
+	}
+
+	// draw them
+	for (const auto& discardAnim : activeDiscardAnimations) {
+		const SDL_Rect rect  = discardAnim->getRect();
+		const Card*    card  = discardAnim->getOwnedCard();
+		if (!card) continue;
+
+		if (!discardAnim->getCachedTexture()) {
+			SDL_Texture* target = SDL_CreateTexture(renderer,
+				SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET, rect.w, rect.h);
+			if (!target) continue;
+			SDL_SetTextureBlendMode(target, SDL_BLENDMODE_BLEND);
+			SDL_SetRenderTarget(renderer, target);
+			SDL_SetRenderDrawColor(renderer, 0, 0, 0, 0);
+			SDL_RenderClear(renderer);
+			RenderCard::drawHandCard(renderer, textRenderer, *card,
+									{0, 0, rect.w, rect.h}, uiFonts.tiny, uiFonts.small);
+			SDL_SetRenderTarget(renderer, nullptr);
+			discardAnim->setCachedTexture(target);
+		}
+
+		discardAnim->drawDisintegration(renderer, now);
 	}
 
 	if (draggingCard && playing.drag.index < playing.cardRects.size()) {

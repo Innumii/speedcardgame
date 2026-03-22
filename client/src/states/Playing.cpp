@@ -4,6 +4,7 @@
 #include "animation/AnimationGroup.hpp"
 #include "animation/AttackAnimation.hpp"
 #include "animation/DeathAnimation.hpp"
+#include "animation/DiscardAnimation.hpp"
 #include "animation/DrawCardAnimation.hpp"
 #include "featureFlag/AnimationFlag.hpp"
 #include "render/RenderPlaying.hpp"
@@ -402,6 +403,15 @@ void Playing::handleEvents(Game& game, const SDL_Event& event) {
                 if (droppedInDiscard) {
                     auto& card = localPlayer.hand[drag.index];
                     std::cout << "[Playing] Attempting to Discard " << card->getName() << "\n";
+                    if (animationsEnabled) {
+                        SDL_Rect animRect{
+                            drag.x,
+                            drag.y,
+                            Theme::Playing::CARD_WIDTH,
+                            Theme::Playing::CARD_HEIGHT
+                        };
+                        DiscardAnimation::stagePending(animRect, card->getId(), 500U, card->clone());
+                    }
                     authority->discardCard(card->getId());
                 }
                 else if (laneIndex >= 0) {
@@ -572,6 +582,7 @@ void Playing::update(Game& game) {
         recentSpellPreviewUntil = 0;
         recentSpellPreviewStartTick = 0;
     }
+    DiscardAnimation::cleanupStalePending(now);
 }
 
 void Playing::flushDeferredStatUpdatesIfReady() {
@@ -851,9 +862,19 @@ void Playing::discardCard(int playerId, int cardId) {
                                return c->getId() == cardId;
                            });
 
-    if (it == player->hand.end()) {
-        // Card not found (maybe already discarded?), just ignore
-        return;
+    if (it == player->hand.end()) return;
+
+    // Snapshot old rects before hand changes
+    const std::vector<SDL_Rect> oldRects = cardRects;
+    const std::size_t discardedIdx = static_cast<std::size_t>(
+        std::distance(player->hand.begin(), it));
+
+    if (playerId == localPlayer.id && animationsEnabled) {
+        auto anim = DiscardAnimation::takePending(cardId);
+        if (!anim && discardedIdx < oldRects.size()) {
+            anim = std::make_shared<DiscardAnimation>(oldRects[discardedIdx], cardId, 500U);
+        }
+        if (anim) animationQueue.enqueue(anim);
     }
 
     std::unique_ptr<Card> cardToDiscard = std::move(*it);
