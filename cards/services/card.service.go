@@ -21,6 +21,18 @@ var inputCard struct {
 	Effect    string `json:"effect"`
 }
 
+
+// CreateCard godoc
+// @Summary      Create a card
+// @Description  Creates a new card. Admin use only.
+// @Tags         cards
+// @Accept       json
+// @Produce      json
+// @Param        body  body      object  true  "Card details"
+// @Success      200   {object}  models.Card
+// @Failure      400   {string}  string  "Invalid input"
+// @Failure      500   {string}  string  "Failed to create card"
+
 // create a new card, ONLY FOR ADMIN USE
 func CreateCard(w http.ResponseWriter, r *http.Request) {
 
@@ -58,6 +70,16 @@ func CreateCard(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+
+// ListCards godoc
+// @Summary      List all cards
+// @Description  Returns all cards ordered by card ID
+// @Tags         cards
+// @Produce      json
+// @Success      200  {array}   models.Card
+// @Failure      500  {string}  string  "Failed to retrieve cards"
+// @Router       /cards [get]
+
 // List cards within the page range by Cid order
 func ListCards(w http.ResponseWriter, _ *http.Request) {
 	var cards []models.Card
@@ -75,6 +97,20 @@ func ListCards(w http.ResponseWriter, _ *http.Request) {
 		return
 	}
 }
+
+
+// UpdateCard godoc
+// @Summary      Update a card
+// @Description  Updates one or more fields of an existing card. Admin use only.
+// @Tags         cards
+// @Accept       json
+// @Produce      json
+// @Param        body  body      object  true  "Fields to update (include cid)"
+// @Success      200   {object}  models.Card
+// @Failure      400   {string}  string  "Invalid input or no valid fields"
+// @Failure      404   {string}  string  "Card not found"
+// @Failure      500   {string}  string  "Failed to update card"
+// @Router       /cards [put]
 
 // Update Card details, ONLY FOR ADMIN USE
 func UpdateCard(w http.ResponseWriter, r *http.Request) {
@@ -130,6 +166,21 @@ func UpdateCard(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 }
+
+
+
+// DeleteCard godoc
+// @Summary      Delete a card
+// @Description  Deletes a card by its card ID. Admin use only.
+// @Tags         cards
+// @Accept       json
+// @Produce      json
+// @Param        body  body      object  true  "Card ID"
+// @Success      200   {object}  models.Card
+// @Failure      400   {string}  string  "Invalid input"
+// @Failure      404   {string}  string  "Card not found"
+// @Failure      500   {string}  string  "Failed to delete card"
+// @Router       /cards [delete]
 
 func DeleteCard(w http.ResponseWriter, r *http.Request) {
 	if err := json.NewDecoder(r.Body).Decode(&inputCard); err != nil {

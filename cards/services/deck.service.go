@@ -40,6 +40,18 @@ func CountDeckCards(cards models.CardCounts) int {
 }
 
 // CreateDeck creates a new deck for a user
+
+// CreateDeck godoc
+// @Summary      Create a deck
+// @Description  Creates a new deck for a user. Replaces existing deck. Must contain exactly DECK_SIZE cards (default 30).
+// @Tags         decks
+// @Accept       json
+// @Produce      json
+// @Param        body  body      object  true  "Deck details"
+// @Success      200   {object}  models.Deck
+// @Failure      400   {string}  string  "Invalid input or wrong deck size"
+// @Failure      500   {string}  string  "Failed to create deck"
+// @Router       /decks [post]
 func CreateDeck(w http.ResponseWriter, r *http.Request) {
 	var inputDeck struct {
 		Uid   int               `json:"uid"`
@@ -92,6 +104,15 @@ func CreateDeck(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+
+// ListDecks godoc
+// @Summary      List all decks
+// @Description  Returns all decks for all users
+// @Tags         decks
+// @Produce      json
+// @Success      200  {array}   models.Deck
+// @Failure      500  {string}  string  "Failed to retrieve decks"
+// @Router       /decks [get]
 func ListDecks(w http.ResponseWriter, _ *http.Request) {
 	var decks []models.Deck
 
@@ -109,6 +130,18 @@ func ListDecks(w http.ResponseWriter, _ *http.Request) {
 	}
 }
 
+
+// DeleteDeck godoc
+// @Summary      Delete a deck
+// @Description  Deletes a deck by user ID
+// @Tags         decks
+// @Accept       json
+// @Produce      json
+// @Param        body  body      object  true  "User ID"
+// @Success      200   {object}  map[string]string
+// @Failure      400   {string}  string  "Invalid input"
+// @Failure      500   {string}  string  "Failed to delete deck"
+// @Router       /decks [delete]
 func DeleteDeck(w http.ResponseWriter, r *http.Request) {
 	var inputDeck struct {
 		Uid   int               `json:"uid"`
@@ -135,6 +168,18 @@ func DeleteDeck(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// FillDeckForUser godoc
+// @Summary      Fill deck from inventory
+// @Description  Automatically fills a deck for a user based on their inventory
+// @Tags         decks
+// @Accept       json
+// @Produce      json
+// @Param        body  body      object  true  "User ID"
+// @Success      200   {object}  models.Deck
+// @Failure      400   {string}  string  "Invalid input"
+// @Failure      404   {string}  string  "Inventory not found"
+// @Failure      500   {string}  string  "Failed to fill deck"
+// @Router       /decks/fill [post]
 func FillDeckForUser(w http.ResponseWriter, r *http.Request) {
 	var input struct {
 		Uid int `json:"uid"`
@@ -264,6 +309,16 @@ func BuildDeckCounts(inventory models.CardCounts, allCards []models.Card, limit 
 }
 
 // GetDeckByUserID handles GET /decks/{uid}
+// GetDeckByUserID godoc
+// @Summary      Get deck by user ID
+// @Description  Returns a user's current deck
+// @Tags         decks
+// @Produce      json
+// @Param        uid  path      int  true  "User ID"
+// @Success      200  {object}  models.Deck
+// @Failure      400  {string}  string  "Invalid user ID"
+// @Failure      404  {string}  string  "Deck not found"
+// @Router       /decks/{uid} [get]
 func GetDeckByUserID(w http.ResponseWriter, r *http.Request) {
 	uidStr := chi.URLParam(r, "uid")
 	uid, err := strconv.Atoi(uidStr)

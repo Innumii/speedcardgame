@@ -8,6 +8,9 @@ import (
 	"path/filepath"
 	"strings"
 
+	httpSwagger "github.com/swaggo/http-swagger"
+	_ "github.com/Ryanljk/speedcardgame/cards/docs"
+
 	"github.com/Ryanljk/speedcardgame/cards/config"
 	"github.com/Ryanljk/speedcardgame/cards/models"
 	"github.com/Ryanljk/speedcardgame/cards/services"
@@ -133,6 +136,11 @@ func main() {
 	r.Put("/inventories", services.UpdateInventory)            // Update inventory by user ID
 	r.Put("/inventories/coins", services.UpdateInventoryCoins)    // Update inventory coins by user ID
 	r.Put("/inventories/coins/add", services.AddInventoryCoins)    // Add coins/subtract
+
+
+	r.Get("/swagger/*", httpSwagger.Handler(
+		httpSwagger.URL("/cards/swagger/doc.json"),
+	))
 
 	// router.Mount("/cardbase", r) //api prefix
 	router.Mount("/cards", r)
