@@ -16,6 +16,7 @@ public:
     void render(const Game& game);
 
 private:
+    int maxRetryRounds{3};
     bool cardsPrepared{false};
     bool deckPrepared{false};
     std::size_t retryRounds{0};

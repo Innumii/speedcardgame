@@ -76,11 +76,17 @@ void Loading::update(Game& game) {
         }
 
         if (cachedCount < totalCards) {
-            ++retryRounds;
-            currentCardIndex = 0;
-            statusMessage = "Caching card art... (" + std::to_string(cachedCount) + "/" +
-                std::to_string(totalCards) + ", retry " + std::to_string(retryRounds) + ")";
-            return;
+
+            if (retryRounds >= MaxRetryRounds) {
+                statusMessage = "Failed to download, return to login";
+                game.setNextState(GameState::Login);
+            } else {
+                ++retryRounds;
+                currentCardIndex = 0;
+                statusMessage = "Caching card art... (" + std::to_string(cachedCount) + "/" +
+                    std::to_string(totalCards) + ", retry " + std::to_string(retryRounds) + ")";
+                return;
+            }
         }
     }
 
