@@ -90,7 +90,7 @@ namespace Theme {
         constexpr int SCREEN_MARGIN                    = 20;
         constexpr int SIDE_ZONE_MARGIN                 = 10;
         constexpr int SELF_DECK_GAP                    = 20;
-        constexpr int OPPONENT_SIDE_GAP                = 28;
+        constexpr int OPPONENT_SIDE_GAP                = 20;
         constexpr int OPPONENT_ZONE_OFFSET             = 210;
 
         constexpr Uint32 HOVER_PREVIEW_DELAY_MS        = 300;
@@ -172,7 +172,7 @@ namespace Theme {
 
         constexpr SDL_Color PAUSE_OVERLAY              = {0, 0, 0, 190};
         constexpr SDL_Color EXIT_OVERLAY               = {0, 0, 0, 190};
-        constexpr SDL_Color SURRENDER_OVERLAY          = {0, 0, 0, 220};
+        constexpr SDL_Color SURRENDER_OVERLAY          = {0, 0, 0, 200};
 
         constexpr SDL_Color PAUSE_MODAL_BORDER         = {160, 120, 200, 255};
         constexpr SDL_Color EXIT_MODAL_BORDER          = {240, 192, 64, 150};
