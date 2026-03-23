@@ -84,7 +84,7 @@ void Loading::update(Game& game) {
                 ++retryRounds;
                 currentCardIndex = 0;
                 statusMessage = "Caching card art... (" + std::to_string(cachedCount) + "/" +
-                    std::to_string(totalCards) + ", retry " + std::to_string(retryRounds) + ")";
+                    std::to_string(totalCards) + ", retry " + std::to_string(retryRounds) + "/" + std::to_string(maxRetryRounds) + ")";
                 return;
             }
         }
