@@ -24,15 +24,12 @@ void Connecting::handleEvents(Game& game, const SDL_Event& event) {
     if (event.type == SDL_QUIT) {
         game.setNextState(GameState::Quit);
     }
-
-    
 }
 
 void Connecting::update(Game& game) {
     if (!started) {
         started = true;
 
-        // Launch async connect ONCE
         connectionThread = std::thread([this, &game]() {
             bool ok = game.getNetworkClient().connectTo(serverIp, serverPort);
             success = ok;
@@ -40,14 +37,11 @@ void Connecting::update(Game& game) {
         });
     }
 
-    // Main thread polls result
     if (finished) {
         if (success) {
             std::cout << "Connection succeeded!\n";
-            // sends player data to server and waits for response in Waiting state
 
             const int playerId = game.getPlayerId();
-            // std::cout << "[Connecting] " << playerId;
             const std::string& username = game.getPlayerUsername();
 
             auto escapeJson = [](const std::string& input) {
@@ -98,9 +92,13 @@ void Connecting::render(const Game& game) {
     SDL_SetRenderDrawColor(renderer, Theme::BG.r, Theme::BG.g, Theme::BG.b, 255);
     SDL_RenderClear(renderer);
 
-    // ── panel layout (centered) ───────────────
-    const int panelW = 420;
-    const int panelH = 140; // taller to fit 2 buttons stacked
+    // ── panel layout (centered, scaled) ──────────────────────────────
+    const float scale = std::min(
+        static_cast<float>(screenW) / 1200.0F,
+        static_cast<float>(screenH) / 850.0F);
+
+    const int panelW = static_cast<int>(420 * scale);
+    const int panelH = static_cast<int>(140 * scale);
 
     SDL_Rect panel{
         (screenW - panelW) / 2,
@@ -109,19 +107,14 @@ void Connecting::render(const Game& game) {
         panelH
     };
 
-    SDL_Color panelFill   = Theme::BANNER_FILL;
-    SDL_Color borderColor = Theme::BANNER_BORDER;
-    SDL_Color textColor   = Theme::BANNER_TEXT;
-
     RenderBanner::drawBanner(
         renderer,
         panel,
         "Connecting to Server...",
         uiFonts.large,
-        panelFill,
-        borderColor,
-        textColor,
+        Theme::BANNER_FILL,
+        Theme::BANNER_BORDER,
+        Theme::BANNER_TEXT,
         Theme::BANNER_GLOW
     );
-    
 }

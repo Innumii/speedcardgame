@@ -17,11 +17,15 @@
 #include <iostream>
 #include <sstream>
 #include <cmath>
+
 // ── network helpers ───────────────────────────────────────────────────────────
 
 namespace {
     constexpr std::size_t kMaxUsernameLen = 64;
     constexpr std::size_t kMaxPasswordLen = 32;
+
+    constexpr float kRefW = 1200.0F;
+    constexpr float kRefH = 850.0F;
 
     bool parseUserId(const std::string& body, int& outId, std::string& error) {
         std::string userJson;
@@ -51,7 +55,6 @@ namespace {
         int statusCode = -1;
         std::string responseBody;
         if (!HttpUtil::sendHttp(host, port, "POST", "/auth/login", payload.str(), statusCode, responseBody)) {
-            // std::cout << host << "\n";
             error = "auth service unreachable";
             return false;
         }
@@ -87,7 +90,6 @@ void Login::exit(Game& game) {
     backHover       = false;
 }
 
-
 void Login::setActiveField(Field field) {
     activeField = field;
     activeField == Field::None ? SDL_StopTextInput() : SDL_StartTextInput();
@@ -97,27 +99,59 @@ void Login::updateLayout(SDL_Renderer* renderer) {
     int screenW = 800, screenH = 600;
     if (renderer) SDL_GetRendererOutputSize(renderer, &screenW, &screenH);
 
-    const int panelW  = std::min(520, (int)(screenW * 0.75f));
-    const int panelH  = 420;
-    const int panelX  = (screenW - panelW) / 2;
-    const int panelY  = (screenH - panelH) / 2 + 20;  // pushed down for banner
+    const float scale = std::min(
+        static_cast<float>(screenW) / kRefW,
+        static_cast<float>(screenH) / kRefH);
+
+    // All reference values are in 1200x850 space
+    const int inputH     = static_cast<int>(52  * scale);
+    const int inputGapY  = static_cast<int>(40  * scale);
+    const int btnH       = static_cast<int>(52  * scale);
+    const int btnGapY    = static_cast<int>(36  * scale);
+    const int titleSpace = static_cast<int>(120 * scale);
+    const int panelPad   = static_cast<int>(40  * scale);
+    const int btnGapX    = static_cast<int>(16  * scale);
+    const int labelOffY  = static_cast<int>(30  * scale);
+
+    // Panel height derived from its contents, not hardcoded
+    const int panelH = titleSpace
+                     + inputH + inputGapY
+                     + inputH + btnGapY
+                     + btnH
+                     + static_cast<int>(40 * scale);  // bottom padding
+
+    const int panelW = std::min(
+        static_cast<int>(520 * scale),
+        static_cast<int>(screenW * 0.75f));
+
+    const int bannerH    = static_cast<int>(Theme::BANNER_H * scale);
+    const int bannerTopY = static_cast<int>(30 * scale);
+    const int panelX     = (screenW - panelW) / 2;
+    const int panelY     = (screenH - panelH) / 2 + static_cast<int>(20 * scale);
+
     panelRect = {panelX, panelY, panelW, panelH};
 
-    const int inputW  = panelW - 80;
-    const int inputH  = 52;                            // taller inputs
-    const int inputX  = panelX + 40;
-    int       cursorY = panelY + 120;                   // more space for title
+    const int inputW = panelW - panelPad * 2;
+    const int inputX = panelX + panelPad;
+    int cursorY      = panelY + titleSpace;
 
     usernameRect = {inputX, cursorY, inputW, inputH};
-    cursorY += inputH + 40;                            // generous spacing
+    cursorY += inputH + inputGapY;
 
     passwordRect = {inputX, cursorY, inputW, inputH};
-    cursorY += inputH + 36;
+    cursorY += inputH + btnGapY;
 
-    const int btnW = (inputW - 16) / 2;
-    const int btnH = 52;
-    loginButtonRect = {inputX,          cursorY, btnW, btnH};
-    backButtonRect  = {inputX + btnW + 16, cursorY, btnW, btnH};
+    const int btnW      = (inputW - btnGapX) / 2;
+    loginButtonRect = {inputX,            cursorY, btnW, btnH};
+    backButtonRect  = {inputX + btnW + btnGapX, cursorY, btnW, btnH};
+
+    // Store scale for use in render()
+    cachedScale    = scale;
+    cachedBannerY  = bannerTopY;
+    cachedBannerW  = static_cast<int>(Theme::BANNER_W * scale);
+    cachedBannerH  = bannerH;
+    cachedLabelOffY = labelOffY;
+    cachedInputPad  = static_cast<int>(16 * scale);
 }
 
 void Login::handleEvents(Game& game, const SDL_Event& event) {
@@ -135,12 +169,12 @@ void Login::handleEvents(Game& game, const SDL_Event& event) {
         const int mx = event.button.x, my = event.button.y;
         if      (RenderUtil::pointInRect(usernameRect,    mx, my)) setActiveField(Field::Username);
         else if (RenderUtil::pointInRect(passwordRect,    mx, my)) setActiveField(Field::Password);
-        else                                           setActiveField(Field::None);
+        else                                                        setActiveField(Field::None);
         if      (RenderUtil::pointInRect(loginButtonRect, mx, my)) loginPressed    = true;
         else if (RenderUtil::pointInRect(backButtonRect,  mx, my)) registerPressed = true;
     }
     if (event.type == SDL_TEXTINPUT) {
-        statusMessage.clear(); 
+        statusMessage.clear();
         if (activeField == Field::Username && username.size() < kMaxUsernameLen)
             username.append(event.text.text);
         else if (activeField == Field::Password && password.size() < kMaxPasswordLen)
@@ -169,13 +203,11 @@ void Login::update(Game& game) {
         loginPressed = false;
         statusMessage.clear();
 
-        // input validation checks
         if (username.empty()) {
             statusMessage = "Email is required.";
             return;
         }
 
-        // basic email check — must have @ and a dot after it
         const std::size_t atPos = username.find('@');
         if (atPos == std::string::npos || atPos == 0 || atPos + 1 >= username.size()) {
             statusMessage = "Enter a valid email address.";
@@ -192,7 +224,6 @@ void Login::update(Game& game) {
             return;
         }
 
-        // authentication
         int userId = -1;
         std::string sessionId;
         std::string error;
@@ -225,26 +256,28 @@ void Login::render(const Game& game) {
 
     // ── background + vignette ────────────────────────────────────────
     RenderBackdrop::drawBackgroundWithVignette(
-        r,
-        screenW,
-        screenH,
+        r, screenW, screenH,
         Theme::BG,
         SDL_Color{0, 0, 0, 255},
-        80,
-        1.5f,
-        120
+        80, 1.5f, 120
     );
 
     // ── banner ───────────────────────────────────────────────────────
-    SDL_Rect bannerRect = {screenW/2 - Theme::BANNER_W/2, 30,
-                           Theme::BANNER_W, Theme::BANNER_H};
+    SDL_Rect bannerRect = {
+        screenW / 2 - cachedBannerW / 2,
+        cachedBannerY,
+        cachedBannerW,
+        cachedBannerH
+    };
     RenderBanner::drawBanner(r, bannerRect, "Mana Kaisen",
-                              titleFonts.large,
-                              Theme::BANNER_FILL,  Theme::BANNER_BORDER,
-                              Theme::BANNER_TEXT,  Theme::BANNER_GLOW);
+                             titleFonts.large,
+                             Theme::BANNER_FILL,  Theme::BANNER_BORDER,
+                             Theme::BANNER_TEXT,  Theme::BANNER_GLOW);
 
     // ── panel ────────────────────────────────────────────────────────
-    RenderUtil::drawRoundedShadow(r, panelRect, Theme::PANEL_RADIUS, Theme::Effects::SHADOW_OFFSET, Theme::Effects::SHADOW_COLOR);
+    RenderUtil::drawRoundedShadow(r, panelRect, Theme::PANEL_RADIUS,
+                                  Theme::Effects::SHADOW_OFFSET,
+                                  Theme::Effects::SHADOW_COLOR);
     RenderUtil::drawRoundedRect(r, panelRect, Theme::PANEL_RADIUS,
                                 Theme::PANEL_FILL, Theme::PANEL_BORDER);
 
@@ -252,17 +285,18 @@ void Login::render(const Game& game) {
     if (titleFonts.medium) {
         RenderText::drawText(r, "Login", titleFonts.medium,
                              Theme::BANNER_TEXT,
-                             panelRect.x + 30, panelRect.y + 22);
+                             panelRect.x + static_cast<int>(30 * cachedScale),
+                             panelRect.y + static_cast<int>(22 * cachedScale));
     }
 
     // ── field labels ─────────────────────────────────────────────────
     if (uiFonts.large) {
         RenderText::drawText(r, "Username", uiFonts.large,
                              Theme::TEXT_MUTED,
-                             usernameRect.x, usernameRect.y - 30);
+                             usernameRect.x, usernameRect.y - cachedLabelOffY);
         RenderText::drawText(r, "Password", uiFonts.large,
                              Theme::TEXT_MUTED,
-                             passwordRect.x, passwordRect.y - 30);
+                             passwordRect.x, passwordRect.y - cachedLabelOffY);
     }
 
     // ── input fields ─────────────────────────────────────────────────
@@ -292,21 +326,21 @@ void Login::render(const Game& game) {
     // ── validation message ───────────────────────────────────────────
     if (uiFonts.small && !statusMessage.empty()) {
         RenderText::drawText(r, statusMessage, uiFonts.small,
-                            Theme::ERROR_RED,
-                            passwordRect.x,
-                            passwordRect.y + passwordRect.h + 8);
+                             Theme::ERROR_RED,
+                             passwordRect.x,
+                             passwordRect.y + passwordRect.h + static_cast<int>(8 * cachedScale));
     }
 
     // ── input text ───────────────────────────────────────────────────
     if (uiFonts.large) {
-        const int pad = 16;
-        const int ty  = usernameRect.y + (usernameRect.h - 20) / 2;
+        const int ty = usernameRect.y + (usernameRect.h - 20) / 2;
         RenderText::drawText(r, username, uiFonts.large,
-                             Theme::TEXT_PRIMARY, usernameRect.x + pad, ty);
+                             Theme::TEXT_PRIMARY,
+                             usernameRect.x + cachedInputPad, ty);
         std::string mask(password.size(), '*');
         RenderText::drawText(r, mask, uiFonts.large,
                              Theme::TEXT_PRIMARY,
-                             passwordRect.x + pad,
+                             passwordRect.x + cachedInputPad,
                              passwordRect.y + (passwordRect.h - 20) / 2);
     }
 

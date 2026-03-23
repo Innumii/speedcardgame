@@ -45,6 +45,13 @@ private:
     bool loginHover{false};
     bool backHover{false};
 
+    float cachedScale{1.0f};
+    int cachedBannerY{30};
+    int cachedBannerW{0};
+    int cachedBannerH{0};
+    int cachedLabelOffY{30};
+    int cachedInputPad{16};
+
 };
 
 #endif
