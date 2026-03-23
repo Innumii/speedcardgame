@@ -10,6 +10,46 @@
 #include <SDL2/SDL_ttf.h>
 #include <cmath>
 
+SDL_Texture* Title::buildButtonTexture(SDL_Renderer* renderer,
+                                       const SDL_Rect& rect,
+                                       const std::string& text,
+                                       SDL_Color fill,
+                                       bool hovered,
+                                       const RenderText::FontSet& fonts)
+{
+    SDL_Texture* tex = SDL_CreateTexture(
+        renderer,
+        SDL_PIXELFORMAT_RGBA8888,
+        SDL_TEXTUREACCESS_TARGET,
+        rect.w,
+        rect.h
+    );
+
+    if (!tex) return nullptr;
+
+    SDL_SetTextureBlendMode(tex, SDL_BLENDMODE_BLEND);
+    SDL_SetRenderTarget(renderer, tex);
+
+    SDL_SetRenderDrawColor(renderer, 0, 0, 0, 0);
+    SDL_RenderClear(renderer);
+
+    SDL_Rect local{0, 0, rect.w, rect.h};
+
+    RenderButton::drawButton(
+        renderer,
+        local,
+        text,
+        fonts.large,
+        fill,
+        Theme::BTN_BORDER,
+        Theme::BTN_TEXT,
+        hovered
+    );
+
+    SDL_SetRenderTarget(renderer, nullptr);
+    return tex;
+}
+
 static constexpr float kRefW = 1200.0F;
 static constexpr float kRefH = 850.0F;
 
@@ -55,6 +95,15 @@ void Title::updateLayout(SDL_Renderer* renderer) {
     quitButton   = {smallStartX + smallBtnW + smallRowGap, smallY, smallBtnW, smallBtnH};
 }
 
+Title::~Title() {
+    for (auto& cache : cachedButtons) {
+        if (cache.texture) {
+            SDL_DestroyTexture(cache.texture);
+            cache.texture = nullptr;
+        }
+    }
+}
+
 void Title::handleEvents(Game& game, const SDL_Event& event) {
     updateLayout(game.getRenderer());
 
@@ -84,12 +133,12 @@ void Title::handleEvents(Game& game, const SDL_Event& event) {
         } else if (inOpenPacks) {
             game.setNextState(GameState::PackOpening);
         } else if (inLogout) {
-            animInitialized = false;
-            game.endUserSession();
-            game.getNetworkClient().disconnect();
-            game.setPlayerUsername("Player");
-            game.setNextState(GameState::Login);
-        } else if (inQuit) {
+        animInitialized = false;
+        game.endUserSession();
+        game.getNetworkClient().disconnect();
+        game.setPlayerUsername("Player");
+        game.setNextState(GameState::Login);
+    } else if (inQuit) {
             game.setNextState(GameState::Quit);
         }
     }
@@ -182,45 +231,41 @@ void Title::render(const Game& game) {
     };
 
     auto drawBtn = [&](const SDL_Rect& rect, SDL_Color fill,
-                        const std::string& text, int index) {
+                    const std::string& text, int index) {
+
         auto [alpha, offY] = buttonSlide(index);
         if (alpha == 0) return;
 
         SDL_Rect animRect = {rect.x, rect.y + offY, rect.w, rect.h};
 
-        if (alpha >= 255) {
-            // Fully opaque — draw directly, no texture overhead
-            RenderButton::drawButton(renderer, animRect, text, uiFonts.large,
-                fill, Theme::BTN_BORDER, Theme::BTN_TEXT, hoveredButton == index);
-            return;
+        bool isHovered = (hoveredButton == index);
+        auto& cache = cachedButtons[index];
+
+        // ✅ rebuild ONLY when needed
+        if (!cache.texture ||
+            cache.w != rect.w ||
+            cache.h != rect.h ||
+            cache.label != text ||
+            cache.hovered != isHovered)
+        {
+            if (cache.texture) {
+                SDL_DestroyTexture(cache.texture);
+            }
+
+            cache.texture = buildButtonTexture(
+                renderer, rect, text, fill, isHovered, uiFonts
+            );
+
+            cache.w = rect.w;
+            cache.h = rect.h;
+            cache.label = text;
+            cache.hovered = isHovered;
         }
 
-        // Render at full opacity into an offscreen texture, then blit
-        // with alpha mod. This prevents the rounded-corner primitives from
-        // double-blending against each other and producing a different shade.
-        SDL_Texture* tex = SDL_CreateTexture(renderer,
-            SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET,
-            animRect.w, animRect.h);
-        if (!tex) {
-            // Fallback: draw directly (artifact visible but not a crash)
-            RenderButton::drawButton(renderer, animRect, text, uiFonts.large,
-                fill, Theme::BTN_BORDER, Theme::BTN_TEXT, hoveredButton == index);
-            return;
-        }
-        SDL_SetTextureBlendMode(tex, SDL_BLENDMODE_BLEND);
-        SDL_SetRenderTarget(renderer, tex);
-        SDL_SetRenderDrawColor(renderer, 0, 0, 0, 0);
-        SDL_RenderClear(renderer);
+        if (!cache.texture) return;
 
-        // Draw at full alpha into the texture, offset so (0,0) is top-left
-        const SDL_Rect localRect{0, 0, animRect.w, animRect.h};
-        RenderButton::drawButton(renderer, localRect, text, uiFonts.large,
-            fill, Theme::BTN_BORDER, Theme::BTN_TEXT, hoveredButton == index);
-
-        SDL_SetRenderTarget(renderer, nullptr);
-        SDL_SetTextureAlphaMod(tex, alpha);
-        SDL_RenderCopy(renderer, tex, nullptr, &animRect);
-        SDL_DestroyTexture(tex);
+        SDL_SetTextureAlphaMod(cache.texture, alpha);
+        SDL_RenderCopy(renderer, cache.texture, nullptr, &animRect);
     };
 
     drawBtn(startButton,     Theme::BTN_START,   "Start Game", 0);

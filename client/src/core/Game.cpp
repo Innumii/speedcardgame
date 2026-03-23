@@ -129,6 +129,8 @@ void Game::commitStateChange() {
         const GameState previousState = state;
         state = nextState;
 
+        // if (previousState == GameState::Title) titleState.exit();
+
         if (previousState == GameState::DeckBuilding) {
             deckBuildingState.exit(*this);
         }
