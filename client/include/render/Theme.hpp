@@ -93,7 +93,7 @@ namespace Theme {
         constexpr int OPPONENT_SIDE_GAP                = 28;
         constexpr int OPPONENT_ZONE_OFFSET             = 210;
 
-        constexpr Uint32 HOVER_PREVIEW_DELAY_MS        = 1000;
+        constexpr Uint32 HOVER_PREVIEW_DELAY_MS        = 300;
         constexpr int PREVIEW_MAX_WIDTH                = 320;
         constexpr int PREVIEW_MIN_WIDTH                = 180;
         constexpr float PREVIEW_ASPECT_RATIO           = 1.5f;

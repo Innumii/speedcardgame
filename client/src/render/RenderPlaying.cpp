@@ -493,9 +493,20 @@ void RenderPlaying::render(Playing& playing, const Game& game) {
 			const int previewW = std::min(maxPreviewW, screenW - Theme::Playing::PREVIEW_MARGIN * 2);
 			const int previewH = static_cast<int>(previewW * Theme::Playing::PREVIEW_ASPECT_RATIO);
 			const int previewX = Theme::Playing::PREVIEW_MARGIN;
-			int previewY = Theme::Playing::PREVIEW_MARGIN + Theme::Playing::OPPONENT_BAR_HEIGHT + Theme::Playing::SIDE_PREVIEW_TOP_OFFSET;
-			if (previewY + previewH > screenH - Theme::Playing::PREVIEW_MARGIN) {
-				previewY = screenH - previewH - Theme::Playing::PREVIEW_MARGIN;
+			int previewY = 0;
+			if (playing.recentSpellPreview && previewCard == playing.recentSpellPreview.get()) {
+				// Spell preview: top-anchored (original behaviour)
+				previewY = Theme::Playing::PREVIEW_MARGIN + Theme::Playing::OPPONENT_BAR_HEIGHT + Theme::Playing::SIDE_PREVIEW_TOP_OFFSET;
+				if (previewY + previewH > screenH - Theme::Playing::PREVIEW_MARGIN) {
+					previewY = screenH - previewH - Theme::Playing::PREVIEW_MARGIN;
+				}
+			} else {
+				// Hand/board hover preview: bottom-anchored
+				const int playerBarTop = screenH - Theme::Playing::PLAYER_BAR_HEIGHT - Theme::Playing::PLAYER_BAR_BOTTOM_MARGIN;
+				previewY = playerBarTop - previewH - Theme::Playing::PREVIEW_MARGIN;
+				if (previewY < Theme::Playing::PREVIEW_MARGIN) {
+					previewY = Theme::Playing::PREVIEW_MARGIN;
+				}
 			}
 
 			SDL_Rect panel{previewX, previewY, previewW, previewH};
