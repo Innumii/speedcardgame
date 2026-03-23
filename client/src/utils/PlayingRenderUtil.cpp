@@ -214,4 +214,19 @@ namespace PlayingRenderUtil {
             deckBase.y + textPad
         );
     }
+
+    // PlayingRenderUtil.cpp
+    SDL_Rect computeOpponentDiscardRect(const std::vector<SDL_Rect>& opponentSlots, int screenW, int screenH) {
+        const float scale = std::min(
+            static_cast<float>(screenW) / 1200.0F,
+            static_cast<float>(screenH) / 850.0F
+        );
+
+        const int cardW      = static_cast<int>(Theme::Playing::CARD_WIDTH        * scale);
+        const int cardH      = static_cast<int>(Theme::Playing::CARD_HEIGHT       * scale);
+        const int sideGap    = static_cast<int>(Theme::Playing::OPPONENT_SIDE_GAP * scale);
+        const int sideMargin = static_cast<int>(Theme::Playing::SIDE_ZONE_MARGIN  * scale);
+
+        return PlayingLayoutUtil::computeDiscardRect(opponentSlots, cardW, cardH, sideGap, sideMargin);
+    }
 }

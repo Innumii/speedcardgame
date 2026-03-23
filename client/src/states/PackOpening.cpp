@@ -22,6 +22,7 @@
 #include <random>
 #include <sstream>
 #include <unordered_map>
+#include <render/RenderBackdrop.hpp>
 
 namespace {
     int resolveUserId(const Game& game) {
@@ -172,8 +173,16 @@ void PackOpening::render(Game& game) {
     int screenH = 600;
     SDL_GetRendererOutputSize(renderer, &screenW, &screenH);
 
-    SDL_SetRenderDrawColor(renderer, Theme::BG.r, Theme::BG.g, Theme::BG.b, 255);
-    SDL_RenderClear(renderer);
+    RenderBackdrop::drawBackgroundWithVignette(
+        renderer,
+        screenW,
+        screenH,
+        Theme::BG,                              // base background color
+        Theme::Loading::VIGNETTE_COLOR,        // vignette color
+        Theme::Loading::VIGNETTE_LAYERS,       // layers
+        Theme::Loading::VIGNETTE_ALPHA_FALLOFF,// alpha falloff
+        Theme::Loading::VIGNETTE_MAX_ALPHA     // max alpha
+    );
 
     // ── Top strip: title (centred) + coins (top-right), same baseline ───────
     const int headerY = Theme::PackOpening::HEADER_Y;

@@ -21,6 +21,7 @@
 #include <stdexcept>
 #include <sstream>
 #include <objects/CreatureCard.h>
+#include <utils/PlayingRenderUtil.hpp>
 // #include <functional>
 
 // -------------------------
@@ -407,7 +408,6 @@ void Playing::handleEvents(Game& game, const SDL_Event& event) {
                         SDL_Rect animRect = cardRects[drag.index];
                         animRect.x = drag.x;
                         animRect.y = drag.y;
-                        DiscardAnimation::stagePending(animRect, card->getId(), 500U, card->clone());
                         DiscardAnimation::stagePending(animRect, card->getId(), 500U, card->clone());
                     }
                     authority->discardCard(card->getId());
@@ -868,35 +868,22 @@ void Playing::discardCard(int playerId, int cardId) {
         std::distance(player->hand.begin(), it));
 
     if (animationsEnabled) {
-        int screenW = 0, screenH = 0;
-        SDL_GetRendererOutputSize(renderer, &screenW, &screenH);
-
+        auto anim = DiscardAnimation::takePending(cardId);
         if (playerId == localPlayer.id) {
-            auto anim = DiscardAnimation::takePending(cardId);
             if (!anim && discardedIdx < oldRects.size()) {
                 anim = std::make_shared<DiscardAnimation>(oldRects[discardedIdx], cardId, 500U);
             }
-            if (anim) animationQueue.enqueue(anim);
         } else {
-            // Build scaled opponent hand rects the same way the renderer does
-            auto oppRects = computeCardLayout(player->hand.size(), screenW, screenH);
-            if (!oppRects.empty() && !opponentSlots.empty()) {
-                const int cardHeight = oppRects.front().h;
-                const int topHandY = PlayingLayoutUtil::computeOpponentHandY(
-                    opponentSlots, cardHeight, Theme::Playing::PREVIEW_MARGIN);
-                for (auto& r : oppRects) r.y = topHandY;
+            int screenW, screenH;
+            if (SDL_GetRendererOutputSize(renderer, &screenW, &screenH) != 0) {
+                return;
             }
-            if (discardedIdx < oppRects.size()) {
-                auto anim = std::make_shared<DiscardAnimation>(oppRects[discardedIdx], cardId, 500U);
-                // Clone the card before it gets moved so the renderer can draw it
-                if (discardedIdx < oppRects.size()) {
-                    auto anim = std::make_shared<DiscardAnimation>(oppRects[discardedIdx], cardId, 500U);
-                    animationQueue.enqueue(anim);
-                }
-                animationQueue.enqueue(anim);
-            }
+            SDL_Rect opponentDiscardRect = PlayingRenderUtil::computeOpponentDiscardRect(opponentSlots, screenW, screenH);
+            anim = std::make_shared<DiscardAnimation>(opponentDiscardRect, cardId, 500U);
         }
+        if (anim) animationQueue.enqueue(anim);
     }
+    
 
     std::unique_ptr<Card> cardToDiscard = std::move(*it);
     std::string name = cardToDiscard->getName();
@@ -906,6 +893,7 @@ void Playing::discardCard(int playerId, int cardId) {
     int boardIndex = (playerId == localPlayer.id) ? 0:1;
     board.addToDiscard(std::move(cardToDiscard), boardIndex);
 
+    // You can animate this if desired
     std::cout<< "[Playing] " << playerId << " Discarded " << name << "\n";
 }
 
@@ -1313,6 +1301,7 @@ void Playing::computeUiRects(int screenW, int screenH) {
     returnToTitleButton = SDL_Rect{startX,              y, returnW, returnH};
     requeueButton       = SDL_Rect{startX + returnW + spacing, y, returnW, returnH};
 }
+
 
 PlayingGameState Playing::getState() const {
     return state;

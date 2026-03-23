@@ -8,6 +8,7 @@
 #include <sstream>
 #include <thread>
 #include "core/Game.hpp"
+#include <render/RenderBackdrop.hpp>
 
 Connecting::Connecting(const std::string& ip, int port):serverIp(ip),serverPort(port) {
 
@@ -89,8 +90,16 @@ void Connecting::render(const Game& game) {
     SDL_GetRendererOutputSize(renderer, &screenW, &screenH);
 
     // ── background ─────────────────────────────
-    SDL_SetRenderDrawColor(renderer, Theme::BG.r, Theme::BG.g, Theme::BG.b, 255);
-    SDL_RenderClear(renderer);
+    RenderBackdrop::drawBackgroundWithVignette(
+        renderer,
+        screenW,
+        screenH,
+        Theme::BG,                              // base background color
+        Theme::Loading::VIGNETTE_COLOR,        // vignette color
+        Theme::Loading::VIGNETTE_LAYERS,       // layers
+        Theme::Loading::VIGNETTE_ALPHA_FALLOFF,// alpha falloff
+        Theme::Loading::VIGNETTE_MAX_ALPHA     // max alpha
+    );
 
     // ── panel layout (centered, scaled) ──────────────────────────────
     const float scale = std::min(

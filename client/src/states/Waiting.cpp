@@ -13,6 +13,7 @@
 #include "core/Game.hpp"
 #include <iostream>
 #include <sstream>
+#include <render/RenderBackdrop.hpp>
 
 void Waiting::handleEvents(Game& game, const SDL_Event& event) {
     if (event.type == SDL_QUIT) {
@@ -182,8 +183,16 @@ void Waiting::render(const Game& game) {
     SDL_GetRendererOutputSize(renderer, &screenW, &screenH);
 
     // ── background ────────────────────────────────────────────────────
-    SDL_SetRenderDrawColor(renderer, Theme::BG.r, Theme::BG.g, Theme::BG.b, 255);
-    SDL_RenderClear(renderer);
+    RenderBackdrop::drawBackgroundWithVignette(
+        renderer,
+        screenW,
+        screenH,
+        Theme::BG,
+        Theme::Loading::VIGNETTE_COLOR,
+        Theme::Loading::VIGNETTE_LAYERS,
+        Theme::Loading::VIGNETTE_ALPHA_FALLOFF,
+        Theme::Loading::VIGNETTE_MAX_ALPHA
+    );
 
     // ── scaled layout ─────────────────────────────────────────────────
     const float scale = std::min(

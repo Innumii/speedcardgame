@@ -18,6 +18,7 @@
 #include <iostream>
 #include <algorithm>
 #include <cstdlib>
+#include <render/RenderBackdrop.hpp>
 
 
 namespace {
@@ -269,11 +270,29 @@ void DeckBuilding::update(Game& game) {
 
 void DeckBuilding::render(Game& game) {
     SDL_Renderer* renderer = game.getRenderer();
+    if (!renderer) return;
 
+    int screenW = Theme::SCREEN_DEFAULT_WIDTH;
+    int screenH = Theme::SCREEN_DEFAULT_HEIGHT;
+    SDL_GetRendererOutputSize(renderer, &screenW, &screenH);
+
+    // ── Draw background with vignette (from Loading) ──────────────
+    RenderBackdrop::drawBackgroundWithVignette(
+        renderer,
+        screenW,
+        screenH,
+        Theme::BG,                              // base background color
+        Theme::Loading::VIGNETTE_COLOR,        // vignette color
+        Theme::Loading::VIGNETTE_LAYERS,       // layers
+        Theme::Loading::VIGNETTE_ALPHA_FALLOFF,// alpha falloff
+        Theme::Loading::VIGNETTE_MAX_ALPHA     // max alpha
+    );
+
+    // ── Build layout and update buttons ───────────────────────────
     const auto layout = buildLayout(game);
     updateMenuButtons(layout);
 
-    // render cards and deck building UI
+    // ── render cards and deck building UI ─────────────────────────
     RenderDeckBuilding::render(*this, game);
 }
 

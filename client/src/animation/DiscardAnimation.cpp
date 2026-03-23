@@ -70,7 +70,7 @@ void DiscardAnimation::drawDisintegration(SDL_Renderer* renderer, Uint32 now) co
 
         for (int g = 4; g >= 1; --g) {
             const int   expand    = static_cast<int>(g * 5 * chargeT);
-            const Uint8 glowAlpha = static_cast<Uint8>((20.0F / g) * chargeT);
+            const Uint8 glowAlpha = static_cast<Uint8>((5.0F / g) * chargeT);
             SDL_SetRenderDrawColor(renderer, PLAYER_MANA_GLOW_BORDER.r - 20, PLAYER_MANA_GLOW_BORDER.g, PLAYER_MANA_GLOW_BORDER.b, glowAlpha);
             const SDL_Rect glowRect{
                 rect.x - expand, rect.y - expand,
@@ -141,10 +141,10 @@ void DiscardAnimation::drawDisintegration(SDL_Renderer* renderer, Uint32 now) co
                         SDL_RenderFillRect(renderer, &glowBlock);
                     }
                     // Bright blue edge block
-                    SDL_SetRenderDrawColor(renderer, 80, 160, 255, 255);
+                SDL_SetRenderDrawColor(renderer, PLAYER_MANA_GLOW_BORDER.r - 20, PLAYER_MANA_GLOW_BORDER.g, PLAYER_MANA_GLOW_BORDER.b, 255);
                 } else {
                     // Interior blocks: solid mid-blue
-                    SDL_SetRenderDrawColor(renderer, 50, 120, 220, 255);
+                SDL_SetRenderDrawColor(renderer, PLAYER_MANA_GLOW_BORDER.r - 20, PLAYER_MANA_GLOW_BORDER.g, PLAYER_MANA_GLOW_BORDER.b, 255);
                 }
 
                 SDL_RenderFillRect(renderer, &block);
