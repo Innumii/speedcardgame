@@ -73,6 +73,7 @@ private:
         int h = 0;
         std::string label;
         bool hovered = false;
+        float lastScale = 0.0f;
     };
 
     std::array<CachedButton, 5> cachedButtons;

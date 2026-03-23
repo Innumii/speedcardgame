@@ -10,6 +10,10 @@
 #include <SDL2/SDL_ttf.h>
 #include <cmath>
 
+namespace {
+    float scale = 1.0f;
+}
+
 SDL_Texture* Title::buildButtonTexture(SDL_Renderer* renderer,
                                        const SDL_Rect& rect,
                                        const std::string& text,
@@ -60,9 +64,10 @@ void Title::updateLayout(SDL_Renderer* renderer) {
         SDL_GetRendererOutputSize(renderer, &screenW, &screenH);
     }
 
-    const float scale = std::min(
+    scale = std::min(
         static_cast<float>(screenW) / kRefW,
         static_cast<float>(screenH) / kRefH);
+    
 
     // Scale all button and banner dimensions from theme constants
     const int mainBtnW   = static_cast<int>(Theme::Title::MAIN_BUTTON_WIDTH   * scale);
@@ -241,12 +246,12 @@ void Title::render(const Game& game) {
         bool isHovered = (hoveredButton == index);
         auto& cache = cachedButtons[index];
 
-        // ✅ rebuild ONLY when needed
         if (!cache.texture ||
             cache.w != rect.w ||
             cache.h != rect.h ||
             cache.label != text ||
-            cache.hovered != isHovered)
+            cache.hovered != isHovered ||
+            cache.lastScale != scale)
         {
             if (cache.texture) {
                 SDL_DestroyTexture(cache.texture);

@@ -87,7 +87,7 @@ private:
 	int collectionPage{0};
 	std::string statusMessage{};
 	Uint32 statusMessageUntil{0};
-
+	int currentScale{1};
 	int deckScrollOffset = 0;
 };
 
