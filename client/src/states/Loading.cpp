@@ -77,7 +77,7 @@ void Loading::update(Game& game) {
 
         if (cachedCount < totalCards) {
 
-            if (retryRounds >= MaxRetryRounds) {
+            if (retryRounds >= maxRetryRounds) {
                 statusMessage = "Failed to download, return to login";
                 game.setNextState(GameState::Login);
             } else {
