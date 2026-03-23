@@ -35,12 +35,16 @@ jobs:
         shell: msys2 {0}
         run: |
           cd client/env
-          if [ -f .env ]; then
-            if grep -q '^USE_AWS_SERVICES=' .env; then
-              sed -i 's/^USE_AWS_SERVICES=.*/USE_AWS_SERVICES=true/' .env
-            else
-              echo 'USE_AWS_SERVICES=true' >> .env
-            fi
+          if [ ! -f .env ] && [ -f .env.template ]; then
+            cp .env.template .env
+          fi
+
+          if [ ! -f .env ]; then
+            echo 'USE_AWS_SERVICES=true' > .env
+          elif grep -q '^USE_AWS_SERVICES=' .env; then
+            sed -i 's/^USE_AWS_SERVICES=.*/USE_AWS_SERVICES=true/' .env
+          else
+            echo 'USE_AWS_SERVICES=true' >> .env
           fi
 
       - name: Build client
@@ -55,13 +59,19 @@ jobs:
           set -euo pipefail
           cd client
 
-          mkdir -p dist
+          mkdir -p dist dist/env dist/certs
           cp main.exe dist/main.exe
 
           # Copy .env and CA cert into bundle
-          cp env/.env dist/env/.env
-          mkdir -p dist/certs
-          cp certs/CA.crt dist/certs/CA.crt
+          if [ -f env/.env ]; then
+            cp env/.env dist/env/.env
+          elif [ -f env/.env.template ]; then
+            cp env/.env.template dist/env/.env
+          fi
+
+          if [ -f certs/ca.crt ]; then
+            cp certs/ca.crt dist/certs/ca.crt
+          fi
 
           if [ -d assets ]; then
             cp -r assets dist/assets
@@ -105,12 +115,16 @@ jobs:
       - name: Set USE_AWS_SERVICES to true in .env
         run: |
           cd client/env
-          if [ -f .env ]; then
-            if grep -q '^USE_AWS_SERVICES=' .env; then
-              sed -i '' 's/^USE_AWS_SERVICES=.*/USE_AWS_SERVICES=true/' .env
-            else
-              echo 'USE_AWS_SERVICES=true' >> .env
-            fi
+          if [ ! -f .env ] && [ -f .env.template ]; then
+            cp .env.template .env
+          fi
+
+          if [ ! -f .env ]; then
+            echo 'USE_AWS_SERVICES=true' > .env
+          elif grep -q '^USE_AWS_SERVICES=' .env; then
+            sed -i '' 's/^USE_AWS_SERVICES=.*/USE_AWS_SERVICES=true/' .env
+          else
+            echo 'USE_AWS_SERVICES=true' >> .env
           fi
 
       - name: Build client
@@ -124,14 +138,20 @@ jobs:
           set -euo pipefail
           cd client
 
-          mkdir -p dist
+          mkdir -p dist dist/env dist/certs
           cp main dist/main
           chmod +x dist/main
 
           # Copy .env and CA cert into bundle
-          cp env/.env dist/env/.env
-          mkdir -p dist/certs
-          cp certs/CA.crt dist/certs/CA.crt
+          if [ -f env/.env ]; then
+            cp env/.env dist/env/.env
+          elif [ -f env/.env.template ]; then
+            cp env/.env.template dist/env/.env
+          fi
+
+          if [ -f certs/ca.crt ]; then
+            cp certs/ca.crt dist/certs/ca.crt
+          fi
 
           if [ -d assets ]; then
             cp -r assets dist/assets
