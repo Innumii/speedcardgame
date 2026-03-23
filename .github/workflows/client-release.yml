@@ -31,22 +31,6 @@ jobs:
             mingw-w64-x86_64-SDL2_image
             mingw-w64-x86_64-openssl
 
-      - name: Set USE_AWS_SERVICES to true in .env
-        shell: msys2 {0}
-        run: |
-          cd client/env
-          if [ ! -f .env ] && [ -f .env.template ]; then
-            cp .env.template .env
-          fi
-
-          if [ ! -f .env ]; then
-            echo 'USE_AWS_SERVICES=true' > .env
-          elif grep -q '^USE_AWS_SERVICES=' .env; then
-            sed -i 's/^USE_AWS_SERVICES=.*/USE_AWS_SERVICES=true/' .env
-          else
-            echo 'USE_AWS_SERVICES=true' >> .env
-          fi
-
       - name: Build client
         shell: msys2 {0}
         run: |
@@ -55,6 +39,9 @@ jobs:
 
       - name: Bundle runtime dependencies
         shell: msys2 {0}
+        env:
+          ENV_SECRET: ${{ secrets.ENV }}
+          CERT_SECRET: ${{ secrets.CERT }}
         run: |
           set -euo pipefail
           cd client
@@ -62,16 +49,9 @@ jobs:
           mkdir -p dist dist/env dist/certs
           cp main.exe dist/main.exe
 
-          # Copy .env and CA cert into bundle
-          if [ -f env/.env ]; then
-            cp env/.env dist/env/.env
-          elif [ -f env/.env.template ]; then
-            cp env/.env.template dist/env/.env
-          fi
-
-          if [ -f certs/ca.crt ]; then
-            cp certs/ca.crt dist/certs/ca.crt
-          fi
+          # Write secrets to bundle
+          echo "$ENV_SECRET" > dist/env/.env
+          echo "$CERT_SECRET" > dist/certs/ca.crt
 
           if [ -d assets ]; then
             cp -r assets dist/assets
@@ -112,21 +92,6 @@ jobs:
         run: |
           brew install sdl2 sdl2_ttf sdl2_image openssl@3 pkg-config
 
-      - name: Set USE_AWS_SERVICES to true in .env
-        run: |
-          cd client/env
-          if [ ! -f .env ] && [ -f .env.template ]; then
-            cp .env.template .env
-          fi
-
-          if [ ! -f .env ]; then
-            echo 'USE_AWS_SERVICES=true' > .env
-          elif grep -q '^USE_AWS_SERVICES=' .env; then
-            sed -i '' 's/^USE_AWS_SERVICES=.*/USE_AWS_SERVICES=true/' .env
-          else
-            echo 'USE_AWS_SERVICES=true' >> .env
-          fi
-
       - name: Build client
         run: |
           cd client
@@ -134,6 +99,9 @@ jobs:
           make -f Makefile.mac
 
       - name: Bundle artifact
+        env:
+          ENV_SECRET: ${{ secrets.ENV }}
+          CERT_SECRET: ${{ secrets.CERT }}
         run: |
           set -euo pipefail
           cd client
@@ -142,16 +110,9 @@ jobs:
           cp main dist/main
           chmod +x dist/main
 
-          # Copy .env and CA cert into bundle
-          if [ -f env/.env ]; then
-            cp env/.env dist/env/.env
-          elif [ -f env/.env.template ]; then
-            cp env/.env.template dist/env/.env
-          fi
-
-          if [ -f certs/ca.crt ]; then
-            cp certs/ca.crt dist/certs/ca.crt
-          fi
+          # Write secrets to bundle
+          echo "$ENV_SECRET" > dist/env/.env
+          echo "$CERT_SECRET" > dist/certs/ca.crt
 
           if [ -d assets ]; then
             cp -r assets dist/assets
