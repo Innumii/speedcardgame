@@ -52,24 +52,29 @@ void RenderCombatPhaseWidget::draw(SDL_Renderer* renderer, RenderText& textRende
         return;
     }
 
+    const float scale = std::min(
+        static_cast<float>(screenW) / 1200.0F,
+        static_cast<float>(screenH) / 850.0F);
+
+    const int iconSize   = std::max(1, static_cast<int>(Theme::CombatWidget::ICON_SIZE   * scale));
+    const int barWidth   = std::max(1, static_cast<int>(Theme::CombatWidget::BAR_WIDTH   * scale));
+    const int barHeight  = std::max(1, static_cast<int>(Theme::CombatWidget::BAR_HEIGHT  * scale));
+    const int iconGap    = std::max(1, static_cast<int>(Theme::CombatWidget::ICON_GAP    * scale));
+    const int textBarGap = std::max(1, static_cast<int>(Theme::CombatWidget::TEXT_BAR_GAP * scale));
+
     int combatTextW = 0;
     int combatTextH = 0;
     if (font) {
         TTF_SizeText(font, combatLabel.c_str(), &combatTextW, &combatTextH);
     }
 
-    const int iconSize = Theme::CombatWidget::ICON_SIZE;
-    const int barWidth = Theme::CombatWidget::BAR_WIDTH;
-    const int barHeight = Theme::CombatWidget::BAR_HEIGHT;
-    const int iconGap = Theme::CombatWidget::ICON_GAP;
-    const int textBarGap = Theme::CombatWidget::TEXT_BAR_GAP;
     const int widgetHeight = std::max(iconSize, combatTextH + textBarGap + barHeight);
-    const int widgetWidth = iconSize + iconGap + std::max(combatTextW, barWidth);
-    const int widgetX = (screenW - widgetWidth) / 2;
+    const int widgetWidth  = iconSize + iconGap + std::max(combatTextW, barWidth);
+    const int widgetX      = (screenW - widgetWidth) / 2;
 
     int widgetY = (screenH - widgetHeight) / 2;
     if (!opponentSlots.empty() && !playSlots.empty()) {
-        const int gapTop = opponentSlots.front().y + opponentSlots.front().h;
+        const int gapTop    = opponentSlots.front().y + opponentSlots.front().h;
         const int gapBottom = playSlots.front().y;
         if (gapBottom > gapTop) {
             widgetY = gapTop + (gapBottom - gapTop - widgetHeight) / 2;
@@ -77,11 +82,12 @@ void RenderCombatPhaseWidget::draw(SDL_Renderer* renderer, RenderText& textRende
     }
 
     const SDL_Rect iconRect{widgetX, widgetY + (widgetHeight - iconSize) / 2, iconSize, iconSize};
-    const int contentX = iconRect.x + iconRect.w + iconGap;
-    const SDL_Rect textRect{contentX, widgetY, std::max(combatTextW, barWidth), combatTextH};
-    const SDL_Rect barOuter{contentX, textRect.y + textRect.h + textBarGap, barWidth, barHeight};
+    const int      contentX  = iconRect.x + iconRect.w + iconGap;
+    const SDL_Rect textRect  {contentX, widgetY, std::max(combatTextW, barWidth), combatTextH};
+    const SDL_Rect barOuter  {contentX, textRect.y + textRect.h + textBarGap, barWidth, barHeight};
+
     const int barInnerWidth = std::max(0, static_cast<int>(static_cast<float>(barOuter.w - 2) * barProgress));
-    const SDL_Rect barInner{barOuter.x + 1, barOuter.y + 1, barInnerWidth, std::max(0, barOuter.h - 2)};
+    const SDL_Rect barInner {barOuter.x + 1, barOuter.y + 1, barInnerWidth, std::max(0, barOuter.h - 2)};
 
     if (SDL_Texture* combatIcon = getCombatIconTexture(renderer)) {
         SDL_RenderCopy(renderer, combatIcon, nullptr, &iconRect);
@@ -97,6 +103,7 @@ void RenderCombatPhaseWidget::draw(SDL_Renderer* renderer, RenderText& textRende
                            Theme::CombatWidget::BAR_BACKGROUND.b,
                            Theme::CombatWidget::BAR_BACKGROUND.a);
     SDL_RenderFillRect(renderer, &barOuter);
+
     SDL_SetRenderDrawColor(renderer,
                            Theme::CombatWidget::BAR_BORDER.r,
                            Theme::CombatWidget::BAR_BORDER.g,

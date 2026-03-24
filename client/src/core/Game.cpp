@@ -58,7 +58,7 @@ Game::Game(const char *title, int xpos, int ypos, int width, int height, bool fu
         throw std::runtime_error(std::string("SDL_Init failed: ") + SDL_GetError());
     }
 
-    Uint32 flags = fullscreen ? SDL_WINDOW_FULLSCREEN : 0;
+    Uint32 flags = fullscreen ? SDL_WINDOW_FULLSCREEN_DESKTOP : 0;
     flags |= SDL_WINDOW_RESIZABLE;
 
     window.reset(SDL_CreateWindow(title, xpos, ypos, width, height, flags));
@@ -128,6 +128,8 @@ void Game::commitStateChange() {
     if (nextState != state) {
         const GameState previousState = state;
         state = nextState;
+
+        // if (previousState == GameState::Title) titleState.exit();
 
         if (previousState == GameState::DeckBuilding) {
             deckBuildingState.exit(*this);

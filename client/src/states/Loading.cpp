@@ -77,7 +77,7 @@ void Loading::update(Game& game) {
 
         if (cachedCount < totalCards) {
 
-            if (retryRounds >= MaxRetryRounds) {
+            if (retryRounds >= maxRetryRounds) {
                 statusMessage = "Failed to download, return to login";
                 game.setNextState(GameState::Login);
             } else {
@@ -100,10 +100,19 @@ void Loading::render(const Game& game) {
     const RenderText::FontSet& titleFonts = game.getTitleFonts();
     const RenderText::FontSet& uiFonts = game.getUIFonts();
 
-    int screenW = Theme::SCREEN_DEFAULT_WIDTH;
-    int screenH = Theme::SCREEN_DEFAULT_HEIGHT;
+    int screenW = 800, screenH = 600;
     SDL_GetRendererOutputSize(renderer, &screenW, &screenH);
 
+    // ✅ SAME scaling system as Login
+    constexpr float kRefW = 1200.0f;
+    constexpr float kRefH = 850.0f;
+
+    const float scale = std::min(
+        static_cast<float>(screenW) / kRefW,
+        static_cast<float>(screenH) / kRefH
+    );
+
+    // ── background ───────────────────────────────────────────────
     RenderBackdrop::drawBackgroundWithVignette(
         renderer,
         screenW,
@@ -115,11 +124,16 @@ void Loading::render(const Game& game) {
         Theme::Loading::VIGNETTE_MAX_ALPHA
     );
 
+    // ── scaled panel ─────────────────────────────────────────────
+    const int panelW = static_cast<int>(Theme::Loading::PANEL_WIDTH * scale);
+    const int panelH = static_cast<int>(Theme::Loading::PANEL_HEIGHT * scale);
+    const int panelOffsetY = static_cast<int>(Theme::Loading::PANEL_OFFSET_Y * scale);
+
     SDL_Rect panel{
-        screenW / 2 - (Theme::Loading::PANEL_WIDTH / 2),
-        screenH / 2 - Theme::Loading::PANEL_OFFSET_Y,
-        Theme::Loading::PANEL_WIDTH,
-        Theme::Loading::PANEL_HEIGHT
+        screenW / 2 - panelW / 2,
+        screenH / 2 - panelOffsetY,
+        panelW,
+        panelH
     };
 
     RenderBanner::drawBanner(
@@ -133,42 +147,68 @@ void Loading::render(const Game& game) {
         Theme::BANNER_GLOW
     );
 
-    const int barMargin = Theme::Loading::BAR_MARGIN_X;
+    // ── progress bar ─────────────────────────────────────────────
+    const int barMargin = static_cast<int>(Theme::Loading::BAR_MARGIN_X * scale);
+    const int barHeight = static_cast<int>(Theme::Loading::BAR_HEIGHT * scale);
+    const int barOffsetBottom = static_cast<int>(Theme::Loading::BAR_OFFSET_FROM_BOTTOM * scale);
+
     SDL_Rect barBg{
         panel.x + barMargin,
-        panel.y + panel.h - Theme::Loading::BAR_OFFSET_FROM_BOTTOM,
+        panel.y + panel.h - barOffsetBottom,
         panel.w - (barMargin * 2),
-        Theme::Loading::BAR_HEIGHT
+        barHeight
     };
 
     SDL_SetRenderDrawColor(renderer,
-                           Theme::Loading::BAR_BACKGROUND.r,
-                           Theme::Loading::BAR_BACKGROUND.g,
-                           Theme::Loading::BAR_BACKGROUND.b,
-                           Theme::Loading::BAR_BACKGROUND.a);
+        Theme::Loading::BAR_BACKGROUND.r,
+        Theme::Loading::BAR_BACKGROUND.g,
+        Theme::Loading::BAR_BACKGROUND.b,
+        Theme::Loading::BAR_BACKGROUND.a);
     SDL_RenderFillRect(renderer, &barBg);
-    SDL_SetRenderDrawColor(renderer, Theme::BTN_BORDER.r, Theme::BTN_BORDER.g, Theme::BTN_BORDER.b, 255);
+
+    SDL_SetRenderDrawColor(renderer,
+        Theme::BTN_BORDER.r,
+        Theme::BTN_BORDER.g,
+        Theme::BTN_BORDER.b,
+        255);
     SDL_RenderDrawRect(renderer, &barBg);
 
+    // ── progress fill ────────────────────────────────────────────
     const float progress = totalCards == 0
         ? (cardsPrepared ? 1.0f : 0.0f)
         : static_cast<float>(currentCardIndex) / static_cast<float>(totalCards);
+
+    const int inset = static_cast<int>(Theme::Loading::BAR_INNER_INSET * scale);
+    const int heightReduction = static_cast<int>(Theme::Loading::BAR_INNER_HEIGHT_REDUCTION * scale);
+
     SDL_Rect fillRect = barBg;
-    fillRect.w = static_cast<int>((barBg.w - (Theme::Loading::BAR_INNER_INSET * 2)) * std::clamp(progress, 0.0f, 1.0f));
-    fillRect.x += Theme::Loading::BAR_INNER_INSET;
-    fillRect.y += Theme::Loading::BAR_INNER_INSET;
-    fillRect.h -= Theme::Loading::BAR_INNER_HEIGHT_REDUCTION;
-    SDL_SetRenderDrawColor(renderer, Theme::BTN_START.r, Theme::BTN_START.g, Theme::BTN_START.b, 255);
+    fillRect.x += inset;
+    fillRect.y += inset;
+    fillRect.h -= heightReduction;
+
+    fillRect.w = static_cast<int>(
+        (barBg.w - inset * 2) * std::clamp(progress, 0.0f, 1.0f)
+    );
+
+    SDL_SetRenderDrawColor(renderer,
+        Theme::BTN_START.r,
+        Theme::BTN_START.g,
+        Theme::BTN_START.b,
+        255);
     SDL_RenderFillRect(renderer, &fillRect);
 
+    // ── status text ──────────────────────────────────────────────
     if (uiFonts.large) {
+        const int textOffsetX = static_cast<int>(Theme::Loading::STATUS_TEXT_OFFSET_X * scale);
+        const int textOffsetY = static_cast<int>(Theme::Loading::STATUS_TEXT_OFFSET_Y * scale);
+
         RenderText::drawText(
             renderer,
             statusMessage,
             uiFonts.large,
             Theme::BTN_TEXT,
-            panel.x + Theme::Loading::STATUS_TEXT_OFFSET_X,
-            panel.y + Theme::Loading::STATUS_TEXT_OFFSET_Y
+            panel.x + textOffsetX,
+            panel.y + textOffsetY
         );
     }
 }

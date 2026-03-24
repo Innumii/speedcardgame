@@ -6,6 +6,7 @@
 #include "animation/DrawCardAnimation.hpp"
 #include "render/RenderCard.hpp"
 #include "render/RenderText.hpp"
+#include "utils/RenderUtil.hpp"
 #include "render/Theme.hpp"
 #include "utils/PlayingLayoutUtil.hpp"
 
@@ -91,43 +92,68 @@ namespace PlayingRenderUtil {
 
     void drawOpponentDeckAndDiscard(SDL_Renderer* renderer, RenderText& textRenderer,
                                     const std::vector<SDL_Rect>& opponentSlots,
-                                    std::size_t deckSize, int screenW, TTF_Font* fontSmall) {
+                                    std::size_t deckSize, int screenW, int screenH,
+                                    TTF_Font* fontSmall) {
         if (!renderer || !fontSmall || opponentSlots.empty()) {
             return;
         }
 
+        const float scale = std::min(
+            static_cast<float>(screenW) / 1200.0F,
+            static_cast<float>(screenH) / 850.0F);
+
+        const int cardW       = static_cast<int>(Theme::Playing::CARD_WIDTH        * scale);
+        const int cardH       = static_cast<int>(Theme::Playing::CARD_HEIGHT       * scale);
+        const int sideGap     = static_cast<int>(Theme::Playing::OPPONENT_SIDE_GAP * scale);
+        const int sideMargin  = static_cast<int>(Theme::Playing::SIDE_ZONE_MARGIN  * scale);
+        const int textPad     = static_cast<int>(Theme::Playing::ZONE_TEXT_PADDING * scale);
+        const int stackXOff   = static_cast<int>(Theme::Playing::DECK_STACK_X_OFFSET * scale);
+        const int stackYOff   = static_cast<int>(Theme::Playing::DECK_STACK_Y_OFFSET * scale);
+        const int stackMax    = Theme::Playing::DECK_STACK_MAX_CARDS;
+        const int cornerRadius = std::max(2, static_cast<int>(Theme::Board::DISCARD_CORNER_RADIUS * scale));
+
         const SDL_Rect opponentDiscard = PlayingLayoutUtil::computeDiscardRect(
             opponentSlots,
-            Theme::Playing::CARD_WIDTH,
-            Theme::Playing::CARD_HEIGHT,
-            Theme::Playing::OPPONENT_SIDE_GAP,
-            Theme::Playing::SIDE_ZONE_MARGIN
+            cardW,
+            cardH,
+            sideGap,
+            sideMargin
         );
         const SDL_Rect deckBase = PlayingLayoutUtil::computeDeckRect(
             opponentSlots,
             screenW,
-            Theme::Playing::CARD_WIDTH,
-            Theme::Playing::CARD_HEIGHT,
-            Theme::Playing::OPPONENT_SIDE_GAP,
-            Theme::Playing::SIDE_ZONE_MARGIN
+            cardW,
+            cardH,
+            sideGap,
+            sideMargin
         );
 
-        SDL_SetRenderDrawColor(renderer, Theme::Playing::OPPONENT_DISCARD_FILL.r, Theme::Playing::OPPONENT_DISCARD_FILL.g, Theme::Playing::OPPONENT_DISCARD_FILL.b, Theme::Playing::OPPONENT_DISCARD_FILL.a);
-        SDL_RenderFillRect(renderer, &opponentDiscard);
-        SDL_SetRenderDrawColor(renderer, Theme::Playing::OPPONENT_DISCARD_BORDER.r, Theme::Playing::OPPONENT_DISCARD_BORDER.g, Theme::Playing::OPPONENT_DISCARD_BORDER.b, Theme::Playing::OPPONENT_DISCARD_BORDER.a);
-        SDL_RenderDrawRect(renderer, &opponentDiscard);
+        // Rounded discard zone — matches local player style
+        RenderUtil::drawRoundedRect(
+            renderer,
+            opponentDiscard,
+            cornerRadius,
+            Theme::Playing::OPPONENT_DISCARD_FILL,
+            Theme::Playing::OPPONENT_DISCARD_BORDER
+        );
         textRenderer.drawText(
             renderer,
             "Opponent Discard",
             fontSmall,
             Theme::TEXT_PRIMARY,
-            opponentDiscard.x + Theme::Playing::ZONE_TEXT_PADDING,
-            opponentDiscard.y + Theme::Playing::ZONE_TEXT_PADDING
+            opponentDiscard.x + textPad,
+            opponentDiscard.y + textPad
         );
 
-        const int stackCount = static_cast<int>(std::min<std::size_t>(deckSize, static_cast<std::size_t>(Theme::Playing::DECK_STACK_MAX_CARDS)));
+        const int stackCount = static_cast<int>(
+            std::min<std::size_t>(deckSize, static_cast<std::size_t>(stackMax)));
         for (int i = 0; i < stackCount; ++i) {
-            SDL_Rect card{deckBase.x + i * Theme::Playing::DECK_STACK_X_OFFSET, deckBase.y - i * Theme::Playing::DECK_STACK_Y_OFFSET, deckBase.w, deckBase.h};
+            SDL_Rect card{
+                deckBase.x + i * stackXOff,
+                deckBase.y - i * stackYOff,
+                deckBase.w,
+                deckBase.h
+            };
             RenderCard::drawCardBack(renderer, card);
         }
         textRenderer.drawText(
@@ -135,30 +161,48 @@ namespace PlayingRenderUtil {
             "Deck: " + std::to_string(deckSize),
             fontSmall,
             Theme::TEXT_PRIMARY,
-            deckBase.x + Theme::Playing::ZONE_TEXT_PADDING,
-            deckBase.y + Theme::Playing::ZONE_TEXT_PADDING
+            deckBase.x + textPad,
+            deckBase.y + textPad
         );
     }
 
     void drawSelfDeck(SDL_Renderer* renderer, RenderText& textRenderer,
                       const std::vector<SDL_Rect>& playSlots,
-                      int deckSize, int screenW, TTF_Font* fontSmall) {
+                      int deckSize, int screenW, int screenH, TTF_Font* fontSmall) {
         if (!renderer || !fontSmall || playSlots.empty()) {
             return;
         }
 
+        const float scale = std::min(
+            static_cast<float>(screenW) / 1200.0F,
+            static_cast<float>(screenH) / 850.0F);
+
+        const int cardW      = static_cast<int>(Theme::Playing::CARD_WIDTH          * scale);
+        const int cardH      = static_cast<int>(Theme::Playing::CARD_HEIGHT         * scale);
+        const int deckGap    = static_cast<int>(Theme::Playing::SELF_DECK_GAP       * scale);
+        const int sideMargin = static_cast<int>(Theme::Playing::SIDE_ZONE_MARGIN    * scale);
+        const int textPad    = static_cast<int>(Theme::Playing::ZONE_TEXT_PADDING   * scale);
+        const int stackXOff  = static_cast<int>(Theme::Playing::DECK_STACK_X_OFFSET * scale);
+        const int stackYOff  = static_cast<int>(Theme::Playing::DECK_STACK_Y_OFFSET * scale);
+        const int stackMax   = Theme::Playing::DECK_STACK_MAX_CARDS;
+
         const SDL_Rect deckBase = PlayingLayoutUtil::computeDeckRect(
             playSlots,
             screenW,
-            Theme::Playing::CARD_WIDTH,
-            Theme::Playing::CARD_HEIGHT,
-            Theme::Playing::SELF_DECK_GAP,
-            Theme::Playing::SIDE_ZONE_MARGIN
+            cardW,
+            cardH,
+            deckGap,
+            sideMargin
         );
 
-        const int stackCount = std::min(deckSize, Theme::Playing::DECK_STACK_MAX_CARDS);
+        const int stackCount = std::min(deckSize, stackMax);
         for (int i = 0; i < stackCount; ++i) {
-            SDL_Rect card{deckBase.x + i * Theme::Playing::DECK_STACK_X_OFFSET, deckBase.y - i * Theme::Playing::DECK_STACK_Y_OFFSET, deckBase.w, deckBase.h};
+            SDL_Rect card{
+                deckBase.x + i * stackXOff,
+                deckBase.y - i * stackYOff,
+                deckBase.w,
+                deckBase.h
+            };
             RenderCard::drawCardBack(renderer, card);
         }
         textRenderer.drawText(
@@ -166,8 +210,23 @@ namespace PlayingRenderUtil {
             "Deck: " + std::to_string(deckSize),
             fontSmall,
             Theme::TEXT_PRIMARY,
-            deckBase.x + Theme::Playing::ZONE_TEXT_PADDING,
-            deckBase.y + Theme::Playing::ZONE_TEXT_PADDING
+            deckBase.x + textPad,
+            deckBase.y + textPad
         );
+    }
+
+    // PlayingRenderUtil.cpp
+    SDL_Rect computeOpponentDiscardRect(const std::vector<SDL_Rect>& opponentSlots, int screenW, int screenH) {
+        const float scale = std::min(
+            static_cast<float>(screenW) / 1200.0F,
+            static_cast<float>(screenH) / 850.0F
+        );
+
+        const int cardW      = static_cast<int>(Theme::Playing::CARD_WIDTH        * scale);
+        const int cardH      = static_cast<int>(Theme::Playing::CARD_HEIGHT       * scale);
+        const int sideGap    = static_cast<int>(Theme::Playing::OPPONENT_SIDE_GAP * scale);
+        const int sideMargin = static_cast<int>(Theme::Playing::SIDE_ZONE_MARGIN  * scale);
+
+        return PlayingLayoutUtil::computeDiscardRect(opponentSlots, cardW, cardH, sideGap, sideMargin);
     }
 }

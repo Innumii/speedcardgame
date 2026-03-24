@@ -35,13 +35,11 @@ namespace {
         if (value > maxValue) return maxValue;
         return value;
     }
-
 }
 
 DeckBuilding::DeckBuilding() = default;
 
 bool DeckBuilding::refreshFromService(Game& game) {
-    // Reuse globally cached card templates and clone into local state.
     const auto& cachedCards = LoadAvailableCardsUtil::getAvailableCards();
     availableCards.clear();
     availableCards.reserve(cachedCards.size());
@@ -52,7 +50,6 @@ bool DeckBuilding::refreshFromService(Game& game) {
     }
     cardsLoadedFromService = !availableCards.empty();
 
-    //If no cards pulled, return false
     if (availableCards.empty()) {
         deckCopies.clear();
         inventoryCopies.clear();
@@ -100,7 +97,6 @@ void DeckBuilding::handleEvents(Game& game, const SDL_Event& event) {
     if (deckScrollOffset != previousScrollOffset) {
         layout = buildLayout(game);
     }
-    updateMenuButtons(layout);
 
     if (event.type == SDL_MOUSEWHEEL) {
         int mouseX = 0;
@@ -109,13 +105,12 @@ void DeckBuilding::handleEvents(Game& game, const SDL_Event& event) {
         const SDL_Point mousePoint{mouseX, mouseY};
 
         if (pointInRect(mousePoint, layout.deckArea) && layout.maxDeckScrollOffset > 0) {
-            deckScrollOffset -= event.wheel.y * Theme::DeckBuilding::SCROLL_STEP_PIXELS;
+            deckScrollOffset -= event.wheel.y * static_cast<int>(Theme::DeckBuilding::SCROLL_STEP_PIXELS * currentScale);
             deckScrollOffset = clampScrollOffset(deckScrollOffset, layout.maxDeckScrollOffset);
             return;
         }
     }
 
-    // Further event handling for deck building would go here
     const bool inTitle = (event.type == SDL_MOUSEBUTTONDOWN) &&
                      (event.button.button == SDL_BUTTON_LEFT) &&
                      (event.button.x >= TitleButton.x && event.button.x <= (TitleButton.x + TitleButton.w)) &&
@@ -123,7 +118,7 @@ void DeckBuilding::handleEvents(Game& game, const SDL_Event& event) {
     if (inTitle) {
         game.setNextState(GameState::Title);
         return;
-    };
+    }
 
     const bool inSave = (event.type == SDL_MOUSEBUTTONDOWN) &&
                     (event.button.button == SDL_BUTTON_LEFT) &&
@@ -164,7 +159,6 @@ void DeckBuilding::handleEvents(Game& game, const SDL_Event& event) {
             );
             return;
         }
-
         if (!Deck::saveDeckCopiesToService(game, availableCards, deckCopies)) {
             setStatusMessage("Failed to save deck.", 2000);
             return;
@@ -172,7 +166,6 @@ void DeckBuilding::handleEvents(Game& game, const SDL_Event& event) {
         if (!game.refreshPlayerDeckFromService()) {
             setStatusMessage("Failed to load deck.", 2000);
         }
-        
         game.setNextState(GameState::Connecting);
         return;
     }
@@ -273,7 +266,6 @@ void DeckBuilding::render(Game& game) {
     const auto layout = buildLayout(game);
     updateMenuButtons(layout);
 
-    // render cards and deck building UI
     RenderDeckBuilding::render(*this, game);
 }
 
@@ -286,43 +278,56 @@ DeckBuilding::Layout DeckBuilding::buildLayout(const Game& game) const {
         SDL_GetRendererOutputSize(renderer, &screenW, &screenH);
     }
 
-    const int cardWidth = Theme::DeckBuilding::CARD_WIDTH;
-    const int cardHeight = Theme::DeckBuilding::CARD_HEIGHT;
-    const int marginX = Theme::DeckBuilding::GRID_MARGIN_X;
-    const int marginY = Theme::DeckBuilding::GRID_MARGIN_Y;
+    const float scale = std::min(
+        static_cast<float>(screenW) / static_cast<float>(Theme::SCREEN_DEFAULT_WIDTH),
+        static_cast<float>(screenH) / static_cast<float>(Theme::SCREEN_DEFAULT_HEIGHT)
+    );
+    // Store scale for use in updateMenuButtons and scroll handling
+    const_cast<DeckBuilding*>(this)->currentScale = scale;
+
+    auto sc = [scale](int v) { return static_cast<int>(v * scale); };
+
+    const int cardWidth      = sc(Theme::DeckBuilding::CARD_WIDTH);
+    const int cardHeight     = sc(Theme::DeckBuilding::CARD_HEIGHT);
+    const int marginX        = sc(Theme::DeckBuilding::GRID_MARGIN_X);
+    const int marginY        = sc(Theme::DeckBuilding::GRID_MARGIN_Y);
+    const int rightPadding   = sc(Theme::DeckBuilding::RIGHT_PADDING);
+    const int deckGap        = sc(Theme::DeckBuilding::DECK_GAP);
+    const int deckWidth      = sc(Theme::DeckBuilding::DECK_WIDTH);
+    const int pagerHeight    = sc(Theme::DeckBuilding::PAGER_HEIGHT);
+    const int pagerSpacing   = sc(Theme::DeckBuilding::PAGER_SPACING);
+    const int bottomPadding  = sc(Theme::DeckBuilding::BOTTOM_PADDING);
+    const int entryHeight    = sc(Theme::DeckBuilding::ENTRY_HEIGHT);
+    const int entrySpacing   = sc(Theme::DeckBuilding::ENTRY_SPACING);
+
     const int gridRows = Theme::DeckBuilding::GRID_ROWS;
-
-    const int rightPadding = Theme::DeckBuilding::RIGHT_PADDING;
-    const int deckGap = Theme::DeckBuilding::DECK_GAP;
-    const int deckWidth = Theme::DeckBuilding::DECK_WIDTH;
-
     const int maxContentWidth = screenW - (rightPadding * 2);
-    const int availableGridWidth = maxContentWidth - deckWidth - deckGap - Theme::DeckBuilding::GRID_EXTRA_WIDTH;
+    const int availableGridWidth = maxContentWidth - deckWidth - deckGap - sc(Theme::DeckBuilding::GRID_EXTRA_WIDTH);
     int gridCols = (availableGridWidth + marginX) / (cardWidth + marginX);
     if (gridCols < Theme::DeckBuilding::GRID_MIN_COLS) gridCols = Theme::DeckBuilding::GRID_MIN_COLS;
     if (gridCols > Theme::DeckBuilding::GRID_MAX_COLS) gridCols = Theme::DeckBuilding::GRID_MAX_COLS;
     const int maxSlots = gridCols * gridRows;
 
-    const int gridWidth = gridCols * cardWidth + (gridCols - 1) * marginX;
+    const int gridWidth  = gridCols * cardWidth  + (gridCols - 1) * marginX;
     const int gridHeight = gridRows * cardHeight + (gridRows - 1) * marginY;
 
-    const int pagerHeight = Theme::DeckBuilding::PAGER_HEIGHT;
-    const int pagerSpacing = Theme::DeckBuilding::PAGER_SPACING;
-    const int bottomPadding = Theme::DeckBuilding::BOTTOM_PADDING;
-    const int collectionHeight = gridHeight + Theme::DeckBuilding::COLLECTION_EXTRA_HEIGHT;
+    const int collectionHeight = gridHeight + sc(Theme::DeckBuilding::COLLECTION_EXTRA_HEIGHT);
     const int totalHeight = collectionHeight + pagerSpacing + pagerHeight;
     const int maxTop = screenH - bottomPadding - totalHeight;
     int collectionY = (screenH - totalHeight) / 2;
-    if (collectionY > maxTop) {
-        collectionY = maxTop;
-    }
-    if (collectionY < Theme::DeckBuilding::COLLECTION_MIN_TOP) collectionY = Theme::DeckBuilding::COLLECTION_MIN_TOP;
+    if (collectionY > maxTop) collectionY = maxTop;
+    if (collectionY < sc(Theme::DeckBuilding::COLLECTION_MIN_TOP)) collectionY = sc(Theme::DeckBuilding::COLLECTION_MIN_TOP);
 
-    const int totalWidth = (gridWidth + Theme::DeckBuilding::GRID_EXTRA_WIDTH) + deckGap + deckWidth;
+    const int totalWidth = (gridWidth + sc(Theme::DeckBuilding::GRID_EXTRA_WIDTH)) + deckGap + deckWidth;
     int leftPadding = (screenW - totalWidth) / 2;
-    if (leftPadding < Theme::DeckBuilding::PANEL_MIN_LEFT) leftPadding = Theme::DeckBuilding::PANEL_MIN_LEFT;
+    if (leftPadding < sc(Theme::DeckBuilding::PANEL_MIN_LEFT)) leftPadding = sc(Theme::DeckBuilding::PANEL_MIN_LEFT);
 
-    layout.collectionArea = SDL_Rect{leftPadding, collectionY, gridWidth + Theme::DeckBuilding::GRID_EXTRA_WIDTH, collectionHeight};
+    layout.collectionArea = SDL_Rect{
+        leftPadding,
+        collectionY,
+        gridWidth + sc(Theme::DeckBuilding::GRID_EXTRA_WIDTH),
+        collectionHeight
+    };
 
     int deckX = layout.collectionArea.x + layout.collectionArea.w + deckGap;
     int deckY = layout.collectionArea.y;
@@ -346,13 +351,14 @@ DeckBuilding::Layout DeckBuilding::buildLayout(const Game& game) const {
     const int startIndex = pageIndex * maxSlots;
     const int remaining = totalCards - startIndex;
     const int slotCount = std::min(remaining < 0 ? 0 : remaining, maxSlots);
-    layout.maxSlots = maxSlots;
-    layout.pageCount = pageCount;
-    layout.pageIndex = pageIndex;
+    layout.maxSlots   = maxSlots;
+    layout.pageCount  = pageCount;
+    layout.pageIndex  = pageIndex;
     layout.collectionCardRects.reserve(slotCount);
     layout.collectionCardIndices.reserve(slotCount);
-    const int startX = layout.collectionArea.x + Theme::DeckBuilding::GRID_START_X_PADDING;
-    const int startY = layout.collectionArea.y + Theme::DeckBuilding::GRID_START_Y_PADDING;
+
+    const int startX = layout.collectionArea.x + sc(Theme::DeckBuilding::GRID_START_X_PADDING);
+    const int startY = layout.collectionArea.y + sc(Theme::DeckBuilding::GRID_START_Y_PADDING);
     for (int i = 0; i < slotCount; ++i) {
         int row = i / gridCols;
         int col = i % gridCols;
@@ -367,37 +373,51 @@ DeckBuilding::Layout DeckBuilding::buildLayout(const Game& game) const {
     }
 
     const int pagerY = layout.collectionArea.y + layout.collectionArea.h + pagerSpacing;
-    layout.prevPageButton = SDL_Rect{layout.collectionArea.x + Theme::DeckBuilding::PREV_BUTTON_X_OFFSET, pagerY, Theme::DeckBuilding::PREV_BUTTON_WIDTH, pagerHeight};
-    layout.nextPageButton = SDL_Rect{layout.collectionArea.x + layout.collectionArea.w - Theme::DeckBuilding::NEXT_BUTTON_X_INSET, pagerY, Theme::DeckBuilding::NEXT_BUTTON_WIDTH, pagerHeight};
-    layout.pageLabelRect = SDL_Rect{layout.prevPageButton.x + layout.prevPageButton.w + Theme::DeckBuilding::PAGE_LABEL_LEFT_GAP, pagerY, layout.nextPageButton.x - (layout.prevPageButton.x + layout.prevPageButton.w + Theme::DeckBuilding::PAGE_LABEL_RIGHT_GAP), pagerHeight};
+    layout.prevPageButton = SDL_Rect{
+        layout.collectionArea.x + sc(Theme::DeckBuilding::PREV_BUTTON_X_OFFSET),
+        pagerY,
+        sc(Theme::DeckBuilding::PREV_BUTTON_WIDTH),
+        pagerHeight
+    };
+    layout.nextPageButton = SDL_Rect{
+        layout.collectionArea.x + layout.collectionArea.w - sc(Theme::DeckBuilding::NEXT_BUTTON_X_INSET),
+        pagerY,
+        sc(Theme::DeckBuilding::NEXT_BUTTON_WIDTH),
+        pagerHeight
+    };
+    layout.pageLabelRect = SDL_Rect{
+        layout.prevPageButton.x + layout.prevPageButton.w + sc(Theme::DeckBuilding::PAGE_LABEL_LEFT_GAP),
+        pagerY,
+        layout.nextPageButton.x - (layout.prevPageButton.x + layout.prevPageButton.w + sc(Theme::DeckBuilding::PAGE_LABEL_RIGHT_GAP)),
+        pagerHeight
+    };
 
     const auto deckOrder = getDeckEntryOrder();
     layout.deckEntryCardIndices = deckOrder;
     layout.deckEntryRects.reserve(deckOrder.size());
 
-    const int entryHeight = Theme::DeckBuilding::ENTRY_HEIGHT;
-    const int entryStartY = layout.deckArea.y + Theme::DeckBuilding::ENTRY_START_Y_PADDING;
-    const int entriesBottom = layout.deckArea.y + layout.deckArea.h - Theme::DeckBuilding::ENTRY_BOTTOM_PADDING;
-    const int clipHeight = std::max(0, entriesBottom - entryStartY);
+    const int entryStartY   = layout.deckArea.y + sc(Theme::DeckBuilding::ENTRY_START_Y_PADDING);
+    const int entriesBottom = layout.deckArea.y + layout.deckArea.h - sc(Theme::DeckBuilding::ENTRY_BOTTOM_PADDING);
+    const int clipHeight    = std::max(0, entriesBottom - entryStartY);
     layout.deckEntriesClipRect = SDL_Rect{
-        layout.deckArea.x + Theme::DeckBuilding::ENTRY_X_PADDING,
+        layout.deckArea.x + sc(Theme::DeckBuilding::ENTRY_X_PADDING),
         entryStartY,
-        layout.deckArea.w - Theme::DeckBuilding::ENTRY_X_TOTAL_PADDING,
+        layout.deckArea.w - sc(Theme::DeckBuilding::ENTRY_X_TOTAL_PADDING),
         clipHeight
     };
 
     int contentHeight = 0;
     if (!deckOrder.empty()) {
         contentHeight = static_cast<int>(deckOrder.size()) * entryHeight +
-                        static_cast<int>(deckOrder.size() - 1) * Theme::DeckBuilding::ENTRY_SPACING;
+                        static_cast<int>(deckOrder.size() - 1) * entrySpacing;
     }
     layout.maxDeckScrollOffset = std::max(0, contentHeight - layout.deckEntriesClipRect.h);
 
     for (std::size_t i = 0; i < deckOrder.size(); ++i) {
         SDL_Rect entryRect{
-            layout.deckArea.x + Theme::DeckBuilding::ENTRY_X_PADDING,
-            entryStartY + static_cast<int>(i) * (entryHeight + Theme::DeckBuilding::ENTRY_SPACING) - deckScrollOffset,
-            layout.deckArea.w - Theme::DeckBuilding::ENTRY_X_TOTAL_PADDING,
+            layout.deckArea.x + sc(Theme::DeckBuilding::ENTRY_X_PADDING),
+            entryStartY + static_cast<int>(i) * (entryHeight + entrySpacing) - deckScrollOffset,
+            layout.deckArea.w - sc(Theme::DeckBuilding::ENTRY_X_TOTAL_PADDING),
             entryHeight
         };
         layout.deckEntryRects.push_back(entryRect);
