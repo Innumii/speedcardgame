@@ -56,21 +56,11 @@ void SummonAnimation::draw(SDL_Renderer* renderer) const {
             SDL_RenderFillRect(renderer, &glowRect);
         }
     } else {
-        // ── Pixel disintegration fade out ────────────────────────────
+        // ── Ring dissipation outward ──────────────────────────────────
         const float dissolveT = (t - peakT) / (1.0F - peakT);
-        const float time      = static_cast<float>(SDL_GetTicks()) / 300.0F;
 
         constexpr int BLOCK = 6;
-        const int blocksX = (rect.w + BLOCK - 1) / BLOCK;
-        const int blocksY = (rect.h + BLOCK - 1) / BLOCK;
-
-        // Same hash functions as DiscardAnimation
-        auto blockHash = [](int bx, int seed) -> float {
-            Uint32 h = static_cast<Uint32>(bx) * 2654435761U
-                     ^ static_cast<Uint32>(seed) * 40503U;
-            h ^= h >> 13; h *= 0x9e3779b9U; h ^= h >> 16;
-            return static_cast<float>(h & 0xFFFFU) / 65536.0F;
-        };
+        const int seed = rect.x ^ (rect.y << 8);
 
         auto blockHash2 = [](int bx, int by, int seed) -> float {
             Uint32 h = static_cast<Uint32>(bx) * 2654435761U
@@ -80,63 +70,105 @@ void SummonAnimation::draw(SDL_Renderer* renderer) const {
             return static_cast<float>(h & 0xFFFFU) / 65536.0F;
         };
 
-        // Use a fixed seed so the pattern is stable per card instance
-        const int seed = rect.x ^ (rect.y << 8);
+        // Ring expands from the card boundary outward
+        const float maxRadius  = static_cast<float>(std::max(rect.w, rect.h)) * 0.4F;
+        const float ringRadius = dissolveT * maxRadius;
+        // Half-thickness of the ring in pixels; jitter will blur this edge
+        const float ringHalf   = static_cast<float>(BLOCK) * 1.1F;
 
-        for (int bx = 0; bx < blocksX; ++bx) {
-            const float xNorm   = static_cast<float>(bx) / static_cast<float>(blocksX);
-            const float colHash = blockHash(bx, seed);
+        // Iterate over a bounding area large enough to contain the full ring
+        const int margin = static_cast<int>(maxRadius + ringHalf) + BLOCK * 2;
+        const int x0 = rect.x - margin;
+        const int y0 = rect.y - margin;
+        const int x1 = rect.x + rect.w + margin;
+        const int y1 = rect.y + rect.h + margin;
 
-            const float flame =
-                0.12F * std::sin(xNorm * 8.0F  + time + colHash * 6.28F) +
-                0.07F * std::sin(xNorm * 15.0F - time * 1.3F + colHash * 3.14F) +
-                0.05F * std::sin(xNorm * 25.0F + time * 0.7F) +
-                (colHash - 0.5F) * 0.08F;
+        for (int px = x0; px < x1; px += BLOCK) {
+            const int bx = (px - x0) / BLOCK;
+            for (int py = y0; py < y1; py += BLOCK) {
+                const int by = (py - y0) / BLOCK;
 
-            const float cutoffNorm  = dissolveT * 1.6F - 0.2F + flame;
-            const int   cutoffBlock = static_cast<int>(cutoffNorm * static_cast<float>(blocksY));
+                // Centre of this block
+                const float cx = static_cast<float>(px) + BLOCK * 0.5F;
+                const float cy = static_cast<float>(py) + BLOCK * 0.5F;
 
-            for (int by = 0; by < blocksY; ++by) {
-                // Skip blocks that have already disintegrated
-                const float scatter      = blockHash2(bx, by, seed) * 0.18F;
-                const float blockCutoff  = dissolveT * 1.6F - 0.2F + flame + scatter;
-                const int   blockCutoffRow = static_cast<int>(blockCutoff * static_cast<float>(blocksY));
-                if (by < blockCutoffRow) continue;
-                (void)cutoffBlock;
+                // Signed distance from the card boundary:
+                //   negative  → inside the card (distance to nearest edge, negated)
+                //   positive  → outside the card (distance to nearest edge point)
+                const float nearX = std::clamp(cx,
+                    static_cast<float>(rect.x),
+                    static_cast<float>(rect.x + rect.w));
+                const float nearY = std::clamp(cy,
+                    static_cast<float>(rect.y),
+                    static_cast<float>(rect.y + rect.h));
+                const float dx = cx - nearX;
+                const float dy = cy - nearY;
+                const float outsideDist = std::sqrt(dx * dx + dy * dy);
 
-                const int px = rect.x + bx * BLOCK;
-                const int py = rect.y + by * BLOCK;
-                const int bw = std::min(BLOCK, rect.x + rect.w - px);
-                const int bh = std::min(BLOCK, rect.y + rect.h - py);
+                float signedDist;
+                if (outsideDist > 0.0F) {
+                    signedDist = outsideDist;
+                } else {
+                    // inside card — measure inward depth as a negative value
+                    const float fromLeft   = cx - static_cast<float>(rect.x);
+                    const float fromRight  = static_cast<float>(rect.x + rect.w) - cx;
+                    const float fromTop    = cy - static_cast<float>(rect.y);
+                    const float fromBottom = static_cast<float>(rect.y + rect.h) - cy;
+                    signedDist = -std::min({fromLeft, fromRight, fromTop, fromBottom});
+                }
+
+                // Per-block hash jitter to produce a jagged, pixelated ring edge
+                const float jitter = (blockHash2(bx, by, seed) - 0.5F)
+                                   * static_cast<float>(BLOCK) * 5.0F;
+                const float effDist = signedDist + jitter;
+
+                const float distFromRing = effDist - ringRadius;
+
+                // Skip blocks that the ring hasn't reached yet
+                if (distFromRing > ringHalf) continue;
+
+                const int bw = std::min(BLOCK, x1 - px);
+                const int bh = std::min(BLOCK, y1 - py);
                 if (bw <= 0 || bh <= 0) continue;
-
                 const SDL_Rect block{ px, py, bw, bh };
 
-                // Edge blocks glow bright, interior blocks are solid
-                const float distFromEdge = static_cast<float>(by - blockCutoffRow)
-                                         / static_cast<float>(blocksY);
-                const bool nearEdge = distFromEdge < 0.12F;
+                if (distFromRing < -ringHalf) {
+                    // Behind the ring — draw fading card interior only
+                    if (signedDist >= 0.0F) continue; // outside card: already gone
+                    const Uint8 interiorAlpha =
+                        static_cast<Uint8>((1.0F - dissolveT) * 160.0F);
+                    if (interiorAlpha == 0) continue;
+                    SDL_SetRenderDrawColor(renderer,
+                        kGlowColor.r, kGlowColor.g, kGlowColor.b, interiorAlpha);
+                    SDL_RenderFillRect(renderer, &block);
+                } else {
+                    // On the ring — glow that also fades as it expands
+                    const float ringT    = (distFromRing + ringHalf) / (2.0F * ringHalf);
+                    const float glowPeak = 1.0F - std::abs(ringT - 0.5F) * 2.0F;
+                    const float fade     = 1.0F - dissolveT; // dim as ring expands
+                    const Uint8 alpha    = static_cast<Uint8>(
+                        std::clamp(glowPeak * fade * 255.0F, 0.0F, 255.0F));
+                    if (alpha == 0) continue;
 
-                if (nearEdge) {
-                    for (int g = 2; g >= 1; --g) {
+                    // Soft halo pass behind the bright block
+                    for (int g = 3; g >= 1; --g) {
                         const int   expand    = g * BLOCK;
-                        const Uint8 glowAlpha = static_cast<Uint8>(25 / g);
+                        const Uint8 haloAlpha = static_cast<Uint8>(
+                            std::clamp(static_cast<float>(alpha) * (0.12F / static_cast<float>(g)),
+                                       0.0F, 255.0F));
                         SDL_SetRenderDrawColor(renderer,
-                            kGlowColor.r - 20, kGlowColor.g, kGlowColor.b, glowAlpha);
-                        const SDL_Rect glowBlock{
+                            kGlowColor.r, kGlowColor.g, kGlowColor.b, haloAlpha);
+                        const SDL_Rect halo{
                             block.x - expand, block.y - expand,
                             block.w + expand * 2, block.h + expand * 2
                         };
-                        SDL_RenderFillRect(renderer, &glowBlock);
+                        SDL_RenderFillRect(renderer, &halo);
                     }
-                    SDL_SetRenderDrawColor(renderer,
-                        kGlowColor.r - 20, kGlowColor.g, kGlowColor.b, 255);
-                } else {
-                    SDL_SetRenderDrawColor(renderer,
-                        kGlowColor.r, kGlowColor.g, kGlowColor.b, 180);
-                }
 
-                SDL_RenderFillRect(renderer, &block);
+                    SDL_SetRenderDrawColor(renderer,
+                        kGlowColor.r, kGlowColor.g, kGlowColor.b, alpha);
+                    SDL_RenderFillRect(renderer, &block);
+                }
             }
         }
     }
