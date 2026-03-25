@@ -229,4 +229,5 @@ namespace PlayingRenderUtil {
 
         return PlayingLayoutUtil::computeDiscardRect(opponentSlots, cardW, cardH, sideGap, sideMargin);
     }
+
 }

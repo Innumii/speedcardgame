@@ -26,6 +26,7 @@
 #include <render/RenderCardOverlay.hpp>
 #include <iostream>
 #include <animation/SummonAnimation.hpp>
+#include <animation/AttackAnimation.hpp>
 
 // Reference resolution the Theme pixel constants were authored for.
 static constexpr float kRefW = 1200.0F;
