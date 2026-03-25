@@ -15,6 +15,11 @@ import (
 	"gorm.io/gorm"
 )
 
+type deckRequest struct {
+	Uid   int               `json:"uid"`
+	Cards models.CardCounts `json:"cards"`
+}
+
 const defaultDeckSizeLimit = 30
 
 // GetDeckSizeLimit returns the configured deck size, or the default when unset.
@@ -41,25 +46,21 @@ func CountDeckCards(cards models.CardCounts) int {
 
 // CreateDeck creates a new deck for a user
 func CreateDeck(w http.ResponseWriter, r *http.Request) {
-	var inputDeck struct {
-		Uid   int               `json:"uid"`
-		Cards models.CardCounts `json:"cards"`
-	}
+	var inputDeck deckRequest
 
 	// Decode the JSON body into the inputDeck struct
-	if err := json.NewDecoder(r.Body).Decode(&inputDeck); err != nil {
-		http.Error(w, "Invalid inputDeck", http.StatusBadRequest)
+	if ok := util.DecodeJSONBody(w, r, &inputDeck, "Invalid inputDeck"); !ok {
 		return
 	}
 
 	if inputDeck.Uid <= 0 {
-		http.Error(w, "uid must be a positive integer", http.StatusBadRequest)
+		util.RespondWithError(w, http.StatusBadRequest, "uid must be a positive integer")
 		return
 	}
 
 	deckSizeLimit := GetDeckSizeLimit()
 	if CountDeckCards(inputDeck.Cards) != deckSizeLimit {
-		http.Error(w, fmt.Sprintf("deck must contain exactly %d cards", deckSizeLimit), http.StatusBadRequest)
+		util.RespondWithError(w, http.StatusBadRequest, fmt.Sprintf("deck must contain exactly %d cards", deckSizeLimit))
 		return
 	}
 
@@ -67,7 +68,7 @@ func CreateDeck(w http.ResponseWriter, r *http.Request) {
 	var existingDeck models.Deck
 	if err := config.DB.Where("uid = ?", inputDeck.Uid).First(&existingDeck).Error; err == nil {
 		if err := config.DB.Where("uid = ?", inputDeck.Uid).Delete(&models.Deck{}).Error; err != nil {
-			http.Error(w, fmt.Sprintf("Failed to delete deck: %v", err), http.StatusInternalServerError)
+			util.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to delete deck: %v", err))
 			return
 		}
 	}
@@ -80,16 +81,12 @@ func CreateDeck(w http.ResponseWriter, r *http.Request) {
 
 	// Insert into the database
 	if err := config.DB.Create(&deck).Error; err != nil {
-		http.Error(w, fmt.Sprintf("Failed to create deck: %v", err), http.StatusInternalServerError)
+		util.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to create deck: %v", err))
 		return
 	}
 
 	// Return the created deck as JSON
-	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(deck); err != nil {
-		http.Error(w, fmt.Sprintf("Failed to encode deck response: %v", err), http.StatusInternalServerError)
-		return
-	}
+	util.RespondWithJSON(w, http.StatusOK, deck)
 }
 
 func ListDecks(w http.ResponseWriter, _ *http.Request) {
@@ -97,42 +94,30 @@ func ListDecks(w http.ResponseWriter, _ *http.Request) {
 
 	// Query all decks (Cards field is automatically loaded as JSONB)
 	if err := config.DB.Find(&decks).Error; err != nil {
-		http.Error(w, fmt.Sprintf("Failed to retrieve decks: %v", err), http.StatusInternalServerError)
+		util.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to retrieve decks: %v", err))
 		return
 	}
 
 	// Return the list of decks
-	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(decks); err != nil {
-		http.Error(w, fmt.Sprintf("Failed to encode decks response: %v", err), http.StatusInternalServerError)
-		return
-	}
+	util.RespondWithJSON(w, http.StatusOK, decks)
 }
 
 func DeleteDeck(w http.ResponseWriter, r *http.Request) {
-	var inputDeck struct {
-		Uid   int               `json:"uid"`
-		Cards models.CardCounts `json:"cards"`
-	}
+	var inputDeck deckRequest
 
 	// Decode the JSON body into the inputDeck struct
-	if err := json.NewDecoder(r.Body).Decode(&inputDeck); err != nil {
-		http.Error(w, "Invalid inputDeck", http.StatusBadRequest)
+	if ok := util.DecodeJSONBody(w, r, &inputDeck, "Invalid inputDeck"); !ok {
 		return
 	}
 
 	// Delete the deck from the database
 	if err := config.DB.Where("uid = ?", inputDeck.Uid).Delete(&models.Deck{}).Error; err != nil {
-		http.Error(w, fmt.Sprintf("Failed to delete deck: %v", err), http.StatusInternalServerError)
+		util.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to delete deck: %v", err))
 		return
 	}
 
 	// Return a success message
-	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(map[string]string{"message": "Deck deleted successfully"}); err != nil {
-		http.Error(w, fmt.Sprintf("Failed to encode delete response: %v", err), http.StatusInternalServerError)
-		return
-	}
+	util.RespondWithJSON(w, http.StatusOK, map[string]string{"message": "Deck deleted successfully"})
 }
 
 func FillDeckForUser(w http.ResponseWriter, r *http.Request) {

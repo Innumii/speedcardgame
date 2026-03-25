@@ -189,6 +189,9 @@ void Game::commitStateChange() {
         if (state == GameState::DeckBuilding && previousState != GameState::DeckBuilding) {
             deckBuildingState.enter(*this);
         }
+        if (state == GameState::Payment && previousState != GameState::Payment) {
+            paymentState.enter(*this);
+        }
         if (state == GameState::PackOpening && previousState != GameState::PackOpening) {
             packOpeningState.enter(*this);
         }
@@ -377,6 +380,9 @@ void Game::handleEvents() {
             case GameState::DeckBuilding:
                 deckBuildingState.handleEvents(*this, event);
                 break;
+            case GameState::Payment:
+                paymentState.handleEvents(*this, event);
+                break;
             case GameState::PackOpening:
                 packOpeningState.handleEvents(*this, event);
                 break;
@@ -414,6 +420,9 @@ void Game::update() {
             break;
         case GameState::DeckBuilding:
             deckBuildingState.update(*this);
+            break;
+        case GameState::Payment:
+            paymentState.update(*this);
             break;
         case GameState::PackOpening:
             packOpeningState.update(*this);
@@ -461,6 +470,9 @@ void Game::render() {
             break;
         case GameState::DeckBuilding:
             deckBuildingState.render(*this);
+            break;
+        case GameState::Payment:
+            paymentState.render(*this);
             break;
         case GameState::PackOpening:
             packOpeningState.render(*this);

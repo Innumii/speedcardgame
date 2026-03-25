@@ -8,6 +8,7 @@
 #include "render/RenderText.hpp"
 #include "render/Theme.hpp"
 #include "utils/LoadAvailableCards.hpp"
+#include "objects/ShopPackage.hpp"
 
 #include <SDL2/SDL.h>
 #include <algorithm>
@@ -88,6 +89,11 @@ void Loading::update(Game& game) {
                 return;
             }
         }
+    }
+
+    if (ShopPackage::getNumberOfPackages() == 0) {
+        ShopPackage::loadPackagesFromService();
+        statusMessage = "Loading shop packages...";
     }
 
     game.setNextState(GameState::Title);

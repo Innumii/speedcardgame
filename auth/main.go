@@ -118,13 +118,8 @@ func main() {
 		group.POST("/register", authController.Register)
 		group.POST("/login", authController.Login)
 		group.POST("/logout", authController.Logout)
-		group.GET("/me", authController.GetMe)
-		group.POST("/reset-password", authController.RequestPasswordReset)
-		group.POST("/reset-password/confirm", authController.ConfirmPasswordReset)
-		group.PATCH("/change-password", authController.ChangePassword)
 	}
 
-	registerAuthRoutes(r)
 	registerAuthRoutes(r.Group("/auth"))
 
 	// Health check endpoint for AWS

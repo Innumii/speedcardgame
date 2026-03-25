@@ -12,6 +12,7 @@ namespace LoadAvailableCardsUtil {
     bool ensureAvailableCardsLoaded();
     bool areAvailableCardsLoaded();
     std::vector<std::unique_ptr<Card>>& getAvailableCards();
+    int getNumberOfAvailableCards();
 }
 
 #endif

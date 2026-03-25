@@ -80,33 +80,50 @@ void Title::updateLayout(SDL_Renderer* renderer) {
     const int buttonGap  = static_cast<int>(16 * scale);
     const int smallRowGap = static_cast<int>(12 * scale);
 
-    // Compute total content height to vertically center the block
-    const int buttonsTotalH = (mainBtnH * 3) + (buttonGap * 2) + smallBtnH;
+    startButton.w = mainBtnW;
+    startButton.h = mainBtnH;
+    BuildDeckButton.w = mainBtnW;
+    BuildDeckButton.h = mainBtnH;
+    OpenPacksButton.w = mainBtnW;
+    OpenPacksButton.h = mainBtnH;
+    ShopButton.w = mainBtnW;
+    ShopButton.h = mainBtnH;
+    logoutButton.w = smallBtnW;
+    logoutButton.h = smallBtnH;
+    quitButton.w = smallBtnW;
+    quitButton.h = smallBtnH;
+    titleBanner.w = bannerW;
+    titleBanner.h = bannerH;
+
+    const int buttonsTotalH = (mainBtnH * 4) + (buttonGap * 3) + smallBtnH;
     const int totalH        = bannerH + bannerGap + buttonsTotalH;
     int topY = (screenH - totalH) / 2;
     if (topY < static_cast<int>(20 * scale)) topY = static_cast<int>(20 * scale);
 
     const int centerX = screenW / 2;
 
-    titleBanner  = {centerX - bannerW / 2,    topY,                                  bannerW,   bannerH};
-    startButton  = {centerX - mainBtnW / 2,   titleBanner.y + bannerH + bannerGap,   mainBtnW,  mainBtnH};
-    BuildDeckButton = {startButton.x,          startButton.y + mainBtnH + buttonGap,  mainBtnW,  mainBtnH};
-    OpenPacksButton = {startButton.x,          BuildDeckButton.y + mainBtnH + buttonGap, mainBtnW, mainBtnH};
+    titleBanner.x     = centerX - (bannerW / 2);
+    titleBanner.y     = topY;
 
-    const int smallTotalW = smallBtnW * 2 + smallRowGap;
-    const int smallStartX = centerX - smallTotalW / 2;
-    const int smallY      = OpenPacksButton.y + mainBtnH + buttonGap;
-    logoutButton = {smallStartX,                    smallY, smallBtnW, smallBtnH};
-    quitButton   = {smallStartX + smallBtnW + smallRowGap, smallY, smallBtnW, smallBtnH};
-}
+    startButton.x     = centerX - (mainBtnW / 2);
+    startButton.y     = titleBanner.y + bannerH + bannerGap;
 
-Title::~Title() {
-    for (auto& cache : cachedButtons) {
-        if (cache.texture) {
-            SDL_DestroyTexture(cache.texture);
-            cache.texture = nullptr;
-        }
-    }
+    BuildDeckButton.x = startButton.x;
+    BuildDeckButton.y = startButton.y + mainBtnH + buttonGap;
+
+    OpenPacksButton.x = startButton.x;
+    OpenPacksButton.y = BuildDeckButton.y + mainBtnH + buttonGap;
+
+    ShopButton.x      = startButton.x;
+    ShopButton.y      = OpenPacksButton.y + mainBtnH + buttonGap;
+
+    const int smallTotalW = logoutButton.w + smallRowGap + quitButton.w;
+    const int smallStartX = centerX - (smallTotalW / 2);
+    const int smallY = ShopButton.y + mainBtnH + buttonGap;
+    logoutButton.x = smallStartX;
+    logoutButton.y = smallY;
+    quitButton.x = logoutButton.x + logoutButton.w + smallRowGap;
+    quitButton.y = smallY;
 }
 
 void Title::handleEvents(Game& game, const SDL_Event& event) {
@@ -125,7 +142,9 @@ void Title::handleEvents(Game& game, const SDL_Event& event) {
         const bool inBuildDeck = (mouseX >= BuildDeckButton.x && mouseX <= BuildDeckButton.x + BuildDeckButton.w) &&
                                  (mouseY >= BuildDeckButton.y && mouseY <= BuildDeckButton.y + BuildDeckButton.h);
         const bool inOpenPacks = (mouseX >= OpenPacksButton.x && mouseX <= OpenPacksButton.x + OpenPacksButton.w) &&
-                                 (mouseY >= OpenPacksButton.y && mouseY <= OpenPacksButton.y + OpenPacksButton.h);
+                     (mouseY >= OpenPacksButton.y && mouseY <= OpenPacksButton.y + OpenPacksButton.h);
+        const bool inShop      = (mouseX >= ShopButton.x      && mouseX <= ShopButton.x      + ShopButton.w) &&
+                     (mouseY >= ShopButton.y      && mouseY <= ShopButton.y      + ShopButton.h);
         const bool inLogout    = (mouseX >= logoutButton.x    && mouseX <= logoutButton.x    + logoutButton.w) &&
                                  (mouseY >= logoutButton.y    && mouseY <= logoutButton.y    + logoutButton.h);
         const bool inQuit      = (mouseX >= quitButton.x      && mouseX <= quitButton.x      + quitButton.w)  &&
@@ -137,13 +156,15 @@ void Title::handleEvents(Game& game, const SDL_Event& event) {
             game.setNextState(GameState::DeckBuilding);
         } else if (inOpenPacks) {
             game.setNextState(GameState::PackOpening);
+        } else if (inShop) {
+            game.setNextState(GameState::Payment);
         } else if (inLogout) {
-        animInitialized = false;
-        game.endUserSession();
-        game.getNetworkClient().disconnect();
-        game.setPlayerUsername("Player");
-        game.setNextState(GameState::Login);
-    } else if (inQuit) {
+            animInitialized = false;
+            game.endUserSession();
+            game.getNetworkClient().disconnect();
+            game.setPlayerUsername("Player");
+            game.setNextState(GameState::Login);
+        } else if (inQuit) {
             game.setNextState(GameState::Quit);
         }
     }
@@ -164,12 +185,15 @@ void Title::update(Game& game) {
     } else if (mouseX >= OpenPacksButton.x && mouseX <= OpenPacksButton.x + OpenPacksButton.w &&
                mouseY >= OpenPacksButton.y && mouseY <= OpenPacksButton.y + OpenPacksButton.h) {
         hoveredButton = 2;
+    } else if (mouseX >= ShopButton.x && mouseX <= ShopButton.x + ShopButton.w &&
+               mouseY >= ShopButton.y && mouseY <= ShopButton.y + ShopButton.h) {
+        hoveredButton = 3;
     } else if (mouseX >= logoutButton.x && mouseX <= logoutButton.x + logoutButton.w &&
                mouseY >= logoutButton.y && mouseY <= logoutButton.y + logoutButton.h) {
-        hoveredButton = 3;
+        hoveredButton = 4;
     } else if (mouseX >= quitButton.x && mouseX <= quitButton.x + quitButton.w &&
                mouseY >= quitButton.y && mouseY <= quitButton.y + quitButton.h) {
-        hoveredButton = 4;
+        hoveredButton = 5;
     }
 }
 
@@ -276,6 +300,16 @@ void Title::render(const Game& game) {
     drawBtn(startButton,     Theme::BTN_START,   "Start Game", 0);
     drawBtn(BuildDeckButton, Theme::BTN_BUILD,   "Build Deck", 1);
     drawBtn(OpenPacksButton, Theme::BTN_START,   "Open Packs", 2);
-    drawBtn(logoutButton,    Theme::BTN_CONNECT, "Logout",     3);
-    drawBtn(quitButton,      Theme::BTN_QUIT,    "Quit Game",  4);
+    drawBtn(ShopButton,      Theme::BTN_PRIMARY, "Coin Shop",  3);
+    drawBtn(logoutButton,    Theme::BTN_CONNECT, "Logout",     4);
+    drawBtn(quitButton,      Theme::BTN_QUIT,    "Quit Game",  5);
+}
+
+Title::~Title() {
+    for (auto& cache : cachedButtons) {
+        if (cache.texture) {
+            SDL_DestroyTexture(cache.texture);
+            cache.texture = nullptr;
+        }
+    }
 }
