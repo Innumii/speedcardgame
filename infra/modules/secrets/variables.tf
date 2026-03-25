@@ -52,3 +52,17 @@ variable "cards_database_url" {
   sensitive   = true
 }
 
+variable "stripe_secret_key" {
+  description = "Stripe Secret API Key for payment processing"
+  type        = string
+  sensitive   = true
+  default     = null
+}
+
+variable "stripe_webhook_secret" {
+  description = "Stripe Webhook Secret for validating webhook signatures"
+  type        = string
+  sensitive   = true
+  default     = null
+}
+

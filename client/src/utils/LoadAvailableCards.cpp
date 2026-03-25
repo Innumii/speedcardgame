@@ -186,3 +186,23 @@ bool LoadAvailableCardsUtil::ensureAvailableCardsLoaded() {
 bool LoadAvailableCardsUtil::areAvailableCardsLoaded() {
 	return cachedAvailableCardsLoadedFlag();
 }
+
+int LoadAvailableCardsUtil::getNumberOfAvailableCards() {
+	std::string responseBody;
+	int statusCode = -1;
+	const std::string host = EnvUtil::getCardsServiceHost();
+	const int port = EnvUtil::getCardsServicePort();
+	const std::string path = "/cards/size";
+
+	HttpUtil::sendHttp(host, port, "GET", path, "", statusCode, responseBody);
+
+	if (statusCode != 200) {
+		return -1;
+	}
+
+	int output = -1;
+	if (!JsonUtil::readJsonIntField(responseBody, "count", output)) {
+		return -1;
+	}
+	return output;
+}

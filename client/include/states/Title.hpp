@@ -40,7 +40,12 @@ private:
         Theme::Title::MAIN_BUTTON_WIDTH,
         Theme::Title::MAIN_BUTTON_HEIGHT
     };
-
+    SDL_Rect ShopButton{
+        Theme::Title::START_BUTTON_INITIAL_X,
+        Theme::Title::OPEN_PACKS_BUTTON_INITIAL_Y,
+        Theme::Title::MAIN_BUTTON_WIDTH,
+        Theme::Title::MAIN_BUTTON_HEIGHT
+    };
     SDL_Rect logoutButton{
         Theme::Title::LOGOUT_BUTTON_INITIAL_X,
         Theme::Title::LOGOUT_BUTTON_INITIAL_Y,
@@ -76,7 +81,7 @@ private:
         float lastScale = 0.0f;
     };
 
-    std::array<CachedButton, 5> cachedButtons;
+    std::array<CachedButton, 6> cachedButtons;
 
     SDL_Texture* buildButtonTexture(SDL_Renderer* renderer,
                                     const SDL_Rect& rect,

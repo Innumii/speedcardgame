@@ -48,11 +48,18 @@ private:
         Theme::PackOpening::OPEN_BUTTON_WIDTH,
         Theme::PackOpening::OPEN_BUTTON_HEIGHT
     };
+    SDL_Rect shopButton{
+        Theme::PackOpening::OPEN_BUTTON_INITIAL_X,
+        Theme::PackOpening::OPEN_BUTTON_INITIAL_Y,
+        Theme::PackOpening::OPEN_BUTTON_WIDTH,
+        Theme::PackOpening::OPEN_BUTTON_HEIGHT
+    };
 
     std::string statusMessage;
     int lastRefundCoins{0};
     bool backHovered{false};
     bool openHovered{false};
+    bool shopHovered{false};
     int hoveredOpenedCard{-1};
 
     // Reveal animation

@@ -84,6 +84,8 @@ void PackOpening::handleEvents(Game& game, const SDL_Event& event) {
         const bool canOpenPack = game.getPackRefundCoins() >= PackCostCoins;
         backHovered = (x >= backButton.x && x <= backButton.x + backButton.w &&
                        y >= backButton.y && y <= backButton.y + backButton.h);
+        shopHovered = (x >= shopButton.x && x <= shopButton.x + shopButton.w &&
+                   y >= shopButton.y && y <= shopButton.y + shopButton.h);
         openHovered = (x >= openPackButton.x && x <= openPackButton.x + openPackButton.w &&
                        y >= openPackButton.y && y <= openPackButton.y + openPackButton.h &&
                        canOpenPack);
@@ -135,6 +137,12 @@ void PackOpening::handleEvents(Game& game, const SDL_Event& event) {
         if (x >= backButton.x && x <= backButton.x + backButton.w &&
             y >= backButton.y && y <= backButton.y + backButton.h) {
             game.setNextState(GameState::Title);
+            return;
+        }
+
+        if (x >= shopButton.x && x <= shopButton.x + shopButton.w &&
+            y >= shopButton.y && y <= shopButton.y + shopButton.h) {
+            game.setNextState(GameState::Payment);
             return;
         }
 
@@ -204,6 +212,8 @@ void PackOpening::render(Game& game) {
 
     RenderButton::drawButton(renderer, backButton, "Back to Title", uiFonts.large,
                              Theme::BTN_QUIT, Theme::BTN_BORDER, Theme::BTN_TEXT, backHovered);
+    RenderButton::drawButton(renderer, shopButton, "Coin Shop", uiFonts.large,
+                             Theme::BTN_PRIMARY, Theme::BTN_BORDER, Theme::BTN_TEXT, shopHovered);
     RenderButton::drawButton(renderer, openPackButton, "Open Pack (100c)", uiFonts.large,
                              canOpenPack ? Theme::BTN_START : Theme::BTN_DISABLED,
                              canOpenPack ? Theme::BTN_BORDER : Theme::BTN_DISABLED_BORDER,
@@ -359,15 +369,18 @@ void PackOpening::updateLayout(SDL_Renderer* renderer) {
     }
 
     const int gap = 20;
-    const int groupW = backButton.w + gap + openPackButton.w;
-    const int maxButtonH = std::max(backButton.h, openPackButton.h);
+    const int groupW = backButton.w + gap + shopButton.w + gap + openPackButton.w;
+    const int maxButtonH = std::max(backButton.h, std::max(shopButton.h, openPackButton.h));
     const int startX = (screenW - groupW) / 2;
     const int y = screenH - maxButtonH - Theme::PackOpening::BUTTON_BOTTOM_MARGIN;
 
     backButton.x = startX;
     backButton.y = y;
 
-    openPackButton.x = backButton.x + backButton.w + gap;
+    shopButton.x = backButton.x + backButton.w + gap;
+    shopButton.y = y;
+
+    openPackButton.x = shopButton.x + shopButton.w + gap;
     openPackButton.y = y;
 }
 

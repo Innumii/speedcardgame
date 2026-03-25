@@ -20,6 +20,7 @@
 #include "states/Loading.hpp"
 #include "states/Playing.hpp"
 #include "states/DeckBuilding.hpp"
+#include "states/Payment.hpp"
 #include "states/PackOpening.hpp"
 #include "states/Connecting.hpp"
 #include "states/Waiting.hpp"
@@ -137,6 +138,7 @@ private:
     Loading loadingState;
     Playing playingState;
     DeckBuilding deckBuildingState;
+    Payment paymentState;
     PackOpening packOpeningState;
     std::optional<Connecting> connectingState;
     std::optional<Waiting> waitingState;

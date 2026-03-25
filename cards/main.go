@@ -56,8 +56,14 @@ func main() {
 	}
 
 	// Migrate models
-	if err := config.DB.AutoMigrate(&models.Deck{}, &models.Card{}, &models.Inventory{}); err != nil {
+	if err := config.DB.AutoMigrate(&models.Deck{}, &models.Card{}, &models.Inventory{}, &models.PaymentLedger{}); err != nil {
 		log.Fatalf("Error auto-migrating tables: %v", err)
+	}
+
+	if err := services.InitializePaymentsFromEnv(); err != nil {
+		log.Printf("Payments module disabled: %v", err)
+	} else {
+		log.Printf("Payments module initialized")
 	}
 
 	seedPath := os.Getenv("CARD_CSV_PATH")
@@ -120,21 +126,22 @@ func main() {
 	r.Post("/decks", services.CreateDeck)           // Create deck
 	r.Post("/decks/fill", services.FillDeckForUser)
 	r.Get("/decks", services.ListDecks) // List all decks
-	r.Delete("/decks", services.DeleteDeck)
 
-	r.Post("/cards", services.CreateCard) // Create card
-	r.Get("/cards", services.ListCards)   // List all cards
-	r.Put("/cards", services.UpdateCard)
-	r.Delete("/cards", services.DeleteCard)
+	r.Get("/cards", services.ListCards)         // List all cards
+	r.Get("/cards/size", services.GetCardCount) // Get total card count
 
-	r.Post("/inventories", services.CreateInventory)           // Create inventory
-	r.Get("/inventories", services.ListInventories)            // List all inventories
-	r.Get("/inventories/{uid}", services.GetInventoryByUserID) // Get inventory by user ID
-	r.Put("/inventories", services.UpdateInventory)            // Update inventory by user ID
-	r.Put("/inventories/coins", services.UpdateInventoryCoins)    // Update inventory coins by user ID
-	r.Put("/inventories/coins/add", services.AddInventoryCoins)    // Add coins/subtract
+	r.Post("/inventories", services.CreateInventory)            // Create inventory
+	r.Get("/inventories", services.ListInventories)             // List all inventories
+	r.Get("/inventories/{uid}", services.GetInventoryByUserID)  // Get inventory by user ID
+	r.Put("/inventories", services.UpdateInventory)             // Update inventory by user ID
+	r.Put("/inventories/coins", services.UpdateInventoryCoins)  // Update inventory coins by user ID
+	r.Put("/inventories/coins/add", services.AddInventoryCoins) // Add coins/subtract
 
-	// router.Mount("/cardbase", r) //api prefix
+	r.Post("/payments/checkout-session", services.CreateCoinCheckoutSession) // Create checkout session for purchasing coins
+	r.Post("/payments/webhook", services.HandleStripeWebhook)                // Handle Stripe webhook events
+	r.Get("/payments/checkout-complete", services.RenderCheckoutCompletePage)
+	r.Get("/payments/coin-packages", services.ListCoinPackages) // List available coin packages
+
 	router.Mount("/cards", r)
 
 	srv := &http.Server{

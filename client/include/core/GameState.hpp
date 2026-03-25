@@ -7,6 +7,7 @@ enum class GameState {
     Loading,
     Title,
     DeckBuilding,
+    Payment,
     PackOpening,
     Connecting,
     Waiting,
