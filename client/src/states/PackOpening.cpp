@@ -23,6 +23,7 @@
 #include <sstream>
 #include <unordered_map>
 #include <render/RenderBackdrop.hpp>
+#include <iostream>
 
 namespace {
     int resolveUserId(const Game& game) {
@@ -44,12 +45,18 @@ namespace {
     }
 }
 
+// ── State entry ──────────────────────────────────────────────────────────────
+
 void PackOpening::enter(Game& game) {
     updateLayout(game.getRenderer());
     statusMessage.clear();
     lastOpenedCards.clear();
     lastRefundCoins = 0;
     hoveredOpenedCard = -1;
+
+    // Reset pending deltas for this session in PackOpening
+    pendingCoinDelta = 0;
+    pendingInventoryDelta.clear();
 
     if (!loadAvailableCards(game)) {
         statusMessage = "Failed to load card list.";
@@ -63,18 +70,60 @@ void PackOpening::enter(Game& game) {
     } else {
         game.setPackRefundCoins(loadedCoins);
     }
+
+    lastFlushTick = SDL_GetTicks();
 }
+
+// ── State exit — flush all accumulated deltas to the service in one shot ─────
+
+void PackOpening::exit(Game& game) {
+    // Nothing to flush if the user never opened a pack, or all packs were
+    // pure duplicates (no inventory changes needed).
+    std::cout << "EXIT CALLED\n";
+    const bool hasInventoryChanges = !pendingInventoryDelta.empty();
+    const bool hasCoinChanges      = (pendingCoinDelta != 0);
+
+    if (!hasInventoryChanges && !hasCoinChanges) {
+        return;
+    }
+
+    // Apply accumulated inventory delta in a single PUT request.
+    if (hasInventoryChanges) {
+        if (!applyInventoryDelta(game, pendingInventoryDelta)) {
+            std::cerr << "[PackOpening]: Failed to update Inventory delta\n";
+        }
+    }
+
+    // Persist the final coin balance (already kept accurate on game object).
+    if (hasCoinChanges) {
+        if (!Inventory::updateCoinsOnService(game, game.getPackRefundCoins())) {
+            std::cerr << "[PackOpening]: Failed to update coin balance\n";
+        }
+    }
+
+    pendingCoinDelta = 0;
+    pendingInventoryDelta.clear();
+}
+
+// ── Helper: change state and flush before leaving ────────────────────────────
+
+void PackOpening::leaveState(Game& game, GameState next) {
+    exit(game);
+    game.setNextState(next);
+}
+
+// ── Event handling ───────────────────────────────────────────────────────────
 
 void PackOpening::handleEvents(Game& game, const SDL_Event& event) {
     updateLayout(game.getRenderer());
 
     if (event.type == SDL_QUIT) {
-        game.setNextState(GameState::Quit);
+        leaveState(game, GameState::Quit);
         return;
     }
 
     if (event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_ESCAPE) {
-        game.setNextState(GameState::Title);
+        leaveState(game, GameState::Title);
         return;
     }
 
@@ -136,13 +185,13 @@ void PackOpening::handleEvents(Game& game, const SDL_Event& event) {
 
         if (x >= backButton.x && x <= backButton.x + backButton.w &&
             y >= backButton.y && y <= backButton.y + backButton.h) {
-            game.setNextState(GameState::Title);
+            leaveState(game, GameState::Title);
             return;
         }
 
         if (x >= shopButton.x && x <= shopButton.x + shopButton.w &&
             y >= shopButton.y && y <= shopButton.y + shopButton.h) {
-            game.setNextState(GameState::Payment);
+            leaveState(game, GameState::Payment);
             return;
         }
 
@@ -158,15 +207,20 @@ void PackOpening::handleEvents(Game& game, const SDL_Event& event) {
     }
 }
 
+// ── Update ───────────────────────────────────────────────────────────────────
+
 void PackOpening::update(Game& game) {
-    (void)game;
     if (!lastOpenedCards.empty() && revealedCount < static_cast<int>(lastOpenedCards.size())) {
         const Uint32 now = SDL_GetTicks();
         const int elapsed = static_cast<int>(now - revealStartTick);
         revealedCount = std::min(static_cast<int>(lastOpenedCards.size()),
                                   elapsed / CardRevealIntervalMs + 1);
     }
+
+    tryFlush(game);
 }
+
+// ── Render ───────────────────────────────────────────────────────────────────
 
 void PackOpening::render(Game& game) {
     SDL_Renderer* renderer = game.getRenderer();
@@ -185,14 +239,14 @@ void PackOpening::render(Game& game) {
         renderer,
         screenW,
         screenH,
-        Theme::BG,                              // base background color
-        Theme::Loading::VIGNETTE_COLOR,        // vignette color
-        Theme::Loading::VIGNETTE_LAYERS,       // layers
-        Theme::Loading::VIGNETTE_ALPHA_FALLOFF,// alpha falloff
-        Theme::Loading::VIGNETTE_MAX_ALPHA     // max alpha
+        Theme::BG,
+        Theme::Loading::VIGNETTE_COLOR,
+        Theme::Loading::VIGNETTE_LAYERS,
+        Theme::Loading::VIGNETTE_ALPHA_FALLOFF,
+        Theme::Loading::VIGNETTE_MAX_ALPHA
     );
 
-    // ── Top strip: title (centred) + coins (top-right), same baseline ───────
+    // ── Top strip: title (centred) + coins (top-right), same baseline ────────
     const int headerY = Theme::PackOpening::HEADER_Y;
     {
         int titleW = 0, titleH = 0;
@@ -207,7 +261,7 @@ void PackOpening::render(Game& game) {
                              screenW - coinsW - 20, coinsCentreY);
     }
 
-    // ── Buttons ─────────────────────────────────────────────────────────────
+    // ── Buttons ───────────────────────────────────────────────────────────────
     const bool canOpenPack = game.getPackRefundCoins() >= PackCostCoins;
 
     RenderButton::drawButton(renderer, backButton, "Back to Title", uiFonts.large,
@@ -220,7 +274,7 @@ void PackOpening::render(Game& game) {
                              canOpenPack ? Theme::BTN_TEXT : Theme::BTN_DISABLED_TEXT,
                              canOpenPack && openHovered);
 
-    // ── Empty state ──────────────────────────────────────────────────────────
+    // ── Empty state ───────────────────────────────────────────────────────────
     if (lastOpenedCards.empty()) {
         int promptW = 0, promptH = 0;
         const std::string promptStr = "Open a pack to add cards to inventory.";
@@ -245,15 +299,14 @@ void PackOpening::render(Game& game) {
     const int totalW   = PackSize * cardW + (PackSize - 1) * cardGap;
     const int startX   = (screenW - totalW) / 2;
 
-    // ── Layout: summary panel above cards ────────────────────────────────────
+    // ── Layout: summary panel above cards ─────────────────────────────────────
     const int badgeH    = Theme::PackOpening::CARD_BADGE_HEIGHT;
     const int summaryH  = Theme::PackOpening::SUMMARY_HEIGHT;
     const int summaryGap = Theme::PackOpening::SUMMARY_GAP;
     const int groupH    = summaryH + summaryGap + cardH + Theme::PackOpening::SUMMARY_CARD_GAP + badgeH;
 
-    // Vertically centre the group between header strip and buttons
-    const int topClear    = headerY + Theme::PackOpening::HEADER_CLEARANCE;   // a bit below the title row
-    const int bottomClear = backButton.y;   // top of buttons
+    const int topClear    = headerY + Theme::PackOpening::HEADER_CLEARANCE;
+    const int bottomClear = backButton.y;
     const int groupY      = topClear + std::max(0, (bottomClear - topClear - groupH) / 2);
 
     const int summaryY = groupY;
@@ -266,19 +319,16 @@ void PackOpening::render(Game& game) {
         SDL_Rect cardRect{startX + i * (cardW + cardGap), cardY, cardW, cardH};
 
         if (i >= revealedCount) {
-            // Not revealed yet — show card back
             RenderCard::drawCardBack(renderer, cardRect);
             continue;
         }
 
-        // ── Draw card face ───────────────────────────────────────────────────
         if (result.cardIndex >= 0 && result.cardIndex < static_cast<int>(availableCards.size()) && availableCards[result.cardIndex]) {
             RenderCard::drawPreview(renderer, textRenderer, *availableCards[result.cardIndex], cardRect, uiFonts.small, uiFonts.large);
         } else {
             RenderCard::drawCardBack(renderer, cardRect);
         }
 
-        // ── Qty chip (top-right corner of card) ──────────────────────────────
         const std::string qtyStr = std::to_string(result.resultingCopies) + "/" + std::to_string(MaxCardCopies);
         const int chipW = Theme::PackOpening::QTY_CHIP_WIDTH;
         const int chipH = Theme::PackOpening::QTY_CHIP_HEIGHT;
@@ -292,7 +342,6 @@ void PackOpening::render(Game& game) {
         SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
         drawCenteredText(renderer, qtyStr, uiFonts.small, Theme::PackOpening::QTY_TEXT, chip);
 
-        // ── Status badge (coloured strip below card) ─────────────────────────
         const SDL_Color badgeFill   = result.refunded ? Theme::PackOpening::DUPLICATE_FILL
                                                        : Theme::PackOpening::NEW_FILL;
         const std::string badgeLabel = result.refunded
@@ -304,7 +353,7 @@ void PackOpening::render(Game& game) {
         drawCenteredText(renderer, badgeLabel, uiFonts.small, Theme::PackOpening::BADGE_TEXT, badge);
     }
 
-    // ── Summary panel (above cards) ────────────────────────────────────────
+    // ── Summary panel ─────────────────────────────────────────────────────────
     if (!statusMessage.empty()) {
         SDL_Rect panel{startX, summaryY, totalW, summaryH};
 
@@ -361,6 +410,8 @@ void PackOpening::render(Game& game) {
     }
 }
 
+// ── Layout ───────────────────────────────────────────────────────────────────
+
 void PackOpening::updateLayout(SDL_Renderer* renderer) {
     int screenW = 800;
     int screenH = 600;
@@ -383,6 +434,8 @@ void PackOpening::updateLayout(SDL_Renderer* renderer) {
     openPackButton.x = shopButton.x + shopButton.w + gap;
     openPackButton.y = y;
 }
+
+// ── openPack — accumulates deltas, no service calls ──────────────────────────
 
 void PackOpening::openPack(Game& game) {
     if (availableCards.empty()) {
@@ -449,19 +502,19 @@ void PackOpening::openPack(Game& game) {
         results.push_back(result);
     }
 
-    if (!deltaByCardId.empty() && !applyInventoryDelta(game, deltaByCardId)) {
-        statusMessage = "Failed to open pack: inventory update error.";
-        return;
-    }
+    // ── Update in-memory state immediately so UI stays accurate ──────────────
+    inventoryCopies = std::move(nextInventory);
 
     const int updatedCoins = currentCoins - PackCostCoins + refundCoins;
-    if (!Inventory::updateCoinsOnService(game, updatedCoins)) {
-        statusMessage = "Pack opened but failed to sync coins.";
-        return;
-    }
     game.setPackRefundCoins(updatedCoins);
 
-    inventoryCopies = std::move(nextInventory);
+    // ── Accumulate deltas for deferred flush on exit ──────────────────────────
+    for (const auto& pair : deltaByCardId) {
+        pendingInventoryDelta[pair.first] += pair.second;
+    }
+    pendingCoinDelta += (updatedCoins - currentCoins); // net change this pack
+
+    // ── Update UI ─────────────────────────────────────────────────────────────
     lastOpenedCards = std::move(results);
     lastRefundCoins = refundCoins;
     revealedCount = 0;
@@ -478,6 +531,8 @@ void PackOpening::openPack(Game& game) {
         statusMessage += ", +" + std::to_string(refundCoins) + " coins refund.";
     }
 }
+
+// ── loadAvailableCards ────────────────────────────────────────────────────────
 
 bool PackOpening::loadAvailableCards(const Game& game) {
     (void)game;
@@ -497,6 +552,8 @@ bool PackOpening::loadAvailableCards(const Game& game) {
 
     return !availableCards.empty();
 }
+
+// ── applyInventoryDelta ───────────────────────────────────────────────────────
 
 bool PackOpening::applyInventoryDelta(const Game& game, const std::unordered_map<int, int>& deltaByCardId) {
     if (deltaByCardId.empty()) return true;
@@ -527,4 +584,53 @@ bool PackOpening::applyInventoryDelta(const Game& game, const std::unordered_map
     }
 
     return statusCode >= 200 && statusCode < 300;
+}
+
+int PackOpening::getPendingInventoryOps() const {
+    int total = 0;
+    for (const auto& pair : pendingInventoryDelta) {
+        total += std::abs(pair.second);
+    }
+    return total;
+}
+
+void PackOpening::tryFlush(Game& game) {
+    const Uint32 now = SDL_GetTicks();
+    const Uint32 elapsed = now - lastFlushTick;
+
+    const bool hasInventoryChanges = !pendingInventoryDelta.empty();
+    const bool hasCoinChanges = (pendingCoinDelta != 0);
+
+    if (!hasInventoryChanges && !hasCoinChanges) {
+        return;
+    }
+
+    const bool timeExceeded = elapsed >= FlushIntervalMs;
+    const bool coinExceeded = std::abs(pendingCoinDelta) >= CoinFlushThreshold;
+    const bool inventoryExceeded = getPendingInventoryOps() >= InventoryFlushThreshold;
+
+    if (!(timeExceeded || coinExceeded || inventoryExceeded)) {
+        return;
+    }
+
+    std::cout << "[PackOpening]: Flushing batch...\n";
+
+    if (hasInventoryChanges) {
+        if (!applyInventoryDelta(game, pendingInventoryDelta)) {
+            std::cerr << "[PackOpening]: Failed to update Inventory delta\n";
+            return; // don’t reset if failed
+        }
+    }
+
+    if (hasCoinChanges) {
+        if (!Inventory::updateCoinsOnService(game, game.getPackRefundCoins())) {
+            std::cerr << "[PackOpening]: Failed to update coin balance\n";
+            return;
+        }
+    }
+
+    // Reset after successful flush
+    pendingInventoryDelta.clear();
+    pendingCoinDelta = 0;
+    lastFlushTick = now;
 }

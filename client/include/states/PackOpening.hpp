@@ -8,7 +8,7 @@
 #include <vector>
 
 #include "render/Theme.hpp"
-
+#include "core/GameState.hpp"
 class Game;
 class Card;
 
@@ -18,6 +18,11 @@ public:
     void handleEvents(Game& game, const SDL_Event& event);
     void update(Game& game);
     void render(Game& game);
+    void exit(Game& game);
+    void leaveState(Game& game, GameState next);
+
+    void tryFlush(Game& game);
+    int getPendingInventoryOps() const;
 
 private:
     struct OpenedCardResult {
@@ -71,6 +76,17 @@ private:
     static constexpr int RefundCoinsPerExtra = 10;
     static constexpr int PackCostCoins = 100;
     static constexpr int CardRevealIntervalMs = 350;
+
+    int pendingCoinDelta = 0;
+    std::unordered_map<int, int> pendingInventoryDelta;
+
+    // ── Flush control ─────────────────────────────────────────────
+    Uint32 lastFlushTick{0};
+
+    static constexpr Uint32 FlushIntervalMs = 5000;      // 5 seconds
+    static constexpr int CoinFlushThreshold = 200;       // flush if >= 200 coins changed
+    static constexpr int InventoryFlushThreshold = 10;   // flush if >= 10 cards added
+
 };
 
 #endif
