@@ -185,7 +185,7 @@ namespace {
     const SDL_Rect clipRect{artRect.x + inset, artRect.y + inset,
                             artRect.w - inset * 2, artRect.h - inset * 2};
 
-    const int cornerRadius = std::max(2, clipRect.w / 10);
+    const int cornerRadius = std::max(1, clipRect.w / 10);
 
     SDL_Texture* cardImage = getCardImageTexture(renderer, cardId);
     if (cardImage) {

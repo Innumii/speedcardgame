@@ -336,7 +336,7 @@ void PackOpening::render(Game& game) {
                 int previewW = static_cast<int>(std::round(cardW * Theme::PackOpening::HOVER_PREVIEW_SCALE));
                 const int maxPreviewW = screenW - (Theme::PackOpening::PREVIEW_MARGIN * 2);
                 previewW = std::min(previewW, maxPreviewW);
-                const int previewH = static_cast<int>(std::round(previewW * Theme::PackOpening::PREVIEW_ASPECT_RATIO));
+                const int previewH = static_cast<int>(std::round(previewW * Theme::PREVIEW_ASPECT_RATIO));
 
                 int previewX = hoveredRect.x + (hoveredRect.w - previewW) / 2;
                 int previewY = hoveredRect.y + (hoveredRect.h - previewH) / 2;

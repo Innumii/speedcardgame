@@ -22,6 +22,7 @@
 #include <sstream>
 #include <objects/CreatureCard.h>
 #include <utils/PlayingRenderUtil.hpp>
+#include <animation/SummonAnimation.hpp>
 // #include <functional>
 
 // -------------------------
@@ -773,6 +774,15 @@ void Playing::playCreature(int playerId, std::unique_ptr<Card> card, int lane) {
     // Move the card into the board
     int boardIndex = (playerId == localPlayer.id) ? 0:1;
     board.addToPlay(lane, boardIndex, std::move(card));
+
+    if (animationsEnabled) {
+        const std::vector<SDL_Rect>& slots = (boardIndex == 0) ? playSlots : opponentSlots;
+        if (lane >= 0 && static_cast<std::size_t>(lane) < slots.size()) {
+            animationQueue.enqueue(
+                std::make_shared<SummonAnimation>(slots[static_cast<std::size_t>(lane)], 600U)
+            );
+        }
+    }
 
     // Optional: debug output
     std::cout << "[Playing] Summoned " << name

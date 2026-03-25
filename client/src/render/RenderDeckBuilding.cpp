@@ -315,10 +315,10 @@ void RenderDeckBuilding::render(DeckBuilding& deckBuilding, Game& game) {
         SDL_GetRendererOutputSize(renderer, &screenW, &screenH);
 
         int previewWidth = std::min(Theme::DeckBuilding::PREVIEW_MAX_WIDTH, screenW / Theme::DeckBuilding::PREVIEW_SCREEN_WIDTH_RATIO_DIV);
-        int previewHeight = static_cast<int>(previewWidth * Theme::DeckBuilding::PREVIEW_ASPECT_RATIO);
+        int previewHeight = static_cast<int>(previewWidth * Theme::PREVIEW_ASPECT_RATIO);
         if (previewHeight > screenH - (Theme::DeckBuilding::PREVIEW_EDGE_MARGIN * 2)) {
             previewHeight = screenH - (Theme::DeckBuilding::PREVIEW_EDGE_MARGIN * 2);
-            previewWidth = static_cast<int>(previewHeight / Theme::DeckBuilding::PREVIEW_ASPECT_RATIO);
+            previewWidth = static_cast<int>(previewHeight / Theme::PREVIEW_ASPECT_RATIO);
         }
 
         int previewX = layout.deckArea.x - previewWidth - Theme::DeckBuilding::PREVIEW_DECK_GAP;

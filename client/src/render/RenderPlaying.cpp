@@ -25,6 +25,7 @@
 #include <vector>
 #include <render/RenderCardOverlay.hpp>
 #include <iostream>
+#include <animation/SummonAnimation.hpp>
 
 // Reference resolution the Theme pixel constants were authored for.
 static constexpr float kRefW = 1200.0F;
@@ -409,6 +410,12 @@ void RenderPlaying::render(Playing& playing, const Game& game) {
 		attackingSlots.empty() ? nullptr : &attackingSlots
 	);
 
+	for (const auto& anim : activeAnimations) {
+		if (auto summon = std::dynamic_pointer_cast<SummonAnimation>(anim)) {
+			summon->draw(renderer);
+		}
+	}
+
 	if (!activeAttackFrames.empty()) {
 		SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
 		for (const auto& frame : activeAttackFrames) {
@@ -497,7 +504,7 @@ void RenderPlaying::render(Playing& playing, const Game& game) {
 			maxPreviewW = std::max(Theme::Playing::PREVIEW_MIN_WIDTH, maxPreviewW);
 
 			const int previewW = std::min(maxPreviewW, screenW - Theme::Playing::PREVIEW_MARGIN * 2);
-			const int previewH = static_cast<int>(previewW * Theme::Playing::PREVIEW_ASPECT_RATIO);
+			const int previewH = static_cast<int>(previewW * Theme::PREVIEW_ASPECT_RATIO);
 			const int previewX = Theme::Playing::PREVIEW_MARGIN;
 			int previewY = 0;
 			if (playing.recentSpellPreview && previewCard == playing.recentSpellPreview.get()) {
