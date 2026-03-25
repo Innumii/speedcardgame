@@ -497,7 +497,7 @@ void RenderPlaying::render(Playing& playing, const Game& game) {
 			maxPreviewW = std::max(Theme::Playing::PREVIEW_MIN_WIDTH, maxPreviewW);
 
 			const int previewW = std::min(maxPreviewW, screenW - Theme::Playing::PREVIEW_MARGIN * 2);
-			const int previewH = static_cast<int>(previewW * Theme::Playing::PREVIEW_ASPECT_RATIO);
+			const int previewH = static_cast<int>(previewW * Theme::PREVIEW_ASPECT_RATIO);
 			const int previewX = Theme::Playing::PREVIEW_MARGIN;
 			int previewY = 0;
 			if (playing.recentSpellPreview && previewCard == playing.recentSpellPreview.get()) {
