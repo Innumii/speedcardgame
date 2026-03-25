@@ -91,7 +91,9 @@ module "service" {
   task_secret_arns = local.postgres_password_secret_arn != null ? toset([local.postgres_password_secret_arn]) : toset([])
 
   secrets = local.postgres_password_secret_arn != null ? {
-    DATABASE_URL = "${local.postgres_password_secret_arn}:DATABASE_URL::"
+    DATABASE_URL          = "${local.postgres_password_secret_arn}:DATABASE_URL::"
+    STRIPE_SECRET_KEY     = "${local.postgres_password_secret_arn}:STRIPE_SECRET_KEY::"
+    STRIPE_WEBHOOK_SECRET = "${local.postgres_password_secret_arn}:STRIPE_WEBHOOK_SECRET::"
   } : {}
 
   environment = merge(

@@ -39,11 +39,23 @@ resource "aws_secretsmanager_secret" "cards_runtime" {
   description = "Runtime secret values for cards service"
 }
 
+locals {
+  cards_runtime_secret_values = merge(
+    {
+      DATABASE_URL = var.cards_database_url
+    },
+    var.stripe_secret_key != null ? {
+      STRIPE_SECRET_KEY = var.stripe_secret_key
+    } : {},
+    var.stripe_webhook_secret != null ? {
+      STRIPE_WEBHOOK_SECRET = var.stripe_webhook_secret
+    } : {}
+  )
+}
+
 resource "aws_secretsmanager_secret_version" "cards_runtime_version" {
-  secret_id = aws_secretsmanager_secret.cards_runtime.id
-  secret_string = jsonencode({
-    DATABASE_URL = var.cards_database_url
-  })
+  secret_id     = aws_secretsmanager_secret.cards_runtime.id
+  secret_string = jsonencode(local.cards_runtime_secret_values)
 }
 
 # Output the ARN so you can copy it if needed

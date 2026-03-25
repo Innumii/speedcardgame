@@ -250,5 +250,7 @@ module "secrets" {
   auth_postgres_password   = local.auth_postgres_password_resolved
   cards_service_base_url   = local.cards_service_base_url_resolved
   cards_database_url       = local.cards_database_url
+  stripe_secret_key        = var.stripe_secret_key
+  stripe_webhook_secret    = var.stripe_webhook_secret
   count                    = var.skip_secrets_manager ? 0 : 1
 }
