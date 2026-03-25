@@ -25,6 +25,7 @@
 #include <vector>
 #include <render/RenderCardOverlay.hpp>
 #include <iostream>
+#include <animation/SummonAnimation.hpp>
 
 // Reference resolution the Theme pixel constants were authored for.
 static constexpr float kRefW = 1200.0F;
@@ -408,6 +409,12 @@ void RenderPlaying::render(Playing& playing, const Game& game) {
 		uiFonts.small,
 		attackingSlots.empty() ? nullptr : &attackingSlots
 	);
+
+	for (const auto& anim : activeAnimations) {
+		if (auto summon = std::dynamic_pointer_cast<SummonAnimation>(anim)) {
+			summon->draw(renderer);
+		}
+	}
 
 	if (!activeAttackFrames.empty()) {
 		SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
