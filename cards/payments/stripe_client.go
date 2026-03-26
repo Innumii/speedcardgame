@@ -124,7 +124,10 @@ func (c *StripeClient) ProcessCardPayment(_ context.Context, req DirectCardPayme
 			"coins":      fmt.Sprintf("%d", req.CoinPack.Coins),
 		},
 	}
-	chargeParams.SetSource(tok.ID)
+	
+	if err := chargeParams.SetSource(tok.ID); err != nil {
+		return DirectCardPaymentResponse{}, err
+	}
 
 	ch, err := charge.New(chargeParams)
 	if err != nil {
