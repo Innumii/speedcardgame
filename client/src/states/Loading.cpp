@@ -2,6 +2,7 @@
 
 #include "core/Game.hpp"
 #include "objects/Card.h"
+#include "objects/Inventory.hpp"
 #include "render/RenderBanner.hpp"
 #include "render/RenderBackdrop.hpp"
 #include "render/RenderCard.hpp"
@@ -91,9 +92,17 @@ void Loading::update(Game& game) {
         }
     }
 
+    // Loading Shop Packages
     if (ShopPackage::getNumberOfPackages() == 0) {
         ShopPackage::loadPackagesFromService();
         statusMessage = "Loading shop packages...";
+    }
+
+    // Loading inventory and coins for Pack Opening
+    if (!Inventory::loadInventoryAndCoinsFromService(game)) {
+        statusMessage = "Failed to load inventory.";
+    } else {
+        game.setPackRefundCoins(Inventory::getCachedCoins());
     }
 
     game.setNextState(GameState::Title);

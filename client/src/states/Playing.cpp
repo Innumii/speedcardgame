@@ -37,6 +37,7 @@ std::string effectBitToLabel(int effectBit) {
         case 2: return "Trample";
         case 4: return "Deathtouch";
         case 8: return "Regen";
+        case 16: return "Lifesteal";
         default: return "Effect(" + std::to_string(effectBit) + ")";
     }
 }

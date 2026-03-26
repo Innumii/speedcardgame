@@ -34,6 +34,9 @@ void RenderDeckBuilding::render(DeckBuilding& deckBuilding, Game& game) {
     SDL_GetMouseState(&mouseX, &mouseY);
     const SDL_Point mousePoint{mouseX, mouseY};
     const Uint32 now = SDL_GetTicks();
+    const auto& availableCards = deckBuilding.getAvailableCards();
+    const auto& inventoryCopies = Inventory::getCachedInventoryCopies();
+    const bool inventoryLoaded = Inventory::isInventoryCacheLoaded();
 
     // ── fonts ────────────────────────────────────────────────────────
     const RenderText::FontSet& fonts = game.getUIFonts();
@@ -113,12 +116,12 @@ void RenderDeckBuilding::render(DeckBuilding& deckBuilding, Game& game) {
         const SDL_Rect cardRect = layout.collectionCardRects[i];
         if (i >= layout.collectionCardIndices.size()) continue;
         const int cardIndex = layout.collectionCardIndices[i];
-        if (cardIndex < 0 || cardIndex >= static_cast<int>(deckBuilding.availableCards.size())) continue;
-        const Card& card = *deckBuilding.availableCards[cardIndex];
+        if (cardIndex < 0 || cardIndex >= static_cast<int>(availableCards.size())) continue;
+        const Card& card = *availableCards[cardIndex];
 
         const int remaining = Inventory::getRemainingCount(
-            deckBuilding.inventoryCopies,
-            deckBuilding.inventoryLoaded,
+            inventoryCopies,
+            inventoryLoaded,
             deckBuilding.deckCopies,
             cardIndex,
             Deck::getDeckCopiesLimit()
@@ -195,7 +198,7 @@ void RenderDeckBuilding::render(DeckBuilding& deckBuilding, Game& game) {
         }
 
         const int cardIndex = layout.deckEntryCardIndices[i];
-        const Card& card = *deckBuilding.availableCards[cardIndex];
+        const Card& card = *availableCards[cardIndex];
         const int copies = deckBuilding.deckCopies[cardIndex];
 
         SDL_SetRenderDrawColor(renderer,
@@ -253,8 +256,8 @@ void RenderDeckBuilding::render(DeckBuilding& deckBuilding, Game& game) {
         SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
     }
 
-    if (deckBuilding.dragging && deckBuilding.draggedCardIndex >= 0 && deckBuilding.draggedCardIndex < static_cast<int>(deckBuilding.availableCards.size())) {
-        const Card& card = *deckBuilding.availableCards[deckBuilding.draggedCardIndex];
+    if (deckBuilding.dragging && deckBuilding.draggedCardIndex >= 0 && deckBuilding.draggedCardIndex < static_cast<int>(availableCards.size())) {
+        const Card& card = *availableCards[deckBuilding.draggedCardIndex];
         int dragW = Theme::DeckBuilding::DRAG_FALLBACK_WIDTH;
         int dragH = Theme::DeckBuilding::DRAG_FALLBACK_HEIGHT;
         if (!layout.collectionCardRects.empty()) {
@@ -306,7 +309,7 @@ void RenderDeckBuilding::render(DeckBuilding& deckBuilding, Game& game) {
     constexpr Uint32 hoverDelayMs = Theme::DeckBuilding::HOVER_PREVIEW_DELAY_MS;
     const bool showPreview =
         deckBuilding.hoverIndex != static_cast<std::size_t>(-1) &&
-        deckBuilding.hoverIndex < deckBuilding.availableCards.size() &&
+        deckBuilding.hoverIndex < availableCards.size() &&
         now - deckBuilding.hoverStartTick >= hoverDelayMs;
 
     if (showPreview) {
@@ -333,7 +336,7 @@ void RenderDeckBuilding::render(DeckBuilding& deckBuilding, Game& game) {
         RenderCard::drawPreview(
             renderer,
             textRenderer,
-            *deckBuilding.availableCards[deckBuilding.hoverIndex],
+            *availableCards[deckBuilding.hoverIndex],
             panel,
             fontSmall,
             fontLarge ? fontLarge : fontSmall,

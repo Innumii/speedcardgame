@@ -71,9 +71,8 @@ private:
 		Theme::DeckBuilding::MENU_BUTTON_WIDTH,
 		Theme::DeckBuilding::MENU_BUTTON_HEIGHT
 	};
-	std::vector<std::unique_ptr<Card>> availableCards; //stores card templates owned by the user
 	std::vector<int> deckCopies; //st
-	std::vector<int> inventoryCopies;
+
 
 	bool dragging{false};
 	bool draggingFromDeck{false};
@@ -81,7 +80,6 @@ private:
 	SDL_Point dragPos{0, 0};
 	SDL_Point dragOffset{0, 0};
 	bool cardsLoadedFromService{false};
-	bool inventoryLoaded{false};
 	std::size_t hoverIndex{static_cast<std::size_t>(-1)};
 	Uint32 hoverStartTick{0};
 	int collectionPage{0};

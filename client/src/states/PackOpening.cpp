@@ -13,6 +13,7 @@
 #include "utils/HttpUtil.hpp"
 #include "utils/EnvUtil.hpp"
 #include "utils/LoadAvailableCards.hpp"
+#include "utils/RenderUtil.hpp"
 
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_ttf.h>
@@ -26,14 +27,6 @@
 #include <iostream>
 
 namespace {
-    int resolveUserId(const Game& game) {
-        const int playerId = game.getPlayerId();
-        if (playerId > 0) {
-            return playerId;
-        }
-        return EnvUtil::getEnvIntOrDefault("CARDS_SERVICE_UID", -1);
-    }
-
     void drawCenteredText(SDL_Renderer* renderer, const std::string& text, TTF_Font* font, SDL_Color color, const SDL_Rect& box) {
         if (!renderer || !font || text.empty()) return;
         int textW = 0;
@@ -58,17 +51,16 @@ void PackOpening::enter(Game& game) {
     pendingCoinDelta = 0;
     pendingInventoryDelta.clear();
 
-    if (!loadAvailableCards(game)) {
+    if (!LoadAvailableCardsUtil::ensureAvailableCardsLoaded()) {
         statusMessage = "Failed to load card list.";
-        inventoryCopies.clear();
         return;
     }
 
-    int loadedCoins = 0;
-    if (!Inventory::loadInventoryAndCoinsFromService(game, availableCards, inventoryCopies, loadedCoins, MaxCardCopies)) {
+    const auto& availableCards = LoadAvailableCardsUtil::getAvailableCards();
+    if (!Inventory::ensureInventoryAndCoinsLoaded(game, availableCards, MaxCardCopies)) {
         statusMessage = "Failed to load inventory.";
     } else {
-        game.setPackRefundCoins(loadedCoins);
+        game.setPackRefundCoins(Inventory::getCachedCoins());
     }
 
     lastFlushTick = SDL_GetTicks();
@@ -225,6 +217,7 @@ void PackOpening::update(Game& game) {
 void PackOpening::render(Game& game) {
     SDL_Renderer* renderer = game.getRenderer();
     if (!renderer) return;
+    const auto& availableCards = LoadAvailableCardsUtil::getAvailableCards();
 
     updateLayout(renderer);
 
@@ -438,18 +431,21 @@ void PackOpening::updateLayout(SDL_Renderer* renderer) {
 // ── openPack — accumulates deltas, no service calls ──────────────────────────
 
 void PackOpening::openPack(Game& game) {
+    const auto& availableCards = LoadAvailableCardsUtil::getAvailableCards();
+    auto& inventoryCopies = Inventory::getCachedInventoryCopiesMutable();
+
     if (availableCards.empty()) {
         statusMessage = "No cards available to open.";
         return;
     }
 
     if (inventoryCopies.size() != availableCards.size()) {
-        int loadedCoins = 0;
-        if (!Inventory::loadInventoryAndCoinsFromService(game, availableCards, inventoryCopies, loadedCoins, MaxCardCopies)) {
+        if (!Inventory::ensureInventoryAndCoinsLoaded(game, availableCards, MaxCardCopies)) {
             statusMessage = "Failed to load inventory for your account.";
             return;
         }
-        game.setPackRefundCoins(loadedCoins);
+        inventoryCopies = Inventory::getCachedInventoryCopies();
+        game.setPackRefundCoins(Inventory::getCachedCoins());
     }
 
     const int currentCoins = game.getPackRefundCoins();
@@ -507,6 +503,7 @@ void PackOpening::openPack(Game& game) {
 
     const int updatedCoins = currentCoins - PackCostCoins + refundCoins;
     game.setPackRefundCoins(updatedCoins);
+    Inventory::setCachedCoins(updatedCoins);
 
     // ── Accumulate deltas for deferred flush on exit ──────────────────────────
     for (const auto& pair : deltaByCardId) {
@@ -532,27 +529,6 @@ void PackOpening::openPack(Game& game) {
     }
 }
 
-// ── loadAvailableCards ────────────────────────────────────────────────────────
-
-bool PackOpening::loadAvailableCards(const Game& game) {
-    (void)game;
-    if (!LoadAvailableCardsUtil::ensureAvailableCardsLoaded()) {
-        availableCards.clear();
-        return false;
-    }
-
-    const auto& cachedCards = LoadAvailableCardsUtil::getAvailableCards();
-    availableCards.clear();
-    availableCards.reserve(cachedCards.size());
-    for (const auto& card : cachedCards) {
-        if (card) {
-            availableCards.push_back(card->clone());
-        }
-    }
-
-    return !availableCards.empty();
-}
-
 // ── applyInventoryDelta ───────────────────────────────────────────────────────
 
 bool PackOpening::applyInventoryDelta(const Game& game, const std::unordered_map<int, int>& deltaByCardId) {
@@ -561,7 +537,7 @@ bool PackOpening::applyInventoryDelta(const Game& game, const std::unordered_map
     const std::string host = EnvUtil::getCardsServiceHost();
     const int port = EnvUtil::getCardsServicePort();
     const std::string path = "/cards/inventories";
-    const int userId = resolveUserId(game);
+    const int userId = game.getPlayerId();
     if (userId <= 0) {
         return false;
     }

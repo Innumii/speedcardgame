@@ -40,20 +40,11 @@ namespace {
 DeckBuilding::DeckBuilding() = default;
 
 bool DeckBuilding::refreshFromService(Game& game) {
-    const auto& cachedCards = LoadAvailableCardsUtil::getAvailableCards();
-    availableCards.clear();
-    availableCards.reserve(cachedCards.size());
-    for (const auto& card : cachedCards) {
-        if (card) {
-            availableCards.push_back(card->clone());
-        }
-    }
+    const auto& availableCards = getAvailableCards();
     cardsLoadedFromService = !availableCards.empty();
 
     if (availableCards.empty()) {
         deckCopies.clear();
-        inventoryCopies.clear();
-        inventoryLoaded = false;
         return false;
     }
 
@@ -65,10 +56,9 @@ bool DeckBuilding::refreshFromService(Game& game) {
         deckCopies,
         Deck::getDeckCopiesLimit()
     );
-    inventoryLoaded = Inventory::loadInventoryCopiesFromService(
+    Inventory::ensureInventoryAndCoinsLoaded(
         game,
         availableCards,
-        inventoryCopies,
         Deck::getDeckCopiesLimit()
     );
     return deckLoaded;
@@ -87,6 +77,10 @@ void DeckBuilding::exit(const Game& game) {
 }
 
 void DeckBuilding::handleEvents(Game& game, const SDL_Event& event) {
+    const auto& availableCards = getAvailableCards();
+    const auto& inventoryCopies = Inventory::getCachedInventoryCopies();
+    const bool inventoryLoaded = Inventory::isInventoryCacheLoaded();
+
     if (event.type == SDL_QUIT) {
         game.setNextState(GameState::Title);
     }
@@ -271,6 +265,7 @@ void DeckBuilding::render(Game& game) {
 
 DeckBuilding::Layout DeckBuilding::buildLayout(const Game& game) const {
     Layout layout;
+    const auto& availableCards = getAvailableCards();
 
     int screenW = Theme::SCREEN_DEFAULT_WIDTH;
     int screenH = Theme::SCREEN_DEFAULT_HEIGHT;
@@ -448,6 +443,7 @@ void DeckBuilding::updateMenuButtons(const Layout& layout) {
 }
 
 std::vector<int> DeckBuilding::getDeckEntryOrder() const {
+    const auto& availableCards = getAvailableCards();
     std::vector<int> indices;
     indices.reserve(availableCards.size());
     for (std::size_t i = 0; i < availableCards.size(); ++i) {
@@ -456,7 +452,7 @@ std::vector<int> DeckBuilding::getDeckEntryOrder() const {
         }
     }
 
-    std::sort(indices.begin(), indices.end(), [this](int a, int b) {
+    std::sort(indices.begin(), indices.end(), [&availableCards](int a, int b) {
         const int manaA = availableCards[a]->getManaCost();
         const int manaB = availableCards[b]->getManaCost();
         if (manaA != manaB) {
@@ -479,4 +475,8 @@ bool DeckBuilding::isStatusMessageActive(Uint32 now) const {
 void DeckBuilding::setStatusMessage(const std::string& message, Uint32 durationMs) {
     statusMessage = message;
     statusMessageUntil = SDL_GetTicks() + durationMs;
+}
+
+const std::vector<std::unique_ptr<Card>>& DeckBuilding::getAvailableCards() const {
+    return LoadAvailableCardsUtil::getAvailableCards();
 }

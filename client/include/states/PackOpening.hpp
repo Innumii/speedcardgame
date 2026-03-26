@@ -31,14 +31,11 @@ private:
         int resultingCopies{0};
     };
 
-    bool loadAvailableCards(const Game& game);
     bool applyInventoryDelta(const Game& game, const std::unordered_map<int, int>& deltaByCardId);
     
     void updateLayout(SDL_Renderer* renderer);
     void openPack(Game& game);
 
-    std::vector<std::unique_ptr<Card>> availableCards;
-    std::vector<int> inventoryCopies;
     std::vector<OpenedCardResult> lastOpenedCards;
 
     SDL_Rect backButton{

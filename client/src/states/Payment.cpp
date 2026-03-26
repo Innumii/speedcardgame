@@ -29,12 +29,6 @@
 namespace {
     std::map<std::string, SDL_Texture*> coinPackTextureCache;
 
-    int resolveUserId(const Game& game) {
-        const int playerId = game.getPlayerId();
-        if (playerId > 0) return playerId;
-        return EnvUtil::getEnvIntOrDefault("CARDS_SERVICE_UID", -1);
-    }
-
     std::string normalize(const std::string& value) {
         std::string out = value;
         std::transform(out.begin(), out.end(), out.begin(),
@@ -646,7 +640,7 @@ bool Payment::refreshPackages() {
 }
 
 bool Payment::requestCheckoutSession(Game& game, const ShopPackage::Package& package) {
-    const int uid = resolveUserId(game);
+    const int uid = game.getPlayerId();
     if (uid <= 0) {
         statusMessage = "There was an error processing payment.";
         return false;
@@ -712,7 +706,7 @@ bool Payment::requestCheckoutSession(Game& game, const ShopPackage::Package& pac
 }
 
 bool Payment::tryLoadLatestCoins(Game& game, int& outCoins) const {
-    const int uid = resolveUserId(game);
+    const int uid = game.getPlayerId();
     if (uid <= 0) {
         return false;
     }
