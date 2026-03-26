@@ -114,6 +114,12 @@ variable "postgres_password_secret_arn" {
   default     = null
 }
 
+variable "cards_runtime_secret_name" {
+  description = "Cards runtime secret name for IAM permission and ECS secret fallback when ARN is not present in remote state"
+  type        = string
+  default     = "speedcardgame-cards-runtime"
+}
+
 variable "postgres_db" {
   type    = string
   default = null

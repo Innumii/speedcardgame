@@ -85,7 +85,7 @@ func InitializePaymentsFromEnv() error {
     }
 
     // 2. Local dev: explicit opt-in via USE_LOCAL_SECRETS=true
-    if util.GetEnvAsBool("USE_LOCAL_SECRETS", false) {
+    if !util.IsAwsEnabled(){
         apiKey := os.Getenv("STRIPE_SECRET_KEY")
         webhookSecret := os.Getenv("STRIPE_WEBHOOK_SECRET")
 
@@ -344,6 +344,71 @@ func HandleStripeWebhook(w http.ResponseWriter, r *http.Request) {
 	}
 
 	util.RespondWithJSON(w, http.StatusOK, map[string]string{"success": "true"})
+}
+
+func GetCheckoutSessionStatus(w http.ResponseWriter, r *http.Request) {
+	if paymentClient == nil {
+		util.RespondWithError(w, http.StatusServiceUnavailable, "payments module is not configured")
+		return
+	}
+
+	sessionID := strings.TrimSpace(r.URL.Query().Get("session_id"))
+	if sessionID == "" {
+		util.RespondWithError(w, http.StatusBadRequest, "session_id is required")
+		return
+	}
+
+	session, err := paymentClient.GetCheckoutSession(r.Context(), sessionID)
+	if err != nil {
+		util.RespondWithError(w, http.StatusBadGateway, fmt.Sprintf("failed to get checkout session: %v", err))
+		return
+	}
+
+	if session.PaymentState != "paid" {
+		util.RespondWithJSON(w, http.StatusOK, map[string]interface{}{
+			"session_id": session.ID,
+			"paid":       false,
+		})
+		return
+	}
+
+	uidStr := session.Metadata["uid"]
+	packageID := session.Metadata["package_id"]
+	coinsStr := session.Metadata["coins"]
+
+	if uidStr == "" || packageID == "" || coinsStr == "" {
+		util.RespondWithError(w, http.StatusBadRequest, "missing required metadata in checkout session")
+		return
+	}
+
+	uid, err := strconv.Atoi(uidStr)
+	if err != nil {
+		util.RespondWithError(w, http.StatusBadRequest, "invalid uid in checkout session metadata")
+		return
+	}
+
+	coins, err := strconv.Atoi(coinsStr)
+	if err != nil {
+		util.RespondWithError(w, http.StatusBadRequest, "invalid coins in checkout session metadata")
+		return
+	}
+
+	coinPack, ok := payments.GetCoinPackage(packageID)
+	if !ok {
+		util.RespondWithError(w, http.StatusBadRequest, "unknown package_id in checkout session metadata")
+		return
+	}
+
+	if err := applyCoinPurchase("checkout:"+session.ID, session.ID, uid, coins, coinPack.AmountCents, coinPack.Currency); err != nil {
+		util.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("failed to apply coin purchase: %v", err))
+		return
+	}
+
+	util.RespondWithJSON(w, http.StatusOK, map[string]interface{}{
+		"session_id":  session.ID,
+		"paid":        true,
+		"coins_added": coins,
+	})
 }
 
 func applyCoinPurchase(eventID, sessionID string, uid, coins int, amountCents int64, currency string) error {

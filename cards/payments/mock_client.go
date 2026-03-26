@@ -39,3 +39,11 @@ func (m *MockPaymentClient) ParseWebhook(payload []byte, signature string) (Webh
 		Type: "checkout.session.completed",
 	}, nil
 }
+
+func (m *MockPaymentClient) GetCheckoutSession(_ context.Context, sessionID string) (CheckoutSessionPaid, error) {
+	return CheckoutSessionPaid{
+		ID:           sessionID,
+		PaymentState: "paid",
+		Metadata:     map[string]string{},
+	}, nil
+}

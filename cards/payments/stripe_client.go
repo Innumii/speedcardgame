@@ -56,6 +56,7 @@ type Client interface {
 	CreateCheckoutSession(ctx context.Context, req CheckoutSessionRequest) (CheckoutSessionResponse, error)
 	ProcessCardPayment(ctx context.Context, req DirectCardPaymentRequest) (DirectCardPaymentResponse, error)
 	ParseWebhook(payload []byte, signature string) (WebhookEvent, error)
+	GetCheckoutSession(ctx context.Context, sessionID string) (CheckoutSessionPaid, error)
 }
 
 type StripeClient struct {
@@ -160,4 +161,17 @@ func (c *StripeClient) ParseWebhook(payload []byte, signature string) (WebhookEv
 	}
 
 	return out, nil
+}
+
+func (c *StripeClient) GetCheckoutSession(_ context.Context, sessionID string) (CheckoutSessionPaid, error) {
+	cs, err := session.Get(sessionID, nil)
+	if err != nil {
+		return CheckoutSessionPaid{}, err
+	}
+
+	return CheckoutSessionPaid{
+		ID:           cs.ID,
+		PaymentState: string(cs.PaymentStatus),
+		Metadata:     cs.Metadata,
+	}, nil
 }

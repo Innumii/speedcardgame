@@ -45,6 +45,7 @@ private:
     bool payPressed       = false;
 
     bool awaitingCoinUpdate = false;
+    std::string checkoutSessionId;
     int checkoutStartCoins = 0;
     Uint32 checkoutPollStartTick = 0;
     Uint32 checkoutLastPollTick = 0;

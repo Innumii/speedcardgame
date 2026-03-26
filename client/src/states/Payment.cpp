@@ -130,6 +130,7 @@ void Payment::enter(Game& game) {
     payHovered        = false;
     payPressed        = false;
     awaitingCoinUpdate = false;
+    checkoutSessionId.clear();
     checkoutStartCoins = game.getPackRefundCoins();
     checkoutPollStartTick = 0;
     checkoutLastPollTick = 0;
@@ -325,16 +326,29 @@ void Payment::update(Game& game) {
         const Uint32 nowTicks = SDL_GetTicks();
         if ((nowTicks - checkoutLastPollTick) >= CHECKOUT_POLL_INTERVAL_MS) {
             checkoutLastPollTick = nowTicks;
+
+            if (!checkoutSessionId.empty()) {
+                const std::string host = EnvUtil::getCardsServiceHost();
+                const int port = EnvUtil::getCardsServicePort();
+                const std::string statusPath = "/cards/payments/checkout-status?session_id=" + checkoutSessionId;
+
+                int statusCode = -1;
+                std::string statusBody;
+                (void)HttpUtil::sendHttp(host, port, "GET", statusPath, "", statusCode, statusBody);
+            }
+
             int latestCoins = game.getPackRefundCoins();
             if (tryLoadLatestCoins(game, latestCoins) && latestCoins > checkoutStartCoins) {
                 game.setPackRefundCoins(latestCoins);
                 awaitingCoinUpdate = false;
+                checkoutSessionId.clear();
                 statusMessage = "Payment confirmed. Coins updated.";
             }
         }
 
         if ((nowTicks - checkoutPollStartTick) >= CHECKOUT_POLL_TIMEOUT_MS) {
             awaitingCoinUpdate = false;
+            checkoutSessionId.clear();
             statusMessage = "Payment submitted. Coin update is taking longer than expected.";
         }
     }
@@ -667,7 +681,12 @@ bool Payment::requestCheckoutSession(Game& game, const ShopPackage::Package& pac
     }
 
     std::string checkoutURL;
+    std::string checkoutID;
     if (!JsonUtil::readJsonStringField(responseBody, "url", checkoutURL) || checkoutURL.empty()) {
+        statusMessage = "There was an error processing payment.";
+        return false;
+    }
+    if (!JsonUtil::readJsonStringField(responseBody, "id", checkoutID) || checkoutID.empty()) {
         statusMessage = "There was an error processing payment.";
         return false;
     }
@@ -678,6 +697,7 @@ bool Payment::requestCheckoutSession(Game& game, const ShopPackage::Package& pac
     }
 
     checkoutStartCoins = game.getPackRefundCoins();
+    checkoutSessionId = checkoutID;
     checkoutPollStartTick = SDL_GetTicks();
     checkoutLastPollTick = 0;
     awaitingCoinUpdate = true;

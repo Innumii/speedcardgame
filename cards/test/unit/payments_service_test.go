@@ -42,6 +42,21 @@ func (f *fakePaymentClient) ParseWebhook(_ []byte, _ string) (payments.WebhookEv
 	return f.webhookEvent, nil
 }
 
+func (f *fakePaymentClient) GetCheckoutSession(_ context.Context, sessionID string) (payments.CheckoutSessionPaid, error) {
+	if f.webhookErr != nil {
+		return payments.CheckoutSessionPaid{}, f.webhookErr
+	}
+	return payments.CheckoutSessionPaid{
+		ID:           sessionID,
+		PaymentState: "paid",
+		Metadata: map[string]string{
+			"uid":        "7",
+			"coins":      "1000",
+			"package_id": "coin_pack_small",
+		},
+	}, nil
+}
+
 func TestListCoinPackages(t *testing.T) {
 	cardservices.SetPaymentClientForTests(&fakePaymentClient{})
 	t.Cleanup(func() { cardservices.SetPaymentClientForTests(nil) })
