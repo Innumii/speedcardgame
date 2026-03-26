@@ -662,63 +662,92 @@ void RenderPlaying::render(Playing& playing, const Game& game) {
 
 	// ── Game End Screen (need a button for requeue)─────────────────────────────────────────────
 	//Currently, game end does NOT mean disconnect from server. They are still in the server.
+	// ── Game End Screen ─────────────────────────────────────────────────────────
 	if (playing.getState() != PlayingGameState::Playing) {
 		std::string msg = "Defeat";
 		int coinReward = playing.getCoinReward();
 		if (playing.getState() == PlayingGameState::Won) {
 			msg = "Victory";
 		}
+
+	// ── Camera shake intro ───────────────────────────────────────────
+	PlayingGameState currentState = playing.getState();
+
+	// Reset timer whenever we freshly enter an end state
+	if (playing.lastEndState != currentState && currentState != PlayingGameState::Playing) {
+		playing.gameEndStartTick = now;
+	}
+	playing.lastEndState = currentState;
+
+	// Shake parameters
+	constexpr Uint32 shakeDurationMs  = 600U;
+	constexpr float  shakePeakPixels  = 18.0F;
+	constexpr float  shakeFrequency   = 28.0F; // oscillations/sec
+
+	int shakeX = 0, shakeY = 0;
+	const Uint32 shakeElapsed = now - playing.gameEndStartTick;
+	if (shakeElapsed < shakeDurationMs) {
+		const float t       = static_cast<float>(shakeElapsed) / static_cast<float>(shakeDurationMs);
+		const float decay   = (1.0F - t) * (1.0F - t);                         // quadratic ease-out
+		const float timeS   = static_cast<float>(shakeElapsed) / 1000.0F;
+		const float sineX   = std::sin(timeS * shakeFrequency * 3.14159F * 2.0F);
+		const float sineY   = std::sin(timeS * shakeFrequency * 3.14159F * 2.0F * 1.3F); // slight phase offset
+		shakeX = static_cast<int>(sineX * shakePeakPixels * decay);
+		shakeY = static_cast<int>(sineY * shakePeakPixels * decay * 0.5F);     // vertical shake is subtler
+	}
+
+		// ── Overlay ──────────────────────────────────────────────────────
 		SDL_Rect overlay{0, 0, screenW, screenH};
 		SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
-		SDL_SetRenderDrawColor(renderer, Theme::Playing::SURRENDER_OVERLAY.r, Theme::Playing::SURRENDER_OVERLAY.g, Theme::Playing::SURRENDER_OVERLAY.b, Theme::Playing::SURRENDER_OVERLAY.a);
+		SDL_SetRenderDrawColor(renderer,
+			Theme::Playing::SURRENDER_OVERLAY.r,
+			Theme::Playing::SURRENDER_OVERLAY.g,
+			Theme::Playing::SURRENDER_OVERLAY.b,
+			Theme::Playing::SURRENDER_OVERLAY.a);
 		SDL_RenderFillRect(renderer, &overlay);
 
-		int loseTextW = 0;
-		int loseTextH = 0;
+		// ── Victory / Defeat text ────────────────────────────────────────
+		int loseTextW = 0, loseTextH = 0;
 		if (titleFonts.large) {
 			TTF_SizeText(titleFonts.large, msg.data(), &loseTextW, &loseTextH);
 		}
-
 		textRenderer.drawText(
-			renderer,
-			msg,
-			titleFonts.large,
-			Theme::TEXT_PRIMARY,
-			(screenW - loseTextW) / 2,
-			(screenH / 2) - loseTextH - 26
+			renderer, msg, titleFonts.large, Theme::TEXT_PRIMARY,
+			(screenW - loseTextW) / 2 + shakeX,
+			(screenH / 2) - loseTextH - 26 + shakeY
 		);
 
+		// ── Coin reward text ─────────────────────────────────────────────
 		if (coinReward > 0) {
 			std::string coinsMsg = std::to_string(coinReward) + " Coins Earned!";
-			int coinsTextW = 0;
-			int coinsTextH = 0;
+			int coinsTextW = 0, coinsTextH = 0;
 			if (uiFonts.large) {
 				TTF_SizeText(uiFonts.large, coinsMsg.c_str(), &coinsTextW, &coinsTextH);
 			}
-
 			textRenderer.drawText(
-				renderer,
-				coinsMsg,
-				uiFonts.large,
-				Theme::TEXT_PRIMARY,
-				(screenW - coinsTextW) / 2,
-				(screenH / 2) - 16   //
+				renderer, coinsMsg, uiFonts.large, Theme::TEXT_PRIMARY,
+				(screenW - coinsTextW) / 2 + shakeX,
+				(screenH / 2) - 16 + shakeY
 			);
 		}
 
-
+		// ── Buttons (shake applied to their rects) ───────────────────────
 		RenderButton::Style returnStyle{};
-		returnStyle.fill = Theme::BTN_START;
+		returnStyle.fill   = Theme::BTN_START;
 		returnStyle.border = Theme::BTN_BORDER;
-		returnStyle.text = Theme::BTN_TEXT;
+		returnStyle.text   = Theme::BTN_TEXT;
 		returnStyle.radius = 10;
 
-		const bool hoveringReturn = RenderUtil::pointInRect(playing.returnToTitleButton, mouseX, mouseY);
-		RenderButton::drawButton(renderer, playing.returnToTitleButton, "Return to Title", uiFonts.large, returnStyle, hoveringReturn, false);
+		SDL_Rect shakenReturn  = playing.returnToTitleButton;
+		SDL_Rect shakenRequeue = playing.requeueButton;
+		shakenReturn.x  += shakeX;  shakenReturn.y  += shakeY;
+		shakenRequeue.x += shakeX;  shakenRequeue.y += shakeY;
 
-		// ── Requeue button ───────────────────────────────────────────────
-		const bool hoveringRequeue = RenderUtil::pointInRect(playing.requeueButton, mouseX, mouseY);
-		RenderButton::drawButton(renderer, playing.requeueButton, "Requeue", uiFonts.large, returnStyle, hoveringRequeue, false);
+		const bool hoveringReturn  = RenderUtil::pointInRect(playing.returnToTitleButton, mouseX, mouseY);
+		const bool hoveringRequeue = RenderUtil::pointInRect(playing.requeueButton,       mouseX, mouseY);
+
+		RenderButton::drawButton(renderer, shakenReturn,  "Return to Title", uiFonts.large, returnStyle, hoveringReturn,  false);
+		RenderButton::drawButton(renderer, shakenRequeue, "Requeue",         uiFonts.large, returnStyle, hoveringRequeue, false);
 	}
 
 	SDL_RenderPresent(renderer);

@@ -239,7 +239,9 @@ void Playing::setup(const Game& game) {
     lastDrawTick = SDL_GetTicks();
     combatCycleStartTick = lastDrawTick;
     lastCombatSyncTick = 0;
-    deferredStatUpdates.clear(); // add this
+    deferredStatUpdates.clear(); 
+    lastEndState = PlayingGameState::Playing;
+    gameEndStartTick = 0;
 
     if (!authority) {
         authority = std::make_unique<LocalAuthority>(
