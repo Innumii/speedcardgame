@@ -38,6 +38,9 @@ int getMaskFromCard(const ServerCard* card) {
     if (textLower.find("regen") != std::string::npos) {
         mask |= kRegen;
     }
+    if (textLower.find("lifesteal") != std::string::npos) {
+        mask |= kLifesteal;
+    }
 
     return mask;
 }

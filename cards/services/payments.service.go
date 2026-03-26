@@ -43,82 +43,82 @@ type processCardPaymentRequest struct {
 
 // stripeSecrets holds the Stripe fields within the shared cards runtime secret.
 type stripeSecrets struct {
-    SecretKey     string `json:"STRIPE_SECRET_KEY"`
-    WebhookSecret string `json:"STRIPE_WEBHOOK_SECRET"`
+	SecretKey     string `json:"STRIPE_SECRET_KEY"`
+	WebhookSecret string `json:"STRIPE_WEBHOOK_SECRET"`
 }
 
 func loadStripeSecretsFromAWS(ctx context.Context) (stripeSecrets, error) {
-    // Use the shared cards runtime secret — defaults match the Terraform default
-    // in infra/modules/secrets/variables.tf (cards_runtime_secret_name).
-    secretName := util.GetEnvOrDefault("CARDS_RUNTIME_SECRET_NAME", "speedcardgame-cards-runtime")
+	// Use the shared cards runtime secret — defaults match the Terraform default
+	// in infra/modules/secrets/variables.tf (cards_runtime_secret_name).
+	secretName := util.GetEnvOrDefault("CARDS_RUNTIME_SECRET_NAME", "speedcardgame-cards-runtime")
 
-    cfg, err := awsconfig.LoadDefaultConfig(ctx)
-    if err != nil {
-        return stripeSecrets{}, fmt.Errorf("failed to load AWS config: %w", err)
-    }
+	cfg, err := awsconfig.LoadDefaultConfig(ctx)
+	if err != nil {
+		return stripeSecrets{}, fmt.Errorf("failed to load AWS config: %w", err)
+	}
 
-    client := secretsmanager.NewFromConfig(cfg)
-    result, err := client.GetSecretValue(ctx, &secretsmanager.GetSecretValueInput{
-        SecretId: aws.String(secretName),
-    })
-    if err != nil {
-        return stripeSecrets{}, fmt.Errorf("failed to get secret %q: %w", secretName, err)
-    }
+	client := secretsmanager.NewFromConfig(cfg)
+	result, err := client.GetSecretValue(ctx, &secretsmanager.GetSecretValueInput{
+		SecretId: aws.String(secretName),
+	})
+	if err != nil {
+		return stripeSecrets{}, fmt.Errorf("failed to get secret %q: %w", secretName, err)
+	}
 
-    if result.SecretString == nil {
-        return stripeSecrets{}, fmt.Errorf("secret %q has no string value", secretName)
-    }
+	if result.SecretString == nil {
+		return stripeSecrets{}, fmt.Errorf("secret %q has no string value", secretName)
+	}
 
-    var s stripeSecrets
-    if err := json.Unmarshal([]byte(*result.SecretString), &s); err != nil {
-        return stripeSecrets{}, fmt.Errorf("failed to parse secret JSON: %w", err)
-    }
+	var s stripeSecrets
+	if err := json.Unmarshal([]byte(*result.SecretString), &s); err != nil {
+		return stripeSecrets{}, fmt.Errorf("failed to parse secret JSON: %w", err)
+	}
 
-    return s, nil
+	return s, nil
 }
 
 func InitializePaymentsFromEnv() error {
-    // 1. Mock client for tests / CI
-    if os.Getenv("PAYMENT_TEST_MODE") == "true" {
-        paymentClient = payments.NewMockPaymentClient()
-        return nil
-    }
+	// 1. Mock client for tests / CI
+	if os.Getenv("PAYMENT_TEST_MODE") == "true" {
+		paymentClient = payments.NewMockPaymentClient()
+		return nil
+	}
 
-    // 2. Local dev: explicit opt-in via USE_LOCAL_SECRETS=true
-    if !util.IsAwsEnabled(){
-        apiKey := os.Getenv("STRIPE_SECRET_KEY")
-        webhookSecret := os.Getenv("STRIPE_WEBHOOK_SECRET")
+	// 2. Local dev: explicit opt-in via USE_LOCAL_SECRETS=true
+	if !util.IsAwsEnabled() {
+		apiKey := os.Getenv("STRIPE_SECRET_KEY")
+		webhookSecret := os.Getenv("STRIPE_WEBHOOK_SECRET")
 
-        if apiKey == "" || webhookSecret == "" {
-            paymentClient = nil
-            return errors.New(
-                "stripe payment module disabled: USE_LOCAL_SECRETS=true but " +
-                    "STRIPE_SECRET_KEY or STRIPE_WEBHOOK_SECRET is not set",
-            )
-        }
+		if apiKey == "" || webhookSecret == "" {
+			paymentClient = nil
+			return errors.New(
+				"stripe payment module disabled: USE_LOCAL_SECRETS=true but " +
+					"STRIPE_SECRET_KEY or STRIPE_WEBHOOK_SECRET is not set",
+			)
+		}
 
-        paymentClient = payments.NewStripeClient(apiKey, webhookSecret)
-        return nil
-    }
+		paymentClient = payments.NewStripeClient(apiKey, webhookSecret)
+		return nil
+	}
 
-    // 3. Default: AWS Secrets Manager using the shared cards runtime secret
-    secrets, err := loadStripeSecretsFromAWS(context.Background())
-    if err != nil {
-        paymentClient = nil
-        return fmt.Errorf(
-            "stripe payment module disabled: failed to load from cards runtime secret: %w", err,
-        )
-    }
+	// 3. Default: AWS Secrets Manager using the shared cards runtime secret
+	secrets, err := loadStripeSecretsFromAWS(context.Background())
+	if err != nil {
+		paymentClient = nil
+		return fmt.Errorf(
+			"stripe payment module disabled: failed to load from cards runtime secret: %w", err,
+		)
+	}
 
-    if secrets.SecretKey == "" || secrets.WebhookSecret == "" {
-        paymentClient = nil
-        return errors.New(
-            "stripe payment module disabled: cards runtime secret missing STRIPE_SECRET_KEY or STRIPE_WEBHOOK_SECRET",
-        )
-    }
+	if secrets.SecretKey == "" || secrets.WebhookSecret == "" {
+		paymentClient = nil
+		return errors.New(
+			"stripe payment module disabled: cards runtime secret missing STRIPE_SECRET_KEY or STRIPE_WEBHOOK_SECRET",
+		)
+	}
 
-    paymentClient = payments.NewStripeClient(secrets.SecretKey, secrets.WebhookSecret)
-    return nil
+	paymentClient = payments.NewStripeClient(secrets.SecretKey, secrets.WebhookSecret)
+	return nil
 }
 
 // SetPaymentClientForTests swaps the payment client implementation in unit tests.

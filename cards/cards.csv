@@ -19,7 +19,7 @@ cid,name,type,cost,value,power,toughness,effect
 18,The Pass,Spell,3,2,0,0,Give target creature Trample.
 19,Pepe,Creature,6,3,6,7,
 20,"Mr. President, Get Down!!",Spell,4,2,0,0,Give target creature +0/+3.
-21,Shawn,Creature,4,1,1,2,Trample
+21,Shawn,Creature,4,1,7,1,Trample
 22,Grass Ain't Green,Spell,3,1,0,0,Your opponent takes 1 damage for each creature they control.
 23,Equivalent Exchange,Spell,1,1,0,0,"Target player takes 5 damage, they gain 5 mana."
 24,Bushcamper,Creature,3,2,2,2,"When summoned, deal 2 damage to your opponent."
@@ -39,3 +39,8 @@ cid,name,type,cost,value,power,toughness,effect
 38,Mossad Mayhem,Spell,5,1,0,0,"Lose 10 HP, deal 5 damage to all opponent creatures"
 39,Baby Bear,Creature,1,1,1,1,Trample
 40,Slime,Creature,1,1,1,1,Regen 1
+41,Unpaid Intern,Creature,3,2,1,2,"When this creature enters the battlefield, draw a card."
+42,Full Time Worker,Creature,5,3,4,4,"When this creature enters the battlefield, draw 2 cards."
+43,Vampire,Creature,3,2,2,2,"Lifesteal"
+44,Vampire Bat,Creature,2,1,1,1,"Lifesteal"
+45,Vampire Bite,Spell,2,1,0,0,"Target creature gains Lifesteal."
