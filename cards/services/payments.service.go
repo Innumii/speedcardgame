@@ -41,89 +41,84 @@ type processCardPaymentRequest struct {
 	CardholderName string `json:"cardholder_name"`
 }
 
-// stripeSecrets holds the JSON structure stored in AWS Secrets Manager.
+// stripeSecrets holds the Stripe fields within the shared cards runtime secret.
 type stripeSecrets struct {
-	SecretKey     string `json:"STRIPE_SECRET_KEY"`
-	WebhookSecret string `json:"STRIPE_WEBHOOK_SECRET"`
+    SecretKey     string `json:"STRIPE_SECRET_KEY"`
+    WebhookSecret string `json:"STRIPE_WEBHOOK_SECRET"`
 }
 
-// loadStripeSecretsFromAWS fetches Stripe credentials from AWS Secrets Manager.
-// The secret should be a JSON object:
-//
-//	{ "STRIPE_SECRET_KEY": "sk_live_...", "STRIPE_WEBHOOK_SECRET": "whsec_..." }
-//
-// The secret name is read from the env var STRIPE_SECRET_NAME (required when
-// running on AWS).
 func loadStripeSecretsFromAWS(ctx context.Context) (stripeSecrets, error) {
-	secretName := os.Getenv("STRIPE_SECRET_NAME")
-	if secretName == "" {
-		return stripeSecrets{}, errors.New("STRIPE_SECRET_NAME env var is not set")
-	}
+    // Use the shared cards runtime secret — defaults match the Terraform default
+    // in infra/modules/secrets/variables.tf (cards_runtime_secret_name).
+    secretName := util.GetEnvOrDefault("CARDS_RUNTIME_SECRET_NAME", "speedcardgame-cards-runtime")
 
-	cfg, err := awsconfig.LoadDefaultConfig(ctx)
-	if err != nil {
-		return stripeSecrets{}, fmt.Errorf("failed to load AWS config: %w", err)
-	}
+    cfg, err := awsconfig.LoadDefaultConfig(ctx)
+    if err != nil {
+        return stripeSecrets{}, fmt.Errorf("failed to load AWS config: %w", err)
+    }
 
-	client := secretsmanager.NewFromConfig(cfg)
-	result, err := client.GetSecretValue(ctx, &secretsmanager.GetSecretValueInput{
-		SecretId: aws.String(secretName),
-	})
-	if err != nil {
-		return stripeSecrets{}, fmt.Errorf("failed to get secret %q: %w", secretName, err)
-	}
+    client := secretsmanager.NewFromConfig(cfg)
+    result, err := client.GetSecretValue(ctx, &secretsmanager.GetSecretValueInput{
+        SecretId: aws.String(secretName),
+    })
+    if err != nil {
+        return stripeSecrets{}, fmt.Errorf("failed to get secret %q: %w", secretName, err)
+    }
 
-	if result.SecretString == nil {
-		return stripeSecrets{}, fmt.Errorf("secret %q has no string value", secretName)
-	}
+    if result.SecretString == nil {
+        return stripeSecrets{}, fmt.Errorf("secret %q has no string value", secretName)
+    }
 
-	var s stripeSecrets
-	if err := json.Unmarshal([]byte(*result.SecretString), &s); err != nil {
-		return stripeSecrets{}, fmt.Errorf("failed to parse secret JSON: %w", err)
-	}
+    var s stripeSecrets
+    if err := json.Unmarshal([]byte(*result.SecretString), &s); err != nil {
+        return stripeSecrets{}, fmt.Errorf("failed to parse secret JSON: %w", err)
+    }
 
-	return s, nil
+    return s, nil
 }
 
-// InitializePaymentsFromEnv initialises the payment client.
-//
-// Resolution order:
-//  1. PAYMENT_TEST_MODE=true  → mock client (local dev / CI)
-//  2. Local env vars (STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET) → use local config
-//  3. AWS enabled → load Stripe keys from AWS Secrets Manager
-//  4. fallback → error (no credentials found)
 func InitializePaymentsFromEnv() error {
-	useTestMode := os.Getenv("PAYMENT_TEST_MODE")
-	if useTestMode == "true" {
-		paymentClient = payments.NewMockPaymentClient()
-		return nil
-	}
+    // 1. Mock client for tests / CI
+    if os.Getenv("PAYMENT_TEST_MODE") == "true" {
+        paymentClient = payments.NewMockPaymentClient()
+        return nil
+    }
 
-	var apiKey, webhookSecret string
+    // 2. Local dev: explicit opt-in via USE_LOCAL_SECRETS=true
+    if util.GetEnvAsBool("USE_LOCAL_SECRETS", false) {
+        apiKey := os.Getenv("STRIPE_SECRET_KEY")
+        webhookSecret := os.Getenv("STRIPE_WEBHOOK_SECRET")
 
-	// Step 1: Try to load from local environment/env file
-	apiKey = os.Getenv("STRIPE_SECRET_KEY")
-	webhookSecret = os.Getenv("STRIPE_WEBHOOK_SECRET")
+        if apiKey == "" || webhookSecret == "" {
+            paymentClient = nil
+            return errors.New(
+                "stripe payment module disabled: USE_LOCAL_SECRETS=true but " +
+                    "STRIPE_SECRET_KEY or STRIPE_WEBHOOK_SECRET is not set",
+            )
+        }
 
-	// Step 2: If local secrets not found and AWS is enabled, try AWS Secrets Manager
-	if (apiKey == "" || webhookSecret == "") && util.IsAwsEnabled() {
-		secrets, err := loadStripeSecretsFromAWS(context.Background())
-		if err != nil {
-			paymentClient = nil
-			return fmt.Errorf("stripe payment module disabled: failed to load secrets from AWS: %w", err)
-		}
-		apiKey = secrets.SecretKey
-		webhookSecret = secrets.WebhookSecret
-	}
+        paymentClient = payments.NewStripeClient(apiKey, webhookSecret)
+        return nil
+    }
 
-	// Step 3: Validate that we have both secrets
-	if apiKey == "" || webhookSecret == "" {
-		paymentClient = nil
-		return errors.New("stripe payment module disabled: STRIPE_SECRET_KEY and STRIPE_WEBHOOK_SECRET must both be set (locally or in AWS Secrets Manager)")
-	}
+    // 3. Default: AWS Secrets Manager using the shared cards runtime secret
+    secrets, err := loadStripeSecretsFromAWS(context.Background())
+    if err != nil {
+        paymentClient = nil
+        return fmt.Errorf(
+            "stripe payment module disabled: failed to load from cards runtime secret: %w", err,
+        )
+    }
 
-	paymentClient = payments.NewStripeClient(apiKey, webhookSecret)
-	return nil
+    if secrets.SecretKey == "" || secrets.WebhookSecret == "" {
+        paymentClient = nil
+        return errors.New(
+            "stripe payment module disabled: cards runtime secret missing STRIPE_SECRET_KEY or STRIPE_WEBHOOK_SECRET",
+        )
+    }
+
+    paymentClient = payments.NewStripeClient(secrets.SecretKey, secrets.WebhookSecret)
+    return nil
 }
 
 // SetPaymentClientForTests swaps the payment client implementation in unit tests.
