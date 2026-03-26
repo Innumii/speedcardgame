@@ -1,6 +1,7 @@
 package services
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -14,6 +15,9 @@ import (
 	"github.com/Ryanljk/speedcardgame/cards/models"
 	"github.com/Ryanljk/speedcardgame/cards/payments"
 	"github.com/Ryanljk/speedcardgame/cards/util"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	awsconfig "github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
@@ -37,20 +41,85 @@ type processCardPaymentRequest struct {
 	CardholderName string `json:"cardholder_name"`
 }
 
-func InitializePaymentsFromEnv() error {
-	apiKey := os.Getenv("STRIPE_SECRET_KEY")
-	webhookSecret := os.Getenv("STRIPE_WEBHOOK_SECRET")
-	useTestMode := os.Getenv("PAYMENT_TEST_MODE")
+// stripeSecrets holds the JSON structure stored in AWS Secrets Manager.
+type stripeSecrets struct {
+	SecretKey     string `json:"STRIPE_SECRET_KEY"`
+	WebhookSecret string `json:"STRIPE_WEBHOOK_SECRET"`
+}
 
-	// If test mode is enabled, use mock payment client
+// loadStripeSecretsFromAWS fetches Stripe credentials from AWS Secrets Manager.
+// The secret should be a JSON object:
+//
+//	{ "STRIPE_SECRET_KEY": "sk_live_...", "STRIPE_WEBHOOK_SECRET": "whsec_..." }
+//
+// The secret name is read from the env var STRIPE_SECRET_NAME (required when
+// running on AWS).
+func loadStripeSecretsFromAWS(ctx context.Context) (stripeSecrets, error) {
+	secretName := os.Getenv("STRIPE_SECRET_NAME")
+	if secretName == "" {
+		return stripeSecrets{}, errors.New("STRIPE_SECRET_NAME env var is not set")
+	}
+
+	cfg, err := awsconfig.LoadDefaultConfig(ctx)
+	if err != nil {
+		return stripeSecrets{}, fmt.Errorf("failed to load AWS config: %w", err)
+	}
+
+	client := secretsmanager.NewFromConfig(cfg)
+	result, err := client.GetSecretValue(ctx, &secretsmanager.GetSecretValueInput{
+		SecretId: aws.String(secretName),
+	})
+	if err != nil {
+		return stripeSecrets{}, fmt.Errorf("failed to get secret %q: %w", secretName, err)
+	}
+
+	if result.SecretString == nil {
+		return stripeSecrets{}, fmt.Errorf("secret %q has no string value", secretName)
+	}
+
+	var s stripeSecrets
+	if err := json.Unmarshal([]byte(*result.SecretString), &s); err != nil {
+		return stripeSecrets{}, fmt.Errorf("failed to parse secret JSON: %w", err)
+	}
+
+	return s, nil
+}
+
+// InitializePaymentsFromEnv initialises the payment client.
+//
+// Resolution order:
+//  1. PAYMENT_TEST_MODE=true  → mock client (local dev / CI)
+//  2. Local env vars (STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET) → use local config
+//  3. AWS enabled → load Stripe keys from AWS Secrets Manager
+//  4. fallback → error (no credentials found)
+func InitializePaymentsFromEnv() error {
+	useTestMode := os.Getenv("PAYMENT_TEST_MODE")
 	if useTestMode == "true" {
 		paymentClient = payments.NewMockPaymentClient()
 		return nil
 	}
 
+	var apiKey, webhookSecret string
+
+	// Step 1: Try to load from local environment/env file
+	apiKey = os.Getenv("STRIPE_SECRET_KEY")
+	webhookSecret = os.Getenv("STRIPE_WEBHOOK_SECRET")
+
+	// Step 2: If local secrets not found and AWS is enabled, try AWS Secrets Manager
+	if (apiKey == "" || webhookSecret == "") && util.IsAwsEnabled() {
+		secrets, err := loadStripeSecretsFromAWS(context.Background())
+		if err != nil {
+			paymentClient = nil
+			return fmt.Errorf("stripe payment module disabled: failed to load secrets from AWS: %w", err)
+		}
+		apiKey = secrets.SecretKey
+		webhookSecret = secrets.WebhookSecret
+	}
+
+	// Step 3: Validate that we have both secrets
 	if apiKey == "" || webhookSecret == "" {
 		paymentClient = nil
-		return errors.New("stripe payment module disabled: STRIPE_SECRET_KEY and STRIPE_WEBHOOK_SECRET must both be set")
+		return errors.New("stripe payment module disabled: STRIPE_SECRET_KEY and STRIPE_WEBHOOK_SECRET must both be set (locally or in AWS Secrets Manager)")
 	}
 
 	paymentClient = payments.NewStripeClient(apiKey, webhookSecret)
@@ -247,7 +316,6 @@ func HandleStripeWebhook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Extract metadata
 	uidStr := session.Metadata["uid"]
 	packageID := session.Metadata["package_id"]
 	coinsStr := session.Metadata["coins"]
@@ -296,7 +364,6 @@ func applyCoinPurchase(eventID, sessionID string, uid, coins int, amountCents in
 
 		if err := tx.Create(&ledger).Error; err != nil {
 			if isDuplicateEventIDError(err) {
-				// Idempotency: ignore duplicate ledger events (e.g., webhook retries).
 				return nil
 			}
 			return fmt.Errorf("failed to create payment ledger: %w", err)
