@@ -177,6 +177,9 @@ private:
 
     // Animation related
     bool tryDrawCardWithAnimation(Uint32 now);
+
+    Uint32 gameEndStartTick = 0;
+    PlayingGameState lastEndState = PlayingGameState::Playing;
 };
 
 #endif
