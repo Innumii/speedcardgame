@@ -1,6 +1,6 @@
 aws_region = "us-east-1"
 image_tag  = "latest"
-image_repo = "ryanljk/g4t2-auth-service"
+image_repo = "FYL-Studios/speedcardgame"
 assign_public_ip = true
 
 use_managed_data_stack = true
