@@ -72,7 +72,7 @@ void DeckBuilding::enter(Game& game) {
     statusMessageUntil = 0;
 }
 
-void DeckBuilding::exit(const Game& game) {
+void DeckBuilding::exit(Game& game) {
     (void)game;
 }
 

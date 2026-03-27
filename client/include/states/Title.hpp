@@ -4,16 +4,17 @@
 #include <SDL2/SDL.h>
 #include <array>
 #include <string>
+#include "StateInterface.hpp"
 #include "core/GameState.hpp"
 #include "render/Theme.hpp"
 #include "render/RenderText.hpp"
 class Game;
 
-class Title {
+class Title : public StateInterface {
 public:
-    void handleEvents(Game& game, const SDL_Event& event);
-    void update(Game& game);
-    void render(const Game& game);
+    void handleEvents(Game& game, const SDL_Event& event) override;
+    void update(Game& game) override;
+    void render(Game& game) override;
     ~Title();
 
 private:

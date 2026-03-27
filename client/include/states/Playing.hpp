@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "core/GameState.hpp"
+#include "StateInterface.hpp"
 #include "objects/Player.h"
 #include "objects/Deck.h"
 #include "core/Board.hpp"
@@ -22,7 +23,7 @@ class Playing;
 
 std::optional<std::vector<int>> getValidTargets(const Playing& playing, const Card& card, int sourceLane);
 enum class PlayingGameState {Playing, Won, Lost};
-class Playing {
+class Playing : public StateInterface {
     friend class RenderPlaying;
     friend class RenderTargeting;
     friend std::optional<std::vector<int>> getValidTargets(const Playing& playing, const Card& card, int sourceLane);
@@ -39,10 +40,10 @@ public:
     void setup(const Game& game);
     void setDeck(Deck newDeck);
     void setupPlayers(Player&& local, Player&& remote);
-    void handleEvents(Game& game, const SDL_Event& event);
+    void handleEvents(Game& game, const SDL_Event& event) override;
     void run();
-    void update(Game& game);
-    void render(const Game&);
+    void update(Game& game) override;
+    void render(Game& game) override;
     int getCoinReward() const;
 
     PlayingGameState getState() const;

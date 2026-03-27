@@ -80,7 +80,7 @@ void Connecting::update(Game& game) {
     }
 }
 
-void Connecting::render(const Game& game) {
+void Connecting::render(Game& game) {
     SDL_Renderer* renderer = game.getRenderer();
     if (!renderer) return;
 

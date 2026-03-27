@@ -7,21 +7,22 @@
 #include <string>
 #include <vector>
 
+#include "StateInterface.hpp"
 #include "render/Theme.hpp"
 
 class Game;
 class RenderDeckBuilding;
 class Card;
 
-class DeckBuilding {
+class DeckBuilding : public StateInterface {
     friend class RenderDeckBuilding;
 public:
 	DeckBuilding();
-	void handleEvents(Game& game, const SDL_Event& event);
-	void update(Game& game);
-	void render(Game& game);
-	void enter(Game& game);
-	void exit(const Game& game);
+	void handleEvents(Game& game, const SDL_Event& event) override;
+	void update(Game& game) override;
+	void render(Game& game) override;
+	void enter(Game& game) override;
+	void exit(Game& game) override;
 	bool refreshFromService(Game& game);
 	const std::string& getStatusMessage() const;
 	bool isStatusMessageActive(Uint32 now) const;

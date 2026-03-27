@@ -1128,7 +1128,7 @@ void Playing::augmentMana(int playerId, int delta) {
 }
 
 
-void Playing::render(const Game& game) {
+void Playing::render(Game& game) {
     RenderPlaying::render(*this, game);
 }
 

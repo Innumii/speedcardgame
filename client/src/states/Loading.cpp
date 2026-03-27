@@ -108,7 +108,7 @@ void Loading::update(Game& game) {
     game.setNextState(GameState::Title);
 }
 
-void Loading::render(const Game& game) {
+void Loading::render(Game& game) {
     SDL_Renderer* renderer = game.getRenderer();
     if (!renderer) return;
 

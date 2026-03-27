@@ -1,6 +1,7 @@
 #ifndef PAYMENT_HPP
 #define PAYMENT_HPP
 
+#include "StateInterface.hpp"
 #include "core/GameState.hpp"
 #include "objects/ShopPackage.hpp"
 
@@ -10,12 +11,12 @@
 
 class Game;
 
-class Payment {
+class Payment : public StateInterface {
 public:
-    void enter(Game& game);
-    void handleEvents(Game& game, const SDL_Event& event);
-    void update(Game& game);
-    void render(Game& game);
+    void enter(Game& game) override;
+    void handleEvents(Game& game, const SDL_Event& event) override;
+    void update(Game& game) override;
+    void render(Game& game) override;
 
 private:
     // ── Two-step flow ─────────────────────────────────────────────────────────

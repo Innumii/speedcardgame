@@ -1,19 +1,20 @@
 #ifndef LOADING_HPP
 #define LOADING_HPP
 
+#include "StateInterface.hpp"
 #include <SDL2/SDL.h>
 #include <cstddef>
 #include <string>
 
 class Game;
 
-class Loading {
+class Loading : public StateInterface {
 public:
-    void enter(Game& game);
-    void exit(Game& game);
-    void handleEvents(Game& game, const SDL_Event& event);
-    void update(Game& game);
-    void render(const Game& game);
+    void enter(Game& game) override;
+    void exit(Game& game) override;
+    void handleEvents(Game& game, const SDL_Event& event) override;
+    void update(Game& game) override;
+    void render(Game& game) override;
 
 private:
     int maxRetryRounds{3};

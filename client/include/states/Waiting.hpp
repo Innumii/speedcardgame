@@ -4,17 +4,18 @@
 #include <string>
 #include <vector>
 
+#include "StateInterface.hpp"
 #include "render/Theme.hpp"
 
 class Game;
 
-class Waiting {
+class Waiting : public StateInterface {
 public:
     Waiting() = default;
 
-    void handleEvents(Game& game, const SDL_Event& event);
-    void update(Game& game);
-    void render(const Game& game);
+    void handleEvents(Game& game, const SDL_Event& event) override;
+    void update(Game& game) override;
+    void render(Game& game) override;
 
 private:
     std::string recvBuffer; // handles partial TCP messages

@@ -1,6 +1,7 @@
 #ifndef CONNECTING_HPP
 #define CONNECTING_HPP
 
+#include "StateInterface.hpp"
 #include <string>
 #include <SDL2/SDL.h>
 #include <atomic>
@@ -10,15 +11,15 @@
 
 class Game;
 
-class Connecting {
+class Connecting : public StateInterface{
 public:
     //ip and port is for the server client connects to
     Connecting(const std::string& ip, int port);
     ~Connecting();
 
-    void handleEvents(Game& game, const SDL_Event& event);
-    void update(Game& game);
-    void render(const Game& game);
+    void handleEvents(Game& game, const SDL_Event& event) override;
+    void update(Game& game) override;
+    void render(Game& game) override;
 
 private:
     std::string serverIp;

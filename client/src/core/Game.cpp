@@ -123,83 +123,87 @@ Game::~Game() {
     std::cout << "Goodbye!~\n";
 }
 
+StateInterface* Game::getStateInstance(GameState targetState) {
+    switch (targetState) {
+        case GameState::Title:
+            return &titleState;
+        case GameState::Login:
+            return &loginState;
+        case GameState::Register:
+            return &registerState;
+        case GameState::Loading:
+            return &loadingState;
+        case GameState::DeckBuilding:
+            return &deckBuildingState;
+        case GameState::Payment:
+            return &paymentState;
+        case GameState::PackOpening:
+            return &packOpeningState;
+        case GameState::Playing:
+            return &playingState;
+        case GameState::Connecting:
+        case GameState::GameOver:
+            return connectingState ? &(*connectingState) : nullptr;
+        case GameState::Waiting:
+            return waitingState ? &(*waitingState) : nullptr;
+        case GameState::Quit:
+        default:
+            return nullptr;
+    }
+}
+
+void Game::ensureStateInstance(GameState targetState) {
+    if (targetState == GameState::Connecting && !connectingState) {
+        const std::string host = EnvUtil::getGameServerHost();
+        const int port = EnvUtil::getGameServerPort();
+        connectingState.emplace(host, port);
+    }
+
+    if (targetState == GameState::Waiting && !waitingState) {
+        waitingState.emplace();
+        std::cout << "Waiting now\n";
+    }
+}
+
 //check this again ltr
 void Game::commitStateChange() {
-    if (nextState != state) {
-        const GameState previousState = state;
-        state = nextState;
-
-        // if (previousState == GameState::Title) titleState.exit();
-
-        if (previousState == GameState::DeckBuilding) {
-            deckBuildingState.exit(*this);
-        }
-
-        if (previousState == GameState::Login && state != GameState::Login) {
-            loginState.exit(*this);
-        }
-
-        if (previousState == GameState::Register && state != GameState::Register) {
-            registerState.exit(*this);
-        }
-
-        if (previousState == GameState::Loading && state != GameState::Loading) {
-            loadingState.exit(*this);
-        }
-
-        if (previousState == GameState::Playing && state != GameState::Playing) {
-            playingSetup = false;
-        }
-
-        if ((previousState == GameState::Waiting || previousState == GameState::Playing) && state == GameState::Title) {
-            connectingState.reset();
-            getNetworkClient().disconnect();
-        }
-        
-        state = nextState;
-
-        if (state == GameState::Connecting) {
-            const std::string host = EnvUtil::getGameServerHost();
-            const int port = EnvUtil::getGameServerPort();
-            connectingState.emplace(host, port);
-        }
-
-        if (state == GameState::Waiting) {
-            waitingState.emplace();
-            std::cout << "Waiting now\n";
-        }
-
-        if (state == GameState::Login && previousState != GameState::Login) {
-            loginState.enter(*this);
-        }
-
-        if (state == GameState::Register && previousState != GameState::Register) {
-            registerState.enter(*this);
-        }
-
-        if (state == GameState::Loading && previousState != GameState::Loading) {
-            loadingState.enter(*this);
-        }
-
-        if (state == GameState::Playing && !playingSetup) {
-            std::cout << "Committing state change to Playing...\n";
-            playingState.setup(*this);
-            playingSetup = true;
-        }
-        if (state == GameState::DeckBuilding && previousState != GameState::DeckBuilding) {
-            deckBuildingState.enter(*this);
-        }
-        if (state == GameState::Payment && previousState != GameState::Payment) {
-            paymentState.enter(*this);
-        }
-        if (state == GameState::PackOpening && previousState != GameState::PackOpening) {
-            packOpeningState.enter(*this);
-        }
-        if (state == GameState::Quit || state == GameState::GameOver) {
-            isRunning = false;
-        }
+    if (nextState == state) {
+        return;
     }
-    
+
+    const GameState previousState = state;
+    StateInterface* previousStateInstance = getStateInstance(previousState);
+
+    if (previousState == GameState::Playing && nextState != GameState::Playing) {
+        playingSetup = false;
+    }
+
+    if ((previousState == GameState::Waiting || previousState == GameState::Playing) && nextState == GameState::Title) {
+        connectingState.reset();
+        getNetworkClient().disconnect();
+    }
+
+    if (previousStateInstance) {
+        previousStateInstance->exit(*this);
+    }
+
+    state = nextState;
+    ensureStateInstance(state);
+
+    if (state == GameState::Playing && !playingSetup) {
+        std::cout << "Committing state change to Playing...\n";
+        playingState.setup(*this);
+        playingSetup = true;
+    }
+
+    StateInterface* currentStateInstance = getStateInstance(state);
+    if (currentStateInstance) {
+        currentStateInstance->enter(*this);
+    }
+
+    if (state == GameState::Quit || state == GameState::GameOver) {
+        isRunning = false;
+    }
 }
 
 void Game::setNextState(GameState newState) {
@@ -220,7 +224,6 @@ bool Game::refreshPlayerDeckFromService() {
         return false;
     }
     deck = std::move(loadedDeck);
-    // setPlayingDeck(std::move(loadedDeck));
     return true;
 }
 
@@ -328,25 +331,10 @@ Playing& Game::getPlayingState() {
     return playingState;
 }
 
-// const Deck& Game::getDeck(const Player& player) const {
-//     return player.getDeck();
-// }
 
 Player& Game::getPlayer() {
     return player;
 }
-
-// std::size_t Game::getHandSize(const Player& player) const {
-//     return player.handSize();
-// }
-
-// int Game::getHealth(const Player& player) const {
-//     return player.health;
-// }
-
-// int Game::getMana(const Player& player) const {
-//     return player.mana;
-// }
 
 NetworkClient& Game::getNetworkClient() {
     return netClient;
@@ -364,43 +352,9 @@ void Game::handleEvents() {
             continue;
         }
 
-        switch (state) {
-            case GameState::Title:
-                titleState.handleEvents(*this, event);
-                break;
-            case GameState::Login:
-                loginState.handleEvents(*this, event);
-                break;
-            case GameState::Register:
-                registerState.handleEvents(*this, event);
-                break;
-            case GameState::Loading:
-                loadingState.handleEvents(*this, event);
-                break;
-            case GameState::DeckBuilding:
-                deckBuildingState.handleEvents(*this, event);
-                break;
-            case GameState::Payment:
-                paymentState.handleEvents(*this, event);
-                break;
-            case GameState::PackOpening:
-                packOpeningState.handleEvents(*this, event);
-                break;
-            case GameState::Playing:
-                playingState.handleEvents(*this, event);
-                break;
-            case GameState::GameOver:
-            case GameState::Connecting:
-                if (connectingState) {
-                    connectingState->handleEvents(*this, event);
-                }
-                break;
-            case GameState::Waiting:
-                if (waitingState) {
-                    waitingState->handleEvents(*this, event);
-                }
-            default:
-                break;
+        StateInterface* currentState = getStateInstance(state);
+        if (currentState) {
+            currentState->handleEvents(*this, event);
         }
     }
 }
@@ -411,43 +365,9 @@ void Game::update() {
         return;
     }
 
-    switch (state) {
-        case GameState::Title:
-                titleState.update(*this);
-                break;
-        case GameState::Playing:
-            playingState.update(*this);
-            break;
-        case GameState::DeckBuilding:
-            deckBuildingState.update(*this);
-            break;
-        case GameState::Payment:
-            paymentState.update(*this);
-            break;
-        case GameState::PackOpening:
-            packOpeningState.update(*this);
-            break;
-        case GameState::Login:
-            loginState.update(*this);
-            break;
-        case GameState::Register:
-            registerState.update(*this);
-            break;
-        case GameState::Loading:
-            loadingState.update(*this);
-            break;
-        case GameState::Connecting:
-            if (connectingState) {
-                connectingState->update(*this);
-            }
-            break;
-        case GameState::Waiting:
-            if (waitingState) {
-                waitingState->update(*this);
-            }
-            break;
-        default:
-            break;
+    StateInterface* currentState = getStateInstance(state);
+    if (currentState) {
+        currentState->update(*this);
     }
 }
 
@@ -455,43 +375,9 @@ void Game::render() {
     SDL_SetRenderDrawColor(renderer.get(), 30, 30, 30, 255);
     SDL_RenderClear(renderer.get());
 
-    switch (state) {
-        case GameState::Title:
-            titleState.render(*this);
-            break;
-        case GameState::Login:
-            loginState.render(*this);
-            break;
-        case GameState::Register:
-            registerState.render(*this);
-            break;
-        case GameState::Loading:
-            loadingState.render(*this);
-            break;
-        case GameState::DeckBuilding:
-            deckBuildingState.render(*this);
-            break;
-        case GameState::Payment:
-            paymentState.render(*this);
-            break;
-        case GameState::PackOpening:
-            packOpeningState.render(*this);
-            break;
-        case GameState::Playing:
-            playingState.render(*this);
-            break;
-        case GameState::Connecting:
-            if (connectingState) {
-                connectingState->render(*this);
-            }
-            break;
-        case GameState::Waiting:
-            if (waitingState) {
-                waitingState->render(*this);
-            }
-            break;
-        default:
-            break;
+    StateInterface* currentState = getStateInstance(state);
+    if (currentState) {
+        currentState->render(*this);
     }
 
     SDL_RenderPresent(renderer.get());
