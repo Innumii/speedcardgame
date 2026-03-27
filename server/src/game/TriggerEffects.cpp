@@ -373,4 +373,19 @@ const std::unordered_map<int, std::vector<CardEffectEntry>> TriggerEffects::card
         .amount   = 2
     }}},
 
+    //Jew Jitsu Black Belt
+    {46, { CardEffectEntry{
+            .effectId = 5,
+            .amount   = -1,
+            .target   = Target::Opponent,
+            .trigger = TriggerType::OnKill
+          },
+          CardEffectEntry{
+            .effectId = 5,
+            .amount   = 1,
+            .target   = Target::Self,
+            .trigger = TriggerType::OnKill
+          }
+    }},
+
 };

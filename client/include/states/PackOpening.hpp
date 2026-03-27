@@ -89,7 +89,7 @@ private:
     static constexpr int SlideInDelayMs    = 150;  // ms stagger between each card's slide start
     static constexpr int SlideInDurationMs = 420;  // ms for each card to reach its target position
     static constexpr int FlipDurationMs    = 150;  // ms for the flip-reveal animation
-    static constexpr int StaggerOffsetY    = 10;   // px of vertical stagger (up for even, down for odd)
+    static constexpr int StaggerOffsetY    = 0;   // px of vertical stagger (up for even, down for odd)
 
     // ── Deferred service flush ────────────────────────────────────────────────
     int pendingCoinDelta = 0;

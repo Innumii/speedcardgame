@@ -103,7 +103,7 @@ void PackOpening::enter(Game& game) {
     }
 
     const auto& availableCards = LoadAvailableCardsUtil::getAvailableCards();
-    if (!Inventory::ensureInventoryAndCoinsLoaded(game, availableCards, MaxCardCopies)) {
+    if (!Inventory::loadInventoryAndCoinsFromService(game)) {
         statusMessage = "Failed to load inventory.";
     } else {
         game.setPackRefundCoins(Inventory::getCachedCoins());

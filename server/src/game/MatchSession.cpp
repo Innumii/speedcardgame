@@ -774,44 +774,42 @@ void MatchSession::triggerCardEffects(int playerIndex, int cardId, std::optional
     if (!running.load()) return;
 
     auto effects = TriggerEffects::getCardEffects(cardId);
-    std::cout << "CardID: " << cardId << "\n";
     if (!effects) return;
+    
     for (const auto& entry : *effects) {
         if (entry.trigger != triggerType) continue;
 
         EffectFunc effect = TriggerEffects::getEffectById(entry.effectId);
         if (!effect) continue;
+        // Use a local copy so mutations don't bleed into the next iteration
+        std::optional<int> localTargetIndex = serverTargetIndex;
 
         int targetCardId = -1;
-        if (serverTargetIndex.has_value() && targetLane.has_value()) {
-            int tPlayer = *serverTargetIndex;
+        if (localTargetIndex.has_value() && targetLane.has_value()) { //if there is a targeted zone
+            int tPlayer = *localTargetIndex;
             int tLane   = *targetLane;
             if (tPlayer >= 0 && tPlayer < 2 && tLane >= 0 && tLane < board.laneCount) {
-                if (board.lanes[tPlayer][tLane].has_value()) {
+                if (board.lanes[tPlayer][tLane].has_value()) { //check if the card still exists
                     targetCardId = *board.lanes[tPlayer][tLane];
                 } else {
-                    continue;
+                    // Only skip if there's no explicit target override that would redirect it
+                    if (!entry.target.has_value()) continue;
                 }
             }
         }
         if (!entry.condition(*this, targetCardId,
                              targetLane.value_or(-1),
-                             serverTargetIndex.value_or(-1))) {
+                             localTargetIndex.value_or(-1))) {
             continue;
         }
-        if (entry.target.has_value()) {
+        if (entry.target.has_value()) { //assign target
             switch (*entry.target) {
-                case Target::Self:
-                    serverTargetIndex = playerIndex;
-                    break;
-                case Target::Opponent:
-                    serverTargetIndex = 1 - playerIndex;
-                    break;
-                case Target::Nil:
-                    break;
+                case Target::Self:     localTargetIndex = playerIndex;         break;
+                case Target::Opponent: localTargetIndex = 1 - playerIndex;     break;
+                case Target::Nil:                                               break;
             }
         }
-        effect(*this, playerIndex, targetLane, serverTargetIndex,
+        effect(*this, playerIndex, targetLane, localTargetIndex,
                entry.amount, entry.augment);
     }
 }
