@@ -80,10 +80,13 @@ private:
     // ── Flush control ─────────────────────────────────────────────
     Uint32 lastFlushTick{0};
 
-    static constexpr Uint32 FlushIntervalMs = 5000;      // 5 seconds
+    static constexpr Uint32 FlushIntervalMs = 20000;      // 20 seconds
     static constexpr int CoinFlushThreshold = 200;       // flush if >= 200 coins changed
     static constexpr int InventoryFlushThreshold = 10;   // flush if >= 10 cards added
-
+    
+    std::vector<Uint32> cardRevealTicks; 
+    std::vector<Uint32> cardHoverStartTicks;
+    std::vector<bool>   cardHoverActive; 
 };
 
 #endif

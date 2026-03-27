@@ -46,6 +46,8 @@ void PackOpening::enter(Game& game) {
     lastOpenedCards.clear();
     lastRefundCoins = 0;
     hoveredOpenedCard = -1;
+    cardHoverStartTicks.clear();
+    cardHoverActive.clear();
 
     // Reset pending deltas for this session in PackOpening
     pendingCoinDelta = 0;
@@ -71,7 +73,7 @@ void PackOpening::enter(Game& game) {
 void PackOpening::exit(Game& game) {
     // Nothing to flush if the user never opened a pack, or all packs were
     // pure duplicates (no inventory changes needed).
-    std::cout << "EXIT CALLED\n";
+    // std::cout << "EXIT CALLED\n";
     const bool hasInventoryChanges = !pendingInventoryDelta.empty();
     const bool hasCoinChanges      = (pendingCoinDelta != 0);
 
@@ -124,12 +126,12 @@ void PackOpening::handleEvents(Game& game, const SDL_Event& event) {
         const int y = event.motion.y;
         const bool canOpenPack = game.getPackRefundCoins() >= PackCostCoins;
         backHovered = (x >= backButton.x && x <= backButton.x + backButton.w &&
-                       y >= backButton.y && y <= backButton.y + backButton.h);
+                    y >= backButton.y && y <= backButton.y + backButton.h);
         shopHovered = (x >= shopButton.x && x <= shopButton.x + shopButton.w &&
-                   y >= shopButton.y && y <= shopButton.y + shopButton.h);
+                y >= shopButton.y && y <= shopButton.y + shopButton.h);
         openHovered = (x >= openPackButton.x && x <= openPackButton.x + openPackButton.w &&
-                       y >= openPackButton.y && y <= openPackButton.y + openPackButton.h &&
-                       canOpenPack);
+                    y >= openPackButton.y && y <= openPackButton.y + openPackButton.h &&
+                    canOpenPack);
 
         hoveredOpenedCard = -1;
         if (!lastOpenedCards.empty()) {
@@ -139,33 +141,42 @@ void PackOpening::handleEvents(Game& game, const SDL_Event& event) {
                 SDL_GetRendererOutputSize(renderer, &screenW, &screenH);
             }
 
-            const int sidePad = Theme::PackOpening::CARD_SIDE_PADDING;
-            const int cardGap = Theme::PackOpening::CARD_GAP;
+            const int sidePad  = Theme::PackOpening::CARD_SIDE_PADDING;
+            const int cardGap  = Theme::PackOpening::CARD_GAP;
             const int usableW  = screenW - 2 * sidePad;
             const int cardW    = (usableW - (PackSize - 1) * cardGap) / PackSize;
             const int cardH    = cardW * 3 / 2;
             const int totalW   = PackSize * cardW + (PackSize - 1) * cardGap;
             const int startX   = (screenW - totalW) / 2;
 
-            const int badgeH    = Theme::PackOpening::CARD_BADGE_HEIGHT;
-            const int summaryH  = Theme::PackOpening::SUMMARY_HEIGHT;
+            const int summaryH   = Theme::PackOpening::SUMMARY_HEIGHT;
             const int summaryGap = Theme::PackOpening::SUMMARY_GAP;
-            const int groupH    = summaryH + summaryGap + cardH + Theme::PackOpening::SUMMARY_CARD_GAP + badgeH;
-            const int headerY = Theme::PackOpening::HEADER_Y;
-            const int topClear    = headerY + Theme::PackOpening::HEADER_CLEARANCE;
+            const int badgeH     = Theme::PackOpening::CARD_BADGE_HEIGHT;
+            const int groupH     = summaryH + summaryGap + cardH + Theme::PackOpening::SUMMARY_CARD_GAP + badgeH;
+            const int headerY    = Theme::PackOpening::HEADER_Y;
+            const int topClear   = headerY + Theme::PackOpening::HEADER_CLEARANCE;
             const int bottomClear = backButton.y;
-            const int groupY      = topClear + std::max(0, (bottomClear - topClear - groupH) / 2);
-            const int cardY = groupY + summaryH + summaryGap;
+            const int groupY     = topClear + std::max(0, (bottomClear - topClear - groupH) / 2);
+            const int cardY      = groupY + summaryH + summaryGap;
 
+            // ── First: determine which card (if any) is under the cursor ──────
             for (int i = 0; i < static_cast<int>(lastOpenedCards.size()); ++i) {
-                if (i >= revealedCount) {
-                    break;
-                }
-
+                if (i >= revealedCount) break;
                 const SDL_Rect cardRect{startX + i * (cardW + cardGap), cardY, cardW, cardH};
-                if (x >= cardRect.x && x <= cardRect.x + cardRect.w && y >= cardRect.y && y <= cardRect.y + cardRect.h) {
+                if (x >= cardRect.x && x <= cardRect.x + cardRect.w &&
+                    y >= cardRect.y && y <= cardRect.y + cardRect.h) {
                     hoveredOpenedCard = i;
                     break;
+                }
+            }
+
+            // ── Then: update per-card hover transition state ──────────────────
+            for (int i = 0; i < static_cast<int>(lastOpenedCards.size()); ++i) {
+                if (i >= static_cast<int>(cardHoverActive.size())) break;
+                const bool isHovered = (i == hoveredOpenedCard);
+                if (isHovered != cardHoverActive[i]) {
+                    cardHoverActive[i]     = isHovered;
+                    cardHoverStartTicks[i] = SDL_GetTicks();
                 }
             }
         }
@@ -205,8 +216,14 @@ void PackOpening::update(Game& game) {
     if (!lastOpenedCards.empty() && revealedCount < static_cast<int>(lastOpenedCards.size())) {
         const Uint32 now = SDL_GetTicks();
         const int elapsed = static_cast<int>(now - revealStartTick);
-        revealedCount = std::min(static_cast<int>(lastOpenedCards.size()),
-                                  elapsed / CardRevealIntervalMs + 1);
+        const int newRevealed = std::min(static_cast<int>(lastOpenedCards.size()),
+                                        elapsed / CardRevealIntervalMs + 1);
+        for (int i = revealedCount; i < newRevealed; ++i) {
+            if (i < static_cast<int>(cardRevealTicks.size()) && cardRevealTicks[i] == 0) {
+                cardRevealTicks[i] = now;
+            }
+        }
+        revealedCount = newRevealed;
     }
 
     tryFlush(game);
@@ -220,6 +237,8 @@ void PackOpening::render(Game& game) {
     const auto& availableCards = LoadAvailableCardsUtil::getAvailableCards();
 
     updateLayout(renderer);
+
+    const Uint32 now = SDL_GetTicks();
 
     const auto& uiFonts = game.getUIFonts();
     const auto& titleFonts = game.getTitleFonts();
@@ -307,45 +326,6 @@ void PackOpening::render(Game& game) {
 
     RenderText textRenderer;
 
-    for (int i = 0; i < static_cast<int>(lastOpenedCards.size()); ++i) {
-        const auto& result = lastOpenedCards[i];
-        SDL_Rect cardRect{startX + i * (cardW + cardGap), cardY, cardW, cardH};
-
-        if (i >= revealedCount) {
-            RenderCard::drawCardBack(renderer, cardRect);
-            continue;
-        }
-
-        if (result.cardIndex >= 0 && result.cardIndex < static_cast<int>(availableCards.size()) && availableCards[result.cardIndex]) {
-            RenderCard::drawPreview(renderer, textRenderer, *availableCards[result.cardIndex], cardRect, uiFonts.small, uiFonts.large);
-        } else {
-            RenderCard::drawCardBack(renderer, cardRect);
-        }
-
-        const std::string qtyStr = std::to_string(result.resultingCopies) + "/" + std::to_string(MaxCardCopies);
-        const int chipW = Theme::PackOpening::QTY_CHIP_WIDTH;
-        const int chipH = Theme::PackOpening::QTY_CHIP_HEIGHT;
-        SDL_Rect chip{cardRect.x + cardRect.w - chipW - Theme::PackOpening::QTY_CHIP_MARGIN, cardRect.y + Theme::PackOpening::QTY_CHIP_MARGIN, chipW, chipH};
-        SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
-        SDL_SetRenderDrawColor(renderer, Theme::PackOpening::QTY_CHIP_BG.r,
-                               Theme::PackOpening::QTY_CHIP_BG.g,
-                               Theme::PackOpening::QTY_CHIP_BG.b,
-                               Theme::PackOpening::QTY_CHIP_BG.a);
-        SDL_RenderFillRect(renderer, &chip);
-        SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
-        drawCenteredText(renderer, qtyStr, uiFonts.small, Theme::PackOpening::QTY_TEXT, chip);
-
-        const SDL_Color badgeFill   = result.refunded ? Theme::PackOpening::DUPLICATE_FILL
-                                                       : Theme::PackOpening::NEW_FILL;
-        const std::string badgeLabel = result.refunded
-            ? ("DUPE  +" + std::to_string(RefundCoinsPerExtra) + "c")
-            : "NEW!";
-        SDL_Rect badge{cardRect.x, cardRect.y + cardRect.h + Theme::PackOpening::SUMMARY_CARD_GAP, cardRect.w, badgeH};
-        SDL_SetRenderDrawColor(renderer, badgeFill.r, badgeFill.g, badgeFill.b, 255);
-        SDL_RenderFillRect(renderer, &badge);
-        drawCenteredText(renderer, badgeLabel, uiFonts.small, Theme::PackOpening::BADGE_TEXT, badge);
-    }
-
     // ── Summary panel ─────────────────────────────────────────────────────────
     if (!statusMessage.empty()) {
         SDL_Rect panel{startX, summaryY, totalW, summaryH};
@@ -363,44 +343,115 @@ void PackOpening::render(Game& game) {
         drawCenteredText(renderer, statusMessage, uiFonts.large, Theme::BANNER_BORDER, panel);
     }
 
-    if (hoveredOpenedCard >= 0 && hoveredOpenedCard < revealedCount && hoveredOpenedCard < static_cast<int>(lastOpenedCards.size())) {
-        const OpenedCardResult& hoveredResult = lastOpenedCards[hoveredOpenedCard];
-        if (hoveredResult.cardIndex >= 0 && hoveredResult.cardIndex < static_cast<int>(availableCards.size())) {
-            const std::unique_ptr<Card>& hoveredCard = availableCards[hoveredResult.cardIndex];
-            if (hoveredCard) {
-                const SDL_Rect hoveredRect{
-                    startX + hoveredOpenedCard * (cardW + cardGap),
-                    cardY,
-                    cardW,
-                    cardH
-                };
+    // ── DRAW BADGES FIRST (BACKGROUND LAYER) ──
+    for (int i = 0; i < static_cast<int>(lastOpenedCards.size()); ++i) {
+        if (i >= revealedCount) continue;
 
-                int previewW = static_cast<int>(std::round(cardW * Theme::PackOpening::HOVER_PREVIEW_SCALE));
-                const int maxPreviewW = screenW - (Theme::PackOpening::PREVIEW_MARGIN * 2);
-                previewW = std::min(previewW, maxPreviewW);
-                const int previewH = static_cast<int>(std::round(previewW * Theme::PREVIEW_ASPECT_RATIO));
+        const auto& result = lastOpenedCards[i];
 
-                int previewX = hoveredRect.x + (hoveredRect.w - previewW) / 2;
-                int previewY = hoveredRect.y + (hoveredRect.h - previewH) / 2;
+        SDL_Rect baseRect{
+            startX + i * (cardW + cardGap),
+            cardY,
+            cardW,
+            cardH
+        };
 
-                if (previewX < Theme::PackOpening::PREVIEW_MARGIN) {
-                    previewX = Theme::PackOpening::PREVIEW_MARGIN;
-                }
-                if (previewX + previewW > screenW - Theme::PackOpening::PREVIEW_MARGIN) {
-                    previewX = screenW - Theme::PackOpening::PREVIEW_MARGIN - previewW;
-                }
-                if (previewY < Theme::PackOpening::PREVIEW_MARGIN) {
-                    previewY = Theme::PackOpening::PREVIEW_MARGIN;
-                }
-                if (previewY + previewH > screenH - Theme::PackOpening::PREVIEW_MARGIN) {
-                    previewY = screenH - Theme::PackOpening::PREVIEW_MARGIN - previewH;
-                }
+        const SDL_Color badgeFill = result.refunded
+            ? Theme::PackOpening::DUPLICATE_FILL
+            : Theme::PackOpening::NEW_FILL;
 
-                const SDL_Rect previewRect{previewX, previewY, previewW, previewH};
-                RenderCard::drawPreview(renderer, textRenderer, *hoveredCard, previewRect, uiFonts.large, titleFonts.medium);
+        const std::string badgeLabel = result.refunded
+            ? ("DUPE  +" + std::to_string(RefundCoinsPerExtra) + "c")
+            : "NEW!";
+
+        SDL_Rect badge{
+            baseRect.x,
+            baseRect.y + baseRect.h + Theme::PackOpening::SUMMARY_CARD_GAP,
+            baseRect.w,
+            badgeH
+        };
+
+        SDL_SetRenderDrawColor(renderer, badgeFill.r, badgeFill.g, badgeFill.b, 255);
+        SDL_RenderFillRect(renderer, &badge);
+
+        drawCenteredText(renderer, badgeLabel, uiFonts.small, Theme::PackOpening::BADGE_TEXT, badge);
+    }
+
+    for (int i = 0; i < static_cast<int>(lastOpenedCards.size()); ++i) {
+        const auto& result = lastOpenedCards[i];
+        SDL_Rect baseRect{startX + i * (cardW + cardGap), cardY, cardW, cardH};
+        SDL_Rect cardRect = baseRect;
+        if (i >= revealedCount) {
+            RenderCard::drawCardBack(renderer, cardRect);
+            continue;
+        }
+
+        constexpr Uint32  popDurationMs    = 320U;
+        constexpr float   popPeakScale     = 1.18F;
+        constexpr Uint32  hoverTransMs     = 150U;
+        constexpr float   hoverTargetScale = 1.12F;
+
+        float cardScale = 1.0F;
+
+        // ── Pop animation (on reveal) ─────────────────────────────────────
+        if (i < static_cast<int>(cardRevealTicks.size()) && cardRevealTicks[i] != 0) {
+            const Uint32 popElapsed = now - cardRevealTicks[i];
+            if (popElapsed < popDurationMs) {
+                const float t     = static_cast<float>(popElapsed) / static_cast<float>(popDurationMs);
+                const float eased = 1.0F - (1.0F - t) * (1.0F - t);
+                cardScale = popPeakScale - (popPeakScale - 1.0F) * eased;
             }
         }
+
+        // ── Hover scale transition (blended on top of pop if both active) ─
+        if (i < static_cast<int>(cardHoverActive.size())) {
+            const bool   hovered  = cardHoverActive[i];
+            const Uint32 hoverTick = (i < static_cast<int>(cardHoverStartTicks.size()))
+                                    ? cardHoverStartTicks[i] : 0;
+            const float  elapsed   = static_cast<float>(now - hoverTick);
+            const float  t         = std::min(1.0F, elapsed / static_cast<float>(hoverTransMs));
+            const float  eased     = t * t * (3.0F - 2.0F * t); // smoothstep
+            const float  hoverScale = hovered
+                ? (1.0F + (hoverTargetScale - 1.0F) * eased)       // ease in to enlarged
+                : (hoverTargetScale - (hoverTargetScale - 1.0F) * eased); // ease out to normal
+            cardScale = std::max(cardScale, hoverScale);
+        }
+
+        if (cardScale != 1.0F) {
+            const int scaledW = static_cast<int>(cardW * cardScale);
+            const int scaledH = static_cast<int>(cardH * cardScale);
+            cardRect = {
+                cardRect.x + (cardRect.w - scaledW) / 2,
+                cardRect.y + (cardRect.h - scaledH) / 2,
+                scaledW,
+                scaledH
+            };
+        }
+
+        if (result.cardIndex >= 0 && result.cardIndex < static_cast<int>(availableCards.size()) && availableCards[result.cardIndex]) {
+            RenderCard::drawPreview(renderer, textRenderer, *availableCards[result.cardIndex], cardRect, uiFonts.small, uiFonts.large);
+        } else {
+            RenderCard::drawCardBack(renderer, cardRect);
+        }
+
+        const std::string qtyStr = std::to_string(result.resultingCopies) + "/" + std::to_string(MaxCardCopies);
+        const int chipW = Theme::PackOpening::QTY_CHIP_WIDTH;
+        const int chipH = Theme::PackOpening::QTY_CHIP_HEIGHT;
+        SDL_Rect chip{baseRect.x + baseRect.w - chipW - Theme::PackOpening::QTY_CHIP_MARGIN,
+                    baseRect.y + Theme::PackOpening::QTY_CHIP_MARGIN,
+                    chipW, chipH};
+                      SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+        SDL_SetRenderDrawColor(renderer, Theme::PackOpening::QTY_CHIP_BG.r,
+                               Theme::PackOpening::QTY_CHIP_BG.g,
+                               Theme::PackOpening::QTY_CHIP_BG.b,
+                               Theme::PackOpening::QTY_CHIP_BG.a);
+        SDL_RenderFillRect(renderer, &chip);
+        SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
+        drawCenteredText(renderer, qtyStr, uiFonts.small, Theme::PackOpening::QTY_TEXT, chip);
+
     }
+
+
 }
 
 // ── Layout ───────────────────────────────────────────────────────────────────
@@ -516,6 +567,9 @@ void PackOpening::openPack(Game& game) {
     lastRefundCoins = refundCoins;
     revealedCount = 0;
     revealStartTick = SDL_GetTicks();
+    cardRevealTicks.assign(PackSize, 0);
+    cardHoverStartTicks.assign(PackSize, 0);
+    cardHoverActive.assign(PackSize, false);
     hoveredOpenedCard = -1;
 
     int cardsAdded = 0;
