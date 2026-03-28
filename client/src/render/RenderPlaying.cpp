@@ -27,6 +27,7 @@
 #include <iostream>
 #include <animation/SummonAnimation.hpp>
 #include <animation/AttackAnimation.hpp>
+#include <core/Audio.hpp>
 
 // Reference resolution the Theme pixel constants were authored for.
 static constexpr float kRefW = 1200.0F;
@@ -664,6 +665,7 @@ void RenderPlaying::render(Playing& playing, const Game& game) {
 	//Currently, game end does NOT mean disconnect from server. They are still in the server.
 	// ── Game End Screen ─────────────────────────────────────────────────────────
 	if (playing.getState() != PlayingGameState::Playing) {
+		Audio::stopMusic();
 		std::string msg = "Defeat";
 		int coinReward = playing.getCoinReward();
 		if (playing.getState() == PlayingGameState::Won) {
