@@ -234,7 +234,7 @@ void Register::update(Game& game) {
 
 // ── render ────────────────────────────────────────────────────────────────────
 
-void Register::render(const Game& game) {
+void Register::render(Game& game) {
     SDL_Renderer*              renderer   = game.getRenderer();
     const RenderText::FontSet& titleFonts = game.getTitleFonts();
     const RenderText::FontSet& uiFonts    = game.getUIFonts();

@@ -1,0 +1,229 @@
+definitions:
+  dtos.ChangePasswordDTO:
+    properties:
+      newPassword:
+        minLength: 8
+        type: string
+      oldPassword:
+        type: string
+    required:
+    - newPassword
+    - oldPassword
+    type: object
+  dtos.ConfirmPasswordResetDTO:
+    properties:
+      email:
+        type: string
+      newPassword:
+        minLength: 8
+        type: string
+      token:
+        type: string
+    required:
+    - email
+    - newPassword
+    - token
+    type: object
+  dtos.LoginDTO:
+    properties:
+      email:
+        type: string
+      password:
+        type: string
+    required:
+    - email
+    - password
+    type: object
+  dtos.RegisterDTO:
+    properties:
+      email:
+        type: string
+      name:
+        maxLength: 50
+        minLength: 3
+        type: string
+      password:
+        minLength: 8
+        type: string
+    required:
+    - email
+    - name
+    - password
+    type: object
+  dtos.RequestPasswordResetDTO:
+    properties:
+      email:
+        type: string
+    required:
+    - email
+    type: object
+  models.User:
+    properties:
+      createdAt:
+        type: string
+      email:
+        type: string
+      id:
+        type: integer
+      name:
+        type: string
+      password:
+        type: string
+      passwordResetExpiry:
+        type: string
+      resetPasswordToken:
+        type: string
+      role:
+        type: string
+      updatedAt:
+        type: string
+    type: object
+info:
+  contact: {}
+paths:
+  /change-password:
+    patch:
+      consumes:
+      - application/json
+      parameters:
+      - description: Change password
+        in: body
+        name: changePasswordDto
+        required: true
+        schema:
+          $ref: '#/definitions/dtos.ChangePasswordDTO'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+        "400":
+          description: Bad Request
+        "401":
+          description: Unauthorized
+        "500":
+          description: Internal Server Error
+      summary: Change password with old password
+      tags:
+      - users
+  /login:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Login details
+        in: body
+        name: loginDTO
+        required: true
+        schema:
+          $ref: '#/definitions/dtos.LoginDTO'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+        "401":
+          description: Unauthorized
+      summary: Login user
+      tags:
+      - users
+  /logout:
+    post:
+      consumes:
+      - application/json
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+        "401":
+          description: Unauthorized
+        "500":
+          description: Internal Server Error
+      summary: Logout user
+      tags:
+      - users
+  /me:
+    get:
+      consumes:
+      - application/json
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.User'
+        "401":
+          description: Unauthorized
+      summary: Get logged in user info using session id cookie
+      tags:
+      - users
+  /register:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Registration details
+        in: body
+        name: registerDTO
+        required: true
+        schema:
+          $ref: '#/definitions/dtos.RegisterDTO'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+        "400":
+          description: Bad Request
+      summary: Register user
+      tags:
+      - users
+  /reset-password:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Request password reset
+        in: body
+        name: requestPasswordResetDTO
+        required: true
+        schema:
+          $ref: '#/definitions/dtos.RequestPasswordResetDTO'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+        "400":
+          description: Bad Request
+        "500":
+          description: Internal Server Error
+      summary: Reset password request
+      tags:
+      - users
+  /reset-password/confirm:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Confirm password reset
+        in: body
+        name: confirmPasswordResetDTO
+        required: true
+        schema:
+          $ref: '#/definitions/dtos.ConfirmPasswordResetDTO'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+        "400":
+          description: Bad Request
+        "500":
+          description: Internal Server Error
+      summary: Reset password request
+      tags:
+      - users
+swagger: "2.0"

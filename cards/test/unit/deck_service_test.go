@@ -2,6 +2,7 @@ package services_test
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -370,5 +371,129 @@ func TestFillDecksFromInventories_AllCardsQueryFails(t *testing.T) {
 	sqlDB.Close()
 	if err := cardservices.FillDecksFromInventories(db); err == nil {
 		t.Error("expected error when allCards query fails")
+	}
+}
+
+func TestCreateDeck_DeleteExistingError(t *testing.T) {
+	t.Setenv("DECK_SIZE", "3")
+	db := setupTestDB(t)
+	db.Create(&models.Deck{Uid: 1, Cards: models.CardCounts{1: 1, 2: 1, 3: 1}})
+	if err := db.Callback().Delete().Before("gorm:delete").Register("force_delete_error", func(tx *gorm.DB) {
+		tx.AddError(errors.New("forced delete error"))
+	}); err != nil {
+		t.Fatalf("failed to register callback: %v", err)
+	}
+	t.Cleanup(func() {
+		_ = db.Callback().Delete().Remove("force_delete_error")
+	})
+
+	rr := httptest.NewRecorder()
+	cardservices.CreateDeck(rr, jsonRequest(t, http.MethodPost, "/decks", map[string]interface{}{"uid": 1, "cards": map[string]int{"4": 1, "5": 1, "6": 1}}))
+	if rr.Code != http.StatusInternalServerError {
+		t.Fatalf("expected 500, got %d", rr.Code)
+	}
+}
+
+func TestFillDeckForUser_DeleteDeckError(t *testing.T) {
+	t.Setenv("DECK_SIZE", "3")
+	db := setupTestDB(t)
+	seedCards(t, db, []models.Card{{Cid: 1}, {Cid: 2}, {Cid: 3}})
+	seedInventory(t, db, models.Inventory{Uid: 1, Cards: models.CardCounts{1: 2, 2: 1}})
+	if err := db.Callback().Delete().Before("gorm:delete").Register("force_delete_error", func(tx *gorm.DB) {
+		tx.AddError(errors.New("forced delete error"))
+	}); err != nil {
+		t.Fatalf("failed to register callback: %v", err)
+	}
+	t.Cleanup(func() {
+		_ = db.Callback().Delete().Remove("force_delete_error")
+	})
+
+	rr := httptest.NewRecorder()
+	cardservices.FillDeckForUser(rr, jsonRequest(t, http.MethodPost, "/decks/fill", map[string]interface{}{"uid": 1}))
+	if rr.Code != http.StatusInternalServerError {
+		t.Fatalf("expected 500, got %d", rr.Code)
+	}
+}
+
+func TestFillDeckForUser_CreateDeckError(t *testing.T) {
+	t.Setenv("DECK_SIZE", "3")
+	db := setupTestDB(t)
+	seedCards(t, db, []models.Card{{Cid: 1}, {Cid: 2}, {Cid: 3}})
+	seedInventory(t, db, models.Inventory{Uid: 1, Cards: models.CardCounts{1: 2, 2: 1}})
+	if err := db.Callback().Create().Before("gorm:create").Register("force_create_error", func(tx *gorm.DB) {
+		tx.AddError(errors.New("forced create error"))
+	}); err != nil {
+		t.Fatalf("failed to register callback: %v", err)
+	}
+	t.Cleanup(func() {
+		_ = db.Callback().Create().Remove("force_create_error")
+	})
+
+	rr := httptest.NewRecorder()
+	cardservices.FillDeckForUser(rr, jsonRequest(t, http.MethodPost, "/decks/fill", map[string]interface{}{"uid": 1}))
+	if rr.Code != http.StatusInternalServerError {
+		t.Fatalf("expected 500, got %d", rr.Code)
+	}
+}
+
+func TestFillDeckForUser_EncodeError(t *testing.T) {
+	t.Setenv("DECK_SIZE", "3")
+	db := setupTestDB(t)
+	seedCards(t, db, []models.Card{{Cid: 1}, {Cid: 2}, {Cid: 3}})
+	seedInventory(t, db, models.Inventory{Uid: 1, Cards: models.CardCounts{1: 2, 2: 1}})
+
+	fw := &failingResponseWriter{}
+	cardservices.FillDeckForUser(fw, jsonRequest(t, http.MethodPost, "/decks/fill", map[string]interface{}{"uid": 1}))
+	if fw.status != http.StatusInternalServerError {
+		t.Fatalf("expected 500, got %d", fw.status)
+	}
+}
+
+func TestFillDecksFromInventories_SkipsExistingDeck(t *testing.T) {
+	t.Setenv("DECK_SIZE", "3")
+	db := setupTestDB(t)
+	seedCards(t, db, []models.Card{{Cid: 1}, {Cid: 2}, {Cid: 3}})
+	seedInventory(t, db, models.Inventory{Uid: 1, Cards: models.CardCounts{1: 2}})
+	db.Create(&models.Deck{Uid: 1, Cards: models.CardCounts{9: 3}})
+
+	if err := cardservices.FillDecksFromInventories(db); err != nil {
+		t.Fatalf("expected no error, got: %v", err)
+	}
+
+	var deck models.Deck
+	if err := db.Where("uid = ?", 1).First(&deck).Error; err != nil {
+		t.Fatalf("failed to load deck: %v", err)
+	}
+	if _, ok := deck.Cards[9]; !ok {
+		t.Fatalf("expected existing deck to be kept")
+	}
+}
+
+func TestFillDecksFromInventories_CreateError(t *testing.T) {
+	t.Setenv("DECK_SIZE", "3")
+	db := setupTestDB(t)
+	seedCards(t, db, []models.Card{{Cid: 1}, {Cid: 2}, {Cid: 3}})
+	seedInventory(t, db, models.Inventory{Uid: 1, Cards: models.CardCounts{1: 2}})
+	if err := db.Callback().Create().Before("gorm:create").Register("force_create_error", func(tx *gorm.DB) {
+		tx.AddError(errors.New("forced create error"))
+	}); err != nil {
+		t.Fatalf("failed to register callback: %v", err)
+	}
+	t.Cleanup(func() {
+		_ = db.Callback().Create().Remove("force_create_error")
+	})
+
+	if err := cardservices.FillDecksFromInventories(db); err == nil {
+		t.Fatal("expected error, got nil")
+	}
+}
+
+func TestGetDeckByUserID_EncodeError(t *testing.T) {
+	db := setupTestDB(t)
+	db.Create(&models.Deck{Uid: 1, Cards: models.CardCounts{1: 2}})
+	fw := &failingResponseWriter{}
+	cardservices.GetDeckByUserID(fw, withChiParam(httptest.NewRequest(http.MethodGet, "/decks/1", nil), "uid", "1"))
+	if fw.status != http.StatusInternalServerError {
+		t.Fatalf("expected 500, got %d", fw.status)
 	}
 }

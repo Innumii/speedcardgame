@@ -3,12 +3,14 @@ package services_test
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
 	"github.com/Ryanljk/speedcardgame/cards/models"
 	cardservices "github.com/Ryanljk/speedcardgame/cards/services"
+	"gorm.io/gorm"
 )
 
 func TestCreateCard_Success(t *testing.T) {
@@ -83,8 +85,8 @@ func TestListCards_OrderedByCid(t *testing.T) {
 	cardservices.ListCards(rr, httptest.NewRequest(http.MethodGet, "/cards", nil))
 	var cards []models.Card
 	if err := json.NewDecoder(rr.Body).Decode(&cards); err != nil {
-    t.Fatalf("failed to decode response: %v", err)
-}
+		t.Fatalf("failed to decode response: %v", err)
+	}
 	for i := 1; i < len(cards); i++ {
 		if cards[i].Cid < cards[i-1].Cid {
 			t.Errorf("cards not ordered by cid")
@@ -111,8 +113,8 @@ func TestUpdateCard_Success(t *testing.T) {
 	}
 	var card models.Card
 	if err := json.NewDecoder(rr.Body).Decode(&card); err != nil {
-    t.Fatalf("failed to decode response: %v", err)
-}
+		t.Fatalf("failed to decode response: %v", err)
+	}
 	if card.Name != "New" {
 		t.Errorf("expected 'New', got %q", card.Name)
 	}
@@ -129,8 +131,8 @@ func TestUpdateCard_UpdateType(t *testing.T) {
 	}
 	var card models.Card
 	if err := json.NewDecoder(rr.Body).Decode(&card); err != nil {
-    t.Fatalf("failed to decode response: %v", err)
-}
+		t.Fatalf("failed to decode response: %v", err)
+	}
 	if card.Type != "NewType" {
 		t.Errorf("expected 'NewType', got %q", card.Type)
 	}
@@ -162,6 +164,103 @@ func TestUpdateCard_CostBranchAlwaysHit(t *testing.T) {
 	cardservices.UpdateCard(rr, jsonRequest(t, http.MethodPut, "/cards", map[string]interface{}{"cid": 1}))
 	if rr.Code != http.StatusOK {
 		t.Errorf("expected 200, got %d", rr.Code)
+	}
+}
+
+func TestUpdateCard_UpdateValueBranch(t *testing.T) {
+	db := setupTestDB(t)
+	seedCards(t, db, []models.Card{{Cid: 1, Name: "Card", Value: 1}})
+	rr := httptest.NewRecorder()
+	cardservices.UpdateCard(rr, jsonRequest(t, http.MethodPut, "/cards", map[string]interface{}{"cid": 1, "name": "", "type": "", "cost": -2, "value": 7}))
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rr.Code, rr.Body.String())
+	}
+	var card models.Card
+	if err := json.NewDecoder(rr.Body).Decode(&card); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+	if card.Value != 7 {
+		t.Errorf("expected value 7, got %d", card.Value)
+	}
+}
+
+func TestUpdateCard_UpdatePowerBranch(t *testing.T) {
+	db := setupTestDB(t)
+	seedCards(t, db, []models.Card{{Cid: 1, Name: "Card", Power: 1}})
+	rr := httptest.NewRecorder()
+	cardservices.UpdateCard(rr, jsonRequest(t, http.MethodPut, "/cards", map[string]interface{}{"cid": 1, "name": "", "type": "", "cost": -2, "value": -2, "power": 9}))
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", rr.Code)
+	}
+	var card models.Card
+	if err := json.NewDecoder(rr.Body).Decode(&card); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+	if card.Power != 9 {
+		t.Errorf("expected power 9, got %d", card.Power)
+	}
+}
+
+func TestUpdateCard_UpdateToughnessBranch(t *testing.T) {
+	db := setupTestDB(t)
+	seedCards(t, db, []models.Card{{Cid: 1, Name: "Card", Toughness: 1}})
+	rr := httptest.NewRecorder()
+	cardservices.UpdateCard(rr, jsonRequest(t, http.MethodPut, "/cards", map[string]interface{}{"cid": 1, "name": "", "type": "", "cost": -2, "value": -2, "power": -2, "toughness": 11}))
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", rr.Code)
+	}
+	var card models.Card
+	if err := json.NewDecoder(rr.Body).Decode(&card); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+	if card.Toughness != 11 {
+		t.Errorf("expected toughness 11, got %d", card.Toughness)
+	}
+}
+
+func TestUpdateCard_UpdateEffectBranch(t *testing.T) {
+	db := setupTestDB(t)
+	seedCards(t, db, []models.Card{{Cid: 1, Name: "Card", Effect: "old"}})
+	rr := httptest.NewRecorder()
+	cardservices.UpdateCard(rr, jsonRequest(t, http.MethodPut, "/cards", map[string]interface{}{"cid": 1, "name": "", "type": "", "cost": -2, "value": -2, "power": -2, "toughness": -2, "effect": "new"}))
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", rr.Code)
+	}
+	var card models.Card
+	if err := json.NewDecoder(rr.Body).Decode(&card); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+	if card.Effect != "new" {
+		t.Errorf("expected effect 'new', got %q", card.Effect)
+	}
+}
+
+func TestUpdateCard_NoValidFields(t *testing.T) {
+	db := setupTestDB(t)
+	seedCards(t, db, []models.Card{{Cid: 1, Name: "Card"}})
+	rr := httptest.NewRecorder()
+	cardservices.UpdateCard(rr, jsonRequest(t, http.MethodPut, "/cards", map[string]interface{}{"cid": 1, "name": "", "type": "", "cost": -2, "value": -2, "power": -2, "toughness": -2, "effect": ""}))
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d", rr.Code)
+	}
+}
+
+func TestUpdateCard_SaveError(t *testing.T) {
+	db := setupTestDB(t)
+	seedCards(t, db, []models.Card{{Cid: 1, Name: "Old"}})
+	if err := db.Callback().Update().Before("gorm:update").Register("force_update_error", func(tx *gorm.DB) {
+		tx.AddError(errors.New("forced update error"))
+	}); err != nil {
+		t.Fatalf("failed to register callback: %v", err)
+	}
+	t.Cleanup(func() {
+		_ = db.Callback().Update().Remove("force_update_error")
+	})
+
+	rr := httptest.NewRecorder()
+	cardservices.UpdateCard(rr, jsonRequest(t, http.MethodPut, "/cards", map[string]interface{}{"cid": 1, "name": "New"}))
+	if rr.Code != http.StatusInternalServerError {
+		t.Fatalf("expected 500, got %d", rr.Code)
 	}
 }
 
@@ -231,5 +330,50 @@ func TestDeleteCard_DBError(t *testing.T) {
 	cardservices.DeleteCard(rr, jsonRequest(t, http.MethodDelete, "/cards", map[string]interface{}{"cid": 1}))
 	if rr.Code != http.StatusNotFound {
 		t.Errorf("expected 404, got %d", rr.Code)
+	}
+}
+
+func TestDeleteCard_DeleteError(t *testing.T) {
+	db := setupTestDB(t)
+	seedCards(t, db, []models.Card{{Cid: 1, Name: "Del"}})
+	if err := db.Callback().Delete().Before("gorm:delete").Register("force_delete_error", func(tx *gorm.DB) {
+		tx.AddError(errors.New("forced delete error"))
+	}); err != nil {
+		t.Fatalf("failed to register callback: %v", err)
+	}
+	t.Cleanup(func() {
+		_ = db.Callback().Delete().Remove("force_delete_error")
+	})
+
+	rr := httptest.NewRecorder()
+	cardservices.DeleteCard(rr, jsonRequest(t, http.MethodDelete, "/cards", map[string]interface{}{"cid": 1}))
+	if rr.Code != http.StatusInternalServerError {
+		t.Fatalf("expected 500, got %d", rr.Code)
+	}
+}
+
+func TestGetCardCount_Success(t *testing.T) {
+	db := setupTestDB(t)
+	seedCards(t, db, []models.Card{{Cid: 1, Name: "A"}, {Cid: 2, Name: "B"}})
+	rr := httptest.NewRecorder()
+	cardservices.GetCardCount(rr, httptest.NewRequest(http.MethodGet, "/cards/count", nil))
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", rr.Code)
+	}
+	var payload map[string]int64
+	if err := json.NewDecoder(rr.Body).Decode(&payload); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+	if payload["count"] != 2 {
+		t.Errorf("expected count 2, got %d", payload["count"])
+	}
+}
+
+func TestGetCardCount_DBError(t *testing.T) {
+	setupBrokenDB(t)
+	rr := httptest.NewRecorder()
+	cardservices.GetCardCount(rr, httptest.NewRequest(http.MethodGet, "/cards/count", nil))
+	if rr.Code != http.StatusInternalServerError {
+		t.Fatalf("expected 500, got %d", rr.Code)
 	}
 }

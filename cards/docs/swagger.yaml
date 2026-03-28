@@ -1,0 +1,333 @@
+definitions:
+  models.CardCounts:
+    additionalProperties:
+      type: integer
+    type: object
+  models.Deck:
+    properties:
+      cards:
+        allOf:
+        - $ref: '#/definitions/models.CardCounts'
+        description: Map of card ID to quantity
+      uid:
+        type: integer
+    type: object
+  models.Inventory:
+    properties:
+      cards:
+        allOf:
+        - $ref: '#/definitions/models.CardCounts'
+        description: Map of card ID to quantity
+      coins:
+        description: User's coin balance
+        type: integer
+      uid:
+        type: integer
+    type: object
+info:
+  contact: {}
+paths:
+  /decks:
+    delete:
+      consumes:
+      - application/json
+      description: Deletes a deck by user ID
+      parameters:
+      - description: User ID
+        in: body
+        name: body
+        required: true
+        schema:
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Invalid input
+          schema:
+            type: string
+        "500":
+          description: Failed to delete deck
+          schema:
+            type: string
+      summary: Delete a deck
+      tags:
+      - decks
+    get:
+      description: Returns all decks for all users
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.Deck'
+            type: array
+        "500":
+          description: Failed to retrieve decks
+          schema:
+            type: string
+      summary: List all decks
+      tags:
+      - decks
+    post:
+      consumes:
+      - application/json
+      description: Creates a new deck for a user. Replaces existing deck. Must contain
+        exactly DECK_SIZE cards (default 30).
+      parameters:
+      - description: Deck details
+        in: body
+        name: body
+        required: true
+        schema:
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Deck'
+        "400":
+          description: Invalid input or wrong deck size
+          schema:
+            type: string
+        "500":
+          description: Failed to create deck
+          schema:
+            type: string
+      summary: Create a deck
+      tags:
+      - decks
+  /decks/{uid}:
+    get:
+      description: Returns a user's current deck
+      parameters:
+      - description: User ID
+        in: path
+        name: uid
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Deck'
+        "400":
+          description: Invalid user ID
+          schema:
+            type: string
+        "404":
+          description: Deck not found
+          schema:
+            type: string
+      summary: Get deck by user ID
+      tags:
+      - decks
+  /decks/fill:
+    post:
+      consumes:
+      - application/json
+      description: Automatically fills a deck for a user based on their inventory
+      parameters:
+      - description: User ID
+        in: body
+        name: body
+        required: true
+        schema:
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Deck'
+        "400":
+          description: Invalid input
+          schema:
+            type: string
+        "404":
+          description: Inventory not found
+          schema:
+            type: string
+        "500":
+          description: Failed to fill deck
+          schema:
+            type: string
+      summary: Fill deck from inventory
+      tags:
+      - decks
+  /inventories:
+    get:
+      description: Returns all user inventories. Card quantities normalized on read.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.Inventory'
+            type: array
+        "500":
+          description: Failed to retrieve inventories
+          schema:
+            type: string
+      summary: List all inventories
+      tags:
+      - inventories
+    post:
+      consumes:
+      - application/json
+      description: Creates a new inventory for a user. If no cards provided, assigns
+        default starter cards and 1000 coins.
+      parameters:
+      - description: User ID and optional cards
+        in: body
+        name: body
+        required: true
+        schema:
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Inventory'
+        "400":
+          description: Invalid input
+          schema:
+            type: string
+        "500":
+          description: Failed to create inventory
+          schema:
+            type: string
+      summary: Create inventory
+      tags:
+      - inventories
+    put:
+      consumes:
+      - application/json
+      description: Adds cards to a user's inventory. Max 4 copies per card.
+      parameters:
+      - description: User ID and cards to add
+        in: body
+        name: body
+        required: true
+        schema:
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Inventory'
+        "400":
+          description: Invalid input
+          schema:
+            type: string
+        "500":
+          description: Failed to update inventory
+          schema:
+            type: string
+      summary: Update inventory cards
+      tags:
+      - inventories
+  /inventories/{uid}:
+    get:
+      description: Returns a specific user's inventory. Card quantities normalized
+        on read.
+      parameters:
+      - description: User ID
+        in: path
+        name: uid
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Inventory'
+        "400":
+          description: Missing uid
+          schema:
+            type: string
+        "500":
+          description: Failed to retrieve inventory
+          schema:
+            type: string
+      summary: Get inventory by user ID
+      tags:
+      - inventories
+  /inventories/coins:
+    put:
+      consumes:
+      - application/json
+      description: Sets a user's coin balance to an exact value
+      parameters:
+      - description: User ID and coin amount
+        in: body
+        name: body
+        required: true
+        schema:
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+        "400":
+          description: Invalid input
+          schema:
+            type: string
+        "500":
+          description: Failed to update coins
+          schema:
+            type: string
+      summary: Set inventory coins
+      tags:
+      - inventories
+  /inventories/coins/add:
+    put:
+      consumes:
+      - application/json
+      description: Adds or subtracts coins from a user's balance
+      parameters:
+      - description: User ID and coins to add
+        in: body
+        name: body
+        required: true
+        schema:
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+        "400":
+          description: Invalid input
+          schema:
+            type: string
+        "500":
+          description: Failed to add coins
+          schema:
+            type: string
+      summary: Add coins to inventory
+      tags:
+      - inventories
+swagger: "2.0"

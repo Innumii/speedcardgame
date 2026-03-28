@@ -7,18 +7,19 @@
 #include <unordered_map>
 #include <vector>
 
+#include "StateInterface.hpp"
 #include "render/Theme.hpp"
 #include "core/GameState.hpp"
 class Game;
 class Card;
 
-class PackOpening {
+class PackOpening : public StateInterface {
 public:
-    void enter(Game& game);
-    void handleEvents(Game& game, const SDL_Event& event);
-    void update(Game& game);
-    void render(Game& game);
-    void exit(Game& game);
+    void enter(Game& game) override;
+    void handleEvents(Game& game, const SDL_Event& event) override;
+    void update(Game& game) override;
+    void render(Game& game) override;
+    void exit(Game& game) override;
     void leaveState(Game& game, GameState next);
 
     void tryFlush(Game& game);

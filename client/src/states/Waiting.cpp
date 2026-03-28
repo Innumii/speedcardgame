@@ -173,7 +173,7 @@ void Waiting::update(Game& game) {
     }
 }
 
-void Waiting::render(const Game& game) {
+void Waiting::render(Game& game) {
     SDL_Renderer* renderer = game.getRenderer();
     if (!renderer) return;
 

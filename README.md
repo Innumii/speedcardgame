@@ -67,59 +67,106 @@ The `auth` and `cards` services support runtime logging toggles through environm
 
 These vars work in local `docker-compose` and deployed ECS tasks (via Terraform).
 
-## Unit tests
+## Testing
+
+### Unit Tests
+
 #### Auth
-```bash 
+```bash
 cd auth
+go get github.com/alicebob/miniredis/v2 && go mod tidy  # first time only
+go test ./test/unit/... -p=1 -count=1 -v
 ```
-1. Install dependencies (first time run)
-   ```bash
-   go get github.com/alicebob/miniredis/v2
-   go mod tidy
-   ```
-2. Run all unit tests
+
+With coverage:
 ```bash
-go test ./test/... -p=1 -count=1 -v
-```
-3. Run all tests with coverage
-```bash
-go test ./test/... -p=1 -count=1 -coverprofile=coverage.out -coverpkg=github.com/Ryanljk/speedcardgame/auth/services/...
-```
-4. View coverage summary
-```bash
-go tool cover -func=coverage.out
-```
-5. View coverage as HTML report
-```bash
-go tool cover -html=coverage.out -o coverage.html
+go test ./test/unit/... -p=1 -count=1 -coverprofile=coverage.out -coverpkg=github.com/Ryanljk/speedcardgame/auth/services/...
+go tool cover -func=coverage.out       # summary
+go tool cover -html=coverage.out -o coverage.html  # HTML report
 ```
 
 #### Cards
-```bash 
+```bash
 cd cards
+go get gorm.io/driver/sqlite github.com/mattn/go-sqlite3 && go mod tidy  # first time only
+go test ./test/unit/... -p=1 -count=1 -v
 ```
-1. Install dependencies (first time run)
+
+With coverage:
 ```bash
-go get gorm.io/driver/sqlite
-go get github.com/mattn/go-sqlite3
-go mod tidy
-```
-2. Run all unit tests
-```bash
-go test ./test/... -p=1 -count=1 -v
-```
-3. Run all tests with coverage
-```bash
-go test ./test/... -p=1 -count=1 -coverprofile=coverage.out -coverpkg=github.com/Ryanljk/speedcardgame/cards/services/...
-```
-4. View coverage summary
-```bash
+go test ./test/unit/... -p=1 -count=1 -coverprofile=coverage.out -coverpkg=github.com/Ryanljk/speedcardgame/cards/services/...
 go tool cover -func=coverage.out
-```
-5. View coverage as HTML report
-```bash
 go tool cover -html=coverage.out -o coverage.html
 ```
 
+---
+
+### Integration Tests
+
+Requires Docker Compose running first:
+```bash
+docker-compose up -d auth-db auth-redis cards-db
+```
+
+#### Auth
+```bash
+cd auth
+go test ./test/integration/... -v -tags=integration -p=1 -count=1
+```
+
+#### Cards
+```bash
+cd cards
+go test ./test/integration/... -v -tags=integration -p=1 -count=1
+```
+
+> **Note:** Integration tests connect to real Postgres and Redis instances. Make sure your `.env` file is present in both `auth/` and `cards/` before running.
+## Swagger Documentation
+
+### Prerequisites
+- [swag CLI](https://github.com/swaggo/swag) installed globally:
+```bash
+  go install github.com/swaggo/swag/cmd/swag@latest
+```
+
+---
+
+### Generating the Docs
+
+Run this whenever you update any Swagger annotations:
+```bash
+# Auth
+cd auth
+swag init --parseDependency --parseInternal
+
+# Cards
+cd cards
+swag init --parseDependency --parseInternal
+```
+
+This generates/updates the `docs/` folder in each service.
+
+---
+
+### Viewing the Docs
+
+Start the services:
+```bash
+docker-compose up auth cards
+```
+
+Then open in your browser:
+
+| Service | URL |
+|---------|-----|
+| Auth    | http://localhost:8081/swagger/index.html |
+| Cards   | http://localhost:8082/cards/swagger/index.html |
+
+---
+
+### Notes
+- The `docs/` folder is auto-generated — do not edit it manually
+- Re-run `swag init` after adding or changing any `@Summary`, `@Router` or other Swagger annotations
+- The `docs/` folder should be committed to version control so the app builds correctly in Docker
 
 

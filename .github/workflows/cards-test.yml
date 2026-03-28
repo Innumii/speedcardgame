@@ -54,12 +54,13 @@ jobs:
           path: cards/coverage.html
           retention-days: 14
 
-      - name: Enforce minimum coverage (75%)
+      - name: Enforce minimum coverage (90%)
         working-directory: cards
         run: |
+          MIN_COVERAGE=90
           COVERAGE=$(go tool cover -func=coverage.out | grep total | awk '{print $3}' | tr -d '%')
           echo "Total coverage: ${COVERAGE}%"
-          if (( $(echo "$COVERAGE < 75" | bc -l) )); then
-            echo "Coverage ${COVERAGE}% is below the 75% threshold"
+          if (( $(echo "$COVERAGE < $MIN_COVERAGE" | bc -l) )); then
+            echo "Coverage ${COVERAGE}% is below the ${MIN_COVERAGE}% threshold"
             exit 1
           fi

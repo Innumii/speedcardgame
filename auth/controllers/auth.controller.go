@@ -220,7 +220,7 @@ func (controller *AuthController) ConfirmPasswordReset(c *gin.Context) {
 // @Failure 400
 // @Failure 401
 // @Failure 500
-// @Router /reset-password/confirm [post]
+// @Router /change-password [patch]
 func (controller *AuthController) ChangePassword(c *gin.Context) {
 	var changePasswordDto dtos.ChangePasswordDTO
 

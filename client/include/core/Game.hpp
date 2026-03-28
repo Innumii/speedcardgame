@@ -100,6 +100,9 @@ public:
 
 
 private:
+    StateInterface* getStateInstance(GameState targetState);
+    void ensureStateInstance(GameState targetState);
+
     bool isRunning{false};
     NetworkClient netClient{NetworkClient::SocketMode::NonBlocking};
 

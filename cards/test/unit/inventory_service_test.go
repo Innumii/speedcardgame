@@ -2,6 +2,7 @@ package services_test
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -173,8 +174,8 @@ func TestListInventories_MultipleResults(t *testing.T) {
 	cardservices.ListInventories(rr, httptest.NewRequest(http.MethodGet, "/inventories", nil))
 	var invs []models.Inventory
 	if err := json.NewDecoder(rr.Body).Decode(&invs); err != nil {
-	t.Fatalf("failed to decode response: %v", err)
-}
+		t.Fatalf("failed to decode response: %v", err)
+	}
 	if len(invs) != 2 {
 		t.Errorf("expected 2, got %d", len(invs))
 	}
@@ -208,8 +209,8 @@ func TestGetInventoryByUserID_NormalizesOnRead(t *testing.T) {
 	cardservices.GetInventoryByUserID(rr, withChiParam(httptest.NewRequest(http.MethodGet, "/inventories/1", nil), "uid", "1"))
 	var inv models.Inventory
 	if err := json.NewDecoder(rr.Body).Decode(&inv); err != nil {
-	t.Fatalf("failed to decode response: %v", err)
-}
+		t.Fatalf("failed to decode response: %v", err)
+	}
 	if inv.Cards[1] != 4 {
 		t.Errorf("expected 4, got %d", inv.Cards[1])
 	}
@@ -245,8 +246,8 @@ func TestGetInventoryByUserID_DBError(t *testing.T) {
 func TestGetInventoryByUserID_NormalizeSaveFails(t *testing.T) {
 	db, _ := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{Logger: logger.Default.LogMode(logger.Silent)})
 	if err := db.AutoMigrate(&models.Card{}, &models.Deck{}, &models.Inventory{}); err != nil {
-    t.Fatalf("failed to migrate: %v", err)
-}
+		t.Fatalf("failed to migrate: %v", err)
+	}
 	db.Create(&models.Inventory{Uid: 1, Cards: models.CardCounts{1: 10}})
 	sqlDB, _ := db.DB()
 	sqlDB.Close()
@@ -272,8 +273,8 @@ func TestUpdateInventory_AddsCards(t *testing.T) {
 	}
 	var inv models.Inventory
 	if err := json.NewDecoder(rr.Body).Decode(&inv); err != nil {
-	t.Fatalf("failed to decode response: %v", err)
-}
+		t.Fatalf("failed to decode response: %v", err)
+	}
 	if inv.Cards[1] != 3 {
 		t.Errorf("expected 3, got %d", inv.Cards[1])
 	}
@@ -286,8 +287,8 @@ func TestUpdateInventory_ClampsAtMax(t *testing.T) {
 	cardservices.UpdateInventory(rr, jsonRequest(t, http.MethodPut, "/inventories", map[string]interface{}{"uid": 1, "cards": map[string]int{"1": 4}}))
 	var inv models.Inventory
 	if err := json.NewDecoder(rr.Body).Decode(&inv); err != nil {
-	t.Fatalf("failed to decode response: %v", err)
-}
+		t.Fatalf("failed to decode response: %v", err)
+	}
 	if inv.Cards[1] != 4 {
 		t.Errorf("expected 4, got %d", inv.Cards[1])
 	}
@@ -310,6 +311,23 @@ func TestUpdateInventory_SkipsInvalidCid(t *testing.T) {
 	cardservices.UpdateInventory(rr, jsonRequest(t, http.MethodPut, "/inventories", map[string]interface{}{"uid": 1, "cards": map[string]int{"0": 2, "1": 0}}))
 	if rr.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d", rr.Code)
+	}
+}
+
+func TestUpdateInventory_RemovesCardWhenTotalNonPositive(t *testing.T) {
+	db := setupTestDB(t)
+	seedInventory(t, db, models.Inventory{Uid: 1, Cards: models.CardCounts{1: 1}})
+	rr := httptest.NewRecorder()
+	cardservices.UpdateInventory(rr, jsonRequest(t, http.MethodPut, "/inventories", map[string]interface{}{"uid": 1, "cards": map[string]int{"1": -2}}))
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", rr.Code)
+	}
+	var inv models.Inventory
+	if err := json.NewDecoder(rr.Body).Decode(&inv); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+	if _, ok := inv.Cards[1]; ok {
+		t.Fatal("expected card 1 to be removed")
 	}
 }
 
@@ -393,6 +411,25 @@ func TestUpdateInventoryCoins_FindFails(t *testing.T) {
 	}
 }
 
+func TestUpdateInventoryCoins_SaveFails(t *testing.T) {
+	db := setupTestDB(t)
+	seedInventory(t, db, models.Inventory{Uid: 1, Cards: models.CardCounts{1: 2}, Coins: 100})
+	if err := db.Callback().Update().Before("gorm:update").Register("force_update_error", func(tx *gorm.DB) {
+		tx.AddError(errors.New("forced update error"))
+	}); err != nil {
+		t.Fatalf("failed to register callback: %v", err)
+	}
+	t.Cleanup(func() {
+		_ = db.Callback().Update().Remove("force_update_error")
+	})
+
+	rr := httptest.NewRecorder()
+	cardservices.UpdateInventoryCoins(rr, jsonRequest(t, http.MethodPut, "/inventories/coins", map[string]interface{}{"uid": 1, "coins": 500}))
+	if rr.Code != http.StatusInternalServerError {
+		t.Fatalf("expected 500, got %d", rr.Code)
+	}
+}
+
 // ── AddInventoryCoins ──────────────────────────────────────────────────────────
 
 func TestAddInventoryCoins_Success(t *testing.T) {
@@ -443,5 +480,24 @@ func TestAddInventoryCoins_FindFails(t *testing.T) {
 	cardservices.AddInventoryCoins(rr, jsonRequest(t, http.MethodPut, "/inventories/coins/add", map[string]interface{}{"uid": 1, "coins": 200}))
 	if rr.Code != http.StatusInternalServerError {
 		t.Errorf("expected 500, got %d", rr.Code)
+	}
+}
+
+func TestAddInventoryCoins_SaveFails(t *testing.T) {
+	db := setupTestDB(t)
+	seedInventory(t, db, models.Inventory{Uid: 1, Cards: models.CardCounts{1: 2}, Coins: 100})
+	if err := db.Callback().Update().Before("gorm:update").Register("force_update_error", func(tx *gorm.DB) {
+		tx.AddError(errors.New("forced update error"))
+	}); err != nil {
+		t.Fatalf("failed to register callback: %v", err)
+	}
+	t.Cleanup(func() {
+		_ = db.Callback().Update().Remove("force_update_error")
+	})
+
+	rr := httptest.NewRecorder()
+	cardservices.AddInventoryCoins(rr, jsonRequest(t, http.MethodPut, "/inventories/coins/add", map[string]interface{}{"uid": 1, "coins": 200}))
+	if rr.Code != http.StatusInternalServerError {
+		t.Fatalf("expected 500, got %d", rr.Code)
 	}
 }

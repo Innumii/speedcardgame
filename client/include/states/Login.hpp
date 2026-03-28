@@ -4,20 +4,21 @@
 #include <SDL2/SDL.h>
 #include <string>
 
+#include "StateInterface.hpp"
 #include "render/RenderText.hpp"
 
 class Game;
 
-class Login {
+class Login : public StateInterface {
 public:
     Login();
     ~Login();
 
-    void enter(Game& game);
-    void exit(Game& game);
-    void handleEvents(Game& game, const SDL_Event& event);
-    void update(Game& game);
-    void render(const Game& game);
+    void enter(Game& game) override;
+    void exit(Game& game) override;
+    void handleEvents(Game& game, const SDL_Event& event) override;
+    void update(Game& game) override;
+    void render(Game& game) override;
 
 private:
     enum class Field {

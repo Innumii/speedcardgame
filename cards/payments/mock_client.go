@@ -3,6 +3,7 @@ package payments
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"sync/atomic"
 )
 
@@ -33,17 +34,17 @@ func (m *MockPaymentClient) ProcessCardPayment(_ context.Context, req DirectCard
 	}, nil
 }
 
-func (m *MockPaymentClient) ParseWebhook(payload []byte, signature string) (WebhookEvent, error) {
+func (m *MockPaymentClient) ParseWebhook(payload []byte, headers http.Header) (WebhookEvent, error) {
 	return WebhookEvent{
-		ID:   "evt_mock",
-		Type: "checkout.session.completed",
+		ID:                "evt_mock",
+		CheckoutCompleted: true,
 	}, nil
 }
 
 func (m *MockPaymentClient) GetCheckoutSession(_ context.Context, sessionID string) (CheckoutSessionPaid, error) {
 	return CheckoutSessionPaid{
-		ID:           sessionID,
-		PaymentState: "paid",
-		Metadata:     map[string]string{},
+		ID:       sessionID,
+		Paid:     true,
+		Metadata: map[string]string{},
 	}, nil
 }

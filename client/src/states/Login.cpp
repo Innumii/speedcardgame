@@ -245,7 +245,7 @@ void Login::update(Game& game) {
     }
 }
 
-void Login::render(const Game& game) {
+void Login::render(Game& game) {
     SDL_Renderer*              r          = game.getRenderer();
     const RenderText::FontSet& titleFonts = game.getTitleFonts();
     const RenderText::FontSet& uiFonts    = game.getUIFonts();
