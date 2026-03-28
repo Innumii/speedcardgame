@@ -269,7 +269,7 @@ void Login::render(Game& game) {
         cachedBannerW,
         cachedBannerH
     };
-    RenderBanner::drawBanner(r, bannerRect, "Mana Kaisen",
+    RenderBanner::drawBanner(r, bannerRect, "Archcast",
                              titleFonts.large,
                              Theme::BANNER_FILL,  Theme::BANNER_BORDER,
                              Theme::BANNER_TEXT,  Theme::BANNER_GLOW);

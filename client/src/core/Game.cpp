@@ -7,10 +7,11 @@
 #include <fstream>
 #include <utility>
 #include <SDL2/SDL_image.h>
+#include <SDL2/SDL_mixer.h>
 #include "utils/EnvUtil.hpp"
 #include "utils/LoadAvailableCards.hpp"
 #include "utils/HttpUtil.hpp"
-
+#include "core/Audio.hpp"
 #include <map>
 
 namespace {
@@ -56,6 +57,10 @@ bool isWSL() {
 Game::Game(const char *title, int xpos, int ypos, int width, int height, bool fullscreen) {
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_TIMER | SDL_INIT_GAMECONTROLLER) != 0) {
         throw std::runtime_error(std::string("SDL_Init failed: ") + SDL_GetError());
+    }
+    if (Mix_OpenAudio(44100, MIX_DEFAULT_FORMAT, 2, 2048) < 0) {
+        SDL_Quit();
+        throw std::runtime_error(std::string("Mix_OpenAudio failed: ") + Mix_GetError());
     }
 
     Uint32 flags = fullscreen ? SDL_WINDOW_FULLSCREEN_DESKTOP : 0;
@@ -111,6 +116,17 @@ Game::Game(const char *title, int xpos, int ypos, int width, int height, bool fu
     //loading fonts
     titleFonts = RenderText::loadFonts("assets/Cinzel/Cinzel-VariableFont_wght.ttf",   12, 10, 48);
     uiFonts    = RenderText::loadFonts("assets/Rajdhani/Rajdhani-SemiBold.ttf", 16, 12, 22);
+
+    //load SFX
+    Audio::loadSFX("draw");
+    Audio::loadSFX("discard");
+    Audio::loadSFX("activate");
+    Audio::loadSFX("damage");
+    Audio::loadSFX("destroyed");
+    Audio::loadSFX("summon");
+    Audio::loadSFX("attack");
+    Audio::loadSFX("augment");
+    Audio::loadSFX("gameEnd");
 
     loginState.enter(*this);
 
@@ -194,6 +210,7 @@ void Game::commitStateChange() {
         std::cout << "Committing state change to Playing...\n";
         playingState.setup(*this);
         playingSetup = true;
+        Audio::playMusic("battle");
     }
 
     StateInterface* currentStateInstance = getStateInstance(state);
@@ -389,6 +406,7 @@ void Game::clean() {
     RenderText::closeFonts(titleFonts);
     RenderText::closeFonts(uiFonts);
     IMG_Quit();
+    Mix_CloseAudio();
     SDL_Quit();
     isRunning = false;
 }

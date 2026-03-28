@@ -246,7 +246,7 @@ void Title::render(Game& game) {
                                 Theme::BANNER_GLOW.b,   bannerAlpha};
 
     if (bannerAlpha > 0) {
-        RenderBanner::drawBanner(renderer, animBanner, "Mana Kaisen",
+        RenderBanner::drawBanner(renderer, animBanner, "Archcast",
                                  titleFonts.large, animBannerFill, animGold,
                                  animText, animGlow);
     }

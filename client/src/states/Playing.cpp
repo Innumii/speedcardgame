@@ -1,6 +1,7 @@
 #include "states/Playing.hpp"
 
 #include "core/Game.hpp"
+#include "core/Audio.hpp"
 #include "animation/AnimationGroup.hpp"
 #include "animation/AttackAnimation.hpp"
 #include "animation/DeathAnimation.hpp"
@@ -751,9 +752,13 @@ bool Playing::handleServerMessage(const std::string& msg) {
     }
     //add a mana command later -> decouple discard logic to offload to mana logic
     else if (cmd == "MATCH_LOST") {
+        Mix_HaltChannel(-1); 
+        Audio::playSFX("gameEnd");
         state = PlayingGameState::Lost;
         std::cout << "[Playing] Lost Match!\n";
     } else if (cmd == "MATCH_WON") {
+        Mix_HaltChannel(-1); 
+        Audio::playSFX("gameEnd");
         iss >> coinReward;
         state = PlayingGameState::Won;
         std::cout << "[Playing] Won Match!\n";
@@ -776,6 +781,7 @@ void Playing::playCreature(int playerId, std::unique_ptr<Card> card, int lane) {
 
     // Move the card into the board
     int boardIndex = (playerId == localPlayer.id) ? 0:1;
+    Audio::playSFX("summon");
     board.addToPlay(lane, boardIndex, std::move(card));
 
     if (animationsEnabled) {
@@ -807,6 +813,7 @@ void Playing::playSpell(int playerId, std::unique_ptr<Card> card, int sourceLane
 
     std::string name = card->getName();
     player.mana -= card->getManaCost();
+    Audio::playSFX("activate");
 
     // board.addToPlay(sourceLane, boardIndex, std::move(card));
 
@@ -840,6 +847,7 @@ bool Playing::drawCard(int playerId, int cardId) {
         return false;
     }
 
+    Audio::playSFX("draw");
     player.addCardToHand(std::move(card));
 
     int screenW = 0;
@@ -904,6 +912,7 @@ void Playing::discardCard(int playerId, int cardId) {
     player->addMana(cardToDiscard->getManaValue());
 
     int boardIndex = (playerId == localPlayer.id) ? 0:1;
+    Audio::playSFX("discard");
     board.addToDiscard(std::move(cardToDiscard), boardIndex);
 
     // You can animate this if desired
@@ -922,6 +931,7 @@ void Playing::augmentCreature(int playerId, int lane, int powerDelta, int toughn
     Card* card = zone.value().get();
     std::cout << "[augmentCreature] Augmenting " << std::to_string(powerDelta) << "/" << std::to_string(toughnessDelta) << "\n";
     CreatureCard* creature = static_cast<CreatureCard*>(card);
+    Audio::playSFX("augment");
     creature->augmentStats(powerDelta, toughnessDelta);
 }
 
@@ -1012,6 +1022,7 @@ void Playing::processPendingDestroys(Uint32 now) {
             ));
         }
         std::unique_ptr<Card> card;
+        Audio::playSFX("destroyed");
         if (!board.removeFromPlay(pending.lane, pending.boardIndex, card)) {
             continue;
         }
@@ -1027,6 +1038,7 @@ void Playing::resolveLaneCombat(int playerAId, int playerBId, int lane, int powe
     if (lane < 0) {
         return;
     }
+    Audio::playSFX("attack");
 
     if (!animationsEnabled) {
         return;
@@ -1064,6 +1076,7 @@ void Playing::resolveLaneCombat(int playerAId, int playerBId, int lane, int powe
         opponentSlots,
         420U
     ));
+
     animationQueue.enqueue(attackGroup);
 }
 void Playing::resolveDirectCombat(int playerId, int lane, int damage) {
@@ -1103,7 +1116,7 @@ void Playing::resolveDirectCombat(int playerId, int lane, int damage) {
             Theme::Playing::PLAYER_BAR_HEIGHT
         };
     }
-
+    Audio::playSFX("attack");
     if (animationsEnabled) {
         animationQueue.enqueue(std::make_shared<AttackAnimation>(
             lane,
@@ -1119,11 +1132,13 @@ void Playing::augmentHP(int playerId, int delta) {
     //get player object reference, change HP according to delta
     // std::cout << "[DEBUG] AUGMENTING OF " << delta << "\n";
     Player& player = (playerId == localPlayer.id) ? localPlayer : remotePlayer;
+    Audio::playSFX("damage");
     player.health += delta;
 }
 
 void Playing::augmentMana(int playerId, int delta) {
     Player& player = (playerId == localPlayer.id) ? localPlayer : remotePlayer;
+    Audio::playSFX("discard");
     player.mana += delta;
 }
 

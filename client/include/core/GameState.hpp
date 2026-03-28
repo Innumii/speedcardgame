@@ -12,7 +12,6 @@ enum class GameState {
     Connecting,
     Waiting,
     Playing,
-    GameOver,
     Quit
 };
 

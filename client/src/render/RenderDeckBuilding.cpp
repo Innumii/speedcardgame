@@ -15,10 +15,26 @@
 #include <algorithm>
 #include <string>
 #include <vector>
+#include <render/RenderBackdrop.hpp>
 
 void RenderDeckBuilding::render(DeckBuilding& deckBuilding, Game& game) {
     SDL_Renderer* renderer = game.getRenderer();
     if (!renderer) return;
+
+    int screenW, screenH;
+    SDL_GetRendererOutputSize(renderer, &screenW, &screenH);
+
+    // ── background ─────────────────────────────
+    RenderBackdrop::drawBackgroundWithVignette(
+        renderer,
+        screenW,
+        screenH,
+        Theme::BG,                              // base background color
+        Theme::Loading::VIGNETTE_COLOR,        // vignette color
+        Theme::Loading::VIGNETTE_LAYERS,       // layers
+        Theme::Loading::VIGNETTE_ALPHA_FALLOFF,// alpha falloff
+        Theme::Loading::VIGNETTE_MAX_ALPHA     // max alpha
+    );
 
     RenderText textRenderer;
     auto layout = deckBuilding.buildLayout(game);

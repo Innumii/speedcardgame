@@ -27,6 +27,8 @@
 #include <iostream>
 #include <animation/SummonAnimation.hpp>
 #include <animation/AttackAnimation.hpp>
+#include <core/Audio.hpp>
+#include <render/RenderBackdrop.hpp>
 
 // Reference resolution the Theme pixel constants were authored for.
 static constexpr float kRefW = 1200.0F;
@@ -142,13 +144,24 @@ void RenderPlaying::render(Playing& playing, const Game& game) {
 
 	const RenderText::FontSet& uiFonts = game.getUIFonts();
 	const RenderText::FontSet& titleFonts = game.getTitleFonts();
+	int screenW = 0, screenH = 0;
 
-	SDL_SetRenderDrawColor(renderer, Theme::Playing::BACKGROUND.r, Theme::Playing::BACKGROUND.g, Theme::Playing::BACKGROUND.b, Theme::Playing::BACKGROUND.a);
-	SDL_RenderClear(renderer);
+    SDL_GetRendererOutputSize(renderer, &screenW, &screenH);
+
+    // ── background ─────────────────────────────
+    RenderBackdrop::drawBackgroundWithVignette(
+        renderer,
+        screenW,
+        screenH,
+        Theme::BG,                              // base background color
+        Theme::Loading::VIGNETTE_COLOR,        // vignette color
+        Theme::Loading::VIGNETTE_LAYERS,       // layers
+        Theme::Loading::VIGNETTE_ALPHA_FALLOFF,// alpha falloff
+        Theme::Loading::VIGNETTE_MAX_ALPHA     // max alpha
+    );
 
 	const Uint32 now = SDL_GetTicks();
 
-	int screenW = 0, screenH = 0;
 	if (SDL_GetRendererOutputSize(renderer, &screenW, &screenH) != 0) {
 		screenW = 800;
 		screenH = 600;
@@ -664,6 +677,7 @@ void RenderPlaying::render(Playing& playing, const Game& game) {
 	//Currently, game end does NOT mean disconnect from server. They are still in the server.
 	// ── Game End Screen ─────────────────────────────────────────────────────────
 	if (playing.getState() != PlayingGameState::Playing) {
+		Audio::stopMusic();
 		std::string msg = "Defeat";
 		int coinReward = playing.getCoinReward();
 		if (playing.getState() == PlayingGameState::Won) {

@@ -1,6 +1,8 @@
 #include "states/PackOpening.hpp"
 
 #include "core/Game.hpp"
+#include "core/Audio.hpp"
+
 #include "objects/CreatureCard.h"
 #include "objects/SpellCard.h"
 #include "objects/Inventory.hpp"
@@ -108,6 +110,7 @@ void PackOpening::enter(Game& game) {
     } else {
         game.setPackRefundCoins(Inventory::getCachedCoins());
     }
+
 
     lastFlushTick = SDL_GetTicks();
 }
@@ -241,6 +244,7 @@ void PackOpening::handleEvents(Game& game, const SDL_Event& event) {
 
         // ── Click-to-flip: reveal a face-down card ────────────────────────
         if (!lastOpenedCards.empty() && !cardSlideInTicks.empty()) {
+            Audio::playSFX("draw");
             int screenW = Theme::SCREEN_DEFAULT_WIDTH;
             int screenH = Theme::SCREEN_DEFAULT_HEIGHT;
             if (SDL_Renderer* renderer = game.getRenderer()) {
@@ -638,6 +642,7 @@ void PackOpening::openPack(Game& game) {
     cardSlideInTicks.resize(PackSize);
     for (int i = 0; i < PackSize; ++i) {
         // Each card's slide begins SlideInDelayMs after the previous one.
+        Audio::playSFX("draw");
         cardSlideInTicks[i] = packOpenTick + static_cast<Uint32>(i * SlideInDelayMs);
     }
 

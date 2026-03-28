@@ -9,7 +9,7 @@ OPENSSL_PREFIX := $(shell brew --prefix openssl@3)
 # Use pkg-config for SDL2_ttf and SDL2_image; manually set SDL2 include
 # to parent dir so <SDL2/SDL.h> style includes resolve correctly
 SDL2_CFLAGS := -I$(BREW_PREFIX)/include -D_THREAD_SAFE
-SDL2_LIBS   := -L$(BREW_PREFIX)/lib -lSDL2 -lSDL2_ttf -lSDL2_image
+SDL2_LIBS   := -L$(BREW_PREFIX)/lib -lSDL2 -lSDL2_ttf -lSDL2_image -lSDL2_mixer
 
 CXXFLAGS := $(STD) $(INCLUDES) $(SDL2_CFLAGS) \
              -I$(OPENSSL_PREFIX)/include
