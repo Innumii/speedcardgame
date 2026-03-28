@@ -31,7 +31,7 @@ namespace {
     }
 
     int cornerRadiusFormula(int panelWidth) {
-        return std::max(Theme::Card::MIN_CORNER_RADIUS, panelWidth / 9);
+        return std::max(Theme::Card::MIN_CORNER_RADIUS, panelWidth / 20);
     }
 
 } // namespace

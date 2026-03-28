@@ -62,6 +62,17 @@ func NormalizeInventoryCards(cards models.CardCounts) bool {
 }
 
 // CreateInventory creates a new inventory for new user
+// CreateInventory godoc
+// @Summary      Create inventory
+// @Description  Creates a new inventory for a user. If no cards provided, assigns default starter cards and 1000 coins.
+// @Tags         inventories
+// @Accept       json
+// @Produce      json
+// @Param        body  body      object  true  "User ID and optional cards"
+// @Success      200   {object}  models.Inventory
+// @Failure      400   {string}  string  "Invalid input"
+// @Failure      500   {string}  string  "Failed to create inventory"
+// @Router       /inventories [post]
 func CreateInventory(w http.ResponseWriter, r *http.Request) {
 	var inputInventory inventoryRequest
 
@@ -104,6 +115,14 @@ func CreateInventory(w http.ResponseWriter, r *http.Request) {
 }
 
 // ListInventories lists all inventories
+// ListInventories godoc
+// @Summary      List all inventories
+// @Description  Returns all user inventories. Card quantities normalized on read.
+// @Tags         inventories
+// @Produce      json
+// @Success      200  {array}   models.Inventory
+// @Failure      500  {string}  string  "Failed to retrieve inventories"
+// @Router       /inventories [get]
 func ListInventories(w http.ResponseWriter, _ *http.Request) {
 	var inventories []models.Inventory
 
@@ -124,6 +143,16 @@ func ListInventories(w http.ResponseWriter, _ *http.Request) {
 }
 
 // GetInventory retrieves a specific inventory by user ID
+// GetInventoryByUserID godoc
+// @Summary      Get inventory by user ID
+// @Description  Returns a specific user's inventory. Card quantities normalized on read.
+// @Tags         inventories
+// @Produce      json
+// @Param        uid  path      int  true  "User ID"
+// @Success      200  {object}  models.Inventory
+// @Failure      400  {string}  string  "Missing uid"
+// @Failure      500  {string}  string  "Failed to retrieve inventory"
+// @Router       /inventories/{uid} [get]
 func GetInventoryByUserID(w http.ResponseWriter, r *http.Request) {
 	uidParam := chi.URLParam(r, "uid")
 	if uidParam == "" {
@@ -147,6 +176,17 @@ func GetInventoryByUserID(w http.ResponseWriter, r *http.Request) {
 	util.RespondWithJSON(w, http.StatusOK, inventory)
 }
 
+// UpdateInventory godoc
+// @Summary      Update inventory cards
+// @Description  Adds cards to a user's inventory. Max 4 copies per card.
+// @Tags         inventories
+// @Accept       json
+// @Produce      json
+// @Param        body  body      object  true  "User ID and cards to add"
+// @Success      200   {object}  models.Inventory
+// @Failure      400   {string}  string  "Invalid input"
+// @Failure      500   {string}  string  "Failed to update inventory"
+// @Router       /inventories [put]
 func UpdateInventory(w http.ResponseWriter, r *http.Request) {
 	var inputInventory inventoryRequest
 
@@ -194,6 +234,17 @@ func UpdateInventory(w http.ResponseWriter, r *http.Request) {
 	util.RespondWithJSON(w, http.StatusOK, inventory)
 }
 
+// UpdateInventoryCoins godoc
+// @Summary      Set inventory coins
+// @Description  Sets a user's coin balance to an exact value
+// @Tags         inventories
+// @Accept       json
+// @Produce      json
+// @Param        body  body      object  true  "User ID and coin amount"
+// @Success      200
+// @Failure      400   {string}  string  "Invalid input"
+// @Failure      500   {string}  string  "Failed to update coins"
+// @Router       /inventories/coins [put]
 func UpdateInventoryCoins(w http.ResponseWriter, r *http.Request) {
 	var inputInventory inventoryRequest
 
@@ -220,6 +271,17 @@ func UpdateInventoryCoins(w http.ResponseWriter, r *http.Request) {
 	util.RespondWithJSON(w, http.StatusOK, inventory)
 }
 
+// AddInventoryCoins godoc
+// @Summary      Add coins to inventory
+// @Description  Adds or subtracts coins from a user's balance
+// @Tags         inventories
+// @Accept       json
+// @Produce      json
+// @Param        body  body      object  true  "User ID and coins to add"
+// @Success      200
+// @Failure      400   {string}  string  "Invalid input"
+// @Failure      500   {string}  string  "Failed to add coins"
+// @Router       /inventories/coins/add [put]
 func AddInventoryCoins(w http.ResponseWriter, r *http.Request) {
 	var inputInventory inventoryRequest
 

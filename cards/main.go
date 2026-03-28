@@ -8,6 +8,9 @@ import (
 	"path/filepath"
 	"strings"
 
+	httpSwagger "github.com/swaggo/http-swagger"
+	_ "github.com/Ryanljk/speedcardgame/cards/docs"
+
 	"github.com/Ryanljk/speedcardgame/cards/config"
 	"github.com/Ryanljk/speedcardgame/cards/models"
 	"github.com/Ryanljk/speedcardgame/cards/services"
@@ -143,6 +146,12 @@ func main() {
 	r.Get("/payments/checkout-complete", services.RenderCheckoutCompletePage)
 	r.Get("/payments/coin-packages", services.ListCoinPackages) // List available coin packages
 
+
+	r.Get("/swagger/*", httpSwagger.Handler(
+		httpSwagger.URL("/cards/swagger/doc.json"),
+	))
+
+	// router.Mount("/cardbase", r) //api prefix
 	router.Mount("/cards", r)
 
 	srv := &http.Server{

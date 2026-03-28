@@ -11,8 +11,11 @@ import (
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
+	swaggerFiles "github.com/swaggo/files"
+	ginSwagger "github.com/swaggo/gin-swagger"
 
 	"github.com/Ryanljk/speedcardgame/auth/controllers"
+	_ "github.com/Ryanljk/speedcardgame/auth/docs"
 	"github.com/Ryanljk/speedcardgame/auth/dtos"
 	"github.com/Ryanljk/speedcardgame/auth/models"
 	"github.com/Ryanljk/speedcardgame/auth/repositories"
@@ -126,6 +129,9 @@ func main() {
 	r.GET("/health", func(c *gin.Context) {
 		c.JSON(200, gin.H{"status": "healthy"})
 	})
+
+	//Swagger docs
+	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
 	// Start server
 	err = r.Run(":8080")
