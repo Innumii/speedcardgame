@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
 
 	"github.com/stripe/stripe-go/v83"
 	"github.com/stripe/stripe-go/v83/charge"
@@ -41,21 +42,21 @@ type DirectCardPaymentResponse struct {
 }
 
 type CheckoutSessionPaid struct {
-	ID           string            `json:"id"`
-	PaymentState string            `json:"payment_state"`
-	Metadata     map[string]string `json:"metadata"`
+	ID       string            `json:"id"`
+	Paid     bool              `json:"paid"`
+	Metadata map[string]string `json:"metadata"`
 }
 
 type WebhookEvent struct {
-	ID      string               `json:"id"`
-	Type    string               `json:"type"`
-	Session *CheckoutSessionPaid `json:"session,omitempty"`
+	ID                string               `json:"id"`
+	CheckoutCompleted bool                 `json:"checkout_completed"`
+	Session           *CheckoutSessionPaid `json:"session,omitempty"`
 }
 
 type Client interface {
 	CreateCheckoutSession(ctx context.Context, req CheckoutSessionRequest) (CheckoutSessionResponse, error)
 	ProcessCardPayment(ctx context.Context, req DirectCardPaymentRequest) (DirectCardPaymentResponse, error)
-	ParseWebhook(payload []byte, signature string) (WebhookEvent, error)
+	ParseWebhook(payload []byte, headers http.Header) (WebhookEvent, error)
 	GetCheckoutSession(ctx context.Context, sessionID string) (CheckoutSessionPaid, error)
 }
 
@@ -124,7 +125,7 @@ func (c *StripeClient) ProcessCardPayment(_ context.Context, req DirectCardPayme
 			"coins":      fmt.Sprintf("%d", req.CoinPack.Coins),
 		},
 	}
-	
+
 	if err := chargeParams.SetSource(tok.ID); err != nil {
 		return DirectCardPaymentResponse{}, err
 	}
@@ -141,13 +142,14 @@ func (c *StripeClient) ProcessCardPayment(_ context.Context, req DirectCardPayme
 	}, nil
 }
 
-func (c *StripeClient) ParseWebhook(payload []byte, signature string) (WebhookEvent, error) {
+func (c *StripeClient) ParseWebhook(payload []byte, headers http.Header) (WebhookEvent, error) {
+	signature := headers.Get("Stripe-Signature")
 	event, err := webhook.ConstructEvent(payload, signature, c.webhookSecret)
 	if err != nil {
 		return WebhookEvent{}, err
 	}
 
-	out := WebhookEvent{ID: event.ID, Type: string(event.Type)}
+	out := WebhookEvent{ID: event.ID}
 	if event.Type != stripe.EventTypeCheckoutSessionCompleted {
 		return out, nil
 	}
@@ -158,10 +160,11 @@ func (c *StripeClient) ParseWebhook(payload []byte, signature string) (WebhookEv
 	}
 
 	out.Session = &CheckoutSessionPaid{
-		ID:           cs.ID,
-		PaymentState: string(cs.PaymentStatus),
-		Metadata:     cs.Metadata,
+		ID:       cs.ID,
+		Paid:     cs.PaymentStatus == stripe.CheckoutSessionPaymentStatusPaid,
+		Metadata: cs.Metadata,
 	}
+	out.CheckoutCompleted = true
 
 	return out, nil
 }
@@ -173,8 +176,8 @@ func (c *StripeClient) GetCheckoutSession(_ context.Context, sessionID string) (
 	}
 
 	return CheckoutSessionPaid{
-		ID:           cs.ID,
-		PaymentState: string(cs.PaymentStatus),
-		Metadata:     cs.Metadata,
+		ID:       cs.ID,
+		Paid:     cs.PaymentStatus == stripe.CheckoutSessionPaymentStatusPaid,
+		Metadata: cs.Metadata,
 	}, nil
 }

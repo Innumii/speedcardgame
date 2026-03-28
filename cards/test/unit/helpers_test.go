@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -88,4 +89,27 @@ func jsonRequest(t *testing.T, method, url string, body interface{}) *http.Reque
 	req := httptest.NewRequest(method, url, bytes.NewReader(b))
 	req.Header.Set("Content-Type", "application/json")
 	return req
+}
+
+type failingResponseWriter struct {
+	header http.Header
+	status int
+}
+
+func (w *failingResponseWriter) Header() http.Header {
+	if w.header == nil {
+		w.header = make(http.Header)
+	}
+	return w.header
+}
+
+func (w *failingResponseWriter) WriteHeader(statusCode int) {
+	w.status = statusCode
+}
+
+func (w *failingResponseWriter) Write(_ []byte) (int, error) {
+	if w.status == 0 {
+		w.status = http.StatusOK
+	}
+	return 0, errors.New("forced write failure")
 }

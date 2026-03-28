@@ -138,7 +138,7 @@ func main() {
 	r.Put("/inventories/coins/add", services.AddInventoryCoins) // Add coins/subtract
 
 	r.Post("/payments/checkout-session", services.CreateCoinCheckoutSession) // Create checkout session for purchasing coins
-	r.Post("/payments/webhook", services.HandleStripeWebhook)                // Handle Stripe webhook events
+	r.Post("/payments/webhook", services.HandlePaymentWebhook)               // Handle payment provider webhook events
 	r.Get("/payments/checkout-status", services.GetCheckoutSessionStatus)    // Verify checkout session and apply coins
 	r.Get("/payments/checkout-complete", services.RenderCheckoutCompletePage)
 	r.Get("/payments/coin-packages", services.ListCoinPackages) // List available coin packages

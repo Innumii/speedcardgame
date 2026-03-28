@@ -35,7 +35,7 @@ func (f *fakePaymentClient) ProcessCardPayment(_ context.Context, _ payments.Dir
 	return payments.DirectCardPaymentResponse{ID: "ch_test", Status: "succeeded", Paid: true}, nil
 }
 
-func (f *fakePaymentClient) ParseWebhook(_ []byte, _ string) (payments.WebhookEvent, error) {
+func (f *fakePaymentClient) ParseWebhook(_ []byte, _ http.Header) (payments.WebhookEvent, error) {
 	if f.webhookErr != nil {
 		return payments.WebhookEvent{}, f.webhookErr
 	}
@@ -47,8 +47,8 @@ func (f *fakePaymentClient) GetCheckoutSession(_ context.Context, sessionID stri
 		return payments.CheckoutSessionPaid{}, f.webhookErr
 	}
 	return payments.CheckoutSessionPaid{
-		ID:           sessionID,
-		PaymentState: "paid",
+		ID:   sessionID,
+		Paid: true,
 		Metadata: map[string]string{
 			"uid":        "7",
 			"coins":      "1000",
@@ -134,11 +134,11 @@ func TestHandleStripeWebhook_AppliesCoinsIdempotently(t *testing.T) {
 
 	client := &fakePaymentClient{
 		webhookEvent: payments.WebhookEvent{
-			ID:   "evt_123",
-			Type: "checkout.session.completed",
+			ID:                "evt_123",
+			CheckoutCompleted: true,
 			Session: &payments.CheckoutSessionPaid{
-				ID:           "cs_test",
-				PaymentState: "paid",
+				ID:   "cs_test",
+				Paid: true,
 				Metadata: map[string]string{
 					"uid":        "7",
 					"coins":      "1000",

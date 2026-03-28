@@ -158,7 +158,6 @@ StateInterface* Game::getStateInstance(GameState targetState) {
         case GameState::Playing:
             return &playingState;
         case GameState::Connecting:
-        case GameState::GameOver:
             return connectingState ? &(*connectingState) : nullptr;
         case GameState::Waiting:
             return waitingState ? &(*waitingState) : nullptr;
@@ -218,7 +217,7 @@ void Game::commitStateChange() {
         currentStateInstance->enter(*this);
     }
 
-    if (state == GameState::Quit || state == GameState::GameOver) {
+    if (state == GameState::Quit) {
         isRunning = false;
     }
 }

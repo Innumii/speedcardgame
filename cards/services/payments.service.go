@@ -3,11 +3,9 @@ package services
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
-	"os"
 	"strconv"
 	"strings"
 
@@ -15,9 +13,6 @@ import (
 	"github.com/Ryanljk/speedcardgame/cards/models"
 	"github.com/Ryanljk/speedcardgame/cards/payments"
 	"github.com/Ryanljk/speedcardgame/cards/util"
-	"github.com/aws/aws-sdk-go-v2/aws"
-	awsconfig "github.com/aws/aws-sdk-go-v2/config"
-	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
@@ -41,83 +36,14 @@ type processCardPaymentRequest struct {
 	CardholderName string `json:"cardholder_name"`
 }
 
-// stripeSecrets holds the Stripe fields within the shared cards runtime secret.
-type stripeSecrets struct {
-	SecretKey     string `json:"STRIPE_SECRET_KEY"`
-	WebhookSecret string `json:"STRIPE_WEBHOOK_SECRET"`
-}
-
-func loadStripeSecretsFromAWS(ctx context.Context) (stripeSecrets, error) {
-	// Use the shared cards runtime secret — defaults match the Terraform default
-	// in infra/modules/secrets/variables.tf (cards_runtime_secret_name).
-	secretName := util.GetEnvOrDefault("CARDS_RUNTIME_SECRET_NAME", "speedcardgame-cards-runtime")
-
-	cfg, err := awsconfig.LoadDefaultConfig(ctx)
-	if err != nil {
-		return stripeSecrets{}, fmt.Errorf("failed to load AWS config: %w", err)
-	}
-
-	client := secretsmanager.NewFromConfig(cfg)
-	result, err := client.GetSecretValue(ctx, &secretsmanager.GetSecretValueInput{
-		SecretId: aws.String(secretName),
-	})
-	if err != nil {
-		return stripeSecrets{}, fmt.Errorf("failed to get secret %q: %w", secretName, err)
-	}
-
-	if result.SecretString == nil {
-		return stripeSecrets{}, fmt.Errorf("secret %q has no string value", secretName)
-	}
-
-	var s stripeSecrets
-	if err := json.Unmarshal([]byte(*result.SecretString), &s); err != nil {
-		return stripeSecrets{}, fmt.Errorf("failed to parse secret JSON: %w", err)
-	}
-
-	return s, nil
-}
-
 func InitializePaymentsFromEnv() error {
-	// 1. Mock client for tests / CI
-	if os.Getenv("PAYMENT_TEST_MODE") == "true" {
-		paymentClient = payments.NewMockPaymentClient()
-		return nil
-	}
-
-	// 2. Local dev: explicit opt-in via USE_LOCAL_SECRETS=true
-	if !util.IsAwsEnabled() {
-		apiKey := os.Getenv("STRIPE_SECRET_KEY")
-		webhookSecret := os.Getenv("STRIPE_WEBHOOK_SECRET")
-
-		if apiKey == "" || webhookSecret == "" {
-			paymentClient = nil
-			return errors.New(
-				"stripe payment module disabled: USE_LOCAL_SECRETS=true but " +
-					"STRIPE_SECRET_KEY or STRIPE_WEBHOOK_SECRET is not set",
-			)
-		}
-
-		paymentClient = payments.NewStripeClient(apiKey, webhookSecret)
-		return nil
-	}
-
-	// 3. Default: AWS Secrets Manager using the shared cards runtime secret
-	secrets, err := loadStripeSecretsFromAWS(context.Background())
+	client, err := payments.NewClientFromEnv(context.Background(), util.IsAwsEnabled())
 	if err != nil {
 		paymentClient = nil
-		return fmt.Errorf(
-			"stripe payment module disabled: failed to load from cards runtime secret: %w", err,
-		)
+		return err
 	}
 
-	if secrets.SecretKey == "" || secrets.WebhookSecret == "" {
-		paymentClient = nil
-		return errors.New(
-			"stripe payment module disabled: cards runtime secret missing STRIPE_SECRET_KEY or STRIPE_WEBHOOK_SECRET",
-		)
-	}
-
-	paymentClient = payments.NewStripeClient(secrets.SecretKey, secrets.WebhookSecret)
+	paymentClient = client
 	return nil
 }
 
@@ -277,7 +203,7 @@ func ProcessCardPayment(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func HandleStripeWebhook(w http.ResponseWriter, r *http.Request) {
+func HandlePaymentWebhook(w http.ResponseWriter, r *http.Request) {
 	if paymentClient == nil {
 		util.RespondWithError(w, http.StatusServiceUnavailable, "payments module is not configured")
 		return
@@ -289,13 +215,13 @@ func HandleStripeWebhook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	event, err := paymentClient.ParseWebhook(payload, r.Header.Get("Stripe-Signature"))
+	event, err := paymentClient.ParseWebhook(payload, r.Header)
 	if err != nil {
 		util.RespondWithError(w, http.StatusBadRequest, fmt.Sprintf("failed to parse webhook: %v", err))
 		return
 	}
 
-	if event.Type != "checkout.session.completed" {
+	if !event.CheckoutCompleted {
 		util.RespondWithJSON(w, http.StatusOK, map[string]string{"received": "true"})
 		return
 	}
@@ -306,7 +232,7 @@ func HandleStripeWebhook(w http.ResponseWriter, r *http.Request) {
 	}
 
 	session := event.Session
-	if session.PaymentState != "paid" {
+	if !session.Paid {
 		util.RespondWithJSON(w, http.StatusOK, map[string]string{"received": "true"})
 		return
 	}
@@ -346,6 +272,11 @@ func HandleStripeWebhook(w http.ResponseWriter, r *http.Request) {
 	util.RespondWithJSON(w, http.StatusOK, map[string]string{"success": "true"})
 }
 
+// HandleStripeWebhook is kept as a compatibility wrapper for existing routes and tests.
+func HandleStripeWebhook(w http.ResponseWriter, r *http.Request) {
+	HandlePaymentWebhook(w, r)
+}
+
 func GetCheckoutSessionStatus(w http.ResponseWriter, r *http.Request) {
 	if paymentClient == nil {
 		util.RespondWithError(w, http.StatusServiceUnavailable, "payments module is not configured")
@@ -364,7 +295,7 @@ func GetCheckoutSessionStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if session.PaymentState != "paid" {
+	if !session.Paid {
 		util.RespondWithJSON(w, http.StatusOK, map[string]interface{}{
 			"session_id": session.ID,
 			"paid":       false,
