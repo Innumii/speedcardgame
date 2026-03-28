@@ -14,8 +14,8 @@ import (
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
 
-	_ "github.com/Ryanljk/speedcardgame/auth/docs"
 	"github.com/Ryanljk/speedcardgame/auth/controllers"
+	_ "github.com/Ryanljk/speedcardgame/auth/docs"
 	"github.com/Ryanljk/speedcardgame/auth/dtos"
 	"github.com/Ryanljk/speedcardgame/auth/models"
 	"github.com/Ryanljk/speedcardgame/auth/repositories"
