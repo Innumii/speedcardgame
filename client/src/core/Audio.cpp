@@ -6,8 +6,8 @@ std::string Audio::currentTrack = "";
 std::unordered_map<std::string, Mix_Chunk*> Audio::sfxMap;
 
 // Global volume settings
-int Audio::musicVolume = 64; // 0-128
-int Audio::sfxVolume = 70;   // 0-128
+int Audio::musicVolume = 114; // 0-128
+int Audio::sfxVolume = 128;   // 0-128
 std::unordered_map<std::string, int> Audio::sfxOverrides; // per-sfx volume
 
 // -------------------- PATHS --------------------
