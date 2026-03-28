@@ -3,8 +3,6 @@ package util
 import (
 	"log"
 	"net/http"
-	"os"
-	"strconv"
 	"time"
 )
 
@@ -26,19 +24,6 @@ func (rw *loggingResponseWriter) Write(data []byte) (int, error) {
 	n, err := rw.ResponseWriter.Write(data)
 	rw.bytes += n
 	return n, err
-}
-
-func GetEnvAsBool(key string, defaultValue bool) bool {
-	raw := os.Getenv(key)
-	if raw == "" {
-		return defaultValue
-	}
-	value, err := strconv.ParseBool(raw)
-	if err != nil {
-		log.Printf("Invalid boolean value for %s=%q, using default %t", key, raw, defaultValue)
-		return defaultValue
-	}
-	return value
 }
 
 func LogStartupConfiguration(serviceName string, debugEnabled, httpRequestLoggingEnabled bool) {

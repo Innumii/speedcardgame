@@ -9,6 +9,7 @@ class Game;
 
 class Inventory {
 	std::vector<int> copiesByCardIndex;
+    
 
 public:
     explicit Inventory(int cardCount = 0);
@@ -24,20 +25,19 @@ public:
         int maxDeckCopies
     );
 
-    static bool loadInventoryCopiesFromService(
+    static bool loadInventoryAndCoinsFromService(const Game& game);
+
+    static bool ensureInventoryAndCoinsLoaded(
         const Game& game,
         const std::vector<std::unique_ptr<Card>>& availableCards,
-        std::vector<int>& outInventoryCopies,
         int maxCopies
     );
 
-    static bool loadInventoryAndCoinsFromService(
-        const Game& game,
-        const std::vector<std::unique_ptr<Card>>& availableCards,
-        std::vector<int>& outInventoryCopies,
-        int& outCoins,
-        int maxCopies
-    );
+    static bool isInventoryCacheLoaded();
+    static const std::vector<int>& getCachedInventoryCopies();
+    static std::vector<int>& getCachedInventoryCopiesMutable();
+    static int getCachedCoins();
+    static void setCachedCoins(int coins);
 
     static bool updateCoinsOnService(const Game& game, int coins);
 };

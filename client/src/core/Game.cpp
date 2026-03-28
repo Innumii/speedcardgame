@@ -7,10 +7,11 @@
 #include <fstream>
 #include <utility>
 #include <SDL2/SDL_image.h>
+#include <SDL2/SDL_mixer.h>
 #include "utils/EnvUtil.hpp"
 #include "utils/LoadAvailableCards.hpp"
 #include "utils/HttpUtil.hpp"
-
+#include "core/Audio.hpp"
 #include <map>
 
 namespace {
@@ -57,8 +58,12 @@ Game::Game(const char *title, int xpos, int ypos, int width, int height, bool fu
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_TIMER | SDL_INIT_GAMECONTROLLER) != 0) {
         throw std::runtime_error(std::string("SDL_Init failed: ") + SDL_GetError());
     }
+    if (Mix_OpenAudio(44100, MIX_DEFAULT_FORMAT, 2, 2048) < 0) {
+        SDL_Quit();
+        throw std::runtime_error(std::string("Mix_OpenAudio failed: ") + Mix_GetError());
+    }
 
-    Uint32 flags = fullscreen ? SDL_WINDOW_FULLSCREEN : 0;
+    Uint32 flags = fullscreen ? SDL_WINDOW_FULLSCREEN_DESKTOP : 0;
     flags |= SDL_WINDOW_RESIZABLE;
 
     window.reset(SDL_CreateWindow(title, xpos, ypos, width, height, flags));
@@ -112,6 +117,17 @@ Game::Game(const char *title, int xpos, int ypos, int width, int height, bool fu
     titleFonts = RenderText::loadFonts("assets/Cinzel/Cinzel-VariableFont_wght.ttf",   12, 10, 48);
     uiFonts    = RenderText::loadFonts("assets/Rajdhani/Rajdhani-SemiBold.ttf", 16, 12, 22);
 
+    //load SFX
+    Audio::loadSFX("draw");
+    Audio::loadSFX("discard");
+    Audio::loadSFX("activate");
+    Audio::loadSFX("damage");
+    Audio::loadSFX("destroyed");
+    Audio::loadSFX("summon");
+    Audio::loadSFX("attack");
+    Audio::loadSFX("augment");
+    Audio::loadSFX("gameEnd");
+
     loginState.enter(*this);
 
     isRunning = true;
@@ -125,76 +141,50 @@ Game::~Game() {
 
 //check this again ltr
 void Game::commitStateChange() {
-    if (nextState != state) {
-        const GameState previousState = state;
-        state = nextState;
+    if (nextState == state) return;
 
-        if (previousState == GameState::DeckBuilding) {
-            deckBuildingState.exit(*this);
-        }
+    const GameState previousState = state;
+    state = nextState;
 
-        if (previousState == GameState::Login && state != GameState::Login) {
-            loginState.exit(*this);
-        }
-
-        if (previousState == GameState::Register && state != GameState::Register) {
-            registerState.exit(*this);
-        }
-
-        if (previousState == GameState::Loading && state != GameState::Loading) {
-            loadingState.exit(*this);
-        }
-
-        if (previousState == GameState::Playing && state != GameState::Playing) {
-            playingSetup = false;
-        }
-
-        if ((previousState == GameState::Waiting || previousState == GameState::Playing) && state == GameState::Title) {
-            connectingState.reset();
-            getNetworkClient().disconnect();
-        }
-        
-        state = nextState;
-
-        if (state == GameState::Connecting) {
-            const std::string host = EnvUtil::getGameServerHost();
-            const int port = EnvUtil::getGameServerPort();
-            connectingState.emplace(host, port);
-        }
-
-        if (state == GameState::Waiting) {
-            waitingState.emplace();
-            std::cout << "Waiting now\n";
-        }
-
-        if (state == GameState::Login && previousState != GameState::Login) {
-            loginState.enter(*this);
-        }
-
-        if (state == GameState::Register && previousState != GameState::Register) {
-            registerState.enter(*this);
-        }
-
-        if (state == GameState::Loading && previousState != GameState::Loading) {
-            loadingState.enter(*this);
-        }
-
-        if (state == GameState::Playing && !playingSetup) {
-            std::cout << "Committing state change to Playing...\n";
-            playingState.setup(*this);
-            playingSetup = true;
-        }
-        if (state == GameState::DeckBuilding && previousState != GameState::DeckBuilding) {
-            deckBuildingState.enter(*this);
-        }
-        if (state == GameState::PackOpening && previousState != GameState::PackOpening) {
-            packOpeningState.enter(*this);
-        }
-        if (state == GameState::Quit || state == GameState::GameOver) {
-            isRunning = false;
-        }
+    // --- Exit previous state ---
+    switch (previousState) {
+        case GameState::Login:        loginState.exit(*this);                          break;
+        case GameState::Register:     registerState.exit(*this);                       break;
+        case GameState::DeckBuilding: deckBuildingState.exit(*this);                   break;
+        case GameState::Loading:      loadingState.exit(*this);
+                                      Audio::playMusic("title");      break;
+        case GameState::Playing:      playingSetup = false;
+                                      Audio::stopMusic();                              break;
+        default: break;
     }
-    
+
+    if ((previousState == GameState::Waiting || previousState == GameState::Playing)
+        && state == GameState::Title) {
+        connectingState.reset();
+        getNetworkClient().disconnect();
+    }
+
+    // --- Enter new state ---
+    switch (state) {
+        case GameState::Title:        Audio::playMusic("title");                            break;
+        case GameState::Connecting:   connectingState.emplace(EnvUtil::getGameServerHost(),
+                                                              EnvUtil::getGameServerPort()); break;
+        case GameState::Waiting:      waitingState.emplace();
+                                      Audio::playMusic("title");                            break;
+        case GameState::Login:        loginState.enter(*this);
+                                      Audio::stopMusic();                                   break;
+        case GameState::Register:     registerState.enter(*this);                           break;
+        case GameState::Loading:      loadingState.enter(*this);                            break;
+        case GameState::DeckBuilding: deckBuildingState.enter(*this);                       break;
+        case GameState::Payment:      paymentState.enter(*this);                            break;
+        case GameState::PackOpening:  packOpeningState.enter(*this);                        break;
+        case GameState::Playing:      std::cout << "Committing state change to Playing\n";
+                                      playingState.setup(*this);
+                                      playingSetup = true; 
+                                      Audio::playMusic("battle");                           break;
+        case GameState::Quit:
+        default: break;
+    }
 }
 
 void Game::setNextState(GameState newState) {
@@ -375,13 +365,15 @@ void Game::handleEvents() {
             case GameState::DeckBuilding:
                 deckBuildingState.handleEvents(*this, event);
                 break;
+            case GameState::Payment:
+                paymentState.handleEvents(*this, event);
+                break;
             case GameState::PackOpening:
                 packOpeningState.handleEvents(*this, event);
                 break;
             case GameState::Playing:
                 playingState.handleEvents(*this, event);
                 break;
-            case GameState::GameOver:
             case GameState::Connecting:
                 if (connectingState) {
                     connectingState->handleEvents(*this, event);
@@ -412,6 +404,9 @@ void Game::update() {
             break;
         case GameState::DeckBuilding:
             deckBuildingState.update(*this);
+            break;
+        case GameState::Payment:
+            paymentState.update(*this);
             break;
         case GameState::PackOpening:
             packOpeningState.update(*this);
@@ -460,6 +455,9 @@ void Game::render() {
         case GameState::DeckBuilding:
             deckBuildingState.render(*this);
             break;
+        case GameState::Payment:
+            paymentState.render(*this);
+            break;
         case GameState::PackOpening:
             packOpeningState.render(*this);
             break;
@@ -489,6 +487,7 @@ void Game::clean() {
     RenderText::closeFonts(titleFonts);
     RenderText::closeFonts(uiFonts);
     IMG_Quit();
+    Mix_CloseAudio();
     SDL_Quit();
     isRunning = false;
 }

@@ -160,3 +160,17 @@ variable "cards_service_base_url" {
   sensitive   = true
   default     = null
 }
+
+variable "stripe_secret_key" {
+  description = "Stripe Secret API Key for payment processing"
+  type        = string
+  sensitive   = true
+  default     = null
+}
+
+variable "stripe_webhook_secret" {
+  description = "Stripe Webhook Secret for validating webhook signatures"
+  type        = string
+  sensitive   = true
+  default     = null
+}

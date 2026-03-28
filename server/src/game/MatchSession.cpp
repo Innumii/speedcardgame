@@ -774,44 +774,42 @@ void MatchSession::triggerCardEffects(int playerIndex, int cardId, std::optional
     if (!running.load()) return;
 
     auto effects = TriggerEffects::getCardEffects(cardId);
-    std::cout << "CardID: " << cardId << "\n";
     if (!effects) return;
+    
     for (const auto& entry : *effects) {
         if (entry.trigger != triggerType) continue;
 
         EffectFunc effect = TriggerEffects::getEffectById(entry.effectId);
         if (!effect) continue;
+        // Use a local copy so mutations don't bleed into the next iteration
+        std::optional<int> localTargetIndex = serverTargetIndex;
 
         int targetCardId = -1;
-        if (serverTargetIndex.has_value() && targetLane.has_value()) {
-            int tPlayer = *serverTargetIndex;
+        if (localTargetIndex.has_value() && targetLane.has_value()) { //if there is a targeted zone
+            int tPlayer = *localTargetIndex;
             int tLane   = *targetLane;
             if (tPlayer >= 0 && tPlayer < 2 && tLane >= 0 && tLane < board.laneCount) {
-                if (board.lanes[tPlayer][tLane].has_value()) {
+                if (board.lanes[tPlayer][tLane].has_value()) { //check if the card still exists
                     targetCardId = *board.lanes[tPlayer][tLane];
                 } else {
-                    continue;
+                    // Only skip if there's no explicit target override that would redirect it
+                    if (!entry.target.has_value()) continue;
                 }
             }
         }
         if (!entry.condition(*this, targetCardId,
                              targetLane.value_or(-1),
-                             serverTargetIndex.value_or(-1))) {
+                             localTargetIndex.value_or(-1))) {
             continue;
         }
-        if (entry.target.has_value()) {
+        if (entry.target.has_value()) { //assign target
             switch (*entry.target) {
-                case Target::Self:
-                    serverTargetIndex = playerIndex;
-                    break;
-                case Target::Opponent:
-                    serverTargetIndex = 1 - playerIndex;
-                    break;
-                case Target::Nil:
-                    break;
+                case Target::Self:     localTargetIndex = playerIndex;         break;
+                case Target::Opponent: localTargetIndex = 1 - playerIndex;     break;
+                case Target::Nil:                                               break;
             }
         }
-        effect(*this, playerIndex, targetLane, serverTargetIndex,
+        effect(*this, playerIndex, targetLane, localTargetIndex,
                entry.amount, entry.augment);
     }
 }
@@ -1026,6 +1024,7 @@ void MatchSession::resolveAttackPhase() {
 // DIRECT <attacker ID> <lane> <damage>
 void MatchSession::resolveLaneCombat(int lane) {
     if (!running.load()) return;
+
     auto& cardA = board.lanes[0][lane];
     auto& cardB = board.lanes[1][lane];
 
@@ -1039,7 +1038,17 @@ void MatchSession::resolveLaneCombat(int lane) {
         return CombatEffects::hasEffect(effectMaskOpt, effectBit);
     };
 
-    auto sendDirectDamage = [this, lane](int attackerIndex, int damage) {
+    const bool hasDoubleStrikeA = hasEffect(0, lane, CombatEffects::kDoubleStrike);
+    const bool hasDoubleStrikeB = hasEffect(1, lane, CombatEffects::kDoubleStrike);
+    const bool hasTrampleA = hasEffect(0, lane, CombatEffects::kTrample);
+    const bool hasTrampleB = hasEffect(1, lane, CombatEffects::kTrample);
+    const bool hasDeathTouchA = hasEffect(0, lane, CombatEffects::kDeathTouch);
+    const bool hasDeathTouchB = hasEffect(1, lane, CombatEffects::kDeathTouch);
+    const bool hadLifestealA = hasEffect(0, lane, CombatEffects::kLifesteal);
+    const bool hadLifestealB = hasEffect(1, lane, CombatEffects::kLifesteal);
+
+    // UPDATED: Direct damage now includes lifesteal
+    auto sendDirectDamage = [this, lane, &hadLifestealA, &hadLifestealB](int attackerIndex, int damage) {
         if (!running.load()) return;
         if (damage <= 0) return;
 
@@ -1055,21 +1064,20 @@ void MatchSession::resolveLaneCombat(int lane) {
         playerA->send(msg);
         playerB->send(msg);
 
+        // Deal damage
         augmentHP(1 - attackerIndex, -damage);
-    };
 
-    const bool hasDoubleStrikeA = hasEffect(0, lane, CombatEffects::kDoubleStrike);
-    const bool hasDoubleStrikeB = hasEffect(1, lane, CombatEffects::kDoubleStrike);
-    const bool hasTrampleA = hasEffect(0, lane, CombatEffects::kTrample);
-    const bool hasTrampleB = hasEffect(1, lane, CombatEffects::kTrample);
-    const bool hasDeathTouchA = hasEffect(0, lane, CombatEffects::kDeathTouch);
-    const bool hasDeathTouchB = hasEffect(1, lane, CombatEffects::kDeathTouch);
+        // 🔥 Lifesteal heal
+        if ((attackerIndex == 0 && hadLifestealA) ||
+            (attackerIndex == 1 && hadLifestealB)) {
+            augmentHP(attackerIndex, damage);
+        }
+    };
 
     auto resolveCombatOnce = [&](bool allowDoubleStrikePhase) {
         if (!running.load()) return;
         (void)allowDoubleStrikePhase;
 
-        // Check if creatures are still alive
         bool aAlive = board.lanes[0][lane].has_value();
         bool bAlive = board.lanes[1][lane].has_value();
         if (!aAlive && !bAlive) return;
@@ -1078,9 +1086,8 @@ void MatchSession::resolveLaneCombat(int lane) {
         int powerB = bAlive ? getCreaturePower(1, lane) : 0;
         int toughnessA = aAlive ? getCreatureToughness(0, lane) : 0;
         int toughnessB = bAlive ? getCreatureToughness(1, lane) : 0;
-        
 
-
+        // Direct attacks
         if (aAlive && !bAlive && powerA > 0) {
             sendDirectDamage(0, powerA);
             return;
@@ -1093,23 +1100,19 @@ void MatchSession::resolveLaneCombat(int lane) {
         std::cout << "[Combat] Lane " << lane
                   << " A(" << powerA << ") vs B(" << powerB << ")\n";
 
-        // Trample overflow is based on lethal damage assignment against the current blocker.
         int overflowA = 0;
         int overflowB = 0;
+
         if (aAlive && bAlive && hasTrampleA && powerA > 0) {
             int lethalToB = hasDeathTouchA ? 1 : toughnessB;
-            if (lethalToB < 0) lethalToB = 0;
-            overflowA = powerA - lethalToB;
-            if (overflowA < 0) overflowA = 0;
+            overflowA = std::max(0, powerA - lethalToB);
         }
         if (aAlive && bAlive && hasTrampleB && powerB > 0) {
             int lethalToA = hasDeathTouchB ? 1 : toughnessA;
-            if (lethalToA < 0) lethalToA = 0;
-            overflowB = powerB - lethalToA;
-            if (overflowB < 0) overflowB = 0;
+            overflowB = std::max(0, powerB - lethalToA);
         }
 
-        // Broadcast combat event
+        // Broadcast combat
         std::ostringstream ss;
         ss << "COMBAT "
            << players[0].id << " "
@@ -1120,15 +1123,26 @@ void MatchSession::resolveLaneCombat(int lane) {
         playerA->send(ss.str());
         playerB->send(ss.str());
 
-        // Apply damage
+        // UPDATED: Apply damage + lifesteal
         if (aAlive && powerA > 0) {
-            augmentCreature(1, lane, {0, -(hasDeathTouchA ? 1 : powerA)});
-        }
-        if (bAlive && powerB > 0) {
-            augmentCreature(0, lane, {0, -(hasDeathTouchB ? 1 : powerB)});
+            int damageDealt = hasDeathTouchA ? 1 : powerA;
+            augmentCreature(1, lane, {0, -damageDealt});
+
+            if (hadLifestealA) {
+                augmentHP(0, damageDealt);
+            }
         }
 
-        // Deathtouch: any positive combat damage is lethal to creatures.
+        if (bAlive && powerB > 0) {
+            int damageDealt = hasDeathTouchB ? 1 : powerB;
+            augmentCreature(0, lane, {0, -damageDealt});
+
+            if (hadLifestealB) {
+                augmentHP(1, damageDealt);
+            }
+        }
+
+        // Deathtouch instant kill
         if (aAlive && bAlive && hasDeathTouchA && powerA > 0) {
             destroyCreature(1, lane);
         }
@@ -1136,32 +1150,26 @@ void MatchSession::resolveLaneCombat(int lane) {
             destroyCreature(0, lane);
         }
 
-        // Call effects proc'd by kills
+        // OnKill triggers
         if (aAlive && !board.lanes[1][lane].has_value()) {
-            // A was alive, B's lane is now empty -> A killed B
             if (board.lanes[0][lane].has_value()) {
                 triggerCardEffects(0, *board.lanes[0][lane],
-                                std::optional<int>(lane),
-                                std::optional<int>(0),
-                                TriggerType::OnKill);
+                                   lane, 0, TriggerType::OnKill);
             }
         }
         if (bAlive && !board.lanes[0][lane].has_value()) {
-            // B was alive, A's lane is now empty -> B killed A
             if (board.lanes[1][lane].has_value()) {
                 triggerCardEffects(1, *board.lanes[1][lane],
-                                std::optional<int>(lane),
-                                std::optional<int>(1),
-                                TriggerType::OnKill);
+                                   lane, 1, TriggerType::OnKill);
             }
         }
+
+        // Trample overflow → uses lifesteal automatically
         if (overflowA > 0) sendDirectDamage(0, overflowA);
         if (overflowB > 0) sendDirectDamage(1, overflowB);
-
     };
 
-    // Regen ticks once per lane combat cycle; trigger heal after every 2 combats.
-    // This resolves before combat damage is assigned.
+    // Regen tick
     auto tickRegen = [this, lane](int playerIndex) {
         auto& regenOpt = board.regen[playerIndex][lane];
         if (!regenOpt.has_value()) return;
@@ -1172,29 +1180,33 @@ void MatchSession::resolveLaneCombat(int lane) {
 
         int regenValue = regenOpt->first;
         int combatsUntilTrigger = regenOpt->second - 1;
+
         if (combatsUntilTrigger <= 0) {
             const auto& augOpt = board.augments[playerIndex][lane];
-            const int toughnessAug = augOpt.has_value() ? augOpt->second : 0;
-            const int missingToughness = (toughnessAug < 0) ? -toughnessAug : 0;
-            const int healAmount = std::min(regenValue, missingToughness);
-            if (healAmount > 0) {
-                // Regen only heals missing toughness; it never grants power.
-                augmentCreature(playerIndex, lane, {0, healAmount});
+            int toughnessAug = augOpt ? augOpt->second : 0;
+            int missing = (toughnessAug < 0) ? -toughnessAug : 0;
+            int heal = std::min(regenValue, missing);
+
+            if (heal > 0) {
+                augmentCreature(playerIndex, lane, {0, heal});
             }
             combatsUntilTrigger = 2;
         }
+
         regenOpt = std::make_pair(regenValue, combatsUntilTrigger);
     };
 
     if (startedWithA) tickRegen(0);
     if (startedWithB) tickRegen(1);
 
-    // Double strike phase first
+    // Double strike phase
     if (hasDoubleStrikeA || hasDoubleStrikeB) {
         resolveCombatOnce(true);
     }
-    if (!running.load()) return; // THIS LINE
-    // Normal combat phase
+
+    if (!running.load()) return;
+
+    // Normal combat
     resolveCombatOnce(false);
 }
 

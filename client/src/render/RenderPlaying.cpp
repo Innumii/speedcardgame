@@ -25,6 +25,118 @@
 #include <vector>
 #include <render/RenderCardOverlay.hpp>
 #include <iostream>
+#include <animation/SummonAnimation.hpp>
+#include <animation/AttackAnimation.hpp>
+#include <core/Audio.hpp>
+#include <render/RenderBackdrop.hpp>
+
+// Reference resolution the Theme pixel constants were authored for.
+static constexpr float kRefW = 1200.0F;
+static constexpr float kRefH = 850.0F;
+
+static void drawStatsBar(
+	SDL_Renderer* renderer,
+	RenderText& textRenderer,
+	TTF_Font* font,
+	int health,
+	int mana,
+	int screenW,
+	int screenH,
+	bool anchorTop)  // true = opponent bar (top), false = local player bar (bottom)
+{
+	// Scale every pixel value uniformly so the bars shrink with the window.
+	const float scale = std::min(
+		static_cast<float>(screenW) / kRefW,
+		static_cast<float>(screenH) / kRefH);
+
+	const int barW      = static_cast<int>(Theme::Playing::PLAYER_BAR_WIDTH          * scale);
+	const int barH      = static_cast<int>(Theme::Playing::PLAYER_BAR_HEIGHT         * scale);
+	const int glowInset = std::max(1, static_cast<int>(Theme::Playing::PLAYER_BAR_GLOW_INSET    * scale));
+	const int divInset  = std::max(1, static_cast<int>(Theme::Playing::PLAYER_BAR_DIVIDER_INSET * scale));
+	// Small per-section glow offsets (originally 2 px) scaled to match.
+	const int g         = std::max(1, static_cast<int>(2.0F * scale));
+	const int cornerOuter = std::max(2, static_cast<int>(12.0F * scale));
+	const int cornerInner = std::max(2, static_cast<int>(10.0F * scale));
+
+	const int barX = (screenW - barW) / 2;
+	const int verticalOffset = (screenH - static_cast<int>(850.0F * scale)) / 2;
+	const int barY = anchorTop
+		? static_cast<int>(Theme::Playing::OPPONENT_BAR_TOP * scale) + verticalOffset
+		: screenH - barH - static_cast<int>(Theme::Playing::PLAYER_BAR_BOTTOM_MARGIN * scale) - verticalOffset;
+
+	const std::string healthText = "Health: " + std::to_string(health);
+	const std::string manaText   = "Mana: "   + std::to_string(mana);
+
+	int healthW = 0, healthH = 0;
+	int manaW   = 0, manaH   = 0;
+	if (font) {
+		TTF_SizeText(font, healthText.c_str(), &healthW, &healthH);
+		TTF_SizeText(font, manaText.c_str(),   &manaW,   &manaH);
+	}
+
+	const SDL_Rect bar = {barX, barY, barW, barH};
+
+	// Outer glow
+	RenderUtil::drawRoundedRect(renderer,
+		{bar.x - glowInset, bar.y - glowInset,
+		 bar.w + glowInset * 2, bar.h + glowInset * 2},
+		cornerOuter,
+		Theme::Playing::PLAYER_BAR_GLOW_FILL,
+		Theme::Playing::PLAYER_BAR_GLOW_BORDER);
+
+	RenderUtil::drawRoundedRect(renderer, bar,
+		cornerInner,
+		Theme::Playing::PLAYER_BAR_FILL,
+		Theme::Playing::PLAYER_BAR_BORDER);
+
+	// HP section (left half — red tint + glow)
+	const SDL_Rect hpSection = {barX, barY, barW / 2, barH};
+
+	RenderUtil::drawRoundedRect(renderer,
+		{hpSection.x - g, hpSection.y - g, hpSection.w + g, hpSection.h + g * 2},
+		cornerOuter,
+		Theme::Playing::PLAYER_HEALTH_GLOW_FILL,
+		Theme::Playing::PLAYER_HEALTH_GLOW_BORDER);
+
+	RenderUtil::drawRoundedRect(renderer, hpSection,
+		cornerInner,
+		Theme::Playing::PLAYER_HEALTH_FILL,
+		Theme::Playing::PLAYER_HEALTH_BORDER);
+
+	textRenderer.drawText(renderer, healthText, font,
+		Theme::Playing::PLAYER_HEALTH_TEXT,
+		hpSection.x + (hpSection.w - healthW) / 2,
+		hpSection.y + (hpSection.h - healthH) / 2);
+
+	// MP section (right half — blue tint + glow)
+	const SDL_Rect mpSection = {barX + barW / 2, barY, barW / 2, barH};
+
+	RenderUtil::drawRoundedRect(renderer,
+		{mpSection.x - g, mpSection.y - g, mpSection.w + g * 2, mpSection.h + g * 2},
+		cornerOuter,
+		Theme::Playing::PLAYER_MANA_GLOW_FILL,
+		Theme::Playing::PLAYER_MANA_GLOW_BORDER);
+
+	RenderUtil::drawRoundedRect(renderer, mpSection,
+		cornerInner,
+		Theme::Playing::PLAYER_MANA_FILL,
+		Theme::Playing::PLAYER_MANA_BORDER);
+
+	textRenderer.drawText(renderer, manaText, font,
+		Theme::Playing::PLAYER_MANA_TEXT,
+		mpSection.x + (mpSection.w - manaW) / 2,
+		mpSection.y + (mpSection.h - manaH) / 2);
+
+	// Center divider
+	SDL_SetRenderDrawColor(renderer,
+		Theme::Playing::PLAYER_BAR_BORDER.r,
+		Theme::Playing::PLAYER_BAR_BORDER.g,
+		Theme::Playing::PLAYER_BAR_BORDER.b,
+		Theme::Playing::PLAYER_BAR_BORDER.a);
+	SDL_RenderDrawLine(renderer,
+		barX + barW / 2, barY + divInset,
+		barX + barW / 2, barY + barH - divInset);
+}
 
 void RenderPlaying::render(Playing& playing, const Game& game) {
 	SDL_Renderer* renderer = game.getRenderer();
@@ -32,13 +144,24 @@ void RenderPlaying::render(Playing& playing, const Game& game) {
 
 	const RenderText::FontSet& uiFonts = game.getUIFonts();
 	const RenderText::FontSet& titleFonts = game.getTitleFonts();
+	int screenW = 0, screenH = 0;
 
-	SDL_SetRenderDrawColor(renderer, Theme::Playing::BACKGROUND.r, Theme::Playing::BACKGROUND.g, Theme::Playing::BACKGROUND.b, Theme::Playing::BACKGROUND.a);
-	SDL_RenderClear(renderer);
+    SDL_GetRendererOutputSize(renderer, &screenW, &screenH);
+
+    // ── background ─────────────────────────────
+    RenderBackdrop::drawBackgroundWithVignette(
+        renderer,
+        screenW,
+        screenH,
+        Theme::BG,                              // base background color
+        Theme::Loading::VIGNETTE_COLOR,        // vignette color
+        Theme::Loading::VIGNETTE_LAYERS,       // layers
+        Theme::Loading::VIGNETTE_ALPHA_FALLOFF,// alpha falloff
+        Theme::Loading::VIGNETTE_MAX_ALPHA     // max alpha
+    );
 
 	const Uint32 now = SDL_GetTicks();
 
-	int screenW = 0, screenH = 0;
 	if (SDL_GetRendererOutputSize(renderer, &screenW, &screenH) != 0) {
 		screenW = 800;
 		screenH = 600;
@@ -171,6 +294,7 @@ void RenderPlaying::render(Playing& playing, const Game& game) {
 		playing.opponentSlots,
 		opponentDeckCount,
 		screenW,
+		screenH,
 		uiFonts.small
 	);
 	RenderBoard::drawPlayZones(renderer, textRenderer, playing.playSlots, uiFonts.small);
@@ -182,54 +306,15 @@ void RenderPlaying::render(Playing& playing, const Game& game) {
 		playing.playSlots,
 		selfDeckCount,
 		screenW,
+		screenH,
 		uiFonts.small
 	);
 
-	// ── opponent stats - top center horizontal bar ───────────────────
-	const std::string opponentText = "Opponent";
-	const std::string opponentHealthText = "Health: " + std::to_string(playing.remotePlayer.health);
-	const std::string opponentManaText = "Mana: " + std::to_string(playing.remotePlayer.mana);
-
-	int oppLabelW = 0, oppLabelH = 0;
-	int oppHealthW = 0, oppHealthH = 0;
-	int oppManaW = 0, oppManaH = 0;
-
-	if (uiFonts.small) {
-		TTF_SizeText(uiFonts.small, opponentText.c_str(), &oppLabelW, &oppLabelH);
-		TTF_SizeText(uiFonts.small, opponentHealthText.c_str(), &oppHealthW, &oppHealthH);
-		TTF_SizeText(uiFonts.small, opponentManaText.c_str(), &oppManaW, &oppManaH);
-	}
-
-	const int oppBarW = Theme::Playing::OPPONENT_BAR_WIDTH;
-	const int oppBarH = Theme::Playing::OPPONENT_BAR_HEIGHT;
-	const int oppBarX = (screenW - oppBarW) / 2;
-	const int oppBarY = Theme::Playing::OPPONENT_BAR_TOP;
-
-	SDL_Rect opponentBar = {oppBarX, oppBarY, oppBarW, oppBarH};
-	RenderUtil::drawRoundedRect(renderer, opponentBar,
-	            Theme::Board::ZONE_CORNER_RADIUS,
-	            Theme::PANEL_FILL,
-	            Theme::Playing::OPPONENT_BAR_BORDER);
-
-	textRenderer.drawText(renderer, opponentText, uiFonts.small,
-	                      Theme::Playing::OPPONENT_LABEL,
-	                      oppBarX + Theme::Playing::OPPONENT_BAR_TEXT_PADDING, oppBarY + (oppBarH - oppLabelH) / 2);
-
-	const int divider1X = oppBarX + oppLabelW + Theme::Playing::OPPONENT_BAR_DIVIDER_GAP;
-	SDL_SetRenderDrawColor(renderer, Theme::Playing::OPPONENT_BAR_DIVIDER.r, Theme::Playing::OPPONENT_BAR_DIVIDER.g, Theme::Playing::OPPONENT_BAR_DIVIDER.b, Theme::Playing::OPPONENT_BAR_DIVIDER.a);
-	SDL_RenderDrawLine(renderer, divider1X, oppBarY + Theme::Playing::OPPONENT_BAR_DIVIDER_INSET, divider1X, oppBarY + oppBarH - Theme::Playing::OPPONENT_BAR_DIVIDER_INSET);
-
-	textRenderer.drawText(renderer, opponentHealthText, uiFonts.small,
-	                      Theme::Playing::OPPONENT_HEALTH_TEXT,
-	                      divider1X + Theme::Playing::OPPONENT_BAR_TEXT_PADDING, oppBarY + (oppBarH - oppHealthH) / 2);
-
-	const int divider2X = divider1X + oppHealthW + Theme::Playing::OPPONENT_BAR_DIVIDER_GAP;
-	SDL_SetRenderDrawColor(renderer, Theme::Playing::OPPONENT_BAR_DIVIDER.r, Theme::Playing::OPPONENT_BAR_DIVIDER.g, Theme::Playing::OPPONENT_BAR_DIVIDER.b, Theme::Playing::OPPONENT_BAR_DIVIDER.a);
-	SDL_RenderDrawLine(renderer, divider2X, oppBarY + Theme::Playing::OPPONENT_BAR_DIVIDER_INSET, divider2X, oppBarY + oppBarH - Theme::Playing::OPPONENT_BAR_DIVIDER_INSET);
-
-	textRenderer.drawText(renderer, opponentManaText, uiFonts.small,
-	                      Theme::Playing::OPPONENT_MANA_TEXT,
-	                      divider2X + Theme::Playing::OPPONENT_BAR_TEXT_PADDING, oppBarY + (oppBarH - oppManaH) / 2);
+	// ── opponent stats - top center horizontal bar with GLOW ─────────
+	drawStatsBar(
+		renderer, textRenderer, titleFonts.medium,
+		playing.remotePlayer.health, playing.remotePlayer.mana,
+		screenW, screenH, true);
 
 	// ── combat phase widget - compact center overlay ──────────────────
 	const Uint32 cycleElapsed = now - playing.combatCycleStartTick;
@@ -260,77 +345,10 @@ void RenderPlaying::render(Playing& playing, const Game& game) {
 	);
 
 	// ── player stats - bottom center horizontal bar with GLOW ────────
-	const std::string healthText = "Health: " + std::to_string(playing.localPlayer.health);
-	const std::string manaText = "Mana: " + std::to_string(playing.localPlayer.mana);
-
-	int healthW = 0, healthH = 0;
-	int manaW = 0, manaH = 0;
-
-	if (titleFonts.medium) {
-		TTF_SizeText(titleFonts.medium, healthText.c_str(), &healthW, &healthH);
-		TTF_SizeText(titleFonts.medium, manaText.c_str(), &manaW, &manaH);
-	}
-
-	const int playerBarW = Theme::Playing::PLAYER_BAR_WIDTH;
-	const int playerBarH = Theme::Playing::PLAYER_BAR_HEIGHT;
-	const int playerBarX = (screenW - playerBarW) / 2;
-	const int playerBarY = screenH - playerBarH - Theme::Playing::PLAYER_BAR_BOTTOM_MARGIN;
-
-	SDL_Rect playerBar = {playerBarX, playerBarY, playerBarW, playerBarH};
-
-	// Outer glow for entire bar
-	RenderUtil::drawRoundedRect(renderer, {playerBar.x - Theme::Playing::PLAYER_BAR_GLOW_INSET, playerBar.y - Theme::Playing::PLAYER_BAR_GLOW_INSET, playerBar.w + Theme::Playing::PLAYER_BAR_GLOW_INSET * 2, playerBar.h + Theme::Playing::PLAYER_BAR_GLOW_INSET * 2},
-	            12,
-	            Theme::Playing::PLAYER_BAR_GLOW_FILL,
-	            Theme::Playing::PLAYER_BAR_GLOW_BORDER);
-
-	RenderUtil::drawRoundedRect(renderer, playerBar,
-	            10,
-	            Theme::Playing::PLAYER_BAR_FILL,
-	            Theme::Playing::PLAYER_BAR_BORDER);
-
-	// Player HP section (left half with red tint + glow)
-	SDL_Rect hpSection = {playerBarX, playerBarY, playerBarW / 2, playerBarH};
-
-	// HP glow
-	RenderUtil::drawRoundedRect(renderer, {hpSection.x - 2, hpSection.y - 2, hpSection.w + 2, hpSection.h + 4},
-	            12,
-	            Theme::Playing::PLAYER_HEALTH_GLOW_FILL,
-	            Theme::Playing::PLAYER_HEALTH_GLOW_BORDER);
-
-	RenderUtil::drawRoundedRect(renderer, hpSection,
-	            10,
-	            Theme::Playing::PLAYER_HEALTH_FILL,
-	            Theme::Playing::PLAYER_HEALTH_BORDER);
-
-	textRenderer.drawText(renderer, healthText, titleFonts.medium,
-	                      Theme::Playing::PLAYER_HEALTH_TEXT,
-	                      hpSection.x + (hpSection.w - healthW) / 2,
-	                      hpSection.y + (hpSection.h - healthH) / 2);
-
-	// Player MP section (right half with blue tint + glow)
-	SDL_Rect mpSection = {playerBarX + playerBarW / 2, playerBarY, playerBarW / 2, playerBarH};
-
-	// MP glow
-	RenderUtil::drawRoundedRect(renderer, {mpSection.x - 2, mpSection.y - 2, mpSection.w + 4, mpSection.h + 4},
-	            12,
-	            Theme::Playing::PLAYER_MANA_GLOW_FILL,
-	            Theme::Playing::PLAYER_MANA_GLOW_BORDER);
-
-	RenderUtil::drawRoundedRect(renderer, mpSection,
-	            10,
-	            Theme::Playing::PLAYER_MANA_FILL,
-	            Theme::Playing::PLAYER_MANA_BORDER);
-
-	textRenderer.drawText(renderer, manaText, titleFonts.medium,
-	                      Theme::Playing::PLAYER_MANA_TEXT,
-	                      mpSection.x + (mpSection.w - manaW) / 2,
-	                      mpSection.y + (mpSection.h - manaH) / 2);
-
-	// Center divider
-	SDL_SetRenderDrawColor(renderer, Theme::Playing::PLAYER_BAR_BORDER.r, Theme::Playing::PLAYER_BAR_BORDER.g, Theme::Playing::PLAYER_BAR_BORDER.b, Theme::Playing::PLAYER_BAR_BORDER.a);
-	SDL_RenderDrawLine(renderer, playerBarX + playerBarW / 2, playerBarY + Theme::Playing::PLAYER_BAR_DIVIDER_INSET,
-	                   playerBarX + playerBarW / 2, playerBarY + playerBarH - Theme::Playing::PLAYER_BAR_DIVIDER_INSET);
+	drawStatsBar(
+		renderer, textRenderer, titleFonts.medium,
+		playing.localPlayer.health, playing.localPlayer.mana,
+		screenW, screenH, false);
 	RenderTargeting::drawPendingTargeting(renderer, textRenderer, playing, uiFonts.small);
 
 	for (const auto& rect : opponentHandRects) {
@@ -406,6 +424,12 @@ void RenderPlaying::render(Playing& playing, const Game& game) {
 		attackingSlots.empty() ? nullptr : &attackingSlots
 	);
 
+	for (const auto& anim : activeAnimations) {
+		if (auto summon = std::dynamic_pointer_cast<SummonAnimation>(anim)) {
+			summon->draw(renderer);
+		}
+	}
+
 	if (!activeAttackFrames.empty()) {
 		SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
 		for (const auto& frame : activeAttackFrames) {
@@ -432,9 +456,7 @@ void RenderPlaying::render(Playing& playing, const Game& game) {
 
 	// draw them
 	for (const auto& discardAnim : activeDiscardAnimations) {
-		const SDL_Rect rect  = discardAnim->getRect();
-		const Card*    card  = discardAnim->getOwnedCard();
-		if (!card) continue;
+		const SDL_Rect rect = discardAnim->getRect();
 
 		if (!discardAnim->getCachedTexture()) {
 			SDL_Texture* target = SDL_CreateTexture(renderer,
@@ -444,8 +466,13 @@ void RenderPlaying::render(Playing& playing, const Game& game) {
 			SDL_SetRenderTarget(renderer, target);
 			SDL_SetRenderDrawColor(renderer, 0, 0, 0, 0);
 			SDL_RenderClear(renderer);
-			RenderCard::drawHandCard(renderer, textRenderer, *card,
-									{0, 0, rect.w, rect.h}, uiFonts.tiny, uiFonts.small);
+			const Card* card = discardAnim->getOwnedCard();
+			if (card) {
+				RenderCard::drawHandCard(renderer, textRenderer, *card,
+										{0, 0, rect.w, rect.h}, uiFonts.tiny, uiFonts.small);
+			} else {
+				RenderCard::drawCardBack(renderer, {0, 0, rect.w, rect.h});
+			}
 			SDL_SetRenderTarget(renderer, nullptr);
 			discardAnim->setCachedTexture(target);
 		}
@@ -491,7 +518,7 @@ void RenderPlaying::render(Playing& playing, const Game& game) {
 			maxPreviewW = std::max(Theme::Playing::PREVIEW_MIN_WIDTH, maxPreviewW);
 
 			const int previewW = std::min(maxPreviewW, screenW - Theme::Playing::PREVIEW_MARGIN * 2);
-			const int previewH = static_cast<int>(previewW * Theme::Playing::PREVIEW_ASPECT_RATIO);
+			const int previewH = static_cast<int>(previewW * Theme::PREVIEW_ASPECT_RATIO);
 			const int previewX = Theme::Playing::PREVIEW_MARGIN;
 			int previewY = 0;
 			if (playing.recentSpellPreview && previewCard == playing.recentSpellPreview.get()) {
@@ -648,63 +675,93 @@ void RenderPlaying::render(Playing& playing, const Game& game) {
 
 	// ── Game End Screen (need a button for requeue)─────────────────────────────────────────────
 	//Currently, game end does NOT mean disconnect from server. They are still in the server.
+	// ── Game End Screen ─────────────────────────────────────────────────────────
 	if (playing.getState() != PlayingGameState::Playing) {
+		Audio::stopMusic();
 		std::string msg = "Defeat";
 		int coinReward = playing.getCoinReward();
 		if (playing.getState() == PlayingGameState::Won) {
 			msg = "Victory";
 		}
+
+	// ── Camera shake intro ───────────────────────────────────────────
+	PlayingGameState currentState = playing.getState();
+
+	// Reset timer whenever we freshly enter an end state
+	if (playing.lastEndState != currentState && currentState != PlayingGameState::Playing) {
+		playing.gameEndStartTick = now;
+	}
+	playing.lastEndState = currentState;
+
+	// Shake parameters
+	constexpr Uint32 shakeDurationMs  = 600U;
+	constexpr float  shakePeakPixels  = 18.0F;
+	constexpr float  shakeFrequency   = 28.0F; // oscillations/sec
+
+	int shakeX = 0, shakeY = 0;
+	const Uint32 shakeElapsed = now - playing.gameEndStartTick;
+	if (shakeElapsed < shakeDurationMs) {
+		const float t       = static_cast<float>(shakeElapsed) / static_cast<float>(shakeDurationMs);
+		const float decay   = (1.0F - t) * (1.0F - t);                         // quadratic ease-out
+		const float timeS   = static_cast<float>(shakeElapsed) / 1000.0F;
+		const float sineX   = std::sin(timeS * shakeFrequency * 3.14159F * 2.0F);
+		const float sineY   = std::sin(timeS * shakeFrequency * 3.14159F * 2.0F * 1.3F); // slight phase offset
+		shakeX = static_cast<int>(sineX * shakePeakPixels * decay);
+		shakeY = static_cast<int>(sineY * shakePeakPixels * decay * 0.5F);     // vertical shake is subtler
+	}
+
+		// ── Overlay ──────────────────────────────────────────────────────
 		SDL_Rect overlay{0, 0, screenW, screenH};
 		SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
-		SDL_SetRenderDrawColor(renderer, Theme::Playing::SURRENDER_OVERLAY.r, Theme::Playing::SURRENDER_OVERLAY.g, Theme::Playing::SURRENDER_OVERLAY.b, Theme::Playing::SURRENDER_OVERLAY.a);
+		SDL_SetRenderDrawColor(renderer,
+			Theme::Playing::SURRENDER_OVERLAY.r,
+			Theme::Playing::SURRENDER_OVERLAY.g,
+			Theme::Playing::SURRENDER_OVERLAY.b,
+			Theme::Playing::SURRENDER_OVERLAY.a);
 		SDL_RenderFillRect(renderer, &overlay);
 
-		int loseTextW = 0;
-		int loseTextH = 0;
+		// ── Victory / Defeat text ────────────────────────────────────────
+		int loseTextW = 0, loseTextH = 0;
 		if (titleFonts.large) {
 			TTF_SizeText(titleFonts.large, msg.data(), &loseTextW, &loseTextH);
 		}
-
 		textRenderer.drawText(
-			renderer,
-			msg,
-			titleFonts.large,
-			Theme::TEXT_PRIMARY,
-			(screenW - loseTextW) / 2,
-			(screenH / 2) - loseTextH - 26
+			renderer, msg, titleFonts.large, Theme::TEXT_PRIMARY,
+			(screenW - loseTextW) / 2 + shakeX,
+			(screenH / 2) - loseTextH - 26 + shakeY
 		);
 
+		// ── Coin reward text ─────────────────────────────────────────────
 		if (coinReward > 0) {
 			std::string coinsMsg = std::to_string(coinReward) + " Coins Earned!";
-			int coinsTextW = 0;
-			int coinsTextH = 0;
+			int coinsTextW = 0, coinsTextH = 0;
 			if (uiFonts.large) {
 				TTF_SizeText(uiFonts.large, coinsMsg.c_str(), &coinsTextW, &coinsTextH);
 			}
-
 			textRenderer.drawText(
-				renderer,
-				coinsMsg,
-				uiFonts.large,
-				Theme::TEXT_PRIMARY,
-				(screenW - coinsTextW) / 2,
-				(screenH / 2) - 16   //
+				renderer, coinsMsg, uiFonts.large, Theme::TEXT_PRIMARY,
+				(screenW - coinsTextW) / 2 + shakeX,
+				(screenH / 2) - 16 + shakeY
 			);
 		}
 
-
+		// ── Buttons (shake applied to their rects) ───────────────────────
 		RenderButton::Style returnStyle{};
-		returnStyle.fill = Theme::BTN_START;
+		returnStyle.fill   = Theme::BTN_START;
 		returnStyle.border = Theme::BTN_BORDER;
-		returnStyle.text = Theme::BTN_TEXT;
+		returnStyle.text   = Theme::BTN_TEXT;
 		returnStyle.radius = 10;
 
-		const bool hoveringReturn = RenderUtil::pointInRect(playing.returnToTitleButton, mouseX, mouseY);
-		RenderButton::drawButton(renderer, playing.returnToTitleButton, "Return to Title", uiFonts.large, returnStyle, hoveringReturn, false);
+		SDL_Rect shakenReturn  = playing.returnToTitleButton;
+		SDL_Rect shakenRequeue = playing.requeueButton;
+		shakenReturn.x  += shakeX;  shakenReturn.y  += shakeY;
+		shakenRequeue.x += shakeX;  shakenRequeue.y += shakeY;
 
-		// ── Requeue button ───────────────────────────────────────────────
-		const bool hoveringRequeue = RenderUtil::pointInRect(playing.requeueButton, mouseX, mouseY);
-		RenderButton::drawButton(renderer, playing.requeueButton, "Requeue", uiFonts.large, returnStyle, hoveringRequeue, false);
+		const bool hoveringReturn  = RenderUtil::pointInRect(playing.returnToTitleButton, mouseX, mouseY);
+		const bool hoveringRequeue = RenderUtil::pointInRect(playing.requeueButton,       mouseX, mouseY);
+
+		RenderButton::drawButton(renderer, shakenReturn,  "Return to Title", uiFonts.large, returnStyle, hoveringReturn,  false);
+		RenderButton::drawButton(renderer, shakenRequeue, "Requeue",         uiFonts.large, returnStyle, hoveringRequeue, false);
 	}
 
 	SDL_RenderPresent(renderer);

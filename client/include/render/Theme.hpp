@@ -5,6 +5,9 @@
 
 namespace Theme {
 
+    // ── card aspect ratio ────────────────────────────────────────────
+    constexpr float PREVIEW_ASPECT_RATIO = 200.0f / 138.0f;
+
     // ── background ───────────────────────────────────────────────────
     constexpr SDL_Color BG                  = {18,  12,  35,  255};
 
@@ -23,6 +26,7 @@ namespace Theme {
     constexpr SDL_Color BTN_CONNECT         = {75,  95,  140, 255};
     constexpr SDL_Color BTN_PRIMARY         = {70,  120, 200, 255};
     constexpr SDL_Color BTN_SECONDARY       = {70,  70,  70,  255};
+    constexpr SDL_Color BTN_PACKS           = {235,  128,  66,  255};
     constexpr SDL_Color BTN_DISABLED        = {92,  92,  92,  255};
     constexpr SDL_Color BTN_DISABLED_BORDER = {140, 140, 140, 255};
     constexpr SDL_Color BTN_DISABLED_TEXT   = {190, 190, 190, 255};
@@ -83,20 +87,19 @@ namespace Theme {
         constexpr int MAX_HAND_SIZE                    = 10;
 
         constexpr int SLOT_COUNT                       = 5;
-        constexpr int SLOT_WIDTH                       = 115;
+        constexpr int SLOT_WIDTH                       = 105;
         constexpr int SLOT_HEIGHT                      = CARD_HEIGHT;
         constexpr int SLOT_SPACING                     = 15;
         constexpr int SLOT_TO_HAND_GAP                 = 16;
         constexpr int SCREEN_MARGIN                    = 20;
         constexpr int SIDE_ZONE_MARGIN                 = 10;
         constexpr int SELF_DECK_GAP                    = 20;
-        constexpr int OPPONENT_SIDE_GAP                = 28;
+        constexpr int OPPONENT_SIDE_GAP                = 20;
         constexpr int OPPONENT_ZONE_OFFSET             = 210;
 
         constexpr Uint32 HOVER_PREVIEW_DELAY_MS        = 300;
         constexpr int PREVIEW_MAX_WIDTH                = 320;
         constexpr int PREVIEW_MIN_WIDTH                = 180;
-        constexpr float PREVIEW_ASPECT_RATIO           = 1.5f;
         constexpr int PREVIEW_MARGIN                   = 20;
         constexpr int SIDE_PREVIEW_MAX_WIDTH           = 260;
         constexpr int SIDE_PREVIEW_TOP_OFFSET          = 8;
@@ -172,7 +175,7 @@ namespace Theme {
 
         constexpr SDL_Color PAUSE_OVERLAY              = {0, 0, 0, 190};
         constexpr SDL_Color EXIT_OVERLAY               = {0, 0, 0, 190};
-        constexpr SDL_Color SURRENDER_OVERLAY          = {0, 0, 0, 220};
+        constexpr SDL_Color SURRENDER_OVERLAY          = {0, 0, 0, 200};
 
         constexpr SDL_Color PAUSE_MODAL_BORDER         = {160, 120, 200, 255};
         constexpr SDL_Color EXIT_MODAL_BORDER          = {240, 192, 64, 150};
@@ -256,13 +259,12 @@ namespace Theme {
         constexpr int DEFAULT_SCREEN_HEIGHT            = 600;
 
         constexpr Uint32 HOVER_PREVIEW_DELAY_MS        = 350;
-        constexpr float PREVIEW_ASPECT_RATIO           = 1.4f;
         constexpr int PREVIEW_MAX_WIDTH                = 360;
         constexpr int PREVIEW_SCREEN_WIDTH_RATIO_DIV   = 2;
         constexpr int PREVIEW_EDGE_MARGIN              = 20;
         constexpr int PREVIEW_DECK_GAP                 = 16;
 
-        constexpr int CARD_WIDTH                       = 140;
+        constexpr int CARD_WIDTH                       = 138;
         constexpr int CARD_HEIGHT                      = 200;
         constexpr int GRID_MARGIN_X                    = 16;
         constexpr int GRID_MARGIN_Y                    = 16;
@@ -344,14 +346,14 @@ namespace Theme {
         constexpr SDL_Color ART_DIMMED_FALLBACK       = {62, 62, 62, 255};
         constexpr SDL_Color ART_CREATURE_FALLBACK     = {34, 66, 115, 255};
         constexpr SDL_Color ART_SPELL_FALLBACK        = {24, 78, 44, 255};
-        constexpr SDL_Color NAME_PLATE_FILL           = {14, 18, 26, 100};
+        constexpr SDL_Color NAME_PLATE_FILL           = {14, 18, 26, 0};
         constexpr SDL_Color NAME_TEXT                 = {228, 235, 255, 255};
         constexpr SDL_Color TYPE_LINE_CREATURE_FILL   = {11, 28, 46, 235};
         constexpr SDL_Color TYPE_LINE_SPELL_FILL      = {10, 45, 26, 235};
         constexpr SDL_Color TYPE_PILL_CREATURE_FILL   = {34, 74, 130, 255};
         constexpr SDL_Color TYPE_PILL_SPELL_FILL      = {30, 99, 59, 255};
         constexpr SDL_Color TYPE_TEXT                 = {198, 242, 230, 255};
-        constexpr SDL_Color TEXT_BOX_FILL             = {28, 33, 37, 120};
+        constexpr SDL_Color TEXT_BOX_FILL             = {28, 33, 37, 200};
         constexpr SDL_Color TEXT_BOX_BORDER           = {61, 75, 87, 175};
         constexpr SDL_Color TEXT_BODY                 = {172, 206, 227, 255};
         constexpr SDL_Color BOTTOM_BAR_FILL           = {9, 18, 33, 100};
@@ -373,7 +375,7 @@ namespace Theme {
         constexpr SDL_Color CARD_BACK_INSET_FILL      = {85, 60, 120, 255};
         constexpr SDL_Color CARD_BACK_INSET_BORDER    = {125, 95, 165, 255};
 
-        constexpr int MIN_CORNER_RADIUS               = 8;
+        constexpr int MIN_CORNER_RADIUS               = 4;
         constexpr int BORDER_THICKNESS                = 3;
         constexpr int EXPANDED_BORDER_THICKNESS       = 4;
         constexpr int INNER_PADDING                   = 4;
@@ -390,12 +392,12 @@ namespace Theme {
         constexpr int TEXT_CLIP_HORIZONTAL_PADDING    = 6;
         constexpr int TEXT_CLIP_VERTICAL_PADDING      = 4;
         constexpr int TEXT_LINE_GAP                   = 2;
-        constexpr int BOTTOM_SECTION_PADDING          = 6;
+        constexpr int BOTTOM_SECTION_PADDING          = 10;
         constexpr int BOTTOM_SECTION_GAP              = 8;
-        constexpr int BOTTOM_COMPACT_SECTION_GAP      = 2;
+        constexpr int BOTTOM_COMPACT_SECTION_GAP      = 10;
         constexpr int MIN_STAT_LABEL_TOP_PADDING      = 2;
         constexpr int MIN_STAT_BASELINE_OFFSET        = 16;
-        constexpr int CARD_BACK_MIN_RADIUS            = 6;
+        constexpr int CARD_BACK_MIN_RADIUS            = 2;
         constexpr int CARD_BACK_INSET                 = 8;
         constexpr int CARD_BACK_MIN_INSET_RADIUS      = 3;
     }
@@ -429,7 +431,6 @@ namespace Theme {
         constexpr int PREVIEW_MARGIN                  = 20;
         constexpr int PREVIEW_TOP                     = 60;
         constexpr int PREVIEW_WIDTH_RATIO_DIV         = 3;
-        constexpr float PREVIEW_ASPECT_RATIO          = 1.5f;
         constexpr float HOVER_PREVIEW_SCALE           = 1.2f;
         constexpr int QTY_CHIP_WIDTH                  = 34;
         constexpr int QTY_CHIP_HEIGHT                 = 18;

@@ -1,10 +1,10 @@
 cid,name,type,cost,value,power,toughness,effect
 1,Fireball,Spell,2,1,0,0,Deal 3 damage to target creature.
 2,Goblin,Creature,1,1,1,1,
-3,Go,Creature,2,2,2,2,Trample
+3,Go,Creature,3,2,2,2,Trample
 4,Jo,Spell,2,2,0,0,"Give target creature +2/+2, if the creature is named 'Go', Give it +4/+4 Instead."
 5,"Kirby, The Ceaseless Hunger",Creature,8,3,3,5,"When this creature kills a creature, it gains +1/+1."
-6,LYS,Creature,8,3,8,8,"Trample, Double Strike"
+6,"L.Y.S, Lord of Systems",Creature,8,3,8,8,"Trample, Double Strike, Deathtouch, Regen 3"
 7,Jew,Creature,3,2,1,1,"When this creature enters the battlefield, Steal 2 mana from your opponent."
 8,Grizzly Bear,Creature,2,2,2,2,
 9,Russian,Creature,3,2,3,3,
@@ -19,7 +19,7 @@ cid,name,type,cost,value,power,toughness,effect
 18,The Pass,Spell,3,2,0,0,Give target creature Trample.
 19,Pepe,Creature,6,3,6,7,
 20,"Mr. President, Get Down!!",Spell,4,2,0,0,Give target creature +0/+3.
-21,Shawn,Creature,4,1,1,2,Trample
+21,Shawn,Creature,4,1,7,1,Trample
 22,Grass Ain't Green,Spell,3,1,0,0,Your opponent takes 1 damage for each creature they control.
 23,Equivalent Exchange,Spell,1,1,0,0,"Target player takes 5 damage, they gain 5 mana."
 24,Bushcamper,Creature,3,2,2,2,"When summoned, deal 2 damage to your opponent."
@@ -37,3 +37,11 @@ cid,name,type,cost,value,power,toughness,effect
 36,Pot of Greed,Spell,2,1,0,0,"Draw 2 Cards"
 37,Devil's Lettuce,Spell,4,2,0,0,"Target creature gains Regen 3"
 38,Mossad Mayhem,Spell,5,1,0,0,"Lose 10 HP, deal 5 damage to all opponent creatures"
+39,Baby Bear,Creature,1,1,1,1,Trample
+40,Slime,Creature,1,1,1,1,Regen 1
+41,Unpaid Intern,Creature,3,2,1,2,"When this creature enters the battlefield, draw a card."
+42,Full Time Worker,Creature,5,3,4,4,"When this creature enters the battlefield, draw 2 cards."
+43,Vampire,Creature,3,2,2,2,"Lifesteal"
+44,Vampire Bat,Creature,2,1,1,1,"Lifesteal"
+45,Vampire Bite,Spell,2,1,0,0,"Target creature gains Lifesteal."
+46,Jew-Jitsu Black Belt,Creature,5,2,3,2,"When this creature kills another creature, steal 1 mana from your opponent."

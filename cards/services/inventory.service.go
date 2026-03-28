@@ -1,16 +1,16 @@
 package services
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/http"
 
 	"github.com/Ryanljk/speedcardgame/cards/config"
 	"github.com/Ryanljk/speedcardgame/cards/models"
+	"github.com/Ryanljk/speedcardgame/cards/util"
 	"github.com/go-chi/chi"
 )
 
-var inputInventory struct {
+type inventoryRequest struct {
 	Uid   int               `json:"uid"`
 	Coins int               `json:"coins"`
 	Cards models.CardCounts `json:"cards"` // Map of card ID to quantity
@@ -74,10 +74,10 @@ func NormalizeInventoryCards(cards models.CardCounts) bool {
 // @Failure      500   {string}  string  "Failed to create inventory"
 // @Router       /inventories [post]
 func CreateInventory(w http.ResponseWriter, r *http.Request) {
+	var inputInventory inventoryRequest
 
 	// Decode the JSON body into the inputInventory struct
-	if err := json.NewDecoder(r.Body).Decode(&inputInventory); err != nil {
-		http.Error(w, "Invalid inputInventory", http.StatusBadRequest)
+	if ok := util.DecodeJSONBody(w, r, &inputInventory, "Invalid inputInventory"); !ok {
 		return
 	}
 	// Create a new Inventory directly in this handler
@@ -107,15 +107,11 @@ func CreateInventory(w http.ResponseWriter, r *http.Request) {
 	NormalizeInventoryCards(inventory.Cards)
 	// Insert into the database
 	if err := config.DB.Create(&inventory).Error; err != nil {
-		http.Error(w, fmt.Sprintf("Failed to create inventory: %v", err), http.StatusInternalServerError)
+		util.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to create inventory: %v", err))
 		return
 	}
 	// Return the created inventory as JSON
-	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(inventory); err != nil {
-		http.Error(w, fmt.Sprintf("Failed to encode inventory response: %v", err), http.StatusInternalServerError)
-		return
-	}
+	util.RespondWithJSON(w, http.StatusOK, inventory)
 }
 
 // ListInventories lists all inventories
@@ -132,7 +128,7 @@ func ListInventories(w http.ResponseWriter, _ *http.Request) {
 
 	// Query all inventories (Cards field is automatically loaded as JSONB)
 	if err := config.DB.Find(&inventories).Error; err != nil {
-		http.Error(w, fmt.Sprintf("Failed to retrieve inventories: %v", err), http.StatusInternalServerError)
+		util.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to retrieve inventories: %v", err))
 		return
 	}
 
@@ -143,11 +139,7 @@ func ListInventories(w http.ResponseWriter, _ *http.Request) {
 	}
 
 	// Return the list of inventories
-	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(inventories); err != nil {
-		http.Error(w, fmt.Sprintf("Failed to encode inventories response: %v", err), http.StatusInternalServerError)
-		return
-	}
+	util.RespondWithJSON(w, http.StatusOK, inventories)
 }
 
 // GetInventory retrieves a specific inventory by user ID
@@ -164,28 +156,24 @@ func ListInventories(w http.ResponseWriter, _ *http.Request) {
 func GetInventoryByUserID(w http.ResponseWriter, r *http.Request) {
 	uidParam := chi.URLParam(r, "uid")
 	if uidParam == "" {
-		http.Error(w, "Missing uid", http.StatusBadRequest)
+		util.RespondWithError(w, http.StatusBadRequest, "Missing uid")
 		return
 	}
 	var inventory models.Inventory
 	if err := config.DB.Where("uid = ?", uidParam).First(&inventory).Error; err != nil {
-		http.Error(w, fmt.Sprintf("Failed to retrieve inventory: %v", err), http.StatusInternalServerError)
+		util.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to retrieve inventory: %v", err))
 		return
 	}
 
 	if NormalizeInventoryCards(inventory.Cards) {
 		if err := config.DB.Save(&inventory).Error; err != nil {
-			http.Error(w, fmt.Sprintf("Failed to normalize inventory: %v", err), http.StatusInternalServerError)
+			util.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to normalize inventory: %v", err))
 			return
 		}
 	}
 
 	// Return the inventory as JSON
-	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(inventory); err != nil {
-		http.Error(w, fmt.Sprintf("Failed to encode inventory response: %v", err), http.StatusInternalServerError)
-		return
-	}
+	util.RespondWithJSON(w, http.StatusOK, inventory)
 }
 
 // UpdateInventory godoc
@@ -200,10 +188,10 @@ func GetInventoryByUserID(w http.ResponseWriter, r *http.Request) {
 // @Failure      500   {string}  string  "Failed to update inventory"
 // @Router       /inventories [put]
 func UpdateInventory(w http.ResponseWriter, r *http.Request) {
+	var inputInventory inventoryRequest
 
 	// Decode the incoming request body
-	if err := json.NewDecoder(r.Body).Decode(&inputInventory); err != nil {
-		http.Error(w, "Invalid inputDeck", http.StatusBadRequest)
+	if ok := util.DecodeJSONBody(w, r, &inputInventory, "Invalid inputDeck"); !ok {
 		return
 	}
 
@@ -213,7 +201,7 @@ func UpdateInventory(w http.ResponseWriter, r *http.Request) {
 
 	var inventory models.Inventory
 	if err := config.DB.Where("uid = ?", uid).First(&inventory).Error; err != nil {
-		http.Error(w, fmt.Sprintf("Failed to retrieve inventory: %v", err), http.StatusInternalServerError)
+		util.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to retrieve inventory: %v", err))
 		return
 	}
 
@@ -238,16 +226,12 @@ func UpdateInventory(w http.ResponseWriter, r *http.Request) {
 
 	// Save the updated inventory
 	if err := config.DB.Save(&inventory).Error; err != nil {
-		http.Error(w, fmt.Sprintf("Failed to update inventory: %v", err), http.StatusInternalServerError)
+		util.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to update inventory: %v", err))
 		return
 	}
 
 	// Return the updated inventory
-	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(inventory); err != nil {
-		http.Error(w, fmt.Sprintf("Failed to encode inventory response: %v", err), http.StatusInternalServerError)
-		return
-	}
+	util.RespondWithJSON(w, http.StatusOK, inventory)
 }
 
 // UpdateInventoryCoins godoc
@@ -262,10 +246,10 @@ func UpdateInventory(w http.ResponseWriter, r *http.Request) {
 // @Failure      500   {string}  string  "Failed to update coins"
 // @Router       /inventories/coins [put]
 func UpdateInventoryCoins(w http.ResponseWriter, r *http.Request) {
+	var inputInventory inventoryRequest
 
 	// Decode the incoming request body
-	if err := json.NewDecoder(r.Body).Decode(&inputInventory); err != nil {
-		http.Error(w, "Invalid inputDeck", http.StatusBadRequest)
+	if ok := util.DecodeJSONBody(w, r, &inputInventory, "Invalid inputDeck"); !ok {
 		return
 	}
 
@@ -273,16 +257,18 @@ func UpdateInventoryCoins(w http.ResponseWriter, r *http.Request) {
 	coins := inputInventory.Coins
 	var inventory models.Inventory
 	if err := config.DB.Where("uid = ?", uid).First(&inventory).Error; err != nil {
-		http.Error(w, fmt.Sprintf("Failed to retrieve inventory: %v", err), http.StatusInternalServerError)
+		util.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to retrieve inventory: %v", err))
 		return
 	}
 	inventory.Coins = coins
 
 	// Save the updated inventory
 	if err := config.DB.Save(&inventory).Error; err != nil {
-		http.Error(w, fmt.Sprintf("Failed to update inventory: %v", err), http.StatusInternalServerError)
+		util.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to update inventory: %v", err))
 		return
 	}
+
+	util.RespondWithJSON(w, http.StatusOK, inventory)
 }
 
 // AddInventoryCoins godoc
@@ -297,10 +283,10 @@ func UpdateInventoryCoins(w http.ResponseWriter, r *http.Request) {
 // @Failure      500   {string}  string  "Failed to add coins"
 // @Router       /inventories/coins/add [put]
 func AddInventoryCoins(w http.ResponseWriter, r *http.Request) {
+	var inputInventory inventoryRequest
 
 	// Decode the incoming request body
-	if err := json.NewDecoder(r.Body).Decode(&inputInventory); err != nil {
-		http.Error(w, "Invalid inputDeck", http.StatusBadRequest)
+	if ok := util.DecodeJSONBody(w, r, &inputInventory, "Invalid inputDeck"); !ok {
 		return
 	}
 
@@ -308,14 +294,16 @@ func AddInventoryCoins(w http.ResponseWriter, r *http.Request) {
 	coins := inputInventory.Coins
 	var inventory models.Inventory
 	if err := config.DB.Where("uid = ?", uid).First(&inventory).Error; err != nil {
-		http.Error(w, fmt.Sprintf("Failed to retrieve inventory: %v", err), http.StatusInternalServerError)
+		util.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to retrieve inventory: %v", err))
 		return
 	}
 	inventory.Coins += coins
 
 	// Save the updated inventory
 	if err := config.DB.Save(&inventory).Error; err != nil {
-		http.Error(w, fmt.Sprintf("Failed to update inventory: %v", err), http.StatusInternalServerError)
+		util.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to update inventory: %v", err))
 		return
 	}
+
+	util.RespondWithJSON(w, http.StatusOK, inventory)
 }

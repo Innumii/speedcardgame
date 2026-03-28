@@ -22,6 +22,7 @@ public:
 private:
     enum class Field {
         None,
+        Username,
         Email,
         Password,
         ConfirmPassword
@@ -31,6 +32,7 @@ private:
     void setActiveField(Field field);
 
     SDL_Rect panelRect{0, 0, 0, 0};
+    SDL_Rect usernameRect{0, 0, 0, 0};
     SDL_Rect emailRect{0, 0, 0, 0};
     SDL_Rect passwordRect{0, 0, 0, 0};
     SDL_Rect confirmRect{0, 0, 0, 0};
@@ -38,6 +40,7 @@ private:
     SDL_Rect backButtonRect{0, 0, 0, 0};
 
     Field activeField{Field::Email};
+    std::string username;
     std::string email;
     std::string password;
     std::string confirmPassword;

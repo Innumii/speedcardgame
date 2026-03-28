@@ -9,6 +9,54 @@
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_ttf.h>
 #include <cmath>
+#include <utils/RenderUtil.hpp>
+
+namespace {
+    float scale = 1.0f;
+}
+
+SDL_Texture* Title::buildButtonTexture(SDL_Renderer* renderer,
+                                       const SDL_Rect& rect,
+                                       const std::string& text,
+                                       SDL_Color fill,
+                                       bool hovered,
+                                       const RenderText::FontSet& fonts)
+{
+    SDL_Texture* tex = SDL_CreateTexture(
+        renderer,
+        SDL_PIXELFORMAT_RGBA8888,
+        SDL_TEXTUREACCESS_TARGET,
+        rect.w,
+        rect.h
+    );
+
+    if (!tex) return nullptr;
+
+    SDL_SetTextureBlendMode(tex, SDL_BLENDMODE_BLEND);
+    SDL_SetRenderTarget(renderer, tex);
+
+    SDL_SetRenderDrawColor(renderer, 0, 0, 0, 0);
+    SDL_RenderClear(renderer);
+
+    SDL_Rect local{0, 0, rect.w, rect.h};
+
+    RenderButton::drawButton(
+        renderer,
+        local,
+        text,
+        fonts.large,
+        fill,
+        Theme::BTN_BORDER,
+        Theme::BTN_TEXT,
+        hovered
+    );
+
+    SDL_SetRenderTarget(renderer, nullptr);
+    return tex;
+}
+
+static constexpr float kRefW = 1200.0F;
+static constexpr float kRefH = 850.0F;
 
 void Title::updateLayout(SDL_Renderer* renderer) {
     int screenW = 800;
@@ -17,37 +65,62 @@ void Title::updateLayout(SDL_Renderer* renderer) {
         SDL_GetRendererOutputSize(renderer, &screenW, &screenH);
     }
 
-    const int bannerW   = titleBanner.w;
-    const int bannerH   = titleBanner.h;
-    const int buttonW   = startButton.w;
-    const int buttonH   = startButton.h;
-    const int smallButtonH = logoutButton.h;
-    const int bannerGap = 24;
-    const int buttonGap = 16;
-    const int smallRowGap = 12;
+    scale = std::min(
+        static_cast<float>(screenW) / kRefW,
+        static_cast<float>(screenH) / kRefH);
+    
 
-    const int buttonsTotalH = (buttonH * 3) + (buttonGap * 2) + smallButtonH;
+    // Scale all button and banner dimensions from theme constants
+    const int mainBtnW   = static_cast<int>(Theme::Title::MAIN_BUTTON_WIDTH   * scale);
+    const int mainBtnH   = static_cast<int>(Theme::Title::MAIN_BUTTON_HEIGHT  * scale);
+    const int smallBtnW  = static_cast<int>(Theme::Title::SMALL_BUTTON_WIDTH  * scale);
+    const int smallBtnH  = static_cast<int>(Theme::Title::SMALL_BUTTON_HEIGHT * scale);
+    const int bannerW    = static_cast<int>(Theme::Title::BANNER_WIDTH         * scale);
+    const int bannerH    = static_cast<int>(Theme::Title::BANNER_HEIGHT        * scale);
+    const int bannerGap  = static_cast<int>(24 * scale);
+    const int buttonGap  = static_cast<int>(16 * scale);
+    const int smallRowGap = static_cast<int>(12 * scale);
+
+    startButton.w = mainBtnW;
+    startButton.h = mainBtnH;
+    BuildDeckButton.w = mainBtnW;
+    BuildDeckButton.h = mainBtnH;
+    OpenPacksButton.w = mainBtnW;
+    OpenPacksButton.h = mainBtnH;
+    ShopButton.w = mainBtnW;
+    ShopButton.h = mainBtnH;
+    logoutButton.w = smallBtnW;
+    logoutButton.h = smallBtnH;
+    quitButton.w = smallBtnW;
+    quitButton.h = smallBtnH;
+    titleBanner.w = bannerW;
+    titleBanner.h = bannerH;
+
+    const int buttonsTotalH = (mainBtnH * 4) + (buttonGap * 3) + smallBtnH;
     const int totalH        = bannerH + bannerGap + buttonsTotalH;
     int topY = (screenH - totalH) / 2;
-    if (topY < 20) topY = 20;
+    if (topY < static_cast<int>(20 * scale)) topY = static_cast<int>(20 * scale);
 
     const int centerX = screenW / 2;
 
     titleBanner.x     = centerX - (bannerW / 2);
     titleBanner.y     = topY;
 
-    startButton.x     = centerX - (buttonW / 2);
+    startButton.x     = centerX - (mainBtnW / 2);
     startButton.y     = titleBanner.y + bannerH + bannerGap;
 
     BuildDeckButton.x = startButton.x;
-    BuildDeckButton.y = startButton.y + buttonH + buttonGap;
+    BuildDeckButton.y = startButton.y + mainBtnH + buttonGap;
 
     OpenPacksButton.x = startButton.x;
-    OpenPacksButton.y = BuildDeckButton.y + buttonH + buttonGap;
+    OpenPacksButton.y = BuildDeckButton.y + mainBtnH + buttonGap;
+
+    ShopButton.x      = startButton.x;
+    ShopButton.y      = OpenPacksButton.y + mainBtnH + buttonGap;
 
     const int smallTotalW = logoutButton.w + smallRowGap + quitButton.w;
     const int smallStartX = centerX - (smallTotalW / 2);
-    const int smallY = OpenPacksButton.y + buttonH + buttonGap;
+    const int smallY = ShopButton.y + mainBtnH + buttonGap;
     logoutButton.x = smallStartX;
     logoutButton.y = smallY;
     quitButton.x = logoutButton.x + logoutButton.w + smallRowGap;
@@ -71,21 +144,27 @@ void Title::handleEvents(Game& game, const SDL_Event& event) {
                                  (mouseY >= BuildDeckButton.y && mouseY <= BuildDeckButton.y + BuildDeckButton.h);
         const bool inOpenPacks = (mouseX >= OpenPacksButton.x && mouseX <= OpenPacksButton.x + OpenPacksButton.w) &&
                      (mouseY >= OpenPacksButton.y && mouseY <= OpenPacksButton.y + OpenPacksButton.h);
+        const bool inShop      = (mouseX >= ShopButton.x      && mouseX <= ShopButton.x      + ShopButton.w) &&
+                     (mouseY >= ShopButton.y      && mouseY <= ShopButton.y      + ShopButton.h);
         const bool inLogout    = (mouseX >= logoutButton.x    && mouseX <= logoutButton.x    + logoutButton.w) &&
                                  (mouseY >= logoutButton.y    && mouseY <= logoutButton.y    + logoutButton.h);
         const bool inQuit      = (mouseX >= quitButton.x      && mouseX <= quitButton.x      + quitButton.w)  &&
                                  (mouseY >= quitButton.y      && mouseY <= quitButton.y      + quitButton.h);
+
         if (inStart) {
             game.setNextState(GameState::Connecting);
         } else if (inBuildDeck) {
             game.setNextState(GameState::DeckBuilding);
         } else if (inOpenPacks) {
             game.setNextState(GameState::PackOpening);
+        } else if (inShop) {
+            game.setNextState(GameState::Payment);
         } else if (inLogout) {
+            RenderBackdrop::resetElapsed();
+            animInitialized = false;
             game.endUserSession();
             game.getNetworkClient().disconnect();
             game.setPlayerUsername("Player");
-
             game.setNextState(GameState::Login);
         } else if (inQuit) {
             game.setNextState(GameState::Quit);
@@ -108,12 +187,15 @@ void Title::update(Game& game) {
     } else if (mouseX >= OpenPacksButton.x && mouseX <= OpenPacksButton.x + OpenPacksButton.w &&
                mouseY >= OpenPacksButton.y && mouseY <= OpenPacksButton.y + OpenPacksButton.h) {
         hoveredButton = 2;
+    } else if (mouseX >= ShopButton.x && mouseX <= ShopButton.x + ShopButton.w &&
+               mouseY >= ShopButton.y && mouseY <= ShopButton.y + ShopButton.h) {
+        hoveredButton = 3;
     } else if (mouseX >= logoutButton.x && mouseX <= logoutButton.x + logoutButton.w &&
                mouseY >= logoutButton.y && mouseY <= logoutButton.y + logoutButton.h) {
-        hoveredButton = 3;
+        hoveredButton = 4;
     } else if (mouseX >= quitButton.x && mouseX <= quitButton.x + quitButton.w &&
                mouseY >= quitButton.y && mouseY <= quitButton.y + quitButton.h) {
-        hoveredButton = 4;
+        hoveredButton = 5;
     }
 }
 
@@ -122,11 +204,8 @@ void Title::render(const Game& game) {
     const RenderText::FontSet& titleFonts = game.getTitleFonts();
     const RenderText::FontSet& uiFonts    = game.getUIFonts();
 
-    // ── initialize layout once ────────────────────────────────────────
-    if (!layoutInitialized) {
-        updateLayout(renderer);
-        layoutInitialized = true;
-    }
+    // Always recompute layout so it responds to window size changes
+    updateLayout(renderer);
 
     int screenW, screenH;
     SDL_GetRendererOutputSize(renderer, &screenW, &screenH);
@@ -140,41 +219,42 @@ void Title::render(const Game& game) {
             animStartTick   = SDL_GetTicks();
             animInitialized = true;
         }
-        Uint32 now = SDL_GetTicks();
-        elapsed = (now - animStartTick) / 1000.0f;
+        elapsed = (SDL_GetTicks() - animStartTick) / 1000.0f;
     }
 
-    // ── clear background ─────────────────────────────────────────────
-    RenderBackdrop::drawBackgroundWithVignette(
-        renderer,
-        screenW,
-        screenH,
-        Theme::BG,
-        SDL_Color{0, 0, 0, 255},
-        80,
-        1.5f,
-        120
-    );
+    // ── background + vignette ────────────────────────────────────────
+    if (animationsEnabled) {
+        RenderBackdrop::drawTitleBackdrop(renderer, screenW, screenH);
+    } else {
+        RenderBackdrop::drawBackgroundWithVignette(
+            renderer, screenW, screenH,
+            Theme::BG,
+            SDL_Color{0, 0, 0, 255},
+            80, 1.5f, 120
+        );
+    }
+
+    
 
     // ── banner animation ─────────────────────────────────────────────
     float bannerT     = std::min(elapsed / 0.6f, 1.0f);
     float bannerEase  = 1.0f - (1.0f - bannerT) * (1.0f - bannerT);
-    Uint8 bannerAlpha = (Uint8)(bannerEase * 255);
-    int   bannerOffY  = (int)((1.0f - bannerEase) * -40);
+    Uint8 bannerAlpha = static_cast<Uint8>(bannerEase * 255);
+    int   bannerOffY  = static_cast<int>((1.0f - bannerEase) * -40);
 
     SDL_Rect  animBanner     = {titleBanner.x, titleBanner.y + bannerOffY,
                                 titleBanner.w, titleBanner.h};
-    SDL_Color animBannerFill = {Theme::BANNER_FILL.r, Theme::BANNER_FILL.g,
-                                Theme::BANNER_FILL.b, bannerAlpha};
+    SDL_Color animBannerFill = {Theme::BANNER_FILL.r,   Theme::BANNER_FILL.g,
+                                Theme::BANNER_FILL.b,   bannerAlpha};
     SDL_Color animGold       = {Theme::BANNER_BORDER.r, Theme::BANNER_BORDER.g,
                                 Theme::BANNER_BORDER.b, bannerAlpha};
-    SDL_Color animText       = {Theme::BANNER_TEXT.r, Theme::BANNER_TEXT.g,
-                                Theme::BANNER_TEXT.b, bannerAlpha};
-    SDL_Color animGlow       = {Theme::BANNER_GLOW.r, Theme::BANNER_GLOW.g,
-                                Theme::BANNER_GLOW.b, bannerAlpha};
+    SDL_Color animText       = {Theme::BANNER_TEXT.r,   Theme::BANNER_TEXT.g,
+                                Theme::BANNER_TEXT.b,   bannerAlpha};
+    SDL_Color animGlow       = {Theme::BANNER_GLOW.r,   Theme::BANNER_GLOW.g,
+                                Theme::BANNER_GLOW.b,   bannerAlpha};
 
     if (bannerAlpha > 0) {
-        RenderBanner::drawBanner(renderer, animBanner, "Mana Kaisen",
+        RenderBanner::drawBanner(renderer, animBanner, "Archcast",
                                  titleFonts.large, animBannerFill, animGold,
                                  animText, animGlow);
     }
@@ -184,25 +264,91 @@ void Title::render(const Game& game) {
         float delay = 0.3f + index * 0.15f;
         float t     = std::min(std::max((elapsed - delay) / 0.5f, 0.0f), 1.0f);
         float ease  = 1.0f - (1.0f - t) * (1.0f - t);
-        return {(Uint8)(ease * 255), (int)((1.0f - ease) * -40)};
+        return {static_cast<Uint8>(ease * 255), static_cast<int>((1.0f - ease) * -40)};
     };
 
     auto drawBtn = [&](const SDL_Rect& rect, SDL_Color fill,
-                        const std::string& text, int index) {
+                    const std::string& text, int index) {
+
         auto [alpha, offY] = buttonSlide(index);
-        if (alpha == 0) return; // skip invisible buttons
+        if (alpha == 0) return;
 
-        SDL_Rect animRect  = {rect.x, rect.y + offY, rect.w, rect.h};
-        SDL_Color f = {fill.r, fill.g, fill.b, alpha};
-        SDL_Color b = {Theme::BTN_BORDER.r, Theme::BTN_BORDER.g, Theme::BTN_BORDER.b, alpha};
-        SDL_Color t = {Theme::BTN_TEXT.r, Theme::BTN_TEXT.g, Theme::BTN_TEXT.b, alpha};
+        bool isHovered = (hoveredButton == index);
+        auto& cache = cachedButtons[index];
 
-        RenderButton::drawButton(renderer, animRect, text, uiFonts.large, f, b, t, hoveredButton == index);
+        if (!cache.texture      ||
+            cache.w       != rect.w    ||
+            cache.h       != rect.h    ||
+            cache.label   != text      ||
+            cache.hovered != isHovered ||
+            cache.lastScale != scale)
+        {
+            if (cache.texture) SDL_DestroyTexture(cache.texture);
+
+            const int sOff = Theme::Effects::SHADOW_OFFSET;
+
+            // Texture is large enough to hold button + shadow bleed
+            SDL_Texture* tex = SDL_CreateTexture(
+                renderer,
+                SDL_PIXELFORMAT_RGBA8888,
+                SDL_TEXTUREACCESS_TARGET,
+                rect.w + sOff,
+                rect.h + sOff
+            );
+            if (!tex) return;
+
+            SDL_SetTextureBlendMode(tex, SDL_BLENDMODE_BLEND);
+            SDL_SetRenderTarget(renderer, tex);
+            SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+            SDL_SetRenderDrawColor(renderer, 0, 0, 0, 0);
+            SDL_RenderClear(renderer);
+
+            // Shadow drawn first (offset), then button on top —
+            // both composite cleanly against transparent black inside the texture
+            SDL_Rect shadowLocal{sOff, sOff, rect.w, rect.h};
+            RenderUtil::drawRoundedShadow(renderer, shadowLocal,
+                Theme::BTN_RADIUS, 0, Theme::Effects::SHADOW_COLOR);
+
+            SDL_Rect local{0, 0, rect.w, rect.h};
+            RenderButton::Style style{};
+            style.fill       = fill;
+            style.border     = Theme::BTN_BORDER;
+            style.text       = Theme::BTN_TEXT;
+            style.drawShadow = false;  // already drawn manually above
+
+            RenderButton::drawButton(renderer, local, text, uiFonts.large, style, isHovered);
+
+            SDL_SetRenderTarget(renderer, nullptr);
+
+            cache.texture   = tex;
+            cache.w         = rect.w;
+            cache.h         = rect.h;
+            cache.label     = text;
+            cache.hovered   = isHovered;
+            cache.lastScale = scale;
+        }
+
+        if (!cache.texture) return;
+
+        const int sOff = Theme::Effects::SHADOW_OFFSET;
+        SDL_SetTextureAlphaMod(cache.texture, alpha);
+        SDL_Rect dst{rect.x, rect.y + offY, rect.w + sOff, rect.h + sOff};
+        SDL_RenderCopy(renderer, cache.texture, nullptr, &dst);
     };
 
     drawBtn(startButton,     Theme::BTN_START,   "Start Game", 0);
     drawBtn(BuildDeckButton, Theme::BTN_BUILD,   "Build Deck", 1);
-    drawBtn(OpenPacksButton, Theme::BTN_START,   "Open Packs", 2);
-    drawBtn(logoutButton,    Theme::BTN_CONNECT, "Logout",     3);
-    drawBtn(quitButton,      Theme::BTN_QUIT,    "Quit Game",  4);
+    drawBtn(OpenPacksButton, Theme::BTN_PACKS,   "Open Packs", 2);
+    drawBtn(ShopButton,      Theme::BTN_PRIMARY, "Coin Shop",  3);
+    drawBtn(logoutButton,    Theme::BTN_CONNECT, "Logout",     4);
+    drawBtn(quitButton,      Theme::BTN_QUIT,    "Quit Game",  5);
+}
+
+Title::~Title() {
+    for (auto& cache : cachedButtons) {
+        if (cache.texture) {
+            SDL_DestroyTexture(cache.texture);
+            cache.texture = nullptr;
+        }
+    }
 }

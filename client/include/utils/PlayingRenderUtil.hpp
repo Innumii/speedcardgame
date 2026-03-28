@@ -35,11 +35,14 @@ namespace PlayingRenderUtil {
 
     void drawOpponentDeckAndDiscard(SDL_Renderer* renderer, RenderText& textRenderer,
                                     const std::vector<SDL_Rect>& opponentSlots,
-                                    std::size_t deckSize, int screenW, TTF_Font* fontSmall);
+                                    std::size_t deckSize, int screenW, int screenH,
+                                    TTF_Font* fontSmall);
 
     void drawSelfDeck(SDL_Renderer* renderer, RenderText& textRenderer,
                       const std::vector<SDL_Rect>& playSlots,
-                      int deckSize, int screenW, TTF_Font* fontSmall);
+                      int deckSize, int screenW, int screenH, TTF_Font* fontSmall);
+
+    SDL_Rect computeOpponentDiscardRect(const std::vector<SDL_Rect>& opponentSlots, int screenW, int screenH);
 }
 
 #endif

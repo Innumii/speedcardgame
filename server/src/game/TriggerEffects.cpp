@@ -311,6 +311,12 @@ const std::unordered_map<int, std::vector<CardEffectEntry>> TriggerEffects::card
           },
         }},
 
+    // Vampire Bite
+    {45, { CardEffectEntry{
+        .effectId = 7,
+        .amount   = CombatEffects::kLifesteal
+    }}},
+
 //---------------------------------------------------------- CREATURES ----------------------------------------------------------
 
     //Kirby
@@ -354,5 +360,32 @@ const std::unordered_map<int, std::vector<CardEffectEntry>> TriggerEffects::card
         .amount   = -5,
         .target   = Target::Self
     }}},
+
+    //Unpaid Intern
+    {41, { CardEffectEntry{
+        .effectId = 12,
+        .amount   = 1
+    }}},
+
+    //Full Time Worker
+    {42, { CardEffectEntry{
+        .effectId = 12,
+        .amount   = 2
+    }}},
+
+    //Jew Jitsu Black Belt
+    {46, { CardEffectEntry{
+            .effectId = 5,
+            .amount   = -1,
+            .target   = Target::Opponent,
+            .trigger = TriggerType::OnKill
+          },
+          CardEffectEntry{
+            .effectId = 5,
+            .amount   = 1,
+            .target   = Target::Self,
+            .trigger = TriggerType::OnKill
+          }
+    }},
 
 };

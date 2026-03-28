@@ -21,15 +21,9 @@
 // ── network helpers ───────────────────────────────────────────────────────────
 
 namespace {
+    constexpr std::size_t kMaxUsernameLen = 32;
     constexpr std::size_t kMaxEmailLen    = 64;
     constexpr std::size_t kMaxPasswordLen = 32;
-
-    std::string deriveNameFromEmail(const std::string& email) {
-        std::size_t atPos = email.find('@');
-        if (atPos == std::string::npos || atPos == 0) return "Player";
-        std::string name = email.substr(0, atPos);
-        return name.empty() ? "Player" : name;
-    }
 
     bool isLikelyEmail(const std::string& email) {
         std::size_t atPos = email.find('@');
@@ -38,18 +32,16 @@ namespace {
         return dotPos != std::string::npos && dotPos + 1 < email.size();
     }
 
-    bool registerUser(const std::string& email, const std::string& password, std::string& error) {
-        if (email.empty() || password.empty()) {
-            error = "email and password required";
-            return false;
-        }
+    bool registerUser(const std::string& username,
+                      const std::string& email,
+                      const std::string& password,
+                      std::string& error) {
 
         const std::string host = EnvUtil::getAuthServiceHost();
         const int         port = EnvUtil::getAuthServicePort();
-        const std::string name = deriveNameFromEmail(email);
 
         std::ostringstream payload;
-        payload << "{\"name\":\""       << JsonUtil::escapeJsonString(name)
+        payload << "{\"name\":\""       << JsonUtil::escapeJsonString(username)
                 << "\",\"email\":\""    << JsonUtil::escapeJsonString(email)
                 << "\",\"password\":\"" << JsonUtil::escapeJsonString(password) << "\"}";
 
@@ -69,8 +61,7 @@ namespace {
 
         return true;
     }
-
-} // ── end anonymous namespace ──────────────────────────────────────────────────
+}
 
 // ── lifecycle ─────────────────────────────────────────────────────────────────
 
@@ -78,7 +69,7 @@ Register::Register()  = default;
 Register::~Register() = default;
 
 void Register::enter(Game& game) {
-    setActiveField(Field::Email);
+    setActiveField(Field::Username);
     statusMessage.clear();
     SDL_StartTextInput();
 }
@@ -103,13 +94,16 @@ void Register::updateLayout(SDL_Renderer* renderer) {
     if (renderer) SDL_GetRendererOutputSize(renderer, &screenW, &screenH);
 
     const int panelW = std::min(560, static_cast<int>(screenW * 0.75f));
-    const int panelH = 500;
+    const int panelH = 520;
     panelRect = {(screenW - panelW) / 2, (screenH - panelH) / 2 + 60, panelW, panelH};
 
     const int inputW  = panelW - 80;
     const int inputH  = 52;
     const int inputX  = panelRect.x + 40;
-    int       cursorY = panelRect.y + 110;
+    int       cursorY = panelRect.y + 100;
+
+    usernameRect = {inputX, cursorY, inputW, inputH};
+    cursorY += inputH + 40;
 
     emailRect    = {inputX, cursorY, inputW, inputH};
     cursorY += inputH + 40;
@@ -118,11 +112,12 @@ void Register::updateLayout(SDL_Renderer* renderer) {
     cursorY += inputH + 40;
 
     confirmRect  = {inputX, cursorY, inputW, inputH};
-    cursorY += inputH + 36;
+    cursorY += inputH + 30;
 
     const int buttonW = (inputW - 16) / 2;
     const int buttonH = 52;
-    createButtonRect = {inputX,               cursorY, buttonW, buttonH};
+
+    createButtonRect = {inputX, cursorY, buttonW, buttonH};
     backButtonRect   = {inputX + buttonW + 16, cursorY, buttonW, buttonH};
 }
 
@@ -143,7 +138,9 @@ void Register::handleEvents(Game& game, const SDL_Event& event) {
 
     if (event.type == SDL_MOUSEBUTTONDOWN && event.button.button == SDL_BUTTON_LEFT) {
         const int mx = event.button.x, my = event.button.y;
-        if      (RenderUtil::pointInRect(emailRect,    mx, my)) setActiveField(Field::Email);
+
+        if      (RenderUtil::pointInRect(usernameRect, mx, my)) setActiveField(Field::Username);
+        else if (RenderUtil::pointInRect(emailRect,    mx, my)) setActiveField(Field::Email);
         else if (RenderUtil::pointInRect(passwordRect, mx, my)) setActiveField(Field::Password);
         else if (RenderUtil::pointInRect(confirmRect,  mx, my)) setActiveField(Field::ConfirmPassword);
         else                                        setActiveField(Field::None);
@@ -154,9 +151,12 @@ void Register::handleEvents(Game& game, const SDL_Event& event) {
 
     if (event.type == SDL_TEXTINPUT) {
         statusMessage.clear();
-        if      (activeField == Field::Email           && email.size()           < kMaxEmailLen)
+
+        if      (activeField == Field::Username && username.size() < kMaxUsernameLen)
+            username.append(event.text.text);
+        else if (activeField == Field::Email && email.size() < kMaxEmailLen)
             email.append(event.text.text);
-        else if (activeField == Field::Password        && password.size()        < kMaxPasswordLen)
+        else if (activeField == Field::Password && password.size() < kMaxPasswordLen)
             password.append(event.text.text);
         else if (activeField == Field::ConfirmPassword && confirmPassword.size() < kMaxPasswordLen)
             confirmPassword.append(event.text.text);
@@ -165,20 +165,32 @@ void Register::handleEvents(Game& game, const SDL_Event& event) {
     if (event.type == SDL_KEYDOWN) {
         switch (event.key.keysym.sym) {
             case SDLK_TAB:
-                if      (activeField == Field::Email)    setActiveField(Field::Password);
-                else if (activeField == Field::Password) setActiveField(Field::ConfirmPassword);
-                else                                     setActiveField(Field::Email);
-                break;
+                switch (activeField) {
+                    case Field::Username:       setActiveField(Field::Email); break;
+                    case Field::Email:          setActiveField(Field::Password); break;
+                    case Field::Password:       setActiveField(Field::ConfirmPassword); break;
+                    case Field::ConfirmPassword: setActiveField(Field::Username); break;
+                    case Field::None:           setActiveField(Field::Username); break;
+                    default: setActiveField(Field::Username); break;
+                }
+
             case SDLK_BACKSPACE:
                 statusMessage.clear();
-                if      (activeField == Field::Email           && !email.empty())           email.pop_back();
-                else if (activeField == Field::Password        && !password.empty())        password.pop_back();
+                if      (activeField == Field::Username && !username.empty()) username.pop_back();
+                else if (activeField == Field::Email && !email.empty()) email.pop_back();
+                else if (activeField == Field::Password && !password.empty()) password.pop_back();
                 else if (activeField == Field::ConfirmPassword && !confirmPassword.empty()) confirmPassword.pop_back();
                 break;
-            case SDLK_RETURN: case SDLK_KP_ENTER:
-                createPressed = true; break;
+
+            case SDLK_RETURN:
+            case SDLK_KP_ENTER:
+                createPressed = true;
+                break;
+
             case SDLK_ESCAPE:
-                backPressed = true; break;
+                backPressed = true;
+                break;
+
             default: break;
         }
     }
@@ -191,20 +203,21 @@ void Register::update(Game& game) {
         createPressed = false;
         statusMessage.clear();
 
-        if (email.empty())               { statusMessage = "Email is required.";                       return; }
-        if (!isLikelyEmail(email))       { statusMessage = "Enter a valid email address.";             return; }
-        if (password.empty())            { statusMessage = "Password is required.";                    return; }
-        if (confirmPassword.empty())     { statusMessage = "Re-enter your password.";                  return; }
-        if (password.size() < 8)         { statusMessage = "Password must be at least 8 characters."; return; }
-        if (password != confirmPassword) { statusMessage = "Passwords do not match.";                  return; }
+        if (username.empty())               { statusMessage = "Username is required."; return; }
+        if (username.size() < 3)            { statusMessage = "Username must be at least 3 characters."; return; }
+        if (email.empty())                  { statusMessage = "Email is required."; return; }
+        if (!isLikelyEmail(email))          { statusMessage = "Enter a valid email."; return; }
+        if (password.empty())               { statusMessage = "Password is required."; return; }
+        if (password.size() < 8)            { statusMessage = "Password must be at least 8 characters."; return; }
+        if (confirmPassword != password)    { statusMessage = "Passwords do not match."; return; }
 
         std::string error;
-        if (!registerUser(email, password, error)) {
+        if (!registerUser(username, email, password, error)) {
             statusMessage = error;
-            std::cerr << "Registration failed: " << error << '\n';
             return;
         }
 
+        username.clear();
         email.clear();
         password.clear();
         confirmPassword.clear();
@@ -245,7 +258,7 @@ void Register::render(const Game& game) {
     // ── banner ───────────────────────────────────────────────────────
     SDL_Rect bannerRect = {screenW / 2 - Theme::BANNER_W / 2, 30,
                            Theme::BANNER_W, Theme::BANNER_H};
-    RenderBanner::drawBanner(renderer, bannerRect, "Mana Kaisen",
+    RenderBanner::drawBanner(renderer, bannerRect, "Archcast",
                               titleFonts.large,
                               Theme::BANNER_FILL,  Theme::BANNER_BORDER,
                               Theme::BANNER_TEXT,  Theme::BANNER_GLOW);
@@ -262,6 +275,8 @@ void Register::render(const Game& game) {
 
     // ── field labels ─────────────────────────────────────────────────
     if (uiFonts.large) {
+        RenderText::drawText(renderer, "Username",         uiFonts.large,
+                             Theme::TEXT_MUTED, usernameRect.x, usernameRect.y - 28);
         RenderText::drawText(renderer, "Email",            uiFonts.large,
                              Theme::TEXT_MUTED, emailRect.x,    emailRect.y    - 28);
         RenderText::drawText(renderer, "Password",         uiFonts.large,
@@ -271,13 +286,20 @@ void Register::render(const Game& game) {
     }
 
     // ── input fields ─────────────────────────────────────────────────
+    SDL_Color usernameFill   = activeField == Field::Username ? Theme::INPUT_ACTIVE : Theme::INPUT_FILL;
     SDL_Color emailFill     = activeField == Field::Email           ? Theme::INPUT_ACTIVE : Theme::INPUT_FILL;
     SDL_Color passFill      = activeField == Field::Password        ? Theme::INPUT_ACTIVE : Theme::INPUT_FILL;
     SDL_Color confirmFill   = activeField == Field::ConfirmPassword ? Theme::INPUT_ACTIVE : Theme::INPUT_FILL;
 
+    SDL_Color usernameBorder = activeField == Field::Username ? Theme::INPUT_BORDER_ACTIVE : Theme::INPUT_BORDER_IDLE;
     SDL_Color emailBorder   = activeField == Field::Email           ? Theme::INPUT_BORDER_ACTIVE : Theme::INPUT_BORDER_IDLE;
     SDL_Color passBorder    = activeField == Field::Password        ? Theme::INPUT_BORDER_ACTIVE : Theme::INPUT_BORDER_IDLE;
     SDL_Color confirmBorder = activeField == Field::ConfirmPassword ? Theme::INPUT_BORDER_ACTIVE : Theme::INPUT_BORDER_IDLE;
+
+    SDL_SetRenderDrawColor(renderer, usernameFill.r, usernameFill.g, usernameFill.b, usernameFill.a);
+    SDL_RenderFillRect(renderer, &usernameRect);
+    SDL_SetRenderDrawColor(renderer, usernameBorder.r, usernameBorder.g, usernameBorder.b, usernameBorder.a);
+    SDL_RenderDrawRect(renderer, &usernameRect);
 
     SDL_SetRenderDrawColor(renderer, emailFill.r,     emailFill.g,     emailFill.b,     emailFill.a);
     SDL_RenderFillRect(renderer, &emailRect);
@@ -294,9 +316,13 @@ void Register::render(const Game& game) {
     SDL_SetRenderDrawColor(renderer, confirmBorder.r, confirmBorder.g, confirmBorder.b, confirmBorder.a);
     SDL_RenderDrawRect(renderer, &confirmRect);
 
-    // ── input text ───────────────────────────────────────────────────
+   // ── input text ───────────────────────────────────────────────────
     if (uiFonts.large) {
         const int textPad = 10;
+        RenderText::drawText(renderer, username, uiFonts.large,
+                             Theme::TEXT_PRIMARY,
+                             usernameRect.x + textPad,
+                             usernameRect.y + (usernameRect.h - 20) / 2);
         RenderText::drawText(renderer, email, uiFonts.large,
                              Theme::TEXT_PRIMARY,
                              emailRect.x + textPad,
@@ -326,12 +352,12 @@ void Register::render(const Game& game) {
 
     // ── buttons ──────────────────────────────────────────────────────
     RenderButton::drawButton(renderer, createButtonRect, "Create",
-                              uiFonts.large,
-                              Theme::BTN_PRIMARY,   Theme::BTN_BORDER,
-                              Theme::BTN_TEXT,       createHover, false);
+                             uiFonts.large,
+                             Theme::BTN_PRIMARY, Theme::BTN_BORDER,
+                             Theme::BTN_TEXT, createHover, false);
 
-    RenderButton::drawButton(renderer, backButtonRect,   "Back",
-                              uiFonts.large,
-                              Theme::BTN_SECONDARY, Theme::BTN_BORDER,
-                              Theme::BTN_TEXT,       backHover, false);
+    RenderButton::drawButton(renderer, backButtonRect, "Back",
+                             uiFonts.large,
+                             Theme::BTN_SECONDARY, Theme::BTN_BORDER,
+                             Theme::BTN_TEXT, backHover, false);
 }

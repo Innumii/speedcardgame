@@ -1,6 +1,6 @@
 aws_region = "us-east-1"
 image_tag  = "latest"
-image_repo = "ryanljk/g4t2-cards-service"
+image_repo = "FYL-Studios/speedcardgame"
 assign_public_ip = true
 
 use_managed_data_stack = true
@@ -15,6 +15,7 @@ ghcr_pat_secret_arn = "arn:aws:secretsmanager:us-east-1:123456789012:secret:ghcr
 
 # Optional manual override when use_managed_data_stack = false
 # database_url_secret_arn = "arn:aws:secretsmanager:...:secret:speedcardgame-cards-runtime"
+# cards_runtime_secret_name = "speedcardgame-cards-runtime"
 # database_url = "postgres://user:password@your-postgres-host:5432/cardsdb?sslmode=disable" # fallback only when not using Secrets Manager
 
 # Optional manual ALB wiring when use_managed_alb_stack = false

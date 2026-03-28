@@ -1,6 +1,7 @@
 #include "states/Playing.hpp"
 
 #include "core/Game.hpp"
+#include "core/Audio.hpp"
 #include "animation/AnimationGroup.hpp"
 #include "animation/AttackAnimation.hpp"
 #include "animation/DeathAnimation.hpp"
@@ -21,6 +22,8 @@
 #include <stdexcept>
 #include <sstream>
 #include <objects/CreatureCard.h>
+#include <utils/PlayingRenderUtil.hpp>
+#include <animation/SummonAnimation.hpp>
 // #include <functional>
 
 // -------------------------
@@ -35,6 +38,7 @@ std::string effectBitToLabel(int effectBit) {
         case 2: return "Trample";
         case 4: return "Deathtouch";
         case 8: return "Regen";
+        case 16: return "Lifesteal";
         default: return "Effect(" + std::to_string(effectBit) + ")";
     }
 }
@@ -237,7 +241,9 @@ void Playing::setup(const Game& game) {
     lastDrawTick = SDL_GetTicks();
     combatCycleStartTick = lastDrawTick;
     lastCombatSyncTick = 0;
-    deferredStatUpdates.clear(); // add this
+    deferredStatUpdates.clear(); 
+    lastEndState = PlayingGameState::Playing;
+    gameEndStartTick = 0;
 
     if (!authority) {
         authority = std::make_unique<LocalAuthority>(
@@ -307,7 +313,7 @@ void Playing::handleEvents(Game& game, const SDL_Event& event) {
                 authority->surrender();
                 // surrendered = true;
                 pauseModalOpen = false;
-                exitModalOpen = false;
+                // exitModalOpen = false;
                 return;
             }
             if (RenderUtil::pointInRect(noSaveExitButton, mouseX, mouseY)) {
@@ -404,12 +410,9 @@ void Playing::handleEvents(Game& game, const SDL_Event& event) {
                     auto& card = localPlayer.hand[drag.index];
                     std::cout << "[Playing] Attempting to Discard " << card->getName() << "\n";
                     if (animationsEnabled) {
-                        SDL_Rect animRect{
-                            drag.x,
-                            drag.y,
-                            Theme::Playing::CARD_WIDTH,
-                            Theme::Playing::CARD_HEIGHT
-                        };
+                        SDL_Rect animRect = cardRects[drag.index];
+                        animRect.x = drag.x;
+                        animRect.y = drag.y;
                         DiscardAnimation::stagePending(animRect, card->getId(), 500U, card->clone());
                     }
                     authority->discardCard(card->getId());
@@ -749,9 +752,13 @@ bool Playing::handleServerMessage(const std::string& msg) {
     }
     //add a mana command later -> decouple discard logic to offload to mana logic
     else if (cmd == "MATCH_LOST") {
+        Mix_HaltChannel(-1); 
+        Audio::playSFX("gameEnd");
         state = PlayingGameState::Lost;
         std::cout << "[Playing] Lost Match!\n";
     } else if (cmd == "MATCH_WON") {
+        Mix_HaltChannel(-1); 
+        Audio::playSFX("gameEnd");
         iss >> coinReward;
         state = PlayingGameState::Won;
         std::cout << "[Playing] Won Match!\n";
@@ -774,7 +781,17 @@ void Playing::playCreature(int playerId, std::unique_ptr<Card> card, int lane) {
 
     // Move the card into the board
     int boardIndex = (playerId == localPlayer.id) ? 0:1;
+    Audio::playSFX("summon");
     board.addToPlay(lane, boardIndex, std::move(card));
+
+    if (animationsEnabled) {
+        const std::vector<SDL_Rect>& slots = (boardIndex == 0) ? playSlots : opponentSlots;
+        if (lane >= 0 && static_cast<std::size_t>(lane) < slots.size()) {
+            animationQueue.enqueue(
+                std::make_shared<SummonAnimation>(slots[static_cast<std::size_t>(lane)], 600U)
+            );
+        }
+    }
 
     // Optional: debug output
     std::cout << "[Playing] Summoned " << name
@@ -796,6 +813,7 @@ void Playing::playSpell(int playerId, std::unique_ptr<Card> card, int sourceLane
 
     std::string name = card->getName();
     player.mana -= card->getManaCost();
+    Audio::playSFX("activate");
 
     // board.addToPlay(sourceLane, boardIndex, std::move(card));
 
@@ -829,6 +847,7 @@ bool Playing::drawCard(int playerId, int cardId) {
         return false;
     }
 
+    Audio::playSFX("draw");
     player.addCardToHand(std::move(card));
 
     int screenW = 0;
@@ -869,13 +888,23 @@ void Playing::discardCard(int playerId, int cardId) {
     const std::size_t discardedIdx = static_cast<std::size_t>(
         std::distance(player->hand.begin(), it));
 
-    if (playerId == localPlayer.id && animationsEnabled) {
+    if (animationsEnabled) {
         auto anim = DiscardAnimation::takePending(cardId);
-        if (!anim && discardedIdx < oldRects.size()) {
-            anim = std::make_shared<DiscardAnimation>(oldRects[discardedIdx], cardId, 500U);
+        if (playerId == localPlayer.id) {
+            if (!anim && discardedIdx < oldRects.size()) {
+                anim = std::make_shared<DiscardAnimation>(oldRects[discardedIdx], cardId, 500U);
+            }
+        } else {
+            int screenW, screenH;
+            if (SDL_GetRendererOutputSize(renderer, &screenW, &screenH) != 0) {
+                return;
+            }
+            SDL_Rect opponentDiscardRect = PlayingRenderUtil::computeOpponentDiscardRect(opponentSlots, screenW, screenH);
+            anim = std::make_shared<DiscardAnimation>(opponentDiscardRect, cardId, 500U);
         }
         if (anim) animationQueue.enqueue(anim);
     }
+    
 
     std::unique_ptr<Card> cardToDiscard = std::move(*it);
     std::string name = cardToDiscard->getName();
@@ -883,6 +912,7 @@ void Playing::discardCard(int playerId, int cardId) {
     player->addMana(cardToDiscard->getManaValue());
 
     int boardIndex = (playerId == localPlayer.id) ? 0:1;
+    Audio::playSFX("discard");
     board.addToDiscard(std::move(cardToDiscard), boardIndex);
 
     // You can animate this if desired
@@ -901,18 +931,19 @@ void Playing::augmentCreature(int playerId, int lane, int powerDelta, int toughn
     Card* card = zone.value().get();
     std::cout << "[augmentCreature] Augmenting " << std::to_string(powerDelta) << "/" << std::to_string(toughnessDelta) << "\n";
     CreatureCard* creature = static_cast<CreatureCard*>(card);
+    Audio::playSFX("augment");
     creature->augmentStats(powerDelta, toughnessDelta);
 }
 
 void Playing::destroyCreature(int playerId, int lane) {
     int boardIndex = (playerId == localPlayer.id) ? 0 : 1;
-
     if (lane < 0 || lane >= board.getLaneCount()) {
         return;
     }
 
     auto removeAndAnimate = [&](int targetBoardIndex, int targetLane) {
         std::unique_ptr<Card> card;
+        Audio::playSFX("destroyed");
         if (!board.removeFromPlay(targetLane, targetBoardIndex, card)) {
             std::cout << "[destroyCreature] No card on lane " << targetLane
                       << " for player " << playerId << "\n";
@@ -991,6 +1022,7 @@ void Playing::processPendingDestroys(Uint32 now) {
             ));
         }
         std::unique_ptr<Card> card;
+        Audio::playSFX("destroyed");
         if (!board.removeFromPlay(pending.lane, pending.boardIndex, card)) {
             continue;
         }
@@ -1006,6 +1038,7 @@ void Playing::resolveLaneCombat(int playerAId, int playerBId, int lane, int powe
     if (lane < 0) {
         return;
     }
+    Audio::playSFX("attack");
 
     if (!animationsEnabled) {
         return;
@@ -1043,6 +1076,7 @@ void Playing::resolveLaneCombat(int playerAId, int playerBId, int lane, int powe
         opponentSlots,
         420U
     ));
+
     animationQueue.enqueue(attackGroup);
 }
 void Playing::resolveDirectCombat(int playerId, int lane, int damage) {
@@ -1082,7 +1116,7 @@ void Playing::resolveDirectCombat(int playerId, int lane, int damage) {
             Theme::Playing::PLAYER_BAR_HEIGHT
         };
     }
-
+    Audio::playSFX("attack");
     if (animationsEnabled) {
         animationQueue.enqueue(std::make_shared<AttackAnimation>(
             lane,
@@ -1098,11 +1132,13 @@ void Playing::augmentHP(int playerId, int delta) {
     //get player object reference, change HP according to delta
     // std::cout << "[DEBUG] AUGMENTING OF " << delta << "\n";
     Player& player = (playerId == localPlayer.id) ? localPlayer : remotePlayer;
+    Audio::playSFX("damage");
     player.health += delta;
 }
 
 void Playing::augmentMana(int playerId, int delta) {
     Player& player = (playerId == localPlayer.id) ? localPlayer : remotePlayer;
+    Audio::playSFX("discard");
     player.mana += delta;
 }
 
@@ -1118,22 +1154,31 @@ std::vector<SDL_Rect> Playing::computeCardLayout(std::size_t count, int screenW,
     std::vector<SDL_Rect> layout;
     if (count == 0 || screenW <= 0 || screenH <= 0) return layout;
 
-    const int cardWidth = Theme::Playing::CARD_WIDTH;
-    const int cardHeight = Theme::Playing::CARD_HEIGHT;
-    const int maxWidth = static_cast<int>(screenW * Theme::Playing::HAND_MAX_WIDTH_RATIO);
-    
+    const float scale = std::min(
+        static_cast<float>(screenW) / 1200.0F,
+        static_cast<float>(screenH) / 850.0F);
+
+    // Shift the whole layout up so the content block is vertically centered,
+    // not just bottom-anchored. Slack only exists when width limits the scale.
+    const int verticalOffset = (screenH - static_cast<int>(850.0F * scale)) / 2;
+
+    const int cardWidth   = static_cast<int>(Theme::Playing::CARD_WIDTH        * scale);
+    const int cardHeight  = static_cast<int>(Theme::Playing::CARD_HEIGHT       * scale);
+    const int handYOffset = static_cast<int>(Theme::Playing::HAND_Y_OFFSET     * scale);
+    const int maxWidth    = static_cast<int>(screenW * Theme::Playing::HAND_MAX_WIDTH_RATIO);
+
     int totalWidthNoOverlap = static_cast<int>(count) * cardWidth;
-    
-    int spacing = Theme::Playing::HAND_DEFAULT_SPACING;
+
+    int spacing = static_cast<int>(Theme::Playing::HAND_DEFAULT_SPACING * scale);
     if (totalWidthNoOverlap > maxWidth && count > 1) {
         spacing = (maxWidth - totalWidthNoOverlap) / static_cast<int>(count - 1);
     }
 
     int finalHandWidth = (static_cast<int>(count) * cardWidth) + (static_cast<int>(count - 1) * spacing);
-    
+
     int startX = (screenW - finalHandWidth) / 2;
-    int startY = screenH - cardHeight - Theme::Playing::HAND_Y_OFFSET;
-    
+    int startY = screenH - cardHeight - handYOffset - verticalOffset;
+
     for (std::size_t i = 0; i < count; ++i) {
         layout.push_back(SDL_Rect{
             startX + static_cast<int>(i) * (cardWidth + spacing),
@@ -1147,34 +1192,53 @@ std::vector<SDL_Rect> Playing::computeCardLayout(std::size_t count, int screenW,
 }
 
 void Playing::computeZones(int screenW, int screenH) {
-    playSlots.clear();       // local player zones
-    opponentSlots.clear();   // opponent zones
+    playSlots.clear();
+    opponentSlots.clear();
 
     if (screenW <= 0 || screenH <= 0) {
         discardZone = SDL_Rect{0, 0, 0, 0};
         return;
     }
 
-    const int handCardHeight = Theme::Playing::CARD_HEIGHT;
-    const int handYOffset = Theme::Playing::HAND_Y_OFFSET;
-    const int slotCount = Theme::Playing::SLOT_COUNT;
-    const int slotWidth = Theme::Playing::SLOT_WIDTH;
-    const int slotHeight = Theme::Playing::SLOT_HEIGHT;
-    const int slotSpacing = Theme::Playing::SLOT_SPACING;
-    const int margin = Theme::Playing::SCREEN_MARGIN;
-    const int opponentOffset = Theme::Playing::OPPONENT_ZONE_OFFSET;
+    const float scale = std::min(
+        static_cast<float>(screenW) / 1200.0F,
+        static_cast<float>(screenH) / 850.0F);
+
+    // Same centering offset as computeCardLayout — keeps slots aligned with hand.
+    const int verticalOffset = (screenH - static_cast<int>(850.0F * scale)) / 2;
+
+    const int handCardHeight  = static_cast<int>(Theme::Playing::CARD_HEIGHT          * scale);
+    const int handYOffset     = static_cast<int>(Theme::Playing::HAND_Y_OFFSET         * scale);
+    const int slotCount       = Theme::Playing::SLOT_COUNT;
+    const int slotWidth       = static_cast<int>(Theme::Playing::SLOT_WIDTH            * scale);
+    const int slotHeight      = static_cast<int>(Theme::Playing::SLOT_HEIGHT           * scale);
+    const int slotSpacing     = static_cast<int>(Theme::Playing::SLOT_SPACING          * scale);
+    const int slotToHandGap   = static_cast<int>(Theme::Playing::SLOT_TO_HAND_GAP      * scale);
+    const int margin          = static_cast<int>(Theme::Playing::SCREEN_MARGIN         * scale);
+    const int opponentOffset  = static_cast<int>(Theme::Playing::OPPONENT_ZONE_OFFSET  * scale);
+    const int cardWidth       = static_cast<int>(Theme::Playing::CARD_WIDTH            * scale);
+    const int deckGap         = static_cast<int>(Theme::Playing::SELF_DECK_GAP         * scale);
+    const int sideMargin      = static_cast<int>(Theme::Playing::SIDE_ZONE_MARGIN      * scale);
 
     // Hand Y position
-    int handY = screenH - handCardHeight - handYOffset;
+    int handY = screenH - handCardHeight - handYOffset - verticalOffset;
     if (!cardRects.empty()) {
         handY = cardRects.front().y;
     }
 
     int totalSlotsWidth = slotCount * slotWidth + (slotCount - 1) * slotSpacing;
-    int startX = std::max(margin, (screenW - totalSlotsWidth) / 2);
+    int startX = (screenW - totalSlotsWidth) / 2;
 
-    // Local player slots
-    int slotY = handY - slotHeight - Theme::Playing::SLOT_TO_HAND_GAP;
+    // Local player slots — clamped so opponent slots never overlap the scaled stats bar.
+    int slotY = handY - slotHeight - slotToHandGap;
+    {
+        const int statsBarBottom =
+            static_cast<int>((Theme::Playing::OPPONENT_BAR_TOP +
+                              Theme::Playing::PLAYER_BAR_HEIGHT) * scale)
+            + margin + verticalOffset;
+        slotY = std::max(slotY, statsBarBottom + opponentOffset);
+    }
+
     if (slotY < margin) slotY = margin;
 
     playSlots.reserve(static_cast<std::size_t>(slotCount));
@@ -1189,7 +1253,6 @@ void Playing::computeZones(int screenW, int screenH) {
         };
         playSlots.push_back(localRect);
 
-        // Opponent zones are offset upward by opponentOffset
         SDL_Rect oppRect = localRect;
         oppRect.y -= opponentOffset;
         opponentSlots.push_back(oppRect);
@@ -1197,10 +1260,10 @@ void Playing::computeZones(int screenW, int screenH) {
 
     discardZone = PlayingLayoutUtil::computeDiscardRect(
         playSlots,
-        Theme::Playing::CARD_WIDTH,
-        Theme::Playing::CARD_HEIGHT,
-        Theme::Playing::SELF_DECK_GAP,
-        Theme::Playing::SCREEN_MARGIN
+        cardWidth,
+        static_cast<int>(Theme::Playing::CARD_HEIGHT * scale),
+        deckGap,
+        sideMargin
     );
 }
 
@@ -1218,60 +1281,55 @@ void Playing::computeUiRects(int screenW, int screenH) {
         return;
     }
 
-    const int margin = Theme::Playing::SCREEN_MARGIN;
-    
+    const float scale = std::min(
+        static_cast<float>(screenW) / 1200.0F,
+        static_cast<float>(screenH) / 850.0F);
+
+    const int verticalOffset = (screenH - static_cast<int>(850.0F * scale)) / 2;
+
+    const int margin = static_cast<int>(Theme::Playing::SCREEN_MARGIN * scale);
+
     // Menu button - TOP RIGHT
-    const int menuW = Theme::Playing::MENU_BUTTON_WIDTH;
-    const int menuH = Theme::Playing::MENU_BUTTON_HEIGHT;
-    menuButton = SDL_Rect{screenW - menuW - margin, margin, menuW, menuH};
-    
-    const int pauseModalW = Theme::Playing::PAUSE_MODAL_WIDTH;
-    const int pauseModalH = Theme::Playing::PAUSE_MODAL_HEIGHT;
+    const int menuW = static_cast<int>(Theme::Playing::MENU_BUTTON_WIDTH  * scale);
+    const int menuH = static_cast<int>(Theme::Playing::MENU_BUTTON_HEIGHT * scale);
+    menuButton = SDL_Rect{screenW - menuW - margin, margin + verticalOffset, menuW, menuH};
+
+    const int pauseModalW = static_cast<int>(Theme::Playing::PAUSE_MODAL_WIDTH  * scale);
+    const int pauseModalH = static_cast<int>(Theme::Playing::PAUSE_MODAL_HEIGHT * scale);
     pauseModal = SDL_Rect{(screenW - pauseModalW) / 2, (screenH - pauseModalH) / 2, pauseModalW, pauseModalH};
-    
-    const int buttonW = Theme::Playing::PAUSE_BUTTON_WIDTH;
-    const int buttonH = Theme::Playing::PAUSE_BUTTON_HEIGHT;
-    const int buttonSpacing = Theme::Playing::PAUSE_BUTTON_SPACING;
-    const int firstButtonY = pauseModal.y + Theme::Playing::PAUSE_BUTTON_TOP;
-    
-    resumeButton = SDL_Rect{(screenW - buttonW) / 2, firstButtonY, buttonW, buttonH};
+
+    const int buttonW       = static_cast<int>(Theme::Playing::PAUSE_BUTTON_WIDTH   * scale);
+    const int buttonH       = static_cast<int>(Theme::Playing::PAUSE_BUTTON_HEIGHT  * scale);
+    const int buttonSpacing = static_cast<int>(Theme::Playing::PAUSE_BUTTON_SPACING * scale);
+    const int firstButtonY  = pauseModal.y + static_cast<int>(Theme::Playing::PAUSE_BUTTON_TOP * scale);
+
+    resumeButton    = SDL_Rect{(screenW - buttonW) / 2, firstButtonY, buttonW, buttonH};
     pauseExitButton = SDL_Rect{(screenW - buttonW) / 2, firstButtonY + buttonH + buttonSpacing, buttonW, buttonH};
-    
-    const int exitModalW = Theme::Playing::EXIT_MODAL_WIDTH;
-    const int exitModalH = Theme::Playing::EXIT_MODAL_HEIGHT;
+
+    const int exitModalW = static_cast<int>(Theme::Playing::EXIT_MODAL_WIDTH  * scale);
+    const int exitModalH = static_cast<int>(Theme::Playing::EXIT_MODAL_HEIGHT * scale);
     exitModal = SDL_Rect{(screenW - exitModalW) / 2, (screenH - exitModalH) / 2, exitModalW, exitModalH};
-    
-    const int exitButtonW = Theme::Playing::EXIT_BUTTON_WIDTH;
-    const int exitButtonH = Theme::Playing::EXIT_BUTTON_HEIGHT;
-    const int exitButtonSpacing = Theme::Playing::EXIT_BUTTON_SPACING;
-    const int exitFirstButtonY = exitModal.y + Theme::Playing::EXIT_BUTTON_TOP;
-    
-    saveExitButton = SDL_Rect{(screenW - exitButtonW * 2 - exitButtonSpacing) / 2, exitFirstButtonY, exitButtonW, exitButtonH};
+
+    const int exitButtonW       = static_cast<int>(Theme::Playing::EXIT_BUTTON_WIDTH   * scale);
+    const int exitButtonH       = static_cast<int>(Theme::Playing::EXIT_BUTTON_HEIGHT  * scale);
+    const int exitButtonSpacing = static_cast<int>(Theme::Playing::EXIT_BUTTON_SPACING * scale);
+    const int exitFirstButtonY  = exitModal.y + static_cast<int>(Theme::Playing::EXIT_BUTTON_TOP * scale);
+
+    saveExitButton  = SDL_Rect{(screenW - exitButtonW * 2 - exitButtonSpacing) / 2, exitFirstButtonY, exitButtonW, exitButtonH};
     noSaveExitButton = SDL_Rect{saveExitButton.x + exitButtonW + exitButtonSpacing, exitFirstButtonY, exitButtonW, exitButtonH};
-    
-    const int returnW = Theme::Playing::RETURN_BUTTON_WIDTH;
-    const int returnH = Theme::Playing::RETURN_BUTTON_HEIGHT;
-    const int spacing = 20;
+
+    const int returnW = static_cast<int>(Theme::Playing::RETURN_BUTTON_WIDTH  * scale);
+    const int returnH = static_cast<int>(Theme::Playing::RETURN_BUTTON_HEIGHT * scale);
+    const int spacing = static_cast<int>(20 * scale);
 
     const int totalWidth = returnW * 2 + spacing;
     const int startX = (screenW - totalWidth) / 2;
-    const int y = (screenH / 2) + 24;
+    const int y = (screenH / 2) + static_cast<int>(24 * scale) + verticalOffset;
 
-    returnToTitleButton = SDL_Rect{
-        startX,
-        y,
-        returnW,
-        returnH
-    };
-
-    requeueButton = SDL_Rect{
-        startX + returnW + spacing,
-        y,
-        returnW,
-        returnH
-    };
-
+    returnToTitleButton = SDL_Rect{startX,              y, returnW, returnH};
+    requeueButton       = SDL_Rect{startX + returnW + spacing, y, returnW, returnH};
 }
+
 
 PlayingGameState Playing::getState() const {
     return state;
