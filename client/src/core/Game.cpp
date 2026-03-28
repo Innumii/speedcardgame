@@ -117,6 +117,17 @@ Game::Game(const char *title, int xpos, int ypos, int width, int height, bool fu
     titleFonts = RenderText::loadFonts("assets/Cinzel/Cinzel-VariableFont_wght.ttf",   12, 10, 48);
     uiFonts    = RenderText::loadFonts("assets/Rajdhani/Rajdhani-SemiBold.ttf", 16, 12, 22);
 
+    //load SFX
+    Audio::loadSFX("draw");
+    Audio::loadSFX("discard");
+    Audio::loadSFX("activate");
+    Audio::loadSFX("damage");
+    Audio::loadSFX("destroyed");
+    Audio::loadSFX("summon");
+    Audio::loadSFX("attack");
+    Audio::loadSFX("augment");
+    Audio::loadSFX("gameEnd");
+
     loginState.enter(*this);
 
     isRunning = true;
@@ -141,7 +152,7 @@ void Game::commitStateChange() {
         case GameState::Register:     registerState.exit(*this);                       break;
         case GameState::DeckBuilding: deckBuildingState.exit(*this);                   break;
         case GameState::Loading:      loadingState.exit(*this);
-                                      Audio::playMusic("assets/music/title.mp3");      break;
+                                      Audio::playMusic("title");      break;
         case GameState::Playing:      playingSetup = false;
                                       Audio::stopMusic();                              break;
         default: break;

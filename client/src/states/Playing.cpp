@@ -245,17 +245,6 @@ void Playing::setup(const Game& game) {
     lastEndState = PlayingGameState::Playing;
     gameEndStartTick = 0;
 
-    //load SFX
-    Audio::loadSFX("draw");
-    Audio::loadSFX("discard");
-    Audio::loadSFX("activate");
-    Audio::loadSFX("damage");
-    Audio::loadSFX("destroyed");
-    Audio::loadSFX("summon");
-    Audio::playSFX("attack");
-    Audio::playSFX("augment");
-    Audio::playSFX("gameEnd");
-
     if (!authority) {
         authority = std::make_unique<LocalAuthority>(
             &const_cast<Game&>(game).getNetworkClient());
