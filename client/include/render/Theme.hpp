@@ -26,6 +26,7 @@ namespace Theme {
     constexpr SDL_Color BTN_CONNECT         = {75,  95,  140, 255};
     constexpr SDL_Color BTN_PRIMARY         = {70,  120, 200, 255};
     constexpr SDL_Color BTN_SECONDARY       = {70,  70,  70,  255};
+    constexpr SDL_Color BTN_PACKS           = {235,  128,  66,  255};
     constexpr SDL_Color BTN_DISABLED        = {92,  92,  92,  255};
     constexpr SDL_Color BTN_DISABLED_BORDER = {140, 140, 140, 255};
     constexpr SDL_Color BTN_DISABLED_TEXT   = {190, 190, 190, 255};

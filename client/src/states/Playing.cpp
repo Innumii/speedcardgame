@@ -937,13 +937,13 @@ void Playing::augmentCreature(int playerId, int lane, int powerDelta, int toughn
 
 void Playing::destroyCreature(int playerId, int lane) {
     int boardIndex = (playerId == localPlayer.id) ? 0 : 1;
-
     if (lane < 0 || lane >= board.getLaneCount()) {
         return;
     }
 
     auto removeAndAnimate = [&](int targetBoardIndex, int targetLane) {
         std::unique_ptr<Card> card;
+        Audio::playSFX("destroyed");
         if (!board.removeFromPlay(targetLane, targetBoardIndex, card)) {
             std::cout << "[destroyCreature] No card on lane " << targetLane
                       << " for player " << playerId << "\n";

@@ -9,6 +9,7 @@
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_ttf.h>
 #include <cmath>
+#include <utils/RenderUtil.hpp>
 
 namespace {
     float scale = 1.0f;
@@ -159,6 +160,7 @@ void Title::handleEvents(Game& game, const SDL_Event& event) {
         } else if (inShop) {
             game.setNextState(GameState::Payment);
         } else if (inLogout) {
+            RenderBackdrop::resetElapsed();
             animInitialized = false;
             game.endUserSession();
             game.getNetworkClient().disconnect();
@@ -221,12 +223,18 @@ void Title::render(const Game& game) {
     }
 
     // ── background + vignette ────────────────────────────────────────
-    RenderBackdrop::drawBackgroundWithVignette(
-        renderer, screenW, screenH,
-        Theme::BG,
-        SDL_Color{0, 0, 0, 255},
-        80, 1.5f, 120
-    );
+    if (animationsEnabled) {
+        RenderBackdrop::drawTitleBackdrop(renderer, screenW, screenH);
+    } else {
+        RenderBackdrop::drawBackgroundWithVignette(
+            renderer, screenW, screenH,
+            Theme::BG,
+            SDL_Color{0, 0, 0, 255},
+            80, 1.5f, 120
+        );
+    }
+
+    
 
     // ── banner animation ─────────────────────────────────────────────
     float bannerT     = std::min(elapsed / 0.6f, 1.0f);
@@ -265,41 +273,72 @@ void Title::render(const Game& game) {
         auto [alpha, offY] = buttonSlide(index);
         if (alpha == 0) return;
 
-        SDL_Rect animRect = {rect.x, rect.y + offY, rect.w, rect.h};
-
         bool isHovered = (hoveredButton == index);
         auto& cache = cachedButtons[index];
 
-        if (!cache.texture ||
-            cache.w != rect.w ||
-            cache.h != rect.h ||
-            cache.label != text ||
+        if (!cache.texture      ||
+            cache.w       != rect.w    ||
+            cache.h       != rect.h    ||
+            cache.label   != text      ||
             cache.hovered != isHovered ||
             cache.lastScale != scale)
         {
-            if (cache.texture) {
-                SDL_DestroyTexture(cache.texture);
-            }
+            if (cache.texture) SDL_DestroyTexture(cache.texture);
 
-            cache.texture = buildButtonTexture(
-                renderer, rect, text, fill, isHovered, uiFonts
+            const int sOff = Theme::Effects::SHADOW_OFFSET;
+
+            // Texture is large enough to hold button + shadow bleed
+            SDL_Texture* tex = SDL_CreateTexture(
+                renderer,
+                SDL_PIXELFORMAT_RGBA8888,
+                SDL_TEXTUREACCESS_TARGET,
+                rect.w + sOff,
+                rect.h + sOff
             );
+            if (!tex) return;
 
-            cache.w = rect.w;
-            cache.h = rect.h;
-            cache.label = text;
-            cache.hovered = isHovered;
+            SDL_SetTextureBlendMode(tex, SDL_BLENDMODE_BLEND);
+            SDL_SetRenderTarget(renderer, tex);
+            SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+            SDL_SetRenderDrawColor(renderer, 0, 0, 0, 0);
+            SDL_RenderClear(renderer);
+
+            // Shadow drawn first (offset), then button on top —
+            // both composite cleanly against transparent black inside the texture
+            SDL_Rect shadowLocal{sOff, sOff, rect.w, rect.h};
+            RenderUtil::drawRoundedShadow(renderer, shadowLocal,
+                Theme::BTN_RADIUS, 0, Theme::Effects::SHADOW_COLOR);
+
+            SDL_Rect local{0, 0, rect.w, rect.h};
+            RenderButton::Style style{};
+            style.fill       = fill;
+            style.border     = Theme::BTN_BORDER;
+            style.text       = Theme::BTN_TEXT;
+            style.drawShadow = false;  // already drawn manually above
+
+            RenderButton::drawButton(renderer, local, text, uiFonts.large, style, isHovered);
+
+            SDL_SetRenderTarget(renderer, nullptr);
+
+            cache.texture   = tex;
+            cache.w         = rect.w;
+            cache.h         = rect.h;
+            cache.label     = text;
+            cache.hovered   = isHovered;
+            cache.lastScale = scale;
         }
 
         if (!cache.texture) return;
 
+        const int sOff = Theme::Effects::SHADOW_OFFSET;
         SDL_SetTextureAlphaMod(cache.texture, alpha);
-        SDL_RenderCopy(renderer, cache.texture, nullptr, &animRect);
+        SDL_Rect dst{rect.x, rect.y + offY, rect.w + sOff, rect.h + sOff};
+        SDL_RenderCopy(renderer, cache.texture, nullptr, &dst);
     };
 
     drawBtn(startButton,     Theme::BTN_START,   "Start Game", 0);
     drawBtn(BuildDeckButton, Theme::BTN_BUILD,   "Build Deck", 1);
-    drawBtn(OpenPacksButton, Theme::BTN_START,   "Open Packs", 2);
+    drawBtn(OpenPacksButton, Theme::BTN_PACKS,   "Open Packs", 2);
     drawBtn(ShopButton,      Theme::BTN_PRIMARY, "Coin Shop",  3);
     drawBtn(logoutButton,    Theme::BTN_CONNECT, "Logout",     4);
     drawBtn(quitButton,      Theme::BTN_QUIT,    "Quit Game",  5);
