@@ -27,11 +27,8 @@ ArchitecturesInstallIn64BitMode=x64
 Source: "GameBuild\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
-; -------------------------
-; Desktop and Start Menu shortcuts with proper icon and AppUserModelID
-; -------------------------
-Name: "{group}\Archcast"; Filename: "{app}\MyGame.exe"; IconFilename: "{src}\client\assets\images\logo.ico"; IconIndex: 0; AppUserModelID: "archcast"
-Name: "{autodesktop}\Archcast"; Filename: "{app}\MyGame.exe"; IconFilename: "{src}\client\assets\images\logo.ico"; IconIndex: 0; AppUserModelID: "archcast"
+Name: "{group}\Archcast"; Filename: "{app}\MyGame.exe"; IconIndex: 0; AppUserModelID: "Archcast"
+Name: "{autodesktop}\Archcast"; Filename: "{app}\MyGame.exe"; IconIndex: 0; AppUserModelID: "Archcast"
 
 [Run]
 ; -------------------------
