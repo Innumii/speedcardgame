@@ -4,13 +4,13 @@
 
 [Setup]
 AppId={{6A9F579C-C9BC-4DF1-BB4B-7D299A0A9E6D}
-AppName=Archicast
+AppName=Archcast
 AppVersion={#MyAppVersion}
-AppPublisher=fyl Studios
-DefaultDirName={autopf}\Archicast
-DefaultGroupName=Archicast
+AppPublisher=FYL Studios
+DefaultDirName={autopf}\Archcast
+DefaultGroupName=Archcast
 OutputDir=Output
-OutputBaseFilename=MyGameSetup
+OutputBaseFilename=ArchcastSetup
 Compression=lzma
 SolidCompression=yes
 WizardStyle=modern
@@ -20,11 +20,11 @@ ArchitecturesInstallIn64BitMode=x64
 Source: "GameBuild\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
-Name: "{group}\Archicast"; Filename: "{app}\MyGame.exe"
-Name: "{autodesktop}\Archicast"; Filename: "{app}\MyGame.exe"; Tasks: desktopicon
+Name: "{group}\Archcast"; Filename: "{app}\MyGame.exe"
+Name: "{autodesktop}\Archcast"; Filename: "{app}\MyGame.exe"; Tasks: desktopicon
 
 [Tasks]
 Name: "desktopicon"; Description: "Create a desktop shortcut"; GroupDescription: "Additional icons:"; Flags: unchecked
 
 [Run]
-Filename: "{app}\MyGame.exe"; Description: "Launch Archicast"; Flags: nowait postinstall skipifsilent
+Filename: "{app}\MyGame.exe"; Description: "Launch Archcast"; Flags: nowait postinstall skipifsilent

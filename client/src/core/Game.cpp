@@ -71,6 +71,14 @@ Game::Game(const char *title, int xpos, int ypos, int width, int height, bool fu
         SDL_Quit();
         throw std::runtime_error(std::string("SDL_CreateWindow Failed: ") + SDL_GetError());
     }
+    // Set window icon
+    SDL_Surface* icon = IMG_Load("assets/images/logo.png");
+    if (icon) {
+        SDL_SetWindowIcon(window.get(), icon);
+        SDL_FreeSurface(icon);
+    } else {
+        SDL_Log("Failed to load icon: %s", IMG_GetError());
+    }
 
     bool useSoftwareRenderer = true;
 #ifdef _WIN32

@@ -93,8 +93,8 @@ jobs:
           $version = 'latest'
           & 'C:\Program Files (x86)\Inno Setup 6\ISCC.exe' "/DMyAppVersion=$version" 'installer.iss'
 
-          if (-not (Test-Path 'Output/MyGameSetup.exe')) {
-            throw 'Installer was not generated at Output/MyGameSetup.exe.'
+          if (-not (Test-Path 'Output/ArchcastSetup.exe')) {
+            throw 'Installer was not generated at Output/ArchcastSetup.exe.'
           }
 
       - name: Build Windows zip package
@@ -110,7 +110,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: windows-installer
-          path: Output/MyGameSetup.exe
+          path: Output/ArchcastSetup.exe
 
       - name: Upload Windows zip artifact
         uses: actions/upload-artifact@v4
@@ -205,10 +205,10 @@ jobs:
         uses: ncipollo/release-action@v1
         with:
           tag: client-latest
-          name: Archicast Client Latest
-          body: Automated latest build for Archicast.
+          name: Archcast Client Latest
+          body: Automated latest build for Archcast.
           allowUpdates: true
           removeArtifacts: true
           artifactErrorsFailBuild: true
-          artifacts: release/MyGameSetup.exe,release/client-latest-windows.zip,release/client-latest-macos.zip
+          artifacts: release/ArchcastSetup.exe,release/client-latest-windows.zip,release/client-latest-macos.zip
           makeLatest: true
