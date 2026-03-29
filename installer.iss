@@ -19,11 +19,10 @@ ArchitecturesInstallIn64BitMode=x64
 
 [Files]
 Source: "GameBuild\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
-Source: "client\assets\images\logo.ico"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
-Name: "{group}\Archcast"; Filename: "{app}\MyGame.exe"; IconFilename: "{app}\logo.ico"; IconIndex: 0
-Name: "{autodesktop}\Archcast"; Filename: "{app}\MyGame.exe"; IconFilename: "{app}\logo.ico"; IconIndex: 0
+Name: "{group}\Archcast"; Filename: "{app}\MyGame.exe"; IconIndex: 0
+Name: "{autodesktop}\Archcast"; Filename: "{app}\MyGame.exe"; IconIndex: 0
 
 [Run]
 Filename: "{app}\MyGame.exe"; Description: "Launch Archcast"; Flags: nowait postinstall skipifsilent
