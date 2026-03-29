@@ -415,7 +415,7 @@ func TestUpdateInventoryCoins_SaveFails(t *testing.T) {
 	db := setupTestDB(t)
 	seedInventory(t, db, models.Inventory{Uid: 1, Cards: models.CardCounts{1: 2}, Coins: 100})
 	if err := db.Callback().Update().Before("gorm:update").Register("force_update_error", func(tx *gorm.DB) {
-		tx.AddError(errors.New("forced update error"))
+		_ = tx.AddError(errors.New("forced update error"))
 	}); err != nil {
 		t.Fatalf("failed to register callback: %v", err)
 	}
@@ -487,7 +487,7 @@ func TestAddInventoryCoins_SaveFails(t *testing.T) {
 	db := setupTestDB(t)
 	seedInventory(t, db, models.Inventory{Uid: 1, Cards: models.CardCounts{1: 2}, Coins: 100})
 	if err := db.Callback().Update().Before("gorm:update").Register("force_update_error", func(tx *gorm.DB) {
-		tx.AddError(errors.New("forced update error"))
+		_ = tx.AddError(errors.New("forced update error"))
 	}); err != nil {
 		t.Fatalf("failed to register callback: %v", err)
 	}
