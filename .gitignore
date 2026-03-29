@@ -23,4 +23,7 @@ build/
 
 # personal scripts
 *.ps1
-cards/coverage.out
+# Test coverage
+coverage.out
+coverage.html
+*.out
