@@ -12,6 +12,7 @@ class Game;
 
 class Title : public StateInterface {
 public:
+    void enter(Game& game) override;
     void handleEvents(Game& game, const SDL_Event& event) override;
     void update(Game& game) override;
     void render(Game& game) override;

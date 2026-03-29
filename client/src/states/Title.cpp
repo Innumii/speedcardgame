@@ -10,9 +10,14 @@
 #include <SDL2/SDL_ttf.h>
 #include <cmath>
 #include <utils/RenderUtil.hpp>
+#include <core/Audio.hpp>
 
 namespace {
     float scale = 1.0f;
+}
+
+void Title::enter(Game& game) {
+    Audio::playMusic("title");
 }
 
 SDL_Texture* Title::buildButtonTexture(SDL_Renderer* renderer,
@@ -161,6 +166,7 @@ void Title::handleEvents(Game& game, const SDL_Event& event) {
             game.setNextState(GameState::Payment);
         } else if (inLogout) {
             RenderBackdrop::resetElapsed();
+            Audio::stopMusic();
             animInitialized = false;
             game.endUserSession();
             game.getNetworkClient().disconnect();

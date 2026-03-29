@@ -14,6 +14,7 @@
 #include <SDL2/SDL.h>
 #include <algorithm>
 #include <string>
+#include <core/Audio.hpp>
 
 void Loading::enter(Game& game) {
     (void)game;
@@ -23,6 +24,8 @@ void Loading::enter(Game& game) {
     currentCardIndex = 0;
     totalCards = 0;
     statusMessage = "Loading assets...";
+
+    Audio::playMusic("title");
 }
 
 void Loading::exit(Game& game) {
