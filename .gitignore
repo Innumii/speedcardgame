@@ -23,3 +23,4 @@ build/
 
 # personal scripts
 *.ps1
+cards/coverage.out
