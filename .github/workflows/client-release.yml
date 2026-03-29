@@ -2,11 +2,6 @@ name: client-release
 
 on:
   workflow_dispatch:
-  push:
-    branches: [ main ]
-    paths:
-      - 'client/**'
-      - '.github/workflows/client-release.yml'
 
 permissions:
   contents: write

@@ -1,0 +1,214 @@
+name: release
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'client/**'
+      - 'installer.iss'
+      - '.github/workflows/release.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  create-tag:
+    runs-on: ubuntu-latest
+    outputs:
+      new_tag: ${{ steps.autotag.outputs.new_tag }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Auto-increment tag (patch)
+        id: autotag
+        uses: anothrNick/github-tag-action@1.74.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DEFAULT_BUMP: patch
+          WITH_V: true
+          RELEASE_BRANCHES: main
+
+  build-windows-installer:
+    needs: create-tag
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup MSYS2 (MinGW)
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          update: true
+          install: >-
+            mingw-w64-x86_64-gcc
+            make
+            mingw-w64-x86_64-SDL2
+            mingw-w64-x86_64-SDL2_ttf
+            mingw-w64-x86_64-SDL2_image
+            mingw-w64-x86_64-SDL2_mixer
+            mingw-w64-x86_64-openssl
+
+      - name: Build and bundle GameBuild
+        shell: msys2 {0}
+        env:
+          ENV_SECRET: ${{ secrets.ENV }}
+          CERT_SECRET: ${{ secrets.CERT }}
+        run: |
+          set -euo pipefail
+
+          cd client
+          make
+          cd ..
+
+          rm -rf GameBuild
+          mkdir -p GameBuild GameBuild/env GameBuild/certs
+
+          cp client/main.exe GameBuild/MyGame.exe
+
+          if [ -d client/assets ]; then
+            cp -r client/assets GameBuild/assets
+          fi
+
+          # Write optional runtime secrets if present.
+          if [ -n "${ENV_SECRET:-}" ]; then
+            echo "$ENV_SECRET" > GameBuild/env/.env
+          fi
+
+          if [ -n "${CERT_SECRET:-}" ]; then
+            echo "$CERT_SECRET" > GameBuild/certs/ca.crt
+          fi
+
+          # Bundle runtime DLL dependencies.
+          ldd client/main.exe \
+            | awk '/=> \/mingw64\/bin\// { print $3 }' \
+            | sort -u \
+            | while read -r dllpath; do
+                if [ -f "$dllpath" ]; then
+                  cp "$dllpath" GameBuild/
+                fi
+              done
+
+      - name: Validate GameBuild output
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if (-not (Test-Path 'GameBuild/MyGame.exe')) {
+            throw 'Expected GameBuild/MyGame.exe was not found.'
+          }
+
+      - name: Install Inno Setup
+        shell: powershell
+        run: choco install innosetup -y
+
+      - name: Build installer
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $version = '${{ needs.create-tag.outputs.new_tag }}' -replace '^v', ''
+          & 'C:\Program Files (x86)\Inno Setup 6\ISCC.exe' "/DMyAppVersion=$version" 'installer.iss'
+
+          if (-not (Test-Path 'Output/MyGameSetup.exe')) {
+            throw 'Installer was not generated at Output/MyGameSetup.exe.'
+          }
+
+      - name: Upload installer artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-installer
+          path: Output/MyGameSetup.exe
+
+  build-macos-zip:
+    needs: create-tag
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          brew install sdl2 sdl2_ttf sdl2_image sdl2_mixer openssl@3 pkg-config
+
+      - name: Build macOS client
+        run: |
+          cd client
+          make -f Makefile.mac clean
+          make -f Makefile.mac
+
+      - name: Bundle macOS artifact
+        env:
+          ENV_SECRET: ${{ secrets.ENV }}
+          CERT_SECRET: ${{ secrets.CERT }}
+        run: |
+          set -euo pipefail
+          cd client
+
+          mkdir -p dist dist/env dist/certs
+          cp main dist/main
+          chmod +x dist/main
+
+          if [ -n "${ENV_SECRET:-}" ]; then
+            echo "$ENV_SECRET" > dist/env/.env
+          fi
+
+          if [ -n "${CERT_SECRET:-}" ]; then
+            echo "$CERT_SECRET" > dist/certs/ca.crt
+          fi
+
+          if [ -d assets ]; then
+            cp -r assets dist/assets
+          fi
+
+          otool -L main \
+            | awk '/\/opt\/homebrew\/|\/usr\/local\// { print $1 }' \
+            | while read -r lib; do
+                [ -f "$lib" ] && cp "$lib" dist/
+              done
+
+          for lib in dist/*.dylib; do
+            [ -f "$lib" ] || continue
+            orig=$(otool -D "$lib" | tail -1)
+            install_name_tool -change "$orig" \
+              "@executable_path/$(basename "$lib")" dist/main 2>/dev/null || true
+          done
+
+          zip -r client-macos.zip dist/
+
+      - name: Upload macOS artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-client-zip
+          path: client/client-macos.zip
+
+  publish:
+    needs: [create-tag, build-windows-installer, build-macos-zip]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download installer artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: windows-installer
+          path: release/
+
+      - name: Download macOS artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: macos-client-zip
+          path: release/
+
+      - name: Create GitHub release and upload assets
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.create-tag.outputs.new_tag }}
+          name: Release ${{ needs.create-tag.outputs.new_tag }}
+          files: |
+            release/MyGameSetup.exe
+            release/client-macos.zip
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
