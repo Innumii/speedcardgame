@@ -1,13 +1,20 @@
-name: client-release
+name: release
 
 on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'client/**'
+      - 'installer.iss'
+      - '.github/workflows/release.yml'
   workflow_dispatch:
 
 permissions:
   contents: write
 
 jobs:
-  build-windows:
+  build-windows-installer:
     runs-on: windows-latest
     steps:
       - name: Checkout
@@ -27,58 +34,91 @@ jobs:
             mingw-w64-x86_64-SDL2_mixer
             mingw-w64-x86_64-openssl
 
-      - name: Build client
-        shell: msys2 {0}
-        run: |
-          cd client
-          make
-
-      - name: Bundle runtime dependencies
+      - name: Build and bundle GameBuild
         shell: msys2 {0}
         env:
           ENV_SECRET: ${{ secrets.ENV }}
           CERT_SECRET: ${{ secrets.CERT }}
         run: |
           set -euo pipefail
+
           cd client
+          make release
+          cd ..
 
-          mkdir -p dist dist/env dist/certs
-          cp main.exe dist/main.exe
+          rm -rf GameBuild
+          mkdir -p GameBuild GameBuild/env GameBuild/certs
 
-          # Write secrets to bundle
-          echo "$ENV_SECRET" > dist/env/.env
-          echo "$CERT_SECRET" > dist/certs/ca.crt
+          cp client/MyGame.exe GameBuild/MyGame.exe
 
-          if [ -d assets ]; then
-            cp -r assets dist/assets
+          if [ -d client/assets ]; then
+            cp -r client/assets GameBuild/assets
           fi
 
-          ldd main.exe \
+          # Write optional runtime secrets if present.
+          if [ -n "${ENV_SECRET:-}" ]; then
+            echo "$ENV_SECRET" > GameBuild/env/.env
+          fi
+
+          if [ -n "${CERT_SECRET:-}" ]; then
+            echo "$CERT_SECRET" > GameBuild/certs/ca.crt
+          fi
+
+          # Bundle runtime DLL dependencies.
+          ldd client/MyGame.exe \
             | awk '/=> \/mingw64\/bin\// { print $3 }' \
             | sort -u \
             | while read -r dllpath; do
                 if [ -f "$dllpath" ]; then
-                  cp "$dllpath" dist/
+                  cp "$dllpath" GameBuild/
                 fi
               done
 
-      - name: Package build artifact
+      - name: Validate GameBuild output
         shell: powershell
         run: |
           $ErrorActionPreference = 'Stop'
-          if (-not (Test-Path 'client/dist/main.exe')) {
-            throw 'Bundled executable not found at client/dist/main.exe.'
+          if (-not (Test-Path 'GameBuild/MyGame.exe')) {
+            throw 'Expected GameBuild/MyGame.exe was not found.'
           }
 
-          Compress-Archive -Path client/dist/* -DestinationPath client/client-latest-windows.zip -Force
+      - name: Install Inno Setup
+        shell: powershell
+        run: choco install innosetup -y
 
-      - name: Upload Windows artifact
+      - name: Build installer
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $version = 'latest'
+          & 'C:\Program Files (x86)\Inno Setup 6\ISCC.exe' "/DMyAppVersion=$version" 'installer.iss'
+
+          if (-not (Test-Path 'Output/MyGameSetup.exe')) {
+            throw 'Installer was not generated at Output/MyGameSetup.exe.'
+          }
+
+      - name: Build Windows zip package
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if (-not (Test-Path 'GameBuild/MyGame.exe')) {
+            throw 'Expected GameBuild/MyGame.exe was not found before zipping.'
+          }
+          Compress-Archive -Path GameBuild/* -DestinationPath client-latest-windows.zip -Force
+
+      - name: Upload installer artifact
         uses: actions/upload-artifact@v4
         with:
-          name: client-windows
-          path: client/client-latest-windows.zip
+          name: windows-installer
+          path: Output/MyGameSetup.exe
 
-  build-macos:
+      - name: Upload Windows zip artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-client-zip
+          path: client-latest-windows.zip
+
+  build-macos-zip:
     runs-on: macos-latest
     steps:
       - name: Checkout
@@ -88,13 +128,13 @@ jobs:
         run: |
           brew install sdl2 sdl2_ttf sdl2_image sdl2_mixer openssl@3 pkg-config
 
-      - name: Build client
+      - name: Build macOS client
         run: |
           cd client
           make -f Makefile.mac clean
           make -f Makefile.mac
 
-      - name: Bundle artifact
+      - name: Bundle macOS artifact
         env:
           ENV_SECRET: ${{ secrets.ENV }}
           CERT_SECRET: ${{ secrets.CERT }}
@@ -106,22 +146,24 @@ jobs:
           cp main dist/main
           chmod +x dist/main
 
-          # Write secrets to bundle
-          echo "$ENV_SECRET" > dist/env/.env
-          echo "$CERT_SECRET" > dist/certs/ca.crt
+          if [ -n "${ENV_SECRET:-}" ]; then
+            echo "$ENV_SECRET" > dist/env/.env
+          fi
+
+          if [ -n "${CERT_SECRET:-}" ]; then
+            echo "$CERT_SECRET" > dist/certs/ca.crt
+          fi
 
           if [ -d assets ]; then
             cp -r assets dist/assets
           fi
 
-          # Copy all Homebrew dylibs that main links against
           otool -L main \
             | awk '/\/opt\/homebrew\/|\/usr\/local\// { print $1 }' \
             | while read -r lib; do
                 [ -f "$lib" ] && cp "$lib" dist/
               done
 
-          # Fix install names so bundled dylibs are found at runtime
           for lib in dist/*.dylib; do
             [ -f "$lib" ] || continue
             orig=$(otool -D "$lib" | tail -1)
@@ -134,33 +176,39 @@ jobs:
       - name: Upload macOS artifact
         uses: actions/upload-artifact@v4
         with:
-          name: client-macos
+          name: macos-client-zip
           path: client/client-latest-macos.zip
 
   publish:
-    needs: [build-windows, build-macos]
+    needs: [build-windows-installer, build-macos-zip]
     runs-on: ubuntu-latest
     steps:
-      - name: Download Windows artifact
+      - name: Download installer artifact
         uses: actions/download-artifact@v4
         with:
-          name: client-windows
+          name: windows-installer
+          path: release/
+
+      - name: Download Windows zip artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: windows-client-zip
           path: release/
 
       - name: Download macOS artifact
         uses: actions/download-artifact@v4
         with:
-          name: client-macos
+          name: macos-client-zip
           path: release/
 
-      - name: Publish latest client release
+      - name: Create GitHub release and upload assets
         uses: ncipollo/release-action@v1
         with:
           tag: client-latest
-          name: Client Latest Build
-          body: Automated latest client build from GitHub Actions.
+          name: Archicast Client Latest
+          body: Automated latest build for Archicast.
           allowUpdates: true
           removeArtifacts: true
           artifactErrorsFailBuild: true
-          artifacts: release/client-latest-windows.zip,release/client-latest-macos.zip
+          artifacts: release/MyGameSetup.exe,release/client-latest-windows.zip,release/client-latest-macos.zip
           makeLatest: true
