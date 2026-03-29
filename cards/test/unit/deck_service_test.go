@@ -379,7 +379,7 @@ func TestCreateDeck_DeleteExistingError(t *testing.T) {
 	db := setupTestDB(t)
 	db.Create(&models.Deck{Uid: 1, Cards: models.CardCounts{1: 1, 2: 1, 3: 1}})
 	if err := db.Callback().Delete().Before("gorm:delete").Register("force_delete_error", func(tx *gorm.DB) {
-		tx.AddError(errors.New("forced delete error"))
+		_ = tx.AddError(errors.New("forced delete error"))
 	}); err != nil {
 		t.Fatalf("failed to register callback: %v", err)
 	}
@@ -400,7 +400,7 @@ func TestFillDeckForUser_DeleteDeckError(t *testing.T) {
 	seedCards(t, db, []models.Card{{Cid: 1}, {Cid: 2}, {Cid: 3}})
 	seedInventory(t, db, models.Inventory{Uid: 1, Cards: models.CardCounts{1: 2, 2: 1}})
 	if err := db.Callback().Delete().Before("gorm:delete").Register("force_delete_error", func(tx *gorm.DB) {
-		tx.AddError(errors.New("forced delete error"))
+		_ = tx.AddError(errors.New("forced delete error"))
 	}); err != nil {
 		t.Fatalf("failed to register callback: %v", err)
 	}
@@ -421,7 +421,7 @@ func TestFillDeckForUser_CreateDeckError(t *testing.T) {
 	seedCards(t, db, []models.Card{{Cid: 1}, {Cid: 2}, {Cid: 3}})
 	seedInventory(t, db, models.Inventory{Uid: 1, Cards: models.CardCounts{1: 2, 2: 1}})
 	if err := db.Callback().Create().Before("gorm:create").Register("force_create_error", func(tx *gorm.DB) {
-		tx.AddError(errors.New("forced create error"))
+		_ = tx.AddError(errors.New("forced create error"))
 	}); err != nil {
 		t.Fatalf("failed to register callback: %v", err)
 	}
@@ -475,7 +475,7 @@ func TestFillDecksFromInventories_CreateError(t *testing.T) {
 	seedCards(t, db, []models.Card{{Cid: 1}, {Cid: 2}, {Cid: 3}})
 	seedInventory(t, db, models.Inventory{Uid: 1, Cards: models.CardCounts{1: 2}})
 	if err := db.Callback().Create().Before("gorm:create").Register("force_create_error", func(tx *gorm.DB) {
-		tx.AddError(errors.New("forced create error"))
+		_ = tx.AddError(errors.New("forced create error"))
 	}); err != nil {
 		t.Fatalf("failed to register callback: %v", err)
 	}
