@@ -20,8 +20,8 @@ ArchitecturesInstallIn64BitMode=x64
 Source: "GameBuild\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
-Source: "{group}\My Game"; Target: "{app}\MyGame.exe"
-Source: "{autodesktop}\My Game"; Target: "{app}\MyGame.exe"; Tasks: desktopicon
+Name: "{group}\My Game"; Filename: "{app}\MyGame.exe"
+Name: "{autodesktop}\My Game"; Filename: "{app}\MyGame.exe"; Tasks: desktopicon
 
 [Tasks]
 Name: "desktopicon"; Description: "Create a desktop shortcut"; GroupDescription: "Additional icons:"; Flags: unchecked
