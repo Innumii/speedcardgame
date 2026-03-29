@@ -63,13 +63,13 @@ jobs:
           set -euo pipefail
 
           cd client
-          make
+          make release
           cd ..
 
           rm -rf GameBuild
           mkdir -p GameBuild GameBuild/env GameBuild/certs
 
-          cp client/main.exe GameBuild/MyGame.exe
+          cp client/MyGame.exe GameBuild/MyGame.exe
 
           if [ -d client/assets ]; then
             cp -r client/assets GameBuild/assets
@@ -85,7 +85,7 @@ jobs:
           fi
 
           # Bundle runtime DLL dependencies.
-          ldd client/main.exe \
+          ldd client/MyGame.exe \
             | awk '/=> \/mingw64\/bin\// { print $3 }' \
             | sort -u \
             | while read -r dllpath; do
@@ -205,7 +205,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ needs.create-tag.outputs.new_tag }}
-          name: Release ${{ needs.create-tag.outputs.new_tag }}
+          name: Releaseeleas ${{ needs.create-tag.outputs.new_tag }}
           files: |
             release/MyGameSetup.exe
             release/client-macos.zip
