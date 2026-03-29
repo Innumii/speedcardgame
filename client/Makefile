@@ -7,6 +7,10 @@ GUI_LDFLAGS := -mwindows
 BUILD_DIR := build
 MKDIR_P := powershell -NoProfile -Command "New-Item -ItemType Directory -Force -Path"
 
+# Resource (ICON)
+RES := resource.rc
+RES_OBJ := $(BUILD_DIR)/resource.o
+
 # Pick up .cpp files in src and one/two-level subdirs.
 SRCS := $(wildcard src/*.cpp src/*/*.cpp src/*/*/*.cpp)
 OBJS := $(patsubst src/%.cpp,$(BUILD_DIR)/%.o,$(SRCS))
@@ -14,18 +18,24 @@ DEPS := $(OBJS:.o=.d)
 
 all: main
 
-main: $(OBJS)
+main: $(OBJS) $(RES_OBJ)
 	$(CXX) $(STD) -o $@ $^ $(LIBDIR) $(LIBS)
 
 # Production Windows build (no attached console window).
 release: MyGame.exe
 
-MyGame.exe: $(OBJS)
+MyGame.exe: $(OBJS) $(RES_OBJ)
 	$(CXX) $(STD) $(GUI_LDFLAGS) -o $@ $^ $(LIBDIR) $(LIBS)
 
+# Compile C++ sources
 $(BUILD_DIR)/%.o: src/%.cpp
 	$(MKDIR_P) $(@D)
 	$(CXX) $(STD) $(INCLUDES) -MMD -MP -c $< -o $@
+
+# Compile resource file (ICON)
+$(RES_OBJ): $(RES)
+	$(MKDIR_P) $(@D)
+	windres $< -O coff -o $@
 
 -include $(DEPS)
 
