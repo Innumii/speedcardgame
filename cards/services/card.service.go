@@ -14,13 +14,12 @@ type cardRequest struct {
 	Cid       int    `json:"cid"`
 	Name      string `json:"name"`
 	Type      string `json:"type"`
-	Cost      int    `json:"cost"`
-	Value     int    `json:"value"`
-	Power     int    `json:"power"`
-	Toughness int    `json:"toughness"`
+	Cost      *int   `json:"cost"`      // pointer so we can distinguish "not provided" from 0
+	Value     *int   `json:"value"`     // pointer so we can distinguish "not provided" from 0
+	Power     *int   `json:"power"`     // pointer so we can distinguish "not provided" from 0
+	Toughness *int   `json:"toughness"` // pointer so we can distinguish "not provided" from 0
 	Effect    string `json:"effect"`
 }
-
 
 // CreateCard godoc
 // @Summary      Create a card
@@ -32,6 +31,7 @@ type cardRequest struct {
 // @Success      200   {object}  models.Card
 // @Failure      400   {string}  string  "Invalid input"
 // @Failure      500   {string}  string  "Failed to create card"
+// @Router       /cards [post]
 
 // create a new card, ONLY FOR ADMIN USE
 func CreateCard(w http.ResponseWriter, r *http.Request) {
@@ -44,15 +44,30 @@ func CreateCard(w http.ResponseWriter, r *http.Request) {
 
 	// TODO: Add admin authentication check here
 
+	// Default numeric fields to 0 if not provided
+	cost, value, power, toughness := 0, 0, 0, 0
+	if inputCard.Cost != nil {
+		cost = *inputCard.Cost
+	}
+	if inputCard.Value != nil {
+		value = *inputCard.Value
+	}
+	if inputCard.Power != nil {
+		power = *inputCard.Power
+	}
+	if inputCard.Toughness != nil {
+		toughness = *inputCard.Toughness
+	}
+
 	// Create a new Card instance
 	card := models.Card{
 		Cid:       inputCard.Cid,
 		Name:      inputCard.Name,
 		Type:      inputCard.Type,
-		Cost:      inputCard.Cost,
-		Value:     inputCard.Value,
-		Power:     inputCard.Power,
-		Toughness: inputCard.Toughness,
+		Cost:      cost,
+		Value:     value,
+		Power:     power,
+		Toughness: toughness,
 		Effect:    inputCard.Effect,
 	}
 
@@ -65,7 +80,6 @@ func CreateCard(w http.ResponseWriter, r *http.Request) {
 	// Return the created card
 	util.RespondWithJSON(w, http.StatusOK, card)
 }
-
 
 // ListCards godoc
 // @Summary      List all cards
@@ -89,7 +103,6 @@ func ListCards(w http.ResponseWriter, _ *http.Request) {
 	// Respond with the list of cards
 	util.RespondWithJSON(w, http.StatusOK, cards)
 }
-
 
 // UpdateCard godoc
 // @Summary      Update a card
@@ -115,7 +128,7 @@ func UpdateCard(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Extract the CardID from the URL parameter
+	// Extract the CardID from the request body
 	cid := inputCard.Cid
 
 	// Find the existing card
@@ -125,22 +138,40 @@ func UpdateCard(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Apply updates, if the field is empty, keep the existing value
+	// Apply updates independently — each field is checked separately so multiple
+	// fields can be updated in a single request
+	updated := false
+
 	if inputCard.Name != "" {
 		card.Name = inputCard.Name
-	} else if inputCard.Type != "" {
+		updated = true
+	}
+	if inputCard.Type != "" {
 		card.Type = inputCard.Type
-	} else if inputCard.Cost > -1 {
-		card.Cost = inputCard.Cost
-	} else if inputCard.Value > -1 {
-		card.Value = inputCard.Value
-	} else if inputCard.Power > -1 {
-		card.Power = inputCard.Power
-	} else if inputCard.Toughness > -1 {
-		card.Toughness = inputCard.Toughness
-	} else if inputCard.Effect != "" {
+		updated = true
+	}
+	if inputCard.Cost != nil {
+		card.Cost = *inputCard.Cost
+		updated = true
+	}
+	if inputCard.Value != nil {
+		card.Value = *inputCard.Value
+		updated = true
+	}
+	if inputCard.Power != nil {
+		card.Power = *inputCard.Power
+		updated = true
+	}
+	if inputCard.Toughness != nil {
+		card.Toughness = *inputCard.Toughness
+		updated = true
+	}
+	if inputCard.Effect != "" {
 		card.Effect = inputCard.Effect
-	} else {
+		updated = true
+	}
+
+	if !updated {
 		util.RespondWithError(w, http.StatusBadRequest, "No valid fields to update")
 		return
 	}
@@ -154,8 +185,6 @@ func UpdateCard(w http.ResponseWriter, r *http.Request) {
 	// Return the updated card
 	util.RespondWithJSON(w, http.StatusOK, card)
 }
-
-
 
 // DeleteCard godoc
 // @Summary      Delete a card
@@ -176,7 +205,7 @@ func DeleteCard(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Extract the CardID from the URL parameter
+	// Extract the CardID from the request body
 	cid := inputCard.Cid
 
 	// Find the card to delete
