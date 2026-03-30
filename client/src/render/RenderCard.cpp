@@ -297,34 +297,29 @@ namespace {
     // Called once per active effect on the card; the caller is responsible for
     // positioning successive badges so they don't overlap.
     void drawEffectsBadge(SDL_Renderer* renderer, const std::string& effect,
-                          int cx, int cy, int radius, float scale) {
+                        int cx, int cy, int radius, float scale) {
         (void)scale;
         SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
 
-        // Draw a hexagon background using the theme fill colour.
-        RenderUtil::drawHexagon(renderer, cx, cy, radius, Theme::Card::EFFECTS_BADGE_FILL);
+        RenderUtil::drawHexagon(renderer, cx, cy, radius + 2, Theme::BANNER_BORDER);
+        RenderUtil::drawHexagon(renderer, cx, cy, radius, Theme::BANNER_FILL);
 
-        // Fetch the icon texture from the assets/images/ directory.
+        SDL_RenderSetClipRect(renderer, nullptr); // clear any clip set by drawHexagon
+
         SDL_Texture* icon = RenderUtil::getIcon(renderer, effect);
         if (icon) {
-            // Scale the icon to fill the hexagon badge (minimal padding).
-            int iw = 0;
-            int ih = 0;
+            int iw = 0, ih = 0;
             SDL_QueryTexture(icon, nullptr, nullptr, &iw, &ih);
-            const int iconSize = static_cast<int>(radius * 1.9f);
+            const int iconSize = static_cast<int>(radius * 1.5f);
             const float iconScale = std::min(static_cast<float>(iconSize) / iw,
-                                             static_cast<float>(iconSize) / ih);
+                                            static_cast<float>(iconSize) / ih);
             const int scaledW = static_cast<int>(iw * iconScale);
             const int scaledH = static_cast<int>(ih * iconScale);
-            // Centre the icon inside the hexagon.
             SDL_Rect dstRect{cx - scaledW / 2, cy - scaledH / 2, scaledW, scaledH};
             SDL_RenderCopy(renderer, icon, nullptr, &dstRect);
         } else {
-            const std::string iconPath = "assets/images/" + effect + ".png";
             SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
-                        "drawEffectsBadge: missing effect icon '%s' (resolved path: %s)",
-                        effect.c_str(),
-                        iconPath.c_str());
+                        "drawEffectsBadge: missing effect icon '%s'", effect.c_str());
         }
     }
 
@@ -474,20 +469,7 @@ namespace {
         // ── Effects badges (top-left corner, board + expanded modes) ───────────
         // One hexagonal icon badge per active effect, stacked downward from the
         // top-left corner so they sit symmetrically opposite the mana badge.
-        if ((boardMode || expandedMode) && creature) {
-            const std::vector<std::string>& effects = creature->getActiveEffects();
-            if (!effects.empty()) {
-                const int badgeRadius = manaRadius; // match the mana badge size
-                // Start at the same inset as the mana badge but on the left side.
-                int badgeCx = rect.x + badgeRadius + 2;
-                int badgeCy = rect.y + badgeRadius + 2;
-                for (const std::string& effect : effects) {
-                    drawEffectsBadge(renderer, effect, badgeCx, badgeCy, badgeRadius, scale);
-                    // Stack badges vertically downward with a small gap between them.
-                    badgeCy += (badgeRadius * 2) + sc(2);
-                }
-            }
-        }
+
 
         // ── Name plate ────────────────────────────────────────────────────────
         // A solid filled bar directly below the art panel.
@@ -753,6 +735,20 @@ namespace {
                                   ? Theme::Card::VALUE_BADGE_CREATURE_BORDER
                                   : Theme::Card::VALUE_BADGE_SPELL_BORDER,
                               std::to_string(std::max(0, card.getManaValue())), scale);
+        }
+
+        if ((boardMode || expandedMode) && creature) {
+            const std::vector<std::string>& effects = creature->getActiveEffects();
+            if (!effects.empty()) {
+                SDL_RenderSetClipRect(renderer, nullptr); // clear any stale clip
+                const int badgeRadius = manaRadius;
+                int badgeCx = rect.x + badgeRadius + 2;
+                int badgeCy = rect.y + badgeRadius + borderThickness;
+                for (const std::string& effect : effects) {
+                    drawEffectsBadge(renderer, effect, badgeCx, badgeCy, badgeRadius, scale);
+                    badgeCy += static_cast<int>(badgeRadius * 1.4f);
+                }
+            }
         }
     }
 

@@ -365,8 +365,8 @@ namespace Theme {
         constexpr SDL_Color MANA_BADGE_CREATURE_BORDER  = {170, 150, 255, 255};
         constexpr SDL_Color MANA_BADGE_SPELL_FILL       = {55, 138, 78, 255};
         constexpr SDL_Color MANA_BADGE_SPELL_BORDER     = {146, 233, 168, 255};
-        constexpr SDL_Color EFFECTS_BADGE_FILL          = {50, 50, 50, 200};
-        constexpr SDL_Color EFFECTS_BADGE_BORDER        = {255, 255, 255, 255};
+        constexpr SDL_Color EFFECTS_BADGE_FILL          = {34, 74, 130, 200};
+        constexpr SDL_Color EFFECTS_BADGE_BORDER        = {72, 92, 190, 255};
         constexpr SDL_Color VALUE_BADGE_CREATURE_FILL   = {49, 80, 155, 255};
         constexpr SDL_Color VALUE_BADGE_CREATURE_BORDER = {142, 175, 255, 255};
         constexpr SDL_Color VALUE_BADGE_SPELL_FILL      = {47, 126, 75, 255};
