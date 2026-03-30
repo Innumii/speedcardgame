@@ -22,9 +22,9 @@ main: $(OBJS) $(RES_OBJ)
 	$(CXX) $(STD) -o $@ $^ $(LIBDIR) $(LIBS)
 
 # Production Windows build (no attached console window).
-release: MyGame.exe
+release: Archcast.exe
 
-MyGame.exe: $(OBJS) $(RES_OBJ)
+Archcast.exe: $(OBJS) $(RES_OBJ)
 	$(CXX) $(STD) $(GUI_LDFLAGS) -o $@ $^ $(LIBDIR) $(LIBS)
 
 # Compile C++ sources
@@ -40,6 +40,6 @@ $(RES_OBJ): $(RES)
 -include $(DEPS)
 
 clean:
-	powershell -NoProfile -Command "Remove-Item -Recurse -Force -ErrorAction SilentlyContinue $(BUILD_DIR), main, MyGame.exe"
+	powershell -NoProfile -Command "Remove-Item -Recurse -Force -ErrorAction SilentlyContinue $(BUILD_DIR), main, Archcast.exe"
 
 .PHONY: all clean release

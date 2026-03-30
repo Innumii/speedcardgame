@@ -19,20 +19,19 @@ Compression=lzma
 SolidCompression=yes
 WizardStyle=modern
 ArchitecturesInstallIn64BitMode=x64
-
+SetupIconFile=client\assets\images\logo.ico
+UninstallDisplayIcon={app}\Archcast.exe
 [Files]
 ; -------------------------
 ; Include GameBuild contents
 ; -------------------------
 Source: "GameBuild\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
-Source: "client\assets\images\logo.ico"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
-Name: "{group}\Archcast"; Filename: "{app}\MyGame.exe"; IconFilename: "{app}\logo.ico"; IconIndex: 0; AppUserModelID: "Archcast"
-Name: "{autodesktop}\Archcast"; Filename: "{app}\MyGame.exe"; IconFilename: "{app}\logo.ico"; IconIndex: 0; AppUserModelID: "Archcast"
-
+Name: "{group}\Archcast"; Filename: "{app}\Archcast.exe"; WorkingDir: "{app}"; IconFilename: "{app}\Archcast.exe"
+Name: "{autodesktop}\Archcast"; Filename: "{app}\Archcast.exe"; WorkingDir: "{app}"; IconFilename: "{app}\Archcast.exe"
 [Run]
 ; -------------------------
 ; Launch app post-install
 ; -------------------------
-Filename: "{app}\MyGame.exe"; Description: "Launch Archcast"; Flags: nowait postinstall skipifsilent
+Filename: "{app}\Archcast.exe"; Description: "Launch Archcast"; Flags: nowait postinstall skipifsilent

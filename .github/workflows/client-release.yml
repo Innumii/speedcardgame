@@ -49,7 +49,7 @@ jobs:
           rm -rf GameBuild
           mkdir -p GameBuild GameBuild/env GameBuild/certs
 
-          cp client/MyGame.exe GameBuild/MyGame.exe
+          cp client/Archcast.exe GameBuild/Archcast.exe
 
           if [ -d client/assets ]; then
             cp -r client/assets GameBuild/assets
@@ -65,7 +65,7 @@ jobs:
           fi
 
           # Bundle runtime DLL dependencies.
-          ldd client/MyGame.exe \
+          ldd client/Archcast.exe \
             | awk '/=> \/mingw64\/bin\// { print $3 }' \
             | sort -u \
             | while read -r dllpath; do
@@ -78,8 +78,8 @@ jobs:
         shell: powershell
         run: |
           $ErrorActionPreference = 'Stop'
-          if (-not (Test-Path 'GameBuild/MyGame.exe')) {
-            throw 'Expected GameBuild/MyGame.exe was not found.'
+          if (-not (Test-Path 'GameBuild/Archcast.exe')) {
+            throw 'Expected GameBuild/Archcast.exe was not found.'
           }
 
       - name: Install Inno Setup
@@ -101,8 +101,8 @@ jobs:
         shell: powershell
         run: |
           $ErrorActionPreference = 'Stop'
-          if (-not (Test-Path 'GameBuild/MyGame.exe')) {
-            throw 'Expected GameBuild/MyGame.exe was not found before zipping.'
+          if (-not (Test-Path 'GameBuild/Archcast.exe')) {
+            throw 'Expected GameBuild/Archcast.exe was not found before zipping.'
           }
           Compress-Archive -Path GameBuild/* -DestinationPath client-latest-windows.zip -Force
 
