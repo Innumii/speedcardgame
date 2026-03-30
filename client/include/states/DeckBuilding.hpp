@@ -72,6 +72,12 @@ private:
 		Theme::DeckBuilding::MENU_BUTTON_WIDTH,
 		Theme::DeckBuilding::MENU_BUTTON_HEIGHT
 	};
+	SDL_Rect ClearButton{
+		Theme::DeckBuilding::MENU_BUTTON_INITIAL_X,
+		Theme::DeckBuilding::MENU_BUTTON_INITIAL_Y,
+		Theme::DeckBuilding::MENU_BUTTON_WIDTH,
+		Theme::DeckBuilding::MENU_BUTTON_HEIGHT
+	};
 	std::vector<int> deckCopies; //st
 
 

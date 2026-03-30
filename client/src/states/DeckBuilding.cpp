@@ -164,6 +164,17 @@ void DeckBuilding::handleEvents(Game& game, const SDL_Event& event) {
         return;
     }
 
+    const bool inClear = (event.type == SDL_MOUSEBUTTONDOWN) &&
+                     (event.button.button == SDL_BUTTON_LEFT) &&
+                     (event.button.x >= ClearButton.x && event.button.x <= (ClearButton.x + ClearButton.w)) &&
+                     (event.button.y >= ClearButton.y && event.button.y <= (ClearButton.y + ClearButton.h));
+    if (inClear) {
+        std::fill(deckCopies.begin(), deckCopies.end(), 0);
+        deckScrollOffset = 0;
+        setStatusMessage("Deck cleared.", 1500);
+        return;
+    }
+
     if (event.type == SDL_MOUSEBUTTONDOWN && event.button.button == SDL_BUTTON_LEFT) {
         const SDL_Point point = getPoint(event.button.x, event.button.y);
 
@@ -427,7 +438,7 @@ void DeckBuilding::updateMenuButtons(const Layout& layout) {
     const int contentW = contentRight - contentX;
 
     const int buttonGap = Theme::DeckBuilding::MENU_BUTTON_GAP;
-    const int totalButtonsW = TitleButton.w + SaveButton.w + PlayButton.w + (buttonGap * 2);
+    const int totalButtonsW = TitleButton.w + SaveButton.w + PlayButton.w + ClearButton.w + (buttonGap * 3);
     int startX = contentX + (contentW - totalButtonsW) / 2;
     if (startX < Theme::DeckBuilding::MENU_MIN_LEFT) startX = Theme::DeckBuilding::MENU_MIN_LEFT;
 
@@ -440,6 +451,8 @@ void DeckBuilding::updateMenuButtons(const Layout& layout) {
     SaveButton.y = buttonY;
     PlayButton.x = SaveButton.x + SaveButton.w + buttonGap;
     PlayButton.y = buttonY;
+    ClearButton.x = PlayButton.x + PlayButton.w + buttonGap;
+    ClearButton.y = buttonY;
 }
 
 std::vector<int> DeckBuilding::getDeckEntryOrder() const {
