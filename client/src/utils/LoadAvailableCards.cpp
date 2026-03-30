@@ -6,6 +6,7 @@
 #include "utils/EnvUtil.hpp"
 #include "utils/HttpUtil.hpp"
 #include "utils/JsonUtil.hpp"
+#include "utils/StringUtil.hpp"
 
 #include <algorithm>
 #include <cctype>
@@ -18,13 +19,6 @@ namespace LoadAvailableCardsUtil {
 	bool ensureAvailableCardsLoaded();
 	bool areAvailableCardsLoaded();
     std::vector<std::unique_ptr<Card>>& getAvailableCards();
-
-    std::string toLower(std::string value) {
-		std::transform(value.begin(), value.end(), value.begin(), [](unsigned char c) {
-			return static_cast<char>(std::tolower(c));
-		});
-		return value;
-	}
 }
 
 namespace {
@@ -78,7 +72,7 @@ bool LoadAvailableCardsUtil::loadFromService(std::vector<std::unique_ptr<Card>>&
 		JsonUtil::readJsonStringField(obj, "effect", effect);
 
 		if (!name.empty()) {
-			const std::string typeLower = toLower(type);
+			const std::string typeLower = StringUtil::toLower(type);
 			const int manaValue = value > 0 ? value : cost;
 			if (typeLower == "creature") {
 				fetchedCards.push_back(std::make_unique<CreatureCard>(name, effect, manaValue, cost, power, toughness, cid));
@@ -142,7 +136,7 @@ bool LoadAvailableCardsUtil::loadFromCsv(std::vector<std::unique_ptr<Card>>& out
 		const std::string effect = fields[7];
 
 		if (name.empty()) continue;
-		const std::string typeLower = toLower(type);
+		const std::string typeLower = StringUtil::toLower(type);
 		const int manaValue = value > 0 ? value : cost;
 
 		if (typeLower == "creature") {

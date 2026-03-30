@@ -29,23 +29,8 @@
 namespace {
     std::map<std::string, SDL_Texture*> coinPackTextureCache;
 
-    std::string normalize(const std::string& value) {
-        std::string out = value;
-        std::transform(out.begin(), out.end(), out.begin(),
-                       [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
-        return out;
-    }
-
-    std::string getTierLabel(const ShopPackage::Package& package) {
-        const std::string key = normalize(package.id + " " + package.name);
-        if (key.find("small")  != std::string::npos) return "SMALL";
-        if (key.find("medium") != std::string::npos) return "MEDIUM";
-        if (key.find("large")  != std::string::npos) return "LARGE";
-        return "PACK";
-    }
-
     std::string getTierImagePath(const ShopPackage::Package& package) {
-        const std::string key = normalize(package.id + " " + package.name);
+        const std::string key = StringUtil::toLower(package.id + " " + package.name);
         if (key.find("small")  != std::string::npos) return "assets/images/smallCoins.png";
         if (key.find("medium") != std::string::npos) return "assets/images/mediumCoins.png";
         if (key.find("large")  != std::string::npos) return "assets/images/largeCoins.png";
@@ -467,8 +452,7 @@ void Payment::renderPackagesPanel(Game& game, int panelX) {
         }
 
         const int textLeft = imageRect.x + imageRect.w + 18;
-        const std::string tier  = getTierLabel(package);
-        const std::string title = tier + "  " + package.name;
+        const std::string title = package.name;
         const std::string coins = std::to_string(package.coins) + " coins";
         std::string price = formatMoney(package.amountCents, package.currency);
         if (package.discountPercent > 0)
@@ -527,8 +511,7 @@ void Payment::renderFormPanel(Game& game, int panelX) {
 
         // Package info
         const int infoX = thumbRect.x + thumbRect.w + 14;
-        const std::string tier  = getTierLabel(pkg);
-        const std::string title = tier + "  " + pkg.name;
+        const std::string title = pkg.name;
         const std::string coins = std::to_string(pkg.coins) + " coins";
         RenderText::drawText(renderer, title, uiFonts.large, Theme::BANNER_TEXT,   infoX, summaryRect.y + 12);
         RenderText::drawText(renderer, coins, uiFonts.large, Theme::SUCCESS_GREEN, infoX, summaryRect.y + 42);

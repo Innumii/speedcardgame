@@ -22,6 +22,13 @@ namespace StringUtil {
         return value;
     }
 
+    std::string toLower(std::string value) {
+        std::transform(value.begin(), value.end(), value.begin(), [](unsigned char c) {
+            return static_cast<char>(std::tolower(c));
+        });
+        return value;
+    }
+
     std::vector<std::string> splitTrimmedLines(const std::string& text) {
         std::vector<std::string> lines;
         std::istringstream stream(text);

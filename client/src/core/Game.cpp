@@ -12,6 +12,7 @@
 #include "utils/LoadAvailableCards.hpp"
 #include "utils/HttpUtil.hpp"
 #include "utils/RenderUtil.hpp"
+#include "utils/StringUtil.hpp"
 #include "core/Audio.hpp"
 #include <map>
 
@@ -49,9 +50,7 @@ bool isWSL() {
     if (!f) return false;
     std::string line;
     std::getline(f, line);
-    std::transform(line.begin(), line.end(), line.begin(), [](unsigned char c) {
-        return static_cast<char>(std::tolower(c));
-    });
+    line = StringUtil::toLower(line);
     return line.find("microsoft") != std::string::npos;
 }
 
