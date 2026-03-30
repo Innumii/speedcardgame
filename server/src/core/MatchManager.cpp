@@ -34,9 +34,11 @@ void MatchManager::onPairFound(std::shared_ptr<PlayerConnection> a,
 
 void MatchManager::onAccept(std::shared_ptr<PlayerConnection> player)
 {
-    std::cout << "[MatchManager] " << player.get()->getUsername() << " accepted\n";
+    std::cout << "[MatchManager] " << player->getUsername() << " accepted\n";
     auto match = findPending(player);
     if (!match) return;
+
+    std::shared_ptr<MatchSession> sessionToStart;
 
     {
         std::lock_guard<std::mutex> lock(mutex);
@@ -45,9 +47,12 @@ void MatchManager::onAccept(std::shared_ptr<PlayerConnection> player)
         if (match->b == player) match->bAccepted = true;
 
         if (match->aAccepted && match->bAccepted) {
-            startMatch(match);
+            sessionToStart = startMatch(match); // build session, don't start yet
         }
     }
+
+    // Start outside the lock
+    if (sessionToStart) sessionToStart->start();
 }
 
 
@@ -91,37 +96,27 @@ MatchManager::findPending(const std::shared_ptr<PlayerConnection>& player)
     return nullptr;
 }
 
-void MatchManager::startMatch(const std::shared_ptr<PendingMatch>& match)
+std::shared_ptr<MatchSession> MatchManager::startMatch(const std::shared_ptr<PendingMatch>& match)
 {
-    //This is so fkin stupid
-    //clone every card
-
     auto session = std::make_shared<MatchSession>(match->a, match->b, server.getAllCards());
 
-    // Register the end-of-match callback
     session->onMatchEnd = [this](std::shared_ptr<MatchSession> s) {
-        // Remove from activeMatches
         std::lock_guard<std::mutex> lock(mutex);
         activeMatches.erase(
             std::remove(activeMatches.begin(), activeMatches.end(), s),
             activeMatches.end()
         );
-
         std::cout << "[MatchManager] Match ended, cleaned up activeMatches\n";
     };
-    
-    session->start();
 
     activeMatches.push_back(session);
+    removePending(match);
 
     std::cout << "Match started: "
               << match->a->getUsername() << " vs "
               << match->b->getUsername() << "\n";
 
-    // sendMatchStart(match->a);
-    // sendMatchStart(match->b);
-
-    removePending(match);
+    return session; // caller starts it outside the lock
 }
 
 void MatchManager::removePending(const std::shared_ptr<PendingMatch>& match)

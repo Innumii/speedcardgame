@@ -49,7 +49,7 @@ public:
 
     //Callback settings
     using MsgCallback = std::function<void(const std::shared_ptr<PlayerConnection>&, const std::string&)>;
-    ConnectionState state = ConnectionState::Waiting;
+    std::atomic<ConnectionState> state{ConnectionState::Waiting};
     void setMessageHandler(ConnectionState state, MsgCallback cb);
 
 private:    
@@ -81,6 +81,7 @@ private:
     std::mutex stopMutex;
     std::mutex writeMutex;
     bool stopped = false;
+    std::mutex handlerMutex;
 
 };
 

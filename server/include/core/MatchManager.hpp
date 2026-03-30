@@ -45,7 +45,7 @@ private:
     std::shared_ptr<PendingMatch>
     findPending(const std::shared_ptr<PlayerConnection>& player);
 
-    void startMatch(const std::shared_ptr<PendingMatch>& match);
+    std::shared_ptr<MatchSession> startMatch(const std::shared_ptr<PendingMatch>& match);
     void removePending(const std::shared_ptr<PendingMatch>& match);
 
     // ---- Networking helpers ----

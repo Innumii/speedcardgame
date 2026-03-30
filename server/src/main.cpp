@@ -4,12 +4,11 @@
 #include <csignal>
 #include <mutex>
 #include <condition_variable>
+#include <execinfo.h>  // ← add this
+#include <unistd.h>    // ← add this
 
-//allocate null ptr to gameserver
-//use for signal handling
 static GameServer* serverPtr = nullptr;
 
-//cannot use server.stop() as local var is not in scope
 void handleSignal(int) {
     if (serverPtr) {
         std::cout << "\nSignal received. Shutting down...\n";
@@ -17,16 +16,27 @@ void handleSignal(int) {
     }
 }
 
-//local vars in C++ CANNOT be accessed outside the block they are declared in
+void crashHandler(int sig) {
+    void* array[32];
+    int size = backtrace(array, 32);
+    write(STDERR_FILENO, "=== CRASH ===\n", 14);
+    backtrace_symbols_fd(array, size, STDERR_FILENO);
+    _exit(1);
+}
+
 int main() {
+    setvbuf(stderr, nullptr, _IONBF, 0);  // ← add
+    setvbuf(stdout, nullptr, _IONBF, 0);  // ← add
+
+    signal(SIGSEGV, crashHandler);  // ← add
+    signal(SIGABRT, crashHandler);  // ← add
+
     std::set_terminate([]{
         std::cerr << "💥 std::terminate called\n";
         std::abort();
     });
-    //flush buffer
+
     std::cout.setf(std::ios::unitbuf);
-    // std::cout << "Yo\n";
-    //allocate on stack
     GameServer server(4000);
     serverPtr = &server;
 

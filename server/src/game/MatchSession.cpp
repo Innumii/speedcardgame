@@ -85,20 +85,20 @@ bool MatchSession::start() {
 }
 
 void MatchSession::stop() {
-    std::cout  << "[MatchSession] Executing stop()...\n";
+    std::cout << "[MatchSession] Executing stop()...\n";
 
-    // if (!running.exchange(false)) return;
+    running = false;
 
     if (gameThread.joinable()) {
         if (std::this_thread::get_id() == gameThread.get_id()) {
-            std::cout  << "[MatchSession] Detaching Thread...\n";
+            std::cout << "[MatchSession] Detaching Thread...\n";
             gameThread.detach();
         } else {
-            std::cout  << "[MatchSession] Joining Thread...\n";
+            std::cout << "[MatchSession] Joining Thread...\n";
             gameThread.join();
         }
     }
-    std::cout  << "[MatchSession] Stopped.\n";
+    std::cout << "[MatchSession] Stopped.\n";
 }
 
 // --------------------------------------------------
@@ -1213,6 +1213,7 @@ void MatchSession::resolveLaneCombat(int lane) {
 void MatchSession::endMatch(std::shared_ptr<PlayerConnection> winner,
                             std::shared_ptr<PlayerConnection> loser) {
     // Update game state, send messages
+    if (!running.exchange(false)) return; // guard double-calls
     if (winner) {
         std::string msg = "MATCH_WON " + std::to_string(coinReward) + "\n";
         winner->send(msg);
@@ -1221,11 +1222,11 @@ void MatchSession::endMatch(std::shared_ptr<PlayerConnection> winner,
 
     if (loser) loser->send("MATCH_LOST\n");
 
-    running = false; // stop game loop
+    // running = false; // stop game loop
 
-    // ---- Reset player states ----
-    if (winner) winner->state = ConnectionState::Waiting;
-    if (loser) loser->state = ConnectionState::Waiting;
+    // Set state AFTER sending messages, BEFORE onMatchEnd fires from gameLoop
+    if (winner) winner->state.store(ConnectionState::Waiting);
+    if (loser)  loser->state.store(ConnectionState::Waiting);
 }
 
 //Give rewards to winner of match (eg. coins)
