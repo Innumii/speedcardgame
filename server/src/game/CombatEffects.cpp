@@ -38,7 +38,7 @@ int getMaskFromCard(const ServerCard* card) {
 int getRegenValueFromCard(const ServerCard* card) {
     if (!card || card->getType() != CardType::Creature) return 0;
 
-    const std::string textLower = StringUtil::toLowerCopy(card->getText());
+    const std::string textLower = StringUtil::toLower(card->getText());
     static const std::regex regenPattern(R"(regen\s+(-?\d+))");
     std::smatch match;
 
