@@ -18,6 +18,16 @@ namespace {
 
 void Title::enter(Game& game) {
     Audio::playMusic("title");
+
+    // Invalidate cached button textures — SDL render-target textures can
+    // become stale after window resize events that occur in other states.
+    // Clearing here guarantees a clean rebuild on the first render pass.
+    for (auto& cache : cachedButtons) {
+        if (cache.texture) {
+            SDL_DestroyTexture(cache.texture);
+            cache.texture = nullptr;
+        }
+    }
 }
 
 SDL_Texture* Title::buildButtonTexture(SDL_Renderer* renderer,
