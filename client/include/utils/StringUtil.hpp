@@ -9,6 +9,7 @@ namespace StringUtil {
     std::string trim(std::string value);
 
     std::string toUpper(std::string value);
+    std::string toLower(std::string value);
 
     std::vector<std::string> splitTrimmedLines(const std::string& text);
     void splitAbilityTextAndFlavor(const std::string& text,

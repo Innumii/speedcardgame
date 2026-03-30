@@ -1,4 +1,5 @@
 #include "utils/GetValidTargets.hpp"
+#include "utils/StringUtil.hpp"
 
 #include <algorithm>
 #include <cctype>
@@ -27,11 +28,7 @@ std::optional<std::vector<int>> getValidTargets(const Playing& playing, const Ca
 
     std::vector<int> validTargets;
 
-    std::string cardText = card.getText();
-    std::transform(cardText.begin(), cardText.end(), cardText.begin(),
-        [](unsigned char ch) {
-            return static_cast<char>(std::tolower(ch));
-        });
+    std::string cardText = StringUtil::toLower(card.getText());
 
     constexpr int localBoardIndex = 0;
     constexpr int opponentBoardIndex = 1;

@@ -159,7 +159,7 @@ namespace Theme {
         constexpr SDL_Color PLAYER_BAR_GLOW_BORDER     = {140, 120, 180, 180};
         constexpr SDL_Color PLAYER_BAR_FILL            = {30, 25, 45, 240};
         constexpr SDL_Color PLAYER_BAR_BORDER          = {140, 120, 180, 255};
-        constexpr SDL_Color PLAYER_HEALTH_GLOW_FILL    = {60, 20, 20, 0};
+        constexpr SDL_Color PLAYER_HEALTH_GLOW_FILL    = {145, 34, 48, 255};
         constexpr SDL_Color PLAYER_HEALTH_GLOW_BORDER  = {220, 80, 80, 150};
         constexpr SDL_Color PLAYER_HEALTH_FILL         = {40, 20, 20, 200};
         constexpr SDL_Color PLAYER_HEALTH_BORDER       = {180, 60, 60, 255};
