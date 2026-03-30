@@ -1,0 +1,25 @@
+# ---------- Build Stage ----------
+FROM gcc:13-bookworm AS builder
+WORKDIR /app
+COPY . .
+
+RUN apt-get update && apt-get install -y make && rm -rf /var/lib/apt/lists/*
+RUN make clean && make -f Makefile.debug
+
+# ---------- Runtime Stage ----------
+FROM gcc:13-bookworm AS runtime
+WORKDIR /app
+
+# Copy the compiled server binary
+COPY --from=builder /app/server .
+
+# Copy the entrypoint script
+COPY entrypoint.sh /entrypoint.sh
+RUN sed -i 's/\r$//' /entrypoint.sh && chmod +x /entrypoint.sh
+
+# Expose port
+EXPOSE 4000
+
+# Use the entrypoint
+ENTRYPOINT ["/entrypoint.sh"]
+CMD []

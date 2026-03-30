@@ -17,11 +17,9 @@ void handleSignal(int) {
 }
 
 void crashHandler(int sig) {
-    void* array[32];
-    int size = backtrace(array, 32);
-    write(STDERR_FILENO, "=== CRASH ===\n", 14);
-    backtrace_symbols_fd(array, size, STDERR_FILENO);
-    _exit(1);
+    const char* msg = "Crash occurred\n";
+    write(STDERR_FILENO, msg, 15);
+    _exit(1);                    
 }
 
 int main() {

@@ -263,7 +263,7 @@ bool MatchSession::naturalDraw(int playerIndex) {
 // --------------------------------------------------
 void MatchSession::gameLoop() {
     using namespace std::chrono;
-
+    auto self = shared_from_this();
     auto lastDrawTime = steady_clock::now();
     auto lastAttackTime = steady_clock::now();
 
@@ -308,7 +308,7 @@ void MatchSession::gameLoop() {
         std::this_thread::sleep_for(10ms);
     }
 
-    if (onMatchEnd) onMatchEnd(shared_from_this());
+    if (onMatchEnd) onMatchEnd(self);
     std::cout << "[MatchSession] Exiting Match Game Loop...\n";
 }
 
@@ -791,9 +791,9 @@ void MatchSession::triggerCardEffects(int playerIndex, int cardId, std::optional
             if (tPlayer >= 0 && tPlayer < 2 && tLane >= 0 && tLane < board.laneCount) {
                 if (board.lanes[tPlayer][tLane].has_value()) { //check if the card still exists
                     targetCardId = *board.lanes[tPlayer][tLane];
-                } else {
+                } else { //There is no card found.
                     // Only skip if there's no explicit target override that would redirect it
-                    if (!entry.target.has_value()) continue;
+                    if (!entry.target.has_value() || *entry.target == Target::Nil) continue;
                 }
             }
         }
@@ -802,7 +802,7 @@ void MatchSession::triggerCardEffects(int playerIndex, int cardId, std::optional
                              localTargetIndex.value_or(-1))) {
             continue;
         }
-        if (entry.target.has_value()) { //assign target
+        if (entry.target.has_value()) { //assign hardcoded target, if any.
             switch (*entry.target) {
                 case Target::Self:     localTargetIndex = playerIndex;         break;
                 case Target::Opponent: localTargetIndex = 1 - playerIndex;     break;
@@ -1002,6 +1002,7 @@ void MatchSession::resolveAttackPhase() {
     std::cout << "[MatchSession] Attack Phase Entered\n";
 
     for (int lane = 0; lane < board.laneCount; lane++) {
+        if (!running.load()) break;
         resolveLaneCombat(lane);
     }
 
