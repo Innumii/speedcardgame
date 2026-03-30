@@ -40,3 +40,24 @@ void CreatureCard::augmentStats(int powerDelta, int toughnessDelta) {
     power += powerDelta;
     toughness += toughnessDelta;
 }
+
+std::vector<std::string> CreatureCard::getActiveEffects() const {
+    // get native effects from the card's text (e.g. "Double Strike") and combine with granted effects
+    std::vector<std::string> activeEffects = grantedEffects;
+    if (text.find("Double Strike") != std::string::npos) {
+        activeEffects.push_back("Doublestrike");
+    }
+    if (text.find("Trample") != std::string::npos) {
+        activeEffects.push_back("Trample");
+    }
+    if (text.find("Deathtouch") != std::string::npos) {
+        activeEffects.push_back("Deathtouch");
+    }
+    if (text.find("Regen") != std::string::npos) {
+        activeEffects.push_back("Regen");
+    }
+    if (text.find("Lifesteal") != std::string::npos) {
+        activeEffects.push_back("Lifesteal");
+    }
+    return activeEffects;
+}

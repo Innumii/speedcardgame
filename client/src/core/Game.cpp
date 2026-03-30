@@ -11,6 +11,7 @@
 #include "utils/EnvUtil.hpp"
 #include "utils/LoadAvailableCards.hpp"
 #include "utils/HttpUtil.hpp"
+#include "utils/RenderUtil.hpp"
 #include "core/Audio.hpp"
 #include <map>
 
@@ -403,6 +404,7 @@ void Game::render() {
 void Game::clean() {
 	endUserSession();
     RenderCard::clearImageCache();
+    RenderUtil::clearIconCache();
     RenderText::closeFonts(titleFonts);
     RenderText::closeFonts(uiFonts);
     IMG_Quit();

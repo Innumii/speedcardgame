@@ -1,10 +1,20 @@
 #include "utils/RenderUtil.hpp"
 #include "render/Theme.hpp"
 
+#ifndef M_PI
+    #define M_PI 3.14159265358979323846
+#endif
+
 #include <algorithm>
+#include <array>
 #include <cmath>
+#include <cctype>
+#include <unordered_map>
+#include <SDL2/SDL_image.h>
 
 namespace {
+    std::unordered_map<std::string, SDL_Texture*> gIconCache;
+
     int clampRadius(const SDL_Rect& rect, int radius) {
         return std::max(0, std::min(radius, std::min(rect.w, rect.h) / 2));
     }
@@ -147,6 +157,114 @@ void RenderUtil::drawCenteredText(SDL_Renderer* renderer, TTF_Font* font, const 
     }
 
     SDL_FreeSurface(surface);
+}
+
+void RenderUtil::drawHexagon(SDL_Renderer* renderer, int centerX, int centerY, int size, SDL_Color fill) {
+    if (!renderer || size <= 0) return;
+
+    SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+    SDL_SetRenderDrawColor(renderer, fill.r, fill.g, fill.b, fill.a);
+
+    // Precompute the 6 vertices of a flat-top hexagon, starting from the top
+    // Each vertex is separated by 60 degrees (PI / 3 radians)
+    const double angleStep = M_PI / 3;
+    double vx[6], vy[6];
+    for (int i = 0; i < 6; ++i) {
+        double angle = i * angleStep - M_PI / 2;
+        vx[i] = centerX + size * std::cos(angle);
+        vy[i] = centerY + size * std::sin(angle);
+    }
+
+    // Determine the vertical scan range (top to bottom of the hexagon)
+    int yMin = static_cast<int>(std::ceil(vy[0]));   // topmost vertex
+    int yMax = static_cast<int>(std::floor(vy[3]));  // bottommost vertex
+
+    // Fill the hexagon row by row using edge intersection (scanline rasterisation)
+    for (int y = yMin; y <= yMax; ++y) {
+        // For each scanline, find the left and right x boundaries by intersecting
+        // the horizontal line with each of the 6 edges of the hexagon
+        double xLeft  = static_cast<double>(centerX + size); // start wide right
+        double xRight = static_cast<double>(centerX - size); // start wide left
+
+        for (int i = 0; i < 6; ++i) {
+            // Wrap around so the last edge connects back to the first vertex
+            const int j = (i + 1) % 6;
+
+            const double y0 = vy[i], y1 = vy[j];
+            const double x0 = vx[i], x1 = vx[j];
+
+            // Skip edges that don't cross this scanline
+            if ((y < std::min(y0, y1)) || (y > std::max(y0, y1))) continue;
+            // Skip perfectly horizontal edges (no unique x intersection)
+            if (y0 == y1) continue;
+
+            // Linear interpolation: find x where the edge crosses scanline y
+            const double t = (y - y0) / (y1 - y0);
+            const double xIntersect = x0 + t * (x1 - x0);
+
+            xLeft  = std::min(xLeft,  xIntersect);
+            xRight = std::max(xRight, xIntersect);
+        }
+
+        // Draw the horizontal span between the two boundary intersections
+        SDL_RenderDrawLine(renderer,
+            static_cast<int>(std::ceil(xLeft)),
+            y,
+            static_cast<int>(std::floor(xRight)),
+            y
+        );
+    }
+}
+
+SDL_Texture* RenderUtil::getIcon(SDL_Renderer* renderer, const std::string& iconName) {
+    if (!renderer || iconName.empty()) return nullptr;
+
+    const auto cacheIt = gIconCache.find(iconName);
+    if (cacheIt != gIconCache.end()) {
+        return cacheIt->second;
+    }
+
+    SDL_Texture* texture = nullptr;
+    std::string normalizedName;
+    normalizedName.reserve(iconName.size());
+    for (char c : iconName) {
+        if (!std::isspace(static_cast<unsigned char>(c))) {
+            normalizedName.push_back(c);
+        }
+    }
+
+    const std::array<const char*, 3> extensions = {".png", ".jpg", ".bmp"};
+    const std::array<std::string, 4> basePaths = {
+        "assets/images/" + iconName,
+        "assets/images/" + normalizedName,
+        "assets/image/" + iconName,
+        "assets/image/" + normalizedName
+    };
+
+    for (const std::string& basePath : basePaths) {
+        for (const char* extension : extensions) {
+            const std::string path = basePath + extension;
+            SDL_Surface* surface = IMG_Load(path.c_str());
+            if (!surface) continue;
+
+            texture = SDL_CreateTextureFromSurface(renderer, surface);
+            SDL_FreeSurface(surface);
+            if (texture) break;
+        }
+        if (texture) break;
+    }
+
+    gIconCache[iconName] = texture;
+    return texture;
+}
+
+void RenderUtil::clearIconCache() {
+    for (auto& pair : gIconCache) {
+        if (pair.second) {
+            SDL_DestroyTexture(pair.second);
+        }
+    }
+    gIconCache.clear();
 }
 
 bool RenderUtil::pointInRect(const SDL_Rect& rect, int x, int y) {

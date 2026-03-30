@@ -14,6 +14,9 @@ namespace RenderUtil {
     void drawRoundedGlow(SDL_Renderer* renderer, const SDL_Rect& rect, int radius, SDL_Color glowColor, int layers, Uint8 maxAlpha);
     void drawRectGlowBorder(SDL_Renderer* renderer, const SDL_Rect& rect, SDL_Color glowColor, int layers, Uint8 baseAlpha, Uint8 alphaStep);
     void drawCenteredText(SDL_Renderer* renderer, TTF_Font* font, const std::string& text, const SDL_Rect& rect, SDL_Color color);
+    void drawHexagon(SDL_Renderer* renderer, int centerX, int centerY, int size, SDL_Color fill);
+    SDL_Texture* getIcon(SDL_Renderer* renderer, const std::string& iconName);
+    void clearIconCache();
     bool pointInRect(const SDL_Rect& rect, int x, int y);
 
     SDL_Color brighten(SDL_Color color, int amount);

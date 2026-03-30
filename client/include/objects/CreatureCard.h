@@ -29,6 +29,7 @@ public:
     
     void augmentStats(int powerDelta, int toughnessDelta);
     void drawExtraInfo() const override;
+    std::vector<std::string> getActiveEffects() const;
 
     std::unique_ptr<Card> clone() const override {
         return std::make_unique<CreatureCard>(*this);
