@@ -485,7 +485,7 @@ void Payment::renderPackagesPanel(Game& game, int panelX) {
 
     const bool canBuy = (selectedPackage >= 0);
     RenderButton::drawButton(renderer, shiftedBuy,
-                             canBuy ? "Buy Now \xE2\x86\x92" : "Select a Package",
+                             canBuy ? "Buy Now" : "Select a Package",
                              uiFonts.large,
                              canBuy ? Theme::BTN_START    : Theme::BTN_DISABLED,
                              canBuy ? Theme::BTN_BORDER   : Theme::BTN_DISABLED_BORDER,
@@ -505,7 +505,7 @@ void Payment::renderFormPanel(Game& game, int panelX) {
     // ── "← Change package" back link ─────────────────────────────────────────
     SDL_Rect shiftedChange = changePackButton;
     shiftedChange.x += panelX;
-    RenderButton::drawButton(renderer, shiftedChange, "\xE2\x86\x90 Change Package", uiFonts.small,
+    RenderButton::drawButton(renderer, shiftedChange, "Change Package", uiFonts.small,
                              Theme::BTN_SECONDARY, Theme::BTN_BORDER, Theme::BTN_TEXT, changePackHovered);
 
     // ── Order summary strip ───────────────────────────────────────────────────
