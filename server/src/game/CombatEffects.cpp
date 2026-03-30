@@ -1,22 +1,12 @@
 #include "game/CombatEffects.hpp"
 
 #include "objects/ServerCard.h"
+#include "utils/StringUtil.hpp"
 
 #include <algorithm>
 #include <cctype>
 #include <regex>
 #include <string>
-
-namespace {
-
-std::string toLowerCopy(const std::string& input) {
-    std::string lowered = input;
-    std::transform(lowered.begin(), lowered.end(), lowered.begin(),
-        [](unsigned char ch) { return static_cast<char>(std::tolower(ch)); });
-    return lowered;
-}
-
-} // namespace
 
 namespace CombatEffects {
 
@@ -24,7 +14,7 @@ int getMaskFromCard(const ServerCard* card) {
     if (!card || card->getType() != CardType::Creature) return 0;
 
     int mask = 0;
-    const std::string textLower = toLowerCopy(card->getText());
+    const std::string textLower = StringUtil::toLower(card->getText());
 
     if (textLower.find("double strike") != std::string::npos) {
         mask |= kDoubleStrike;
@@ -48,7 +38,7 @@ int getMaskFromCard(const ServerCard* card) {
 int getRegenValueFromCard(const ServerCard* card) {
     if (!card || card->getType() != CardType::Creature) return 0;
 
-    const std::string textLower = toLowerCopy(card->getText());
+    const std::string textLower = StringUtil::toLowerCopy(card->getText());
     static const std::regex regenPattern(R"(regen\s+(-?\d+))");
     std::smatch match;
 
