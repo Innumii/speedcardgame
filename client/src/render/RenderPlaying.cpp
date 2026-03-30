@@ -64,8 +64,8 @@ static void drawStatsBar(
 		? static_cast<int>(Theme::Playing::OPPONENT_BAR_TOP * scale) + verticalOffset
 		: screenH - barH - static_cast<int>(Theme::Playing::PLAYER_BAR_BOTTOM_MARGIN * scale) - verticalOffset;
 
-	const std::string healthText = "Health: " + std::to_string(health);
-	const std::string manaText   = "Mana: "   + std::to_string(mana);
+	const std::string healthText = std::to_string(health);
+	const std::string manaText   = std::to_string(mana);
 
 	int healthW = 0, healthH = 0;
 	int manaW   = 0, manaH   = 0;
@@ -84,37 +84,87 @@ static void drawStatsBar(
 		Theme::Playing::PLAYER_BAR_GLOW_FILL,
 		Theme::Playing::PLAYER_BAR_GLOW_BORDER);
 
-	RenderUtil::drawRoundedRect(renderer, bar,
-		cornerInner,
-		Theme::Playing::PLAYER_BAR_FILL,
-		Theme::Playing::PLAYER_BAR_BORDER);
+	// RenderUtil::drawRoundedRect(renderer, bar,
+	// 	cornerInner,
+	// 	Theme::Playing::PLAYER_BAR_FILL,
+	// 	Theme::Playing::PLAYER_BAR_BORDER);
 
-	// HP section (left half — red tint + glow)
-	const SDL_Rect hpSection = {barX, barY, barW / 2, barH};
+	// ── NEW: HP section — filled health bar (left half) ─────────────
+	constexpr int sectionPad = 6; // pixel gap between HP and mana (pre-scale)
+	const int padScaled = std::max(2, static_cast<int>(sectionPad * scale));
 
+	const int hpW  = (barW * 2 / 3) - (padScaled / 2);
+	const int mpW  = barW - hpW - padScaled;
+	const int mpX  = barX + hpW + padScaled;
+
+	const SDL_Rect hpSection = {barX, barY, hpW, barH};
+	const SDL_Rect mpSection = {mpX,  barY, mpW, barH};
+
+	// Clamp fill ratio: health of 100 = full, 0 = empty, never overshoots
+	// ── Smoothed health display ──────────────────────────────────────
+	static float smoothedHealth[2] = {-1.0F, -1.0F};
+	const int barSlot = anchorTop ? 1 : 0;
+
+	// First-time init: snap to actual value so there's no startup slide
+	if (smoothedHealth[barSlot] < 0.0F) {
+		smoothedHealth[barSlot] = static_cast<float>(health);
+	}
+
+	// Exponential lerp toward target — 0.12 per frame feels smooth at ~60fps
+	// Snap when close enough to avoid infinite creep
+	const float targetHealth = static_cast<float>(health);
+	smoothedHealth[barSlot] += (targetHealth - smoothedHealth[barSlot]) * 0.12F;
+	if (std::abs(smoothedHealth[barSlot] - targetHealth) < 0.25F) {
+		smoothedHealth[barSlot] = targetHealth;
+	}
+
+	// Clamp fill ratio using the smoothed value
+	const float hpRatio = std::max(0.0F, std::min(1.0F, smoothedHealth[barSlot] / 100.0F));
+	const int fillW = static_cast<int>(hpSection.w * hpRatio);
+
+	if (fillW > 0) {
+		// Clip to hpSection bounds before drawing the fill
+		SDL_Rect fillClip = hpSection;
+		SDL_RenderSetClipRect(renderer, &fillClip);
+
+		SDL_Rect fillRect = {hpSection.x, hpSection.y, fillW, hpSection.h};
+		RenderUtil::drawRoundedRect(renderer, fillRect,
+			cornerInner,
+			Theme::Playing::PLAYER_HEALTH_GLOW_FILL,
+			{0, 0, 0, 0});  // no border
+
+		SDL_RenderSetClipRect(renderer, nullptr); // restore
+	}
+
+	// Outer glow on the whole section
 	RenderUtil::drawRoundedRect(renderer,
 		{hpSection.x - g, hpSection.y - g, hpSection.w + g, hpSection.h + g * 2},
 		cornerOuter,
-		Theme::Playing::PLAYER_HEALTH_GLOW_FILL,
+		{0, 0, 0, 0},
 		Theme::Playing::PLAYER_HEALTH_GLOW_BORDER);
 
+	// Background track (empty bar)
 	RenderUtil::drawRoundedRect(renderer, hpSection,
 		cornerInner,
-		Theme::Playing::PLAYER_HEALTH_FILL,
+		{0, 0, 0, 0},       // dim/empty fill
 		Theme::Playing::PLAYER_HEALTH_BORDER);
 
+	// Filled portion — clipped so it never exceeds the section bounds
+
+
+	// Value text centered over the full section (drawn on top of the fill)
 	textRenderer.drawText(renderer, healthText, font,
 		Theme::Playing::PLAYER_HEALTH_TEXT,
 		hpSection.x + (hpSection.w - healthW) / 2,
 		hpSection.y + (hpSection.h - healthH) / 2);
 
 	// MP section (right half — blue tint + glow)
-	const SDL_Rect mpSection = {barX + barW / 2, barY, barW / 2, barH};
+
 
 	RenderUtil::drawRoundedRect(renderer,
 		{mpSection.x - g, mpSection.y - g, mpSection.w + g * 2, mpSection.h + g * 2},
 		cornerOuter,
-		Theme::Playing::PLAYER_MANA_GLOW_FILL,
+		{0, 0, 0, 0},
 		Theme::Playing::PLAYER_MANA_GLOW_BORDER);
 
 	RenderUtil::drawRoundedRect(renderer, mpSection,
@@ -128,14 +178,14 @@ static void drawStatsBar(
 		mpSection.y + (mpSection.h - manaH) / 2);
 
 	// Center divider
-	SDL_SetRenderDrawColor(renderer,
-		Theme::Playing::PLAYER_BAR_BORDER.r,
-		Theme::Playing::PLAYER_BAR_BORDER.g,
-		Theme::Playing::PLAYER_BAR_BORDER.b,
-		Theme::Playing::PLAYER_BAR_BORDER.a);
-	SDL_RenderDrawLine(renderer,
-		barX + barW / 2, barY + divInset,
-		barX + barW / 2, barY + barH - divInset);
+	// SDL_SetRenderDrawColor(renderer,
+	// 	Theme::Playing::PLAYER_BAR_BORDER.r,
+	// 	Theme::Playing::PLAYER_BAR_BORDER.g,
+	// 	Theme::Playing::PLAYER_BAR_BORDER.b,
+	// 	Theme::Playing::PLAYER_BAR_BORDER.a);
+	// SDL_RenderDrawLine(renderer,
+	// 	barX + barW / 2, barY + divInset,
+	// 	barX + barW / 2, barY + barH - divInset);
 }
 
 void RenderPlaying::render(Playing& playing, const Game& game) {
