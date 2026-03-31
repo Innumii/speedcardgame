@@ -39,14 +39,11 @@ namespace {
         RenderText::drawText(renderer, text, font, color, x, y);
     }
 
-    // Shared layout helper: given screen dimensions and the back button's Y,
-    // returns the Y positions used for even and odd cards in the staggered layout.
-    // Also returns groupY (top of the entire card group including summary panel).
     struct CardLayout {
         int cardW, cardH, totalW, startX;
         int groupY, summaryY;
-        int evenCardY;   // top Y for cards 0, 2, 4
-        int oddCardY;    // top Y for cards 1, 3
+        int evenCardY;
+        int oddCardY;
     };
 
     CardLayout computeCardLayout(int screenW, int backButtonY,
@@ -66,15 +63,14 @@ namespace {
         const int topClear   = headerY + Theme::PackOpening::HEADER_CLEARANCE;
         const int bottomClear = backButtonY;
 
-        // Group height now includes the extra vertical room for the stagger band.
         const int groupH = summaryH + summaryGap
                          + cardH + 2 * staggerOffsetY
                          + Theme::PackOpening::SUMMARY_CARD_GAP + badgeH;
 
         const int groupY    = topClear + std::max(0, (bottomClear - topClear - groupH) / 2);
         const int summaryY  = groupY;
-        const int evenCardY = groupY + summaryH + summaryGap;          // cards 0, 2, 4 (upper)
-        const int oddCardY  = evenCardY + 2 * staggerOffsetY;          // cards 1, 3   (lower)
+        const int evenCardY = groupY + summaryH + summaryGap;
+        const int oddCardY  = evenCardY + 2 * staggerOffsetY;
 
         return {cardW, cardH, totalW, startX, groupY, summaryY, evenCardY, oddCardY};
     }
@@ -99,46 +95,45 @@ void PackOpening::enter(Game& game) {
     pendingCoinDelta = 0;
     pendingInventoryDelta.clear();
 
+    // Reset flush state so it's clean for this session.
+    flushState = FlushState{};
+
     if (!LoadAvailableCardsUtil::ensureAvailableCardsLoaded()) {
         statusMessage = "Failed to load card list.";
         return;
     }
 
-    const auto& availableCards = LoadAvailableCardsUtil::getAvailableCards();
     if (!Inventory::loadInventoryAndCoinsFromService(game)) {
         statusMessage = "Failed to load inventory.";
     } else {
         game.setPackRefundCoins(Inventory::getCachedCoins());
     }
-
-
-    lastFlushTick = SDL_GetTicks();
 }
 
-// ── State exit — flush all accumulated deltas to the service in one shot ─────
+// ── State exit — final guaranteed flush ──────────────────────────────────────
 
 void PackOpening::exit(Game& game) {
-    const bool hasInventoryChanges = !pendingInventoryDelta.empty();
-    const bool hasCoinChanges      = (pendingCoinDelta != 0);
+    // Unconditional flush: anything still pending must reach the server.
+    // We skip the backoff check here — the player is leaving so we must try.
+    if (pendingInventoryDelta.empty() && pendingCoinDelta == 0) return;
 
-    if (!hasInventoryChanges && !hasCoinChanges) {
-        return;
-    }
+    std::cout << "[PackOpening] exit: flushing remaining deltas.\n";
 
-    if (hasInventoryChanges) {
+    if (!pendingInventoryDelta.empty()) {
         if (!applyInventoryDelta(game, pendingInventoryDelta)) {
-            std::cerr << "[PackOpening]: Failed to update Inventory delta\n";
+            std::cerr << "[PackOpening] exit: inventory flush failed.\n";
         }
     }
 
-    if (hasCoinChanges) {
+    if (pendingCoinDelta != 0) {
         if (!Inventory::updateCoinsOnService(game, game.getPackRefundCoins())) {
-            std::cerr << "[PackOpening]: Failed to update coin balance\n";
+            std::cerr << "[PackOpening] exit: coin flush failed.\n";
         }
     }
 
     pendingCoinDelta = 0;
     pendingInventoryDelta.clear();
+    flushState = FlushState{};
 }
 
 // ── Helper: flush then transition ────────────────────────────────────────────
@@ -190,10 +185,9 @@ void PackOpening::handleEvents(Game& game, const SDL_Event& event) {
             const int cardGap = Theme::PackOpening::CARD_GAP;
             const Uint32 now  = SDL_GetTicks();
 
-            // ── Determine which slid-in card (if any) is under the cursor ──
             for (int i = 0; i < static_cast<int>(lastOpenedCards.size()); ++i) {
                 if (i >= static_cast<int>(cardSlideInTicks.size())) continue;
-                if (now < cardSlideInTicks[i]) continue; // still off-screen
+                if (now < cardSlideInTicks[i]) continue;
 
                 const int cardTopY = (i % 2 == 0) ? evenCardY : oddCardY;
                 const SDL_Rect cardRect{startX + i * (cardW + cardGap), cardTopY, cardW, cardH};
@@ -204,7 +198,6 @@ void PackOpening::handleEvents(Game& game, const SDL_Event& event) {
                 }
             }
 
-            // ── Update per-card hover transition state ────────────────────
             for (int i = 0; i < static_cast<int>(lastOpenedCards.size()); ++i) {
                 if (i >= static_cast<int>(cardHoverActive.size())) break;
                 const bool isHovered = (i == hoveredOpenedCard);
@@ -242,7 +235,6 @@ void PackOpening::handleEvents(Game& game, const SDL_Event& event) {
             return;
         }
 
-        // ── Click-to-flip: reveal a face-down card ────────────────────────
         if (!lastOpenedCards.empty() && !cardSlideInTicks.empty()) {
             Audio::playSFX("draw");
             int screenW = Theme::SCREEN_DEFAULT_WIDTH;
@@ -259,8 +251,8 @@ void PackOpening::handleEvents(Game& game, const SDL_Event& event) {
 
             for (int i = 0; i < PackSize && i < static_cast<int>(lastOpenedCards.size()); ++i) {
                 if (i >= static_cast<int>(cardSlideInTicks.size())) continue;
-                if (now < cardSlideInTicks[i]) continue;                             // not yet slid in
-                if (i < static_cast<int>(cardFlipped.size()) && cardFlipped[i]) continue; // already flipped
+                if (now < cardSlideInTicks[i]) continue;
+                if (i < static_cast<int>(cardFlipped.size()) && cardFlipped[i]) continue;
 
                 const int cardTopY = (i % 2 == 0) ? evenCardY : oddCardY;
                 const SDL_Rect cardRect{startX + i * (cardW + cardGap), cardTopY, cardW, cardH};
@@ -278,8 +270,6 @@ void PackOpening::handleEvents(Game& game, const SDL_Event& event) {
 // ── Update ───────────────────────────────────────────────────────────────────
 
 void PackOpening::update(Game& game) {
-    // Slide-in and flip animations are purely time-driven in render();
-    // no per-frame state machine needed here.
     tryFlush(game);
 }
 
@@ -310,7 +300,7 @@ void PackOpening::render(Game& game) {
         Theme::Loading::VIGNETTE_MAX_ALPHA
     );
 
-    // ── Header: title (left) + coins (right) ─────────────────────────────────
+    // ── Header ────────────────────────────────────────────────────────────────
     const int headerY = Theme::PackOpening::HEADER_Y;
     {
         int titleW = 0, titleH = 0;
@@ -354,7 +344,7 @@ void PackOpening::render(Game& game) {
         return;
     }
 
-    // ── Layout ───────────────────────────────────────────────────────────────
+    // ── Layout ────────────────────────────────────────────────────────────────
     const int cardGap = Theme::PackOpening::CARD_GAP;
     const auto [cardW, cardH, totalW, startX, groupY, summaryY, evenCardY, oddCardY] =
         computeCardLayout(screenW, backButton.y, PackSize, StaggerOffsetY);
@@ -380,12 +370,10 @@ void PackOpening::render(Game& game) {
         drawCenteredText(renderer, statusMessage, uiFonts.large, Theme::BANNER_BORDER, panel);
     }
 
-    // ── BADGES — drawn first (background layer) ───────────────────────────────
-    // Only shown once the flip animation is past the midpoint (face is becoming visible).
+    // ── Badges ────────────────────────────────────────────────────────────────
     for (int i = 0; i < static_cast<int>(lastOpenedCards.size()); ++i) {
         if (i >= static_cast<int>(cardFlipped.size()) || !cardFlipped[i]) continue;
 
-        // Wait until past the flip midpoint so the badge appears together with the face.
         if (i < static_cast<int>(cardFlipTicks.size()) && cardFlipTicks[i] > 0) {
             const float flipT = std::min(1.0f, static_cast<float>(now - cardFlipTicks[i])
                                                / static_cast<float>(FlipDurationMs));
@@ -412,19 +400,17 @@ void PackOpening::render(Game& game) {
         drawCenteredText(renderer, badgeLabel, uiFonts.small, Theme::PackOpening::BADGE_TEXT, badge);
     }
 
-    // ── CARDS ─────────────────────────────────────────────────────────────────
+    // ── Cards ─────────────────────────────────────────────────────────────────
     constexpr Uint32 hoverTransMs     = 150U;
     constexpr float  hoverTargetScale = 1.12F;
 
     for (int i = 0; i < static_cast<int>(lastOpenedCards.size()); ++i) {
         const auto& result = lastOpenedCards[i];
 
-        // ── Slide-in: skip cards not yet scheduled to appear ──────────────
         if (i >= static_cast<int>(cardSlideInTicks.size())) continue;
         const Uint32 slideStart = cardSlideInTicks[i];
         if (now < slideStart) continue;
 
-        // Ease-out cubic: starts fast, decelerates into the target position.
         float slideT = std::min(1.0f, static_cast<float>(now - slideStart)
                                        / static_cast<float>(SlideInDurationMs));
         {
@@ -433,13 +419,12 @@ void PackOpening::render(Game& game) {
         }
 
         const int targetX  = startX + i * (cardW + cardGap);
-        const int fromX    = screenW; // off-screen to the right
+        const int fromX    = screenW;
         const int currentX = static_cast<int>(fromX + (targetX - fromX) * slideT);
         const int cardTopY = (i % 2 == 0) ? evenCardY : oddCardY;
 
         SDL_Rect baseRect{currentX, cardTopY, cardW, cardH};
 
-        // ── Flip animation ────────────────────────────────────────────────
         bool  showFace   = false;
         float flipXScale = 1.0f;
         bool  midFlip    = false;
@@ -453,17 +438,14 @@ void PackOpening::render(Game& game) {
             midFlip = (flipT < 1.0f);
 
             if (flipT < 0.5f) {
-                // First half: card-back shrinks toward zero width.
                 flipXScale = 1.0f - 2.0f * flipT;
                 showFace   = false;
             } else {
-                // Second half: card-face grows from zero width.
                 flipXScale = 2.0f * (flipT - 0.5f);
                 showFace   = true;
             }
         }
 
-        // ── Hover scale — preserved, but suppressed during active flip ────
         float hoverScale = 1.0f;
         if (!midFlip && i < static_cast<int>(cardHoverActive.size())) {
             const bool   hovered   = cardHoverActive[i];
@@ -471,13 +453,12 @@ void PackOpening::render(Game& game) {
                                      ? cardHoverStartTicks[i] : 0u;
             const float  elapsed   = static_cast<float>(now - hoverTick);
             const float  t         = std::min(1.0f, elapsed / static_cast<float>(hoverTransMs));
-            const float  eased     = t * t * (3.0f - 2.0f * t); // smoothstep
+            const float  eased     = t * t * (3.0f - 2.0f * t);
             hoverScale = hovered
                 ? (1.0f + (hoverTargetScale - 1.0f) * eased)
                 : (hoverTargetScale - (hoverTargetScale - 1.0f) * eased);
         }
 
-        // ── Combine hover (XY) and flip (X-only) into final draw rect ─────
         const int hoverW = static_cast<int>(cardW * hoverScale);
         const int hoverH = static_cast<int>(cardH * hoverScale);
         const int finalW = std::max(1, static_cast<int>(hoverW * std::abs(flipXScale)));
@@ -489,7 +470,6 @@ void PackOpening::render(Game& game) {
             hoverH
         };
 
-        // ── Draw face or back ─────────────────────────────────────────────
         if (showFace) {
             if (result.cardIndex >= 0 &&
                 result.cardIndex < static_cast<int>(availableCards.size()) &&
@@ -501,7 +481,6 @@ void PackOpening::render(Game& game) {
                 RenderCard::drawCardBack(renderer, drawRect);
             }
 
-            // Qty chip — only visible on face-up cards.
             const std::string qtyStr = std::to_string(result.resultingCopies)
                                      + "/" + std::to_string(MaxCardCopies);
             const int chipW = Theme::PackOpening::QTY_CHIP_WIDTH;
@@ -550,7 +529,7 @@ void PackOpening::updateLayout(SDL_Renderer* renderer) {
     openPackButton.y = y;
 }
 
-// ── openPack — accumulates deltas, no service calls ──────────────────────────
+// ── openPack ─────────────────────────────────────────────────────────────────
 
 void PackOpening::openPack(Game& game) {
     const auto& availableCards    = LoadAvailableCardsUtil::getAvailableCards();
@@ -627,21 +606,43 @@ void PackOpening::openPack(Game& game) {
     game.setPackRefundCoins(updatedCoins);
     Inventory::setCachedCoins(updatedCoins);
 
-    // ── Accumulate deltas for deferred flush ──────────────────────────────────
+    // ── Accumulate deltas ────────────────────────────────────────────────────
     for (const auto& pair : deltaByCardId) {
         pendingInventoryDelta[pair.first] += pair.second;
     }
-    pendingCoinDelta += (updatedCoins - currentCoins);
+    pendingCoinDelta = std::clamp(
+        pendingCoinDelta + static_cast<int64_t>(updatedCoins - currentCoins),
+        -CoinDeltaCap,
+        CoinDeltaCap
+    );
+    const int totalOps = [&] {
+        int n = 0;
+        for (const auto& pair : pendingInventoryDelta) n += pair.second;
+        return n;
+    }();
 
-    // ── Initialise slide-in animation ─────────────────────────────────────────
-    // Cards enter staggered from the right, all face-down.
-    // The user must click each card to trigger its flip reveal.
-    const Uint32 packOpenTick = SDL_GetTicks();
+    const Uint32 now = SDL_GetTicks();
+    if (flushState.dirtyWindowStart == 0) {
+        flushState.dirtyWindowStart = now;
+    }
+    flushState.lastDirtyTick = now;
+
+    const bool coinCapHit      = std::abs(pendingCoinDelta) >= CoinDeltaCap;
+    const bool inventoryCapHit = totalOps >= HardFlushOpsThreshold;
+
+    if (coinCapHit || inventoryCapHit) {
+        std::cout << "[PackOpening] Cap reached ("
+                << (coinCapHit ? "coins" : "inventory")
+                << "), forcing flush.\n";
+        tryFlush(game, true);
+    }
+
+    // ── Slide-in animation ────────────────────────────────────────────────────
+    const Uint32 packOpenTick = now;
     revealStartTick = packOpenTick;
 
     cardSlideInTicks.resize(PackSize);
     for (int i = 0; i < PackSize; ++i) {
-        // Each card's slide begins SlideInDelayMs after the previous one.
         Audio::playSFX("draw");
         cardSlideInTicks[i] = packOpenTick + static_cast<Uint32>(i * SlideInDelayMs);
     }
@@ -652,7 +653,6 @@ void PackOpening::openPack(Game& game) {
     cardHoverActive.assign(PackSize, false);
     hoveredOpenedCard = -1;
 
-    // ── Update UI state ───────────────────────────────────────────────────────
     lastOpenedCards = std::move(results);
     lastRefundCoins = refundCoins;
 
@@ -668,7 +668,8 @@ void PackOpening::openPack(Game& game) {
 
 // ── applyInventoryDelta ───────────────────────────────────────────────────────
 
-bool PackOpening::applyInventoryDelta(const Game& game, const std::unordered_map<int, int>& deltaByCardId) {
+bool PackOpening::applyInventoryDelta(const Game& game,
+                                      const std::unordered_map<int, int>& deltaByCardId) {
     if (deltaByCardId.empty()) return true;
 
     const std::string host   = EnvUtil::getCardsServiceHost();
@@ -697,46 +698,81 @@ bool PackOpening::applyInventoryDelta(const Game& game, const std::unordered_map
     return statusCode >= 200 && statusCode < 300;
 }
 
-int PackOpening::getPendingInventoryOps() const {
-    int total = 0;
-    for (const auto& pair : pendingInventoryDelta) {
-        total += std::abs(pair.second);
-    }
-    return total;
-}
+// ── tryFlush — debounce + coalesce window + exponential backoff ───────────────
+//
+//  Design:
+//
+//  A flush is triggered when ANY of these conditions is true:
+//   1. Quiet period:    No new packs opened for DebounceMs          → user paused; safe to flush
+//   2. Coalesce cap:    First dirty change is older than CoalesceMaxMs → must not delay further
+//   3. Forced:        Cap threshold reached in openPack()            → caller demands flush
+//  After a failed flush, the next attempt is delayed by an exponential backoff
+//  (capped at MaxBackoffMs). This prevents a broken server from being hammered by
+//  hundreds of clients all retrying at the same cadence.
+//
+//  tryFlush() exits immediately (no HTTP work) when:
+//   - There is nothing pending
+//   - We are still inside a backoff window
+//   - None of the three conditions above is satisfied
+//
+void PackOpening::tryFlush(Game& game, bool force) {
+    // Nothing to do → exit immediately, no SDL_GetTicks() overhead.
+    if (pendingInventoryDelta.empty() && pendingCoinDelta == 0) return;
 
-void PackOpening::tryFlush(Game& game) {
-    const Uint32 now     = SDL_GetTicks();
-    const Uint32 elapsed = now - lastFlushTick;
+    const Uint32 now = SDL_GetTicks();
 
-    const bool hasInventoryChanges = !pendingInventoryDelta.empty();
-    const bool hasCoinChanges      = (pendingCoinDelta != 0);
+    // Respect backoff window from a previous failure.
+    if (now < flushState.nextAllowedFlushTick) return;
 
-    if (!hasInventoryChanges && !hasCoinChanges) return;
+    // ── Evaluate flush conditions ─────────────────────────────────────────────
 
-    const bool timeExceeded      = elapsed >= FlushIntervalMs;
-    const bool coinExceeded      = std::abs(pendingCoinDelta) >= CoinFlushThreshold;
-    const bool inventoryExceeded = getPendingInventoryOps() >= InventoryFlushThreshold;
+    const bool quietPeriod = (now - flushState.lastDirtyTick)     >= DebounceMs;
+    const bool windowExpired = (now - flushState.dirtyWindowStart) >= CoalesceMaxMs;
 
-    if (!(timeExceeded || coinExceeded || inventoryExceeded)) return;
 
-    std::cout << "[PackOpening]: Flushing batch...\n";
+    if (!force && !quietPeriod && !windowExpired) return;
 
-    if (hasInventoryChanges) {
+    // ── Flush ─────────────────────────────────────────────────────────────────
+    std::cout << "[PackOpening] Flushing ("
+              << (force         ? "forced"   :
+                  quietPeriod   ? "quiet"    : "window")
+              << ") "
+              << " retries: " << flushState.retryCount << "\n";
+
+    bool ok = true;
+
+    if (!pendingInventoryDelta.empty()) {
         if (!applyInventoryDelta(game, pendingInventoryDelta)) {
-            std::cerr << "[PackOpening]: Failed to update Inventory delta\n";
-            return;
+            std::cerr << "[PackOpening] Inventory flush failed.\n";
+            ok = false;
         }
     }
 
-    if (hasCoinChanges) {
+    if (ok && pendingCoinDelta != 0) {
         if (!Inventory::updateCoinsOnService(game, game.getPackRefundCoins())) {
-            std::cerr << "[PackOpening]: Failed to update coin balance\n";
-            return;
+            std::cerr << "[PackOpening] Coin flush failed.\n";
+            ok = false;
         }
     }
 
-    pendingInventoryDelta.clear();
-    pendingCoinDelta  = 0;
-    lastFlushTick     = now;
+    if (ok) {
+        // ── Success: clear all pending state and reset flush tracker ─────────
+        pendingInventoryDelta.clear();
+        pendingCoinDelta = 0;
+        flushState       = FlushState{};
+    } else {
+        // ── Failure: schedule an exponential backoff ──────────────────────────
+        // Backoff doubles with each consecutive failure, capped at MaxBackoffMs.
+        // The dirty-window start and last-dirty tick are NOT reset so the coalesce
+        // window continues to accumulate time — ensuring we don't delay forever.
+        const Uint32 backoffMs = std::min(
+            BaseBackoffMs << flushState.retryCount,   // 2^n * base
+            MaxBackoffMs
+        );
+        flushState.retryCount       = std::min(flushState.retryCount + 1u, MaxRetryCount);
+        flushState.nextAllowedFlushTick = now + backoffMs;
+
+        std::cerr << "[PackOpening] Next retry in " << backoffMs << "ms "
+                  << "(attempt " << flushState.retryCount << ").\n";
+    }
 }
