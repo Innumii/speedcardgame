@@ -1,7 +1,6 @@
-# Use the official Golang image as the base image
-FROM golang:1.23-bookworm
+# ---------- Build Stage ----------
+FROM golang:1.23-bookworm AS builder
 
-# Set the Current Working Directory inside the container
 WORKDIR /app
 
 # Copy go.mod and go.sum files to the container
@@ -13,18 +12,27 @@ RUN go mod download
 # Copy the rest of the application code to the container
 COPY . .
 
-# Copy TLS certificates
-COPY certs/ certs/
+# Build the Go application
+RUN go build -o main -buildvcs=false .
+
+# ---------- Runtime Stage ----------
+FROM golang:1.23-bookworm AS runtime
+
+WORKDIR /app
+
+# Copy the compiled binary from the builder stage
+COPY --from=builder /app/main .
+
+# Copy entrypoint for TLS secret materialization
+COPY entrypoint.sh /entrypoint.sh
+RUN sed -i 's/\r$//' /entrypoint.sh && chmod +x /entrypoint.sh
 
 # Set default environment variables
 ENV POSTGRES_HOST=host.docker.internal
 ENV REDIS_HOST=host.docker.internal
 
-# Build the Go application
-RUN go build -o main -buildvcs=false .
-
-# Expose the port the app runs on (if needed)
+# Expose the port the app runs on
 EXPOSE 8080
 
-# Command to run the executable
-CMD ["./main"]
+ENTRYPOINT ["/entrypoint.sh"]
+CMD []

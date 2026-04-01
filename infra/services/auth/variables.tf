@@ -120,6 +120,12 @@ variable "cards_service_base_url_secret_arn" {
   default     = null
 }
 
+variable "tls_secret_name" {
+  description = "Secrets Manager secret name containing TLS cert/key JSON keys (cert, key)"
+  type        = string
+  default     = "game-server-tls"
+}
+
 variable "postgres_db" {
   type    = string
   default = null
