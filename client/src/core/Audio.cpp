@@ -6,7 +6,7 @@ std::string Audio::currentTrack = "";
 std::unordered_map<std::string, Mix_Chunk*> Audio::sfxMap;
 
 // Global volume settings
-int Audio::musicVolume = 114; // 0-128
+int Audio::musicVolume = 128; // 0-128
 int Audio::sfxVolume = 128;   // 0-128
 std::unordered_map<std::string, int> Audio::sfxOverrides; // per-sfx volume
 
@@ -115,3 +115,12 @@ void Audio::cleanup() {
     sfxMap.clear();
     sfxOverrides.clear();
 }
+
+int Audio::getMusicVolume() {
+    return musicVolume;
+}
+ 
+int Audio::getSFXVolume() {
+    return sfxVolume;
+}
+ 

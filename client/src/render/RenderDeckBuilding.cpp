@@ -89,7 +89,7 @@ void RenderDeckBuilding::render(DeckBuilding& deckBuilding, Game& game) {
 
     RenderButton::drawButton(renderer, deckBuilding.ClearButton,
                               "Clear Deck", buttonFont,
-                              Theme::BTN_SECONDARY,
+                              Theme::BTN_QUIT,
                               Theme::BTN_BORDER, Theme::BTN_TEXT,
                               hoverClear, false);
 
