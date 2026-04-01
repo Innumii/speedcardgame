@@ -15,6 +15,20 @@
 #include <sstream>
 #include <render/RenderBackdrop.hpp>
 
+void Waiting::enter(Game& game) {
+    (void)game;
+    matchFound         = false;
+    waitingForOpponent = false;
+    accepted           = false;
+    declined           = false;
+    acceptHovered      = false;
+    declineHovered     = false;
+    acceptPressed      = false;
+    declinePressed     = false;
+    recvBuffer.clear();
+    opponentDeckCopies.clear();
+}
+
 void Waiting::handleEvents(Game& game, const SDL_Event& event) {
     if (event.type == SDL_QUIT) {
         game.setNextState(GameState::Quit);

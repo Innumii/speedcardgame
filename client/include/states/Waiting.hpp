@@ -16,6 +16,7 @@ public:
     void handleEvents(Game& game, const SDL_Event& event) override;
     void update(Game& game) override;
     void render(Game& game) override;
+    void enter(Game& game) override;
 
 private:
     std::string recvBuffer; // handles partial TCP messages
