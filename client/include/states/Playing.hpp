@@ -181,6 +181,8 @@ private:
 
     Uint32 gameEndStartTick = 0;
     PlayingGameState lastEndState = PlayingGameState::Playing;
+    TTF_Font* cachedFont{nullptr};
+    SDL_Rect computeOpponentDeckRect(int screenW, int screenH) const;
 };
 
 #endif

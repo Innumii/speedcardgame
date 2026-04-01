@@ -31,6 +31,7 @@ public:
     void start() override;
     void update(float dt) override;
     bool isFinished() const override;
+    bool isBlocking() const override { return false; }
 
     SDL_Rect getRect() const;
     float getProgress() const;

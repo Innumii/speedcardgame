@@ -2,6 +2,7 @@
 
 #include "animation/DrawCardAnimation.hpp"
 #include "animation/DiscardAnimation.hpp"
+#include "animation/FatigueAnimation.hpp"
 #include "core/Game.hpp"
 #include "render/RenderBoard.hpp"
 #include "render/RenderButton.hpp"
@@ -477,6 +478,9 @@ void RenderPlaying::render(Playing& playing, const Game& game) {
 	for (const auto& anim : activeAnimations) {
 		if (auto summon = std::dynamic_pointer_cast<SummonAnimation>(anim)) {
 			summon->draw(renderer);
+		}
+		if (const auto fa = std::dynamic_pointer_cast<FatigueAnimation>(anim)) {
+			fa->render(renderer);
 		}
 	}
 
