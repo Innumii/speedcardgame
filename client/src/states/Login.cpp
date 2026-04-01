@@ -21,7 +21,7 @@
 // ── network helpers ───────────────────────────────────────────────────────────
 
 namespace {
-    constexpr std::size_t kMaxUsernameLen = 64;
+    constexpr std::size_t kMaxemailLen = 64;
     constexpr std::size_t kMaxPasswordLen = 32;
 
     constexpr float kRefW = 1200.0F;
@@ -78,7 +78,7 @@ Login::Login()  = default;
 Login::~Login() = default;
 
 void Login::enter(Game& game) {
-    setActiveField(Field::Username);
+    setActiveField(Field::email);
     SDL_StartTextInput();
 }
 
@@ -135,7 +135,7 @@ void Login::updateLayout(SDL_Renderer* renderer) {
     const int inputX = panelX + panelPad;
     int cursorY      = panelY + titleSpace;
 
-    usernameRect = {inputX, cursorY, inputW, inputH};
+    emailRect = {inputX, cursorY, inputW, inputH};
     cursorY += inputH + inputGapY;
 
     passwordRect = {inputX, cursorY, inputW, inputH};
@@ -167,7 +167,7 @@ void Login::handleEvents(Game& game, const SDL_Event& event) {
     }
     if (event.type == SDL_MOUSEBUTTONDOWN && event.button.button == SDL_BUTTON_LEFT) {
         const int mx = event.button.x, my = event.button.y;
-        if      (RenderUtil::pointInRect(usernameRect,    mx, my)) setActiveField(Field::Username);
+        if      (RenderUtil::pointInRect(emailRect,    mx, my)) setActiveField(Field::email);
         else if (RenderUtil::pointInRect(passwordRect,    mx, my)) setActiveField(Field::Password);
         else                                                        setActiveField(Field::None);
         if      (RenderUtil::pointInRect(loginButtonRect, mx, my)) loginPressed    = true;
@@ -175,18 +175,18 @@ void Login::handleEvents(Game& game, const SDL_Event& event) {
     }
     if (event.type == SDL_TEXTINPUT) {
         statusMessage.clear();
-        if (activeField == Field::Username && username.size() < kMaxUsernameLen)
-            username.append(event.text.text);
+        if (activeField == Field::email && email.size() < kMaxemailLen)
+            email.append(event.text.text);
         else if (activeField == Field::Password && password.size() < kMaxPasswordLen)
             password.append(event.text.text);
     }
     if (event.type == SDL_KEYDOWN) {
         switch (event.key.keysym.sym) {
             case SDLK_TAB:
-                setActiveField(activeField == Field::Username ? Field::Password : Field::Username);
+                setActiveField(activeField == Field::email ? Field::Password : Field::email);
                 break;
             case SDLK_BACKSPACE:
-                if      (activeField == Field::Username && !username.empty()) username.pop_back();
+                if      (activeField == Field::email && !email.empty()) email.pop_back();
                 else if (activeField == Field::Password && !password.empty()) password.pop_back();
                 break;
             case SDLK_RETURN: case SDLK_KP_ENTER:
@@ -203,18 +203,18 @@ void Login::update(Game& game) {
         loginPressed = false;
         statusMessage.clear();
 
-        if (username.empty()) {
+        if (email.empty()) {
             statusMessage = "Email is required.";
             return;
         }
 
-        const std::size_t atPos = username.find('@');
-        if (atPos == std::string::npos || atPos == 0 || atPos + 1 >= username.size()) {
+        const std::size_t atPos = email.find('@');
+        if (atPos == std::string::npos || atPos == 0 || atPos + 1 >= email.size()) {
             statusMessage = "Enter a valid email address.";
             return;
         }
-        const std::size_t dotPos = username.find('.', atPos + 1);
-        if (dotPos == std::string::npos || dotPos + 1 >= username.size()) {
+        const std::size_t dotPos = email.find('.', atPos + 1);
+        if (dotPos == std::string::npos || dotPos + 1 >= email.size()) {
             statusMessage = "Enter a valid email address.";
             return;
         }
@@ -227,7 +227,7 @@ void Login::update(Game& game) {
         int userId = -1;
         std::string sessionId;
         std::string error;
-        if (!authenticate(username, password, userId, sessionId, error)) {
+        if (!authenticate(email, password, userId, sessionId, error)) {
             std::cerr << "Login failed: " << error << '\n';
             statusMessage = error;
             return;
@@ -235,7 +235,7 @@ void Login::update(Game& game) {
         game.setPlayerId(userId);
         game.setAuthSessionId(sessionId);
         std::cout << game.getPlayer().id << "\n";
-        game.setPlayerUsername(username);
+        game.setPlayerUsername(email);
         game.setNextState(GameState::Loading);
         return;
     }
@@ -291,23 +291,23 @@ void Login::render(Game& game) {
 
     // ── field labels ─────────────────────────────────────────────────
     if (uiFonts.large) {
-        RenderText::drawText(r, "Username", uiFonts.large,
+        RenderText::drawText(r, "Email", uiFonts.large,
                              Theme::TEXT_MUTED,
-                             usernameRect.x, usernameRect.y - cachedLabelOffY);
+                             emailRect.x, emailRect.y - cachedLabelOffY);
         RenderText::drawText(r, "Password", uiFonts.large,
                              Theme::TEXT_MUTED,
                              passwordRect.x, passwordRect.y - cachedLabelOffY);
     }
 
     // ── input fields ─────────────────────────────────────────────────
-    const bool userActive = activeField == Field::Username;
+    const bool userActive = activeField == Field::email;
     const bool passActive = activeField == Field::Password;
 
-    RenderUtil::drawRoundedRect(r, usernameRect, Theme::INPUT_RADIUS,
+    RenderUtil::drawRoundedRect(r, emailRect, Theme::INPUT_RADIUS,
                                 userActive ? Theme::INPUT_ACTIVE : Theme::INPUT_FILL,
                                 userActive ? Theme::INPUT_BORDER_ACTIVE : Theme::INPUT_BORDER_IDLE);
     if (userActive) {
-        RenderUtil::drawRectGlowBorder(r, usernameRect, Theme::INPUT_BORDER_ACTIVE,
+        RenderUtil::drawRectGlowBorder(r, emailRect, Theme::INPUT_BORDER_ACTIVE,
                                        Theme::Effects::INPUT_GLOW_LAYERS,
                                        Theme::Effects::INPUT_GLOW_BASE_ALPHA,
                                        Theme::Effects::INPUT_GLOW_ALPHA_STEP);
@@ -333,10 +333,10 @@ void Login::render(Game& game) {
 
     // ── input text ───────────────────────────────────────────────────
     if (uiFonts.large) {
-        const int ty = usernameRect.y + (usernameRect.h - 20) / 2;
-        RenderText::drawText(r, username, uiFonts.large,
+        const int ty = emailRect.y + (emailRect.h - 20) / 2;
+        RenderText::drawText(r, email, uiFonts.large,
                              Theme::TEXT_PRIMARY,
-                             usernameRect.x + cachedInputPad, ty);
+                             emailRect.x + cachedInputPad, ty);
         std::string mask(password.size(), '*');
         RenderText::drawText(r, mask, uiFonts.large,
                              Theme::TEXT_PRIMARY,

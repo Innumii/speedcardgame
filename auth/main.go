@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"net/http"
 	"os"
 	"strings"
 	"time"
@@ -109,13 +110,26 @@ func main() {
 	r.Use(gin.Recovery())
 
 	// Allow CORS
+	allowedOrigins := []string{"https://localhost:3000"}
+	if configuredOrigins := strings.TrimSpace(os.Getenv("CORS_ALLOWED_ORIGINS")); configuredOrigins != "" {
+		parts := strings.Split(configuredOrigins, ",")
+		allowedOrigins = allowedOrigins[:0]
+		for _, part := range parts {
+			origin := strings.TrimSpace(part)
+			if origin != "" {
+				allowedOrigins = append(allowedOrigins, origin)
+			}
+		}
+	}
+
 	r.Use(cors.New(cors.Config{
-		AllowOrigins:     []string{"http://localhost:3000"}, // Add your frontend domain
+		AllowOrigins:     allowedOrigins,
 		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization"},
 		AllowCredentials: true,
 		MaxAge:           12 * time.Hour,
 	}))
+	r.Use(httpsSecurityMiddleware())
 
 	registerAuthRoutes := func(group gin.IRoutes) {
 		group.POST("/register", authController.Register)
@@ -133,8 +147,8 @@ func main() {
 	//Swagger docs
 	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
-	// Start server
-	err = r.Run(":8080")
+	// Start server with TLS
+	err = r.RunTLS(":8080", "certs/server.crt", "certs/server.key")
 	if err != nil {
 		log.Fatalf("Failed to start the server: %v", err)
 	}
@@ -199,5 +213,28 @@ func seedDevUsers(authService *services.AuthService) {
 			log.Printf("Dev user seed retry %d/%d for %s: %v", attempt, maxAttempts, user.Email, err)
 			time.Sleep(retryDelay)
 		}
+	}
+}
+
+func isHTTPSRequest(c *gin.Context) bool {
+	if c.Request != nil && c.Request.TLS != nil {
+		return true
+	}
+	return strings.EqualFold(strings.TrimSpace(c.GetHeader("X-Forwarded-Proto")), "https")
+}
+
+func httpsSecurityMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if !isHTTPSRequest(c) {
+			host := strings.TrimSpace(c.Request.Host)
+			if host != "" {
+				c.Redirect(http.StatusMovedPermanently, "https://"+host+c.Request.URL.RequestURI())
+				c.Abort()
+				return
+			}
+		}
+
+		c.Header("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
+		c.Next()
 	}
 }

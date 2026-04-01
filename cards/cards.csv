@@ -3,8 +3,8 @@ cid,name,type,cost,value,power,toughness,effect
 2,Goblin,Creature,1,1,1,1,
 3,Go,Creature,3,2,2,2,Trample
 4,Jo,Spell,2,2,0,0,"Give target creature +2/+2, if the creature is named 'Go', Give it +4/+4 Instead."
-5,"Kirby, The Ceaseless Hunger",Creature,8,3,3,5,"When this creature kills a creature, it gains +1/+1."
-6,"L.Y.S, Lord of Systems",Creature,8,3,8,8,"Trample, Double Strike, Deathtouch, Regen 3"
+5,"Kirby, The Ceaseless Hunger",Creature,6,3,1,10,"Deathtouch, When this creature kills a creature, it gains +1/+1."
+6,"L.Y.S, Lord of Systems",Creature,8,3,8,8,"Trample, Double Strike, Regen 3"
 7,Jew,Creature,3,2,1,1,"When this creature enters the battlefield, Steal 2 mana from your opponent."
 8,Grizzly Bear,Creature,2,2,2,2,
 9,Russian,Creature,3,2,3,3,

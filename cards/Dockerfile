@@ -11,6 +11,9 @@ RUN go mod download
 # Copy the rest of the application code
 COPY . .
 
+# Copy TLS certificates
+COPY certs/ certs/
+
 # Build the Go application
 RUN go build -o main .
 

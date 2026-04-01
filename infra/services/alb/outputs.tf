@@ -35,5 +35,5 @@ output "api_domain_name" {
 
 output "api_base_url" {
   description = "Public API base URL"
-  value       = "${var.enable_https_listener ? "https" : "http"}://${trimsuffix(aws_route53_record.api.fqdn, ".")}"
+  value       = "https://${trimsuffix(aws_route53_record.api.fqdn, ".")}"
 }

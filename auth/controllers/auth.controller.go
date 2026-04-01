@@ -39,6 +39,13 @@ func sessionIDFromRequest(c *gin.Context) (string, bool) {
 	return "", false
 }
 
+func isHTTPSRequest(c *gin.Context) bool {
+	if c.Request != nil && c.Request.TLS != nil {
+		return true
+	}
+	return strings.EqualFold(strings.TrimSpace(c.GetHeader("X-Forwarded-Proto")), "https")
+}
+
 // Constructor function
 // Accepts an instance of authService and returns a new authController
 func NewAuthController(authService *services.AuthService) *AuthController {
@@ -101,7 +108,8 @@ func (controller *AuthController) Login(c *gin.Context) {
 	}
 
 	// Set session ID as a cookie
-	c.SetCookie("session_id", sessionID, 3600*24, "/", "localhost", false, true)
+	c.SetSameSite(http.SameSiteLaxMode)
+	c.SetCookie("session_id", sessionID, 3600*24, "/", "", true, true)
 
 	c.JSON(http.StatusOK, gin.H{"message": "login successful", "user": user, "session_id": sessionID})
 }
@@ -129,7 +137,8 @@ func (controller *AuthController) Logout(c *gin.Context) {
 	}
 
 	// Clear the session cookie
-	c.SetCookie("session_id", "", -1, "/", "localhost", false, true)
+	c.SetSameSite(http.SameSiteLaxMode)
+	c.SetCookie("session_id", "", -1, "/", "", true, true)
 
 	// Respond with success
 	c.JSON(http.StatusOK, gin.H{"message": "Logged out successfully"})

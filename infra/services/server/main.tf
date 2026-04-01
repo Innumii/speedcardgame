@@ -46,7 +46,7 @@ locals {
   game_domain_name             = "game.${trimsuffix(var.base_domain, ".")}"
   cards_service_base_url_local = var.cards_service_base_url != null ? var.cards_service_base_url : try(local.alb_outputs.api_base_url, null)
   cards_service_host = var.cards_service_host != null ? var.cards_service_host : (
-    local.cards_service_base_url_local != null ? replace(replace(local.cards_service_base_url_local, "https://", ""), "http://", "") : try(local.alb_outputs.api_domain_name, null)
+    local.cards_service_base_url_local != null ? regexreplace(local.cards_service_base_url_local, "^https?://", "") : try(local.alb_outputs.api_domain_name, null)
   )
   cards_service_port = var.cards_service_port != null ? var.cards_service_port : (
     local.cards_service_base_url_local != null ? (
