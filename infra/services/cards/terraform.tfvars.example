@@ -16,6 +16,7 @@ ghcr_pat_secret_arn = "arn:aws:secretsmanager:us-east-1:123456789012:secret:ghcr
 # Optional manual override when use_managed_data_stack = false
 # database_url_secret_arn = "arn:aws:secretsmanager:...:secret:speedcardgame-cards-runtime"
 # cards_runtime_secret_name = "speedcardgame-cards-runtime"
+# tls_secret_name = "game-server-tls"
 # database_url = "postgres://user:password@your-postgres-host:5432/cardsdb?sslmode=disable" # fallback only when not using Secrets Manager
 
 # Optional manual ALB wiring when use_managed_alb_stack = false

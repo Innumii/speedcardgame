@@ -15,6 +15,7 @@ use_managed_alb_stack = true
 # postgres_user     = "authuser"
 # postgres_password_secret_arn = "arn:aws:secretsmanager:...:secret:speedcardgame-auth-runtime"
 # cards_service_base_url_secret_arn = "arn:aws:secretsmanager:...:secret:speedcardgame-auth-runtime"
+# tls_secret_name = "game-server-tls"
 # postgres_password = "change-me" # fallback only when not using Secrets Manager
 # postgres_db       = "authdb"
 # postgres_port     = 5432

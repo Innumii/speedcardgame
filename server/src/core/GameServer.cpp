@@ -4,6 +4,8 @@
 #include <iostream>
 #include <memory>
 #include <stdexcept>
+#include <thread>
+#include <chrono>
 #include "utils/HttpUtil.hpp"
 #include "utils/EnvUtil.hpp"
 #include "utils/JsonUtil.hpp"
@@ -36,7 +38,22 @@ bool GameServer::loadPlayerInfo(const std::shared_ptr<PlayerConnection>& player,
 
 bool GameServer::start() {
     running = false;
-    if (!loadAvailableCardsFromService()) {
+    constexpr int maxCardLoadAttempts = 15;
+    bool cardsLoaded = false;
+    for (int attempt = 1; attempt <= maxCardLoadAttempts; ++attempt) {
+        if (loadAvailableCardsFromService()) {
+            cardsLoaded = true;
+            break;
+        }
+
+        if (attempt < maxCardLoadAttempts) {
+            std::cerr << "Retrying card catalog load (attempt " << (attempt + 1)
+                      << "/" << maxCardLoadAttempts << ")\n";
+            std::this_thread::sleep_for(std::chrono::seconds(1));
+        }
+    }
+
+    if (!cardsLoaded) {
         std::cerr << "Failed to load cards, cannot start server\n";
         return false;
     }
