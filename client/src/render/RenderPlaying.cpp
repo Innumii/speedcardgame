@@ -104,19 +104,25 @@ static void drawStatsBar(
 	// Clamp fill ratio: health of 100 = full, 0 = empty, never overshoots
 	// ── Smoothed health display ──────────────────────────────────────
 	static float smoothedHealth[2] = {-1.0F, -1.0F};
+	static Uint32 lastTick[2] = {0, 0};
 	const int barSlot = anchorTop ? 1 : 0;
 
-	// First-time init: snap to actual value so there's no startup slide
+	const Uint32 now = SDL_GetTicks();
+	const float targetHealth = static_cast<float>(health);
+
 	if (smoothedHealth[barSlot] < 0.0F) {
-		smoothedHealth[barSlot] = static_cast<float>(health);
+		smoothedHealth[barSlot] = targetHealth;
+		lastTick[barSlot] = now;
 	}
 
-	// Exponential lerp toward target — 0.12 per frame feels smooth at ~60fps
-	// Snap when close enough to avoid infinite creep
-	const float targetHealth = static_cast<float>(health);
-	smoothedHealth[barSlot] += (targetHealth - smoothedHealth[barSlot]) * 0.12F;
-	if (std::abs(smoothedHealth[barSlot] - targetHealth) < 0.25F) {
+	const float deltaSeconds = static_cast<float>(now - lastTick[barSlot]) / 1000.0F;
+	lastTick[barSlot] = now;
+
+	const float diff = targetHealth - smoothedHealth[barSlot];
+	if (std::abs(diff) < 0.25F) {
 		smoothedHealth[barSlot] = targetHealth;
+	} else {
+		smoothedHealth[barSlot] += diff * std::min(1.0F, 6.0F * deltaSeconds);
 	}
 
 	// Clamp fill ratio using the smoothed value

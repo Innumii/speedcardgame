@@ -573,7 +573,7 @@ void drawEffectsBadge(SDL_Renderer* renderer, const std::string& effect,
     RenderUtil::drawHexagon(renderer, cx, cy, radius,     Theme::BANNER_FILL);
     SDL_RenderSetClipRect(renderer, nullptr);
     std::string effectRaw = StringUtil::toLower(effect);
-    if (effect.find("regen") != std::string::npos ) effectRaw = "regen";
+    if (effectRaw.find("regen") != std::string::npos ) effectRaw = "regen";
     SDL_Texture* icon = RenderUtil::getIcon(renderer, effectRaw);
     if (icon) {
         int iw = 0, ih = 0;
@@ -587,7 +587,7 @@ void drawEffectsBadge(SDL_Renderer* renderer, const std::string& effect,
         SDL_RenderCopy(renderer, icon, nullptr, &dst);
     } else {
         SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
-                    "drawEffectsBadge: missing icon for '%s'", effect.c_str());
+                    "drawEffectsBadge: missing icon for '%s'", effectRaw.c_str());
     }
 }
 
@@ -664,7 +664,8 @@ void drawTemplateLayout(SDL_Renderer* renderer, const Card& card, const SDL_Rect
                            inner.h * (showTextBox ? (expandedMode ? 33 : 40) : 52) / 100);
     int nameH   = std::max(sc(Theme::Card::MIN_NAME_HEIGHT),
                            inner.h * (expandedMode ? 13 : 10) / 100);
-    int typeH   = std::max(sc(Theme::Card::MIN_TYPE_HEIGHT),   inner.h * 8  / 100);
+    const int typeFontH = TTF_FontHeight(compactFont);
+    int typeH   = std::max({sc(Theme::Card::MIN_TYPE_HEIGHT), inner.h * 8 / 100, typeFontH + sc(8)});
     int bottomH = std::max(sc(Theme::Card::MIN_BOTTOM_HEIGHT),
                            inner.h * (expandedMode ? 16 : 19) / 100);
     int textH   = showTextBox ? inner.h - artH - nameH - typeH - bottomH : 0;
