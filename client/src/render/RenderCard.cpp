@@ -572,8 +572,9 @@ void drawEffectsBadge(SDL_Renderer* renderer, const std::string& effect,
     RenderUtil::drawHexagon(renderer, cx, cy, radius + 2, Theme::BANNER_BORDER);
     RenderUtil::drawHexagon(renderer, cx, cy, radius,     Theme::BANNER_FILL);
     SDL_RenderSetClipRect(renderer, nullptr);
-
-    SDL_Texture* icon = RenderUtil::getIcon(renderer, effect);
+    std::string effectRaw = StringUtil::toLower(effect);
+    if (effect.find("regen")) effectRaw = "regen";
+    SDL_Texture* icon = RenderUtil::getIcon(renderer, effectRaw);
     if (icon) {
         int iw = 0, ih = 0;
         SDL_QueryTexture(icon, nullptr, nullptr, &iw, &ih);

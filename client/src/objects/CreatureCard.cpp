@@ -1,5 +1,6 @@
 #include "objects/CreatureCard.h"
 #include <iostream>
+#include <utils/StringUtil.hpp>
 
 CreatureCard::CreatureCard(const std::string& name,
                            const std::string& text,
@@ -44,19 +45,21 @@ void CreatureCard::augmentStats(int powerDelta, int toughnessDelta) {
 std::vector<std::string> CreatureCard::getActiveEffects() const {
     // get native effects from the card's text (e.g. "Double Strike") and combine with granted effects
     std::vector<std::string> activeEffects = grantedEffects;
-    if (text.find("Double Strike") != std::string::npos) {
+    std::string textLower = StringUtil::toLower(text);
+
+    if (textLower.find("double strike") != std::string::npos) {
         activeEffects.push_back("Doublestrike");
     }
-    if (text.find("Trample") != std::string::npos) {
+    if (textLower.find("trample") != std::string::npos) {
         activeEffects.push_back("Trample");
     }
-    if (text.find("Deathtouch") != std::string::npos) {
+    if (textLower.find("deathtouch") != std::string::npos) {
         activeEffects.push_back("Deathtouch");
     }
-    if (text.find("Regen") != std::string::npos) {
+    if (textLower.find("regen") != std::string::npos) {
         activeEffects.push_back("Regen");
     }
-    if (text.find("Lifesteal") != std::string::npos) {
+    if (textLower.find("lifesteal") != std::string::npos) {
         activeEffects.push_back("Lifesteal");
     }
     return activeEffects;

@@ -88,6 +88,7 @@ public:
     void sendOpeningHands();
     bool naturalDraw(int playerIndex);
     bool loadDeckForPlayer(int playerId, ServerDeck& outDeck);
+    void handleFatigue(int playerIndex);
 
     //--------------player actions--------------
     //PLAY <playerId> <cardId> <lane>

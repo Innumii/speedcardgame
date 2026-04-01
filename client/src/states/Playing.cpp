@@ -749,6 +749,10 @@ bool Playing::handleServerMessage(const std::string& msg) {
         if (zone.has_value() && zone.value()) {
             zone.value()->addGrantedEffect("Regen " + std::to_string(regenValue));
         }
+    } else if (cmd == "FATIGUE") {
+        int playerId, fatigueDamage;
+        iss >> playerId, fatigueDamage;
+
     }
     //add a mana command later -> decouple discard logic to offload to mana logic
     else if (cmd == "MATCH_LOST") {
