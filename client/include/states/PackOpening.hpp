@@ -22,7 +22,7 @@ public:
     void exit(Game& game) override;
     void leaveState(Game& game, GameState next);
 
-    void tryFlush(Game& game);
+    void tryFlush(Game& game, bool force = false);
     int getPendingInventoryOps() const;
 
 private:
@@ -31,6 +31,22 @@ private:
         bool refunded{false};
         int resultingCopies{0};
     };
+    struct FlushState {
+        Uint32 dirtyWindowStart     = 0;  // tick of first un-flushed change
+        Uint32 lastDirtyTick        = 0;  // tick of most recent change
+        Uint32 nextAllowedFlushTick = 0;  // backoff gate
+        Uint32 retryCount           = 0;  // consecutive failures (backoff exponent)
+    };
+
+    FlushState flushState;
+
+    //Flush
+    static constexpr Uint32 DebounceMs              = 1'500U;   // 1.5 s of inactivity
+    static constexpr Uint32 CoalesceMaxMs           = 10'000U;  // never wait more than 10 s
+    static constexpr int    HardFlushOpsThreshold   = 50;       // ~10 packs worth of cards
+    static constexpr Uint32 BaseBackoffMs           = 500U;
+    static constexpr Uint32 MaxBackoffMs            = 32'000U;
+    static constexpr Uint32 MaxRetryCount           = 6U;
 
     bool applyInventoryDelta(const Game& game, const std::unordered_map<int, int>& deltaByCardId);
 
@@ -93,13 +109,10 @@ private:
     static constexpr int StaggerOffsetY    = 0;   // px of vertical stagger (up for even, down for odd)
 
     // ── Deferred service flush ────────────────────────────────────────────────
-    int pendingCoinDelta = 0;
+    static constexpr int64_t CoinDeltaCap = 1'000'000LL; // ±1 M coins max pending
+    int64_t pendingCoinDelta = 0;
     std::unordered_map<int, int> pendingInventoryDelta;
 
-    Uint32 lastFlushTick{0};
-    static constexpr Uint32 FlushIntervalMs         = 20000;
-    static constexpr int    CoinFlushThreshold      = 200;
-    static constexpr int    InventoryFlushThreshold = 10;
 };
 
 #endif

@@ -135,14 +135,17 @@ void PlayerConnection::readLoop() {
 }
 
 void PlayerConnection::dispatchMessage(const std::vector<char>& rawMsg) {
-    std::string msg(rawMsg.begin(), rawMsg.end());
-    if (auto it = stateHandlers.find(state); it != stateHandlers.end()) {
-        it->second(shared_from_this(), msg);  // call the callback for the current state
-    } else {
-        std::cerr << "[PlayerConnection] No handler for state " << int(state) << "\n";
+    MsgCallback cb;
+    {
+        std::lock_guard<std::mutex> lock(handlerMutex);
+        auto it = stateHandlers.find(state.load());
+        if (it == stateHandlers.end()) return;
+        cb = it->second;
     }
+    if (cb) cb(shared_from_this(), std::string(rawMsg.begin(), rawMsg.end()));
 }
 
-void PlayerConnection::setMessageHandler(ConnectionState state, MsgCallback cb) {
-        stateHandlers[state] = std::move(cb);
+void PlayerConnection::setMessageHandler(ConnectionState s, MsgCallback cb) {
+    std::lock_guard<std::mutex> lock(handlerMutex);
+    stateHandlers[s] = std::move(cb);
 }

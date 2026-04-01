@@ -269,7 +269,8 @@ const std::unordered_map<int, std::vector<CardEffectEntry>> TriggerEffects::card
     //Aura
     {26, { CardEffectEntry{
         .effectId = 2,
-        .augment  = std::make_pair(2,2)
+        .augment  = std::make_pair(2,2),
+        .target   = Target::Self
     }}},
 
     //Final Gambit
@@ -288,7 +289,8 @@ const std::unordered_map<int, std::vector<CardEffectEntry>> TriggerEffects::card
     //Pot of Greed
     {36, { CardEffectEntry{
         .effectId = 12,
-        .amount   = 2
+        .amount   = 2,
+        .target = Target::Nil
     }}},
 
     //Devil's Lettuce
