@@ -306,10 +306,12 @@ void RenderDeckBuilding::render(DeckBuilding& deckBuilding, Game& game) {
 
             if (fontTiny) {
                 // Centre "x" label inside the button
+                int textW = 0, textH = 0;
+                TTF_SizeText(fontTiny, "x", &textW, &textH);
                 textRenderer.drawText(renderer, "x", fontTiny,
                     SDL_Color{255, 255, 255, 255},
-                    removeRect.x + removeRect.w / 2 - 3,
-                    removeRect.y + removeRect.h / 2 - 6);
+                    removeRect.x + (removeRect.w - textW) / 2,
+                    removeRect.y + (removeRect.h - textH) / 2);
             }
         }
     }
