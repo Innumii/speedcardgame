@@ -32,22 +32,23 @@ public:
 
 
 private:
-	struct Layout {
-		SDL_Rect collectionArea{};
-		SDL_Rect deckArea{};
-		SDL_Rect prevPageButton{};
-		SDL_Rect nextPageButton{};
-		SDL_Rect pageLabelRect{};
-		SDL_Rect deckEntriesClipRect{};
-		std::vector<SDL_Rect> collectionCardRects;
-		std::vector<int> collectionCardIndices;
-		std::vector<SDL_Rect> deckEntryRects;
-		std::vector<int> deckEntryCardIndices;
-		int maxSlots{0};
-		int pageCount{1};
-		int pageIndex{0};
-		int maxDeckScrollOffset{0};
-	};
+struct Layout {
+    SDL_Rect collectionArea{};
+    SDL_Rect deckArea{};
+    SDL_Rect prevPageButton{};
+    SDL_Rect nextPageButton{};
+    SDL_Rect pageLabelRect{};
+    SDL_Rect deckEntriesClipRect{};
+    std::vector<SDL_Rect> collectionCardRects;
+    std::vector<int> collectionCardIndices;
+    std::vector<SDL_Rect> deckEntryRects;
+    std::vector<int> deckEntryCardIndices;
+    std::vector<SDL_Rect> deckEntryRemoveRects;
+    int maxSlots{0};
+    int pageCount{1};
+    int pageIndex{0};
+    int maxDeckScrollOffset{0};
+};
 
 	Layout buildLayout(const Game& game) const;
 	void updateMenuButtons(const Layout& layout);

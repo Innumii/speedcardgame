@@ -253,6 +253,8 @@ namespace Theme {
         constexpr int ENTRY_TEXT_Y_OFFSET              = 6;
         constexpr int ENTRY_COST_X_OFFSET              = 130;
         constexpr int ENTRY_COUNT_X_RIGHT_INSET        = 30;
+        constexpr int ENTRY_REMOVE_BTN_SIZE            = 16;
+        constexpr int ENTRY_REMOVE_BTN_MARGIN          = 4;
         constexpr int DRAG_FALLBACK_WIDTH              = 110;
         constexpr int DRAG_FALLBACK_HEIGHT             = 150;
         constexpr int DEFAULT_SCREEN_WIDTH             = 800;

@@ -187,6 +187,20 @@ void DeckBuilding::handleEvents(Game& game, const SDL_Event& event) {
             return;
         }
 
+        // ── Remove button hit-test (must come before drag initiation) ─────────
+        if (!dragging) {
+            for (std::size_t i = 0; i < layout.deckEntryRemoveRects.size(); ++i) {
+                if (pointInRect(point, layout.deckEntriesClipRect) &&
+                    pointInRect(point, layout.deckEntryRemoveRects[i])) {
+                    const int cardIndex = layout.deckEntryCardIndices[i];
+                    if (cardIndex >= 0 && cardIndex < static_cast<int>(deckCopies.size())) {
+                        Deck::removeCopy(deckCopies, cardIndex);
+                    }
+                    return;
+                }
+            }
+        }
+
         for (std::size_t i = 0; i < layout.collectionCardRects.size(); ++i) {
             if (pointInRect(point, layout.collectionCardRects[i])) {
                 dragging = true;
@@ -288,7 +302,6 @@ DeckBuilding::Layout DeckBuilding::buildLayout(const Game& game) const {
         static_cast<float>(screenW) / static_cast<float>(Theme::SCREEN_DEFAULT_WIDTH),
         static_cast<float>(screenH) / static_cast<float>(Theme::SCREEN_DEFAULT_HEIGHT)
     );
-    // Store scale for use in updateMenuButtons and scroll handling
     const_cast<DeckBuilding*>(this)->currentScale = scale;
 
     auto sc = [scale](int v) { return static_cast<int>(v * scale); };
@@ -401,6 +414,7 @@ DeckBuilding::Layout DeckBuilding::buildLayout(const Game& game) const {
     const auto deckOrder = getDeckEntryOrder();
     layout.deckEntryCardIndices = deckOrder;
     layout.deckEntryRects.reserve(deckOrder.size());
+    layout.deckEntryRemoveRects.reserve(deckOrder.size()); // ← NEW
 
     const int entryStartY   = layout.deckArea.y + sc(Theme::DeckBuilding::ENTRY_START_Y_PADDING);
     const int entriesBottom = layout.deckArea.y + layout.deckArea.h - sc(Theme::DeckBuilding::ENTRY_BOTTOM_PADDING);
@@ -419,6 +433,9 @@ DeckBuilding::Layout DeckBuilding::buildLayout(const Game& game) const {
     }
     layout.maxDeckScrollOffset = std::max(0, contentHeight - layout.deckEntriesClipRect.h);
 
+    const int removeBtnSize   = sc(Theme::DeckBuilding::ENTRY_REMOVE_BTN_SIZE);
+    const int removeBtnMargin = sc(Theme::DeckBuilding::ENTRY_REMOVE_BTN_MARGIN);
+
     for (std::size_t i = 0; i < deckOrder.size(); ++i) {
         SDL_Rect entryRect{
             layout.deckArea.x + sc(Theme::DeckBuilding::ENTRY_X_PADDING),
@@ -427,6 +444,15 @@ DeckBuilding::Layout DeckBuilding::buildLayout(const Game& game) const {
             entryHeight
         };
         layout.deckEntryRects.push_back(entryRect);
+
+        // ── Remove button: vertically centred, right-aligned inside entry ─────
+        SDL_Rect removeRect{
+            entryRect.x + entryRect.w - removeBtnSize - removeBtnMargin,
+            entryRect.y + (entryRect.h - removeBtnSize) / 2,
+            removeBtnSize,
+            removeBtnSize
+        };
+        layout.deckEntryRemoveRects.push_back(removeRect); // ← NEW
     }
 
     return layout;

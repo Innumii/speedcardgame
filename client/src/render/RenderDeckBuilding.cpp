@@ -29,11 +29,11 @@ void RenderDeckBuilding::render(DeckBuilding& deckBuilding, Game& game) {
         renderer,
         screenW,
         screenH,
-        Theme::BG,                              // base background color
-        Theme::Loading::VIGNETTE_COLOR,        // vignette color
-        Theme::Loading::VIGNETTE_LAYERS,       // layers
-        Theme::Loading::VIGNETTE_ALPHA_FALLOFF,// alpha falloff
-        Theme::Loading::VIGNETTE_MAX_ALPHA     // max alpha
+        Theme::BG,
+        Theme::Loading::VIGNETTE_COLOR,
+        Theme::Loading::VIGNETTE_LAYERS,
+        Theme::Loading::VIGNETTE_ALPHA_FALLOFF,
+        Theme::Loading::VIGNETTE_MAX_ALPHA
     );
 
     RenderText textRenderer;
@@ -56,14 +56,14 @@ void RenderDeckBuilding::render(DeckBuilding& deckBuilding, Game& game) {
 
     // ── fonts ────────────────────────────────────────────────────────
     const RenderText::FontSet& fonts = game.getUIFonts();
-    TTF_Font* fontSmall = fonts.small;
-    TTF_Font* fontTiny  = fonts.tiny;
-    TTF_Font* fontLarge = fonts.large;
+    TTF_Font* fontSmall  = fonts.small;
+    TTF_Font* fontTiny   = fonts.tiny;
+    TTF_Font* fontLarge  = fonts.large;
     TTF_Font* buttonFont = fontSmall ? fontSmall : fontLarge;
 
     // ── menu buttons ─────────────────────────────────────────────────
-    const bool canPlay = Deck::hasFullDeck(deckBuilding.deckCopies);
-    const bool canSave = Deck::hasFullDeck(deckBuilding.deckCopies);
+    const bool canPlay  = Deck::hasFullDeck(deckBuilding.deckCopies);
+    const bool canSave  = Deck::hasFullDeck(deckBuilding.deckCopies);
     const bool hoverTitle = SDL_PointInRect(&mousePoint, &deckBuilding.TitleButton) == SDL_TRUE;
     const bool hoverPlay  = SDL_PointInRect(&mousePoint, &deckBuilding.PlayButton)  == SDL_TRUE;
     const bool hoverSave  = SDL_PointInRect(&mousePoint, &deckBuilding.SaveButton)  == SDL_TRUE;
@@ -133,6 +133,7 @@ void RenderDeckBuilding::render(DeckBuilding& deckBuilding, Game& game) {
         );
     }
 
+    // ── Collection cards ─────────────────────────────────────────────
     for (std::size_t i = 0; i < layout.collectionCardRects.size(); ++i) {
         const SDL_Rect cardRect = layout.collectionCardRects[i];
         if (i >= layout.collectionCardIndices.size()) continue;
@@ -150,16 +151,39 @@ void RenderDeckBuilding::render(DeckBuilding& deckBuilding, Game& game) {
         const bool dimmed = remaining <= 0;
         RenderCard::drawCardFace(renderer, textRenderer, card, cardRect, fontSmall, fontTiny, dimmed);
 
+        // ── Feature 1: strong grey overlay when fully exhausted ───────
+        if (dimmed) {
+            SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+            SDL_SetRenderDrawColor(renderer, 0, 0, 0, 150);
+            SDL_RenderFillRect(renderer, &cardRect);
+            SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
+        }
+
+        // ── Feature 2: quantity as "remaining/total" ──────────────────
         if (fontTiny) {
-            const std::string qtyText = "x" + std::to_string(remaining);
-            const SDL_Color qtyColor = dimmed ? Theme::DeckBuilding::QUANTITY_TEXT_DIM : Theme::DeckBuilding::QUANTITY_TEXT;
-            textRenderer.drawText(renderer, qtyText, fontTiny, qtyColor, cardRect.x + Theme::DeckBuilding::CARD_QTY_X_OFFSET, cardRect.y + cardRect.h + Theme::DeckBuilding::CARD_QTY_Y_OFFSET);
+            int inventoryTotal = 0;
+            if (inventoryLoaded &&
+                cardIndex >= 0 &&
+                cardIndex < static_cast<int>(inventoryCopies.size())) {
+                inventoryTotal = inventoryCopies[cardIndex];
+            }
+            const std::string qtyText =
+                std::to_string(remaining) + "/" + std::to_string(inventoryTotal);
+            const SDL_Color qtyColor = dimmed
+                ? Theme::DeckBuilding::QUANTITY_TEXT_DIM
+                : Theme::DeckBuilding::QUANTITY_TEXT;
+            textRenderer.drawText(
+                renderer, qtyText, fontTiny, qtyColor,
+                cardRect.x + Theme::DeckBuilding::CARD_QTY_X_OFFSET,
+                cardRect.y + cardRect.h + Theme::DeckBuilding::CARD_QTY_Y_OFFSET
+            );
         }
     }
 
+    // ── Pager ─────────────────────────────────────────────────────────
     if (layout.pageCount > 1) {
-        const bool canPrev = layout.pageIndex > 0;
-        const bool canNext = layout.pageIndex < layout.pageCount - 1;
+        const bool canPrev  = layout.pageIndex > 0;
+        const bool canNext  = layout.pageIndex < layout.pageCount - 1;
         const bool hoverPrev = canPrev && SDL_PointInRect(&mousePoint, &layout.prevPageButton) == SDL_TRUE;
         const bool hoverNext = canNext && SDL_PointInRect(&mousePoint, &layout.nextPageButton) == SDL_TRUE;
 
@@ -179,10 +203,13 @@ void RenderDeckBuilding::render(DeckBuilding& deckBuilding, Game& game) {
 
         if (fontTiny) {
             const std::string pageText = "Page " + std::to_string(layout.pageIndex + 1) + " / " + std::to_string(layout.pageCount);
-            textRenderer.drawText(renderer, pageText, fontTiny, Theme::DeckBuilding::PAGE_LABEL_TEXT, layout.pageLabelRect.x + Theme::DeckBuilding::PAGE_LABEL_X_OFFSET, layout.pageLabelRect.y + Theme::DeckBuilding::PAGE_LABEL_Y_OFFSET);
+            textRenderer.drawText(renderer, pageText, fontTiny, Theme::DeckBuilding::PAGE_LABEL_TEXT,
+                layout.pageLabelRect.x + Theme::DeckBuilding::PAGE_LABEL_X_OFFSET,
+                layout.pageLabelRect.y + Theme::DeckBuilding::PAGE_LABEL_Y_OFFSET);
         }
     }
 
+    // ── Deck panel ────────────────────────────────────────────────────
     SDL_SetRenderDrawColor(renderer,
                            Theme::DeckBuilding::DECK_FILL.r,
                            Theme::DeckBuilding::DECK_FILL.g,
@@ -210,6 +237,7 @@ void RenderDeckBuilding::render(DeckBuilding& deckBuilding, Game& game) {
         );
     }
 
+    // ── Deck entries ──────────────────────────────────────────────────
     SDL_RenderSetClipRect(renderer, &layout.deckEntriesClipRect);
     for (std::size_t i = 0; i < layout.deckEntryRects.size(); ++i) {
         const SDL_Rect entryRect = layout.deckEntryRects[i];
@@ -219,8 +247,8 @@ void RenderDeckBuilding::render(DeckBuilding& deckBuilding, Game& game) {
         }
 
         const int cardIndex = layout.deckEntryCardIndices[i];
-        const Card& card = *availableCards[cardIndex];
-        const int copies = deckBuilding.deckCopies[cardIndex];
+        const Card& card    = *availableCards[cardIndex];
+        const int copies    = deckBuilding.deckCopies[cardIndex];
 
         SDL_SetRenderDrawColor(renderer,
                                Theme::DeckBuilding::ENTRY_FILL.r,
@@ -236,13 +264,58 @@ void RenderDeckBuilding::render(DeckBuilding& deckBuilding, Game& game) {
         SDL_RenderDrawRect(renderer, &entryRect);
 
         if (fontTiny) {
-            textRenderer.drawText(renderer, card.getName(), fontTiny, Theme::DeckBuilding::ENTRY_NAME_TEXT, entryRect.x + Theme::DeckBuilding::ENTRY_TEXT_X_OFFSET, entryRect.y + Theme::DeckBuilding::ENTRY_TEXT_Y_OFFSET);
-            textRenderer.drawText(renderer, "Cost: " + std::to_string(card.getManaCost()), fontTiny, Theme::DeckBuilding::ENTRY_COST_TEXT, entryRect.x + Theme::DeckBuilding::ENTRY_COST_X_OFFSET, entryRect.y + Theme::DeckBuilding::ENTRY_TEXT_Y_OFFSET);
-            textRenderer.drawText(renderer, "x" + std::to_string(copies), fontTiny, Theme::DeckBuilding::ENTRY_COUNT_TEXT, entryRect.x + entryRect.w - Theme::DeckBuilding::ENTRY_COUNT_X_RIGHT_INSET, entryRect.y + Theme::DeckBuilding::ENTRY_TEXT_Y_OFFSET);
+            textRenderer.drawText(renderer, card.getName(), fontTiny,
+                Theme::DeckBuilding::ENTRY_NAME_TEXT,
+                entryRect.x + Theme::DeckBuilding::ENTRY_TEXT_X_OFFSET,
+                entryRect.y + Theme::DeckBuilding::ENTRY_TEXT_Y_OFFSET);
+
+            textRenderer.drawText(renderer, "Cost: " + std::to_string(card.getManaCost()), fontTiny,
+                Theme::DeckBuilding::ENTRY_COST_TEXT,
+                entryRect.x + Theme::DeckBuilding::ENTRY_COST_X_OFFSET,
+                entryRect.y + Theme::DeckBuilding::ENTRY_TEXT_Y_OFFSET);
+
+            // Copy count — nudged left to make room for the remove button
+            const int removeBtnSize   = Theme::DeckBuilding::ENTRY_REMOVE_BTN_SIZE;
+            const int removeBtnMargin = Theme::DeckBuilding::ENTRY_REMOVE_BTN_MARGIN;
+            textRenderer.drawText(renderer, "x" + std::to_string(copies), fontTiny,
+                Theme::DeckBuilding::ENTRY_COUNT_TEXT,
+                entryRect.x + entryRect.w
+                    - removeBtnSize - removeBtnMargin
+                    - Theme::DeckBuilding::ENTRY_COUNT_X_RIGHT_INSET,
+                entryRect.y + Theme::DeckBuilding::ENTRY_TEXT_Y_OFFSET);
+        }
+
+        // ── Feature 3: remove (✕) button ─────────────────────────────
+        if (i < layout.deckEntryRemoveRects.size()) {
+            const SDL_Rect& removeRect = layout.deckEntryRemoveRects[i];
+            const bool hoverRemove =
+                SDL_PointInRect(&mousePoint, &layout.deckEntriesClipRect) == SDL_TRUE &&
+                SDL_PointInRect(&mousePoint, &removeRect) == SDL_TRUE;
+
+            SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+            SDL_SetRenderDrawColor(renderer,
+                hoverRemove ? 220 : 160,
+                40, 40,
+                hoverRemove ? 255 : 210);
+            SDL_RenderFillRect(renderer, &removeRect);
+
+            // Thin white border
+            SDL_SetRenderDrawColor(renderer, 255, 255, 255, hoverRemove ? 200 : 120);
+            SDL_RenderDrawRect(renderer, &removeRect);
+            SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
+
+            if (fontTiny) {
+                // Centre "x" label inside the button
+                textRenderer.drawText(renderer, "x", fontTiny,
+                    SDL_Color{255, 255, 255, 255},
+                    removeRect.x + removeRect.w / 2 - 3,
+                    removeRect.y + removeRect.h / 2 - 6);
+            }
         }
     }
     SDL_RenderSetClipRect(renderer, nullptr);
 
+    // ── Scrollbar ─────────────────────────────────────────────────────
     if (layout.maxDeckScrollOffset > 0 && layout.deckEntriesClipRect.h > 0) {
         const SDL_Rect trackRect{
             layout.deckArea.x + layout.deckArea.w - Theme::DeckBuilding::SCROLLBAR_WIDTH - 4,
@@ -277,7 +350,9 @@ void RenderDeckBuilding::render(DeckBuilding& deckBuilding, Game& game) {
         SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
     }
 
-    if (deckBuilding.dragging && deckBuilding.draggedCardIndex >= 0 && deckBuilding.draggedCardIndex < static_cast<int>(availableCards.size())) {
+    // ── Drag ghost ────────────────────────────────────────────────────
+    if (deckBuilding.dragging && deckBuilding.draggedCardIndex >= 0 &&
+        deckBuilding.draggedCardIndex < static_cast<int>(availableCards.size())) {
         const Card& card = *availableCards[deckBuilding.draggedCardIndex];
         int dragW = Theme::DeckBuilding::DRAG_FALLBACK_WIDTH;
         int dragH = Theme::DeckBuilding::DRAG_FALLBACK_HEIGHT;
@@ -298,15 +373,14 @@ void RenderDeckBuilding::render(DeckBuilding& deckBuilding, Game& game) {
         SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
     }
 
+    // ── Hover preview ─────────────────────────────────────────────────
     std::size_t newHoverIndex = static_cast<std::size_t>(-1);
     if (!deckBuilding.dragging) {
         for (std::size_t i = 0; i < layout.collectionCardRects.size(); ++i) {
             if (SDL_PointInRect(&mousePoint, &layout.collectionCardRects[i]) == SDL_TRUE) {
-                if (i < layout.collectionCardIndices.size()) {
-                    newHoverIndex = static_cast<std::size_t>(layout.collectionCardIndices[i]);
-                } else {
-                    newHoverIndex = i;
-                }
+                newHoverIndex = (i < layout.collectionCardIndices.size())
+                    ? static_cast<std::size_t>(layout.collectionCardIndices[i])
+                    : i;
                 break;
             }
         }
@@ -323,8 +397,8 @@ void RenderDeckBuilding::render(DeckBuilding& deckBuilding, Game& game) {
     }
 
     if (newHoverIndex != deckBuilding.hoverIndex) {
-        deckBuilding.hoverIndex = newHoverIndex;
-        deckBuilding.hoverStartTick = now;
+        deckBuilding.hoverIndex      = newHoverIndex;
+        deckBuilding.hoverStartTick  = now;
     }
 
     constexpr Uint32 hoverDelayMs = Theme::DeckBuilding::HOVER_PREVIEW_DELAY_MS;
@@ -334,29 +408,26 @@ void RenderDeckBuilding::render(DeckBuilding& deckBuilding, Game& game) {
         now - deckBuilding.hoverStartTick >= hoverDelayMs;
 
     if (showPreview) {
-        int screenW = Theme::DeckBuilding::DEFAULT_SCREEN_WIDTH;
-        int screenH = Theme::DeckBuilding::DEFAULT_SCREEN_HEIGHT;
-        SDL_GetRendererOutputSize(renderer, &screenW, &screenH);
-
-        int previewWidth = std::min(Theme::DeckBuilding::PREVIEW_MAX_WIDTH, screenW / Theme::DeckBuilding::PREVIEW_SCREEN_WIDTH_RATIO_DIV);
+        int previewWidth  = std::min(Theme::DeckBuilding::PREVIEW_MAX_WIDTH,
+                                     screenW / Theme::DeckBuilding::PREVIEW_SCREEN_WIDTH_RATIO_DIV);
         int previewHeight = static_cast<int>(previewWidth * Theme::PREVIEW_ASPECT_RATIO);
         if (previewHeight > screenH - (Theme::DeckBuilding::PREVIEW_EDGE_MARGIN * 2)) {
             previewHeight = screenH - (Theme::DeckBuilding::PREVIEW_EDGE_MARGIN * 2);
-            previewWidth = static_cast<int>(previewHeight / Theme::PREVIEW_ASPECT_RATIO);
+            previewWidth  = static_cast<int>(previewHeight / Theme::PREVIEW_ASPECT_RATIO);
         }
 
         int previewX = layout.deckArea.x - previewWidth - Theme::DeckBuilding::PREVIEW_DECK_GAP;
-        if (previewX < Theme::DeckBuilding::PREVIEW_EDGE_MARGIN) previewX = Theme::DeckBuilding::PREVIEW_EDGE_MARGIN;
+        if (previewX < Theme::DeckBuilding::PREVIEW_EDGE_MARGIN)
+            previewX = Theme::DeckBuilding::PREVIEW_EDGE_MARGIN;
         int previewY = layout.deckArea.y;
-        if (previewY + previewHeight > screenH - Theme::DeckBuilding::PREVIEW_EDGE_MARGIN) {
+        if (previewY + previewHeight > screenH - Theme::DeckBuilding::PREVIEW_EDGE_MARGIN)
             previewY = screenH - previewHeight - Theme::DeckBuilding::PREVIEW_EDGE_MARGIN;
-        }
-        if (previewY < Theme::DeckBuilding::PREVIEW_EDGE_MARGIN) previewY = Theme::DeckBuilding::PREVIEW_EDGE_MARGIN;
+        if (previewY < Theme::DeckBuilding::PREVIEW_EDGE_MARGIN)
+            previewY = Theme::DeckBuilding::PREVIEW_EDGE_MARGIN;
 
         SDL_Rect panel{previewX, previewY, previewWidth, previewHeight};
         RenderCard::drawPreview(
-            renderer,
-            textRenderer,
+            renderer, textRenderer,
             *availableCards[deckBuilding.hoverIndex],
             panel,
             fontSmall,
