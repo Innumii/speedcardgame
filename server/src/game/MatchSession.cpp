@@ -230,8 +230,7 @@ bool MatchSession::draw(int playerIndex) {
 
     auto cardIdOpt = deck.draw();
     if (!cardIdOpt) {
-        augmentHP(playerIndex, -player.fatigueDamage);
-        player.fatigueDamage+=1;
+        handleFatigue(playerIndex);
         return false;
     }
 
@@ -257,6 +256,8 @@ bool MatchSession::naturalDraw(int playerIndex) {
     }
     return draw(playerIndex);
 }
+
+
 
 // --------------------------------------------------
 // Game Loop
@@ -414,6 +415,20 @@ void MatchSession::handleSurrender(int surrenderingPlayerIndex) {
         return;
     }
     endMatch(winner, loser);
+}
+
+void MatchSession::handleFatigue(int playerIndex) {
+    if (!running.load()) return;
+    auto& player = players[playerIndex];
+    int fatigueDamage = player.fatigueDamage;
+    
+    std::ostringstream ss;
+    ss << "FATIGUE " << player.id << " " << fatigueDamage << "\n";
+    playerA->send(ss.str());
+    playerB->send(ss.str());
+    
+    augmentHP(playerIndex, -fatigueDamage);
+    player.fatigueDamage+=1;
 }
 
 void MatchSession::handleSummon(int playerIndex, int cardId, int lane) {
@@ -859,10 +874,10 @@ void MatchSession::setCreatureRegen(int targetPlayerIndex, int lane, int regenVa
 
     board.regen[targetPlayerIndex][lane] = std::make_pair(regenValue, 2);
 
-    std::string effectMsg = "EFFECT_ADD " + std::to_string(players[targetPlayerIndex].id) + " "
-                         + std::to_string(lane) + " " + std::to_string(CombatEffects::kRegen) + "\n";
-    playerA->send(effectMsg);
-    playerB->send(effectMsg);
+    // std::string effectMsg = "EFFECT_ADD " + std::to_string(players[targetPlayerIndex].id) + " "
+    //                      + std::to_string(lane) + " " + std::to_string(CombatEffects::kRegen) + "\n";
+    // playerA->send(effectMsg);
+    // playerB->send(effectMsg);
 
     std::string msg = "REGEN_SET " + std::to_string(players[targetPlayerIndex].id) + " "
                     + std::to_string(lane) + " " + std::to_string(regenValue) + "\n";

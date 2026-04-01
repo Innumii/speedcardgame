@@ -354,22 +354,6 @@ void PackOpening::render(Game& game) {
 
     RenderText textRenderer;
 
-    // ── Summary panel ─────────────────────────────────────────────────────────
-    if (!statusMessage.empty()) {
-        SDL_Rect panel{startX, summaryY, totalW, summaryH};
-        SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
-        SDL_SetRenderDrawColor(renderer, Theme::PackOpening::SUMMARY_FILL.r,
-                               Theme::PackOpening::SUMMARY_FILL.g,
-                               Theme::PackOpening::SUMMARY_FILL.b,
-                               Theme::PackOpening::SUMMARY_FILL.a);
-        SDL_RenderFillRect(renderer, &panel);
-        SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
-        SDL_SetRenderDrawColor(renderer, Theme::BANNER_BORDER.r, Theme::BANNER_BORDER.g,
-                               Theme::BANNER_BORDER.b, 255);
-        SDL_RenderDrawRect(renderer, &panel);
-        drawCenteredText(renderer, statusMessage, uiFonts.large, Theme::BANNER_BORDER, panel);
-    }
-
     // ── Badges ────────────────────────────────────────────────────────────────
     for (int i = 0; i < static_cast<int>(lastOpenedCards.size()); ++i) {
         if (i >= static_cast<int>(cardFlipped.size()) || !cardFlipped[i]) continue;
@@ -384,10 +368,19 @@ void PackOpening::render(Game& game) {
         const int cardTopY  = (i % 2 == 0) ? evenCardY : oddCardY;
         SDL_Rect baseRect{startX + i * (cardW + cardGap), cardTopY, cardW, cardH};
 
-        const SDL_Color badgeFill  = result.refunded ? Theme::PackOpening::DUPLICATE_FILL
-                                                     : Theme::PackOpening::NEW_FILL;
-        const std::string badgeLabel = result.refunded
-            ? ("DUPE  +" + std::to_string(RefundCoinsPerExtra) + "c") : "NEW!";
+        SDL_Color badgeFill;
+        std::string badgeLabel;
+        if (result.resultingCopies > MaxCardCopies) {
+            badgeFill  = Theme::PackOpening::DUPLICATE_FILL;
+            badgeLabel = "DUPE  +" + std::to_string(RefundCoinsPerExtra) + "c";
+        } else if (result.resultingCopies == 1) {
+            badgeFill  = Theme::PackOpening::NEW_FILL;
+            badgeLabel = "NEW!";
+        } else {
+            badgeFill  = Theme::PackOpening::NEW_FILL;
+            badgeLabel = std::to_string(result.resultingCopies)
+                       + "/" + std::to_string(MaxCardCopies) + " OWNED!";
+        }
 
         SDL_Rect badge{
             baseRect.x,
@@ -481,23 +474,6 @@ void PackOpening::render(Game& game) {
                 RenderCard::drawCardBack(renderer, drawRect);
             }
 
-            const std::string qtyStr = std::to_string(result.resultingCopies)
-                                     + "/" + std::to_string(MaxCardCopies);
-            const int chipW = Theme::PackOpening::QTY_CHIP_WIDTH;
-            const int chipH = Theme::PackOpening::QTY_CHIP_HEIGHT;
-            SDL_Rect chip{
-                baseRect.x + baseRect.w - chipW - Theme::PackOpening::QTY_CHIP_MARGIN,
-                baseRect.y + Theme::PackOpening::QTY_CHIP_MARGIN,
-                chipW, chipH
-            };
-            SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
-            SDL_SetRenderDrawColor(renderer, Theme::PackOpening::QTY_CHIP_BG.r,
-                                   Theme::PackOpening::QTY_CHIP_BG.g,
-                                   Theme::PackOpening::QTY_CHIP_BG.b,
-                                   Theme::PackOpening::QTY_CHIP_BG.a);
-            SDL_RenderFillRect(renderer, &chip);
-            SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
-            drawCenteredText(renderer, qtyStr, uiFonts.small, Theme::PackOpening::QTY_TEXT, chip);
         } else {
             RenderCard::drawCardBack(renderer, drawRect);
         }
@@ -656,14 +632,7 @@ void PackOpening::openPack(Game& game) {
     lastOpenedCards = std::move(results);
     lastRefundCoins = refundCoins;
 
-    int cardsAdded = 0;
-    for (const auto& pair : deltaByCardId) { cardsAdded += pair.second; }
-
-    statusMessage = "Pack opened (-" + std::to_string(PackCostCoins) + "c): +"
-                  + std::to_string(cardsAdded) + " card(s)";
-    if (refundCoins > 0) {
-        statusMessage += ", +" + std::to_string(refundCoins) + " coins refund.";
-    }
+    statusMessage.clear();
 }
 
 // ── applyInventoryDelta ───────────────────────────────────────────────────────

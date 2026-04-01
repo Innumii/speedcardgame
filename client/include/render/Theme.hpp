@@ -423,7 +423,7 @@ namespace Theme {
 
         constexpr int HEADER_Y                        = 14;
         constexpr int HEADER_CLEARANCE                = 44;
-        constexpr int CARD_SIDE_PADDING               = 24;
+        constexpr int CARD_SIDE_PADDING               = 96;
         constexpr int CARD_GAP                        = 10;
         constexpr int CARD_BADGE_HEIGHT               = 26;
         constexpr int SUMMARY_HEIGHT                  = 42;
