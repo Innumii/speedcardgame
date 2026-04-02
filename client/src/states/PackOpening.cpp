@@ -52,7 +52,7 @@ namespace {
         const int cardGap  = Theme::PackOpening::CARD_GAP;
         const int usableW  = screenW - 2 * sidePad;
         const int cardW    = (usableW - (packSize - 1) * cardGap) / packSize;
-        const int cardH    = cardW * 3 / 2;
+        const int cardH    = cardW * Theme::PREVIEW_ASPECT_RATIO;
         const int totalW   = packSize * cardW + (packSize - 1) * cardGap;
         const int startX   = (screenW - totalW) / 2;
 
@@ -370,7 +370,7 @@ void PackOpening::render(Game& game) {
 
         SDL_Color badgeFill;
         std::string badgeLabel;
-        if (result.resultingCopies > MaxCardCopies) {
+        if (result.resultingCopies >= MaxCardCopies) {
             badgeFill  = Theme::PackOpening::DUPLICATE_FILL;
             badgeLabel = "DUPE  +" + std::to_string(RefundCoinsPerExtra) + "c";
         } else if (result.resultingCopies == 1) {
