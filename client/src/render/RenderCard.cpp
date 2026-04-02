@@ -5,6 +5,7 @@
 #include "objects/CreatureCard.h"
 #include "render/RenderText.hpp"
 #include "render/Theme.hpp"
+#include "utils/HttpUtil.hpp"
 #include "utils/RenderUtil.hpp"
 #include "utils/EnvUtil.hpp"
 #include "utils/StringUtil.hpp"
@@ -24,8 +25,6 @@
 #include <vector>
 #include <unordered_map>
 #include <unordered_set>
-#define CPPHTTPLIB_OPENSSL_SUPPORT
-#include "httplib/httplib.h"
 
 // ─────────────────────────────────────────────────────────────────────────────
 // NOTE – Card.h / CreatureCard.h recommended change (not required, but cheap):
@@ -72,28 +71,15 @@ void scheduleCardImageRetry(int cardId, Uint32 now) {
 }
 
 bool downloadImageBody(const std::string& host, int port, int cardId,
-                       const std::string& extension, std::string& responseBody) {
-    const std::string path = "/cards/images/" + std::to_string(cardId) + "." + extension;
-    std::string normalizedHost = host;
-    if (normalizedHost.rfind("https://", 0) == 0) {
-        normalizedHost = normalizedHost.substr(8);
+                       std::string& responseBody) {
+    const std::string path = "/cards/images/" + std::to_string(cardId) + ".png";
+    int statusCode = -1;
+    if (!HttpUtil::sendHttp(host, port, "GET", path, "", statusCode, responseBody)) {
+        responseBody.clear();
+        return false;
     }
 
-    const bool useHttps = true;
-    const bool verifyTlsCerts = EnvUtil::getEnvBoolOrDefault("TLS_VERIFY_CERTS", EnvUtil::isAwsEnabled());
-    httplib::Result res;
-    if (useHttps) {
-        httplib::SSLClient client(normalizedHost.c_str(), port);
-        client.enable_server_certificate_verification(verifyTlsCerts);
-        client.set_follow_location(true);
-        client.set_connection_timeout(0, 150000);
-        client.set_read_timeout(0, 250000);
-        client.set_write_timeout(0, 250000);
-        res = client.Get(path.c_str());
-    }
-    if (!res || res->status != 200) { responseBody.clear(); return false; }
-    responseBody = res->body;
-    return !responseBody.empty();
+    return statusCode == 200 && !responseBody.empty();
 }
 
 SDL_Texture* getCardImageTexture(SDL_Renderer* renderer, int cardId,
@@ -114,19 +100,9 @@ SDL_Texture* getCardImageTexture(SDL_Renderer* renderer, int cardId,
 
     const std::string host         = EnvUtil::getCardsServiceHost();
     const int         port         = EnvUtil::getCardsServicePort();
-    const std::string preferredExt = EnvUtil::getEnvOrDefault("CARD_IMAGE_EXT", "");
-    const std::array<std::string, 4> defaultExts{{"png", "jpg", "jpeg", "bmp"}};
 
     std::string imageBytes;
-    bool loaded = false;
-    if (!preferredExt.empty())
-        loaded = downloadImageBody(host, port, cardId, preferredExt, imageBytes);
-    if (!loaded) {
-        for (const std::string& ext : defaultExts) {
-            if (!preferredExt.empty() && preferredExt == ext) continue;
-            if (downloadImageBody(host, port, cardId, ext, imageBytes)) { loaded = true; break; }
-        }
-    }
+    const bool loaded = downloadImageBody(host, port, cardId, imageBytes);
     if (!loaded) { scheduleCardImageRetry(cardId, now); return nullptr; }
 
     SDL_RWops* rw = SDL_RWFromConstMem(imageBytes.data(), static_cast<int>(imageBytes.size()));

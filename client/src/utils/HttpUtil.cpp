@@ -1,6 +1,7 @@
 #include "utils/HttpUtil.hpp"
 #include "utils/EnvUtil.hpp"
 
+#include <fstream>
 #include <map>
 
 #define CPPHTTPLIB_OPENSSL_SUPPORT
@@ -17,18 +18,28 @@
 namespace HttpUtil {
     namespace {
         std::string normalizeHost(const std::string& host) {
+            if (host.rfind("http://", 0) == 0) {
+                return host.substr(7);
+            }
             if (host.rfind("https://", 0) == 0) {
                 return host.substr(8);
             }
             return host;
         }
 
-        bool shouldUseHttps() {
-            return true;  // Default to HTTPS for all service-to-service communication
+        bool tryLoadCaCert(httplib::SSLClient& client) {
+            const char* caPath = "./certs/ca.crt";
+            std::ifstream file(caPath);
+            if (!file.good()) {
+                return false;
+            }
+
+            client.set_ca_cert_path(caPath);
+            return true;
         }
 
-        bool shouldVerifyTlsCerts() {
-            return EnvUtil::getEnvBoolOrDefault("TLS_VERIFY_CERTS", EnvUtil::isAwsEnabled());
+        bool shouldUseHttps() {
+            return true;  // Default to HTTPS for all service-to-service communication
         }
     }
 
@@ -43,7 +54,12 @@ namespace HttpUtil {
 
         if (useHttps) {
             httplib::SSLClient client(normalizedHost.c_str(), port);
-            client.enable_server_certificate_verification(shouldVerifyTlsCerts());
+            client.enable_server_certificate_verification(true);
+            if (!tryLoadCaCert(client)) {
+                statusCode = -1;
+                responseBody.clear();
+                return false;
+            }
             client.set_follow_location(true);
 
             httplib::Headers requestHeaders;
