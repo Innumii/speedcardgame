@@ -835,9 +835,15 @@ void MatchSession::addCreatureEffect(int targetPlayerIndex, int lane, int effect
     if (lane < 0 || lane >= board.laneCount) return;
     if (!board.lanes[targetPlayerIndex][lane].has_value()) return;
 
-    const int currentMask = board.continuousEffects[targetPlayerIndex][lane].value_or(0);
+    auto& effectMaskOpt = board.continuousEffects[targetPlayerIndex][lane];
+
+    if (CombatEffects::hasEffect(effectMaskOpt, effectBit)) { //if effect exists, dont need do anyth
+        return;
+    }
+
+    const int currentMask = effectMaskOpt.value_or(0);
     const int updatedMask = currentMask | effectBit;
-    board.continuousEffects[targetPlayerIndex][lane] = (updatedMask == 0) ? std::nullopt : std::optional<int>(updatedMask);
+    effectMaskOpt = (updatedMask == 0) ? std::nullopt : std::optional<int>(updatedMask);
 
     std::string msg = "EFFECT_ADD " + std::to_string(players[targetPlayerIndex].id) + " "
                     + std::to_string(lane) + " " + std::to_string(effectBit) + "\n";
@@ -868,19 +874,20 @@ void MatchSession::setCreatureRegen(int targetPlayerIndex, int lane, int regenVa
     if (!board.lanes[targetPlayerIndex][lane].has_value()) return;
     if (regenValue <= 0) return;
 
-    const int currentMask = board.continuousEffects[targetPlayerIndex][lane].value_or(0);
-    const int updatedMask = currentMask | CombatEffects::kRegen;
-    board.continuousEffects[targetPlayerIndex][lane] = std::optional<int>(updatedMask);
+    auto& effectMaskOpt = board.continuousEffects[targetPlayerIndex][lane];
+    const int currentMask = effectMaskOpt.value_or(0);
+    effectMaskOpt = currentMask | CombatEffects::kRegen;
 
-    board.regen[targetPlayerIndex][lane] = std::make_pair(regenValue, 2);
+    auto& regenSlot = board.regen[targetPlayerIndex][lane];
 
-    // std::string effectMsg = "EFFECT_ADD " + std::to_string(players[targetPlayerIndex].id) + " "
-    //                      + std::to_string(lane) + " " + std::to_string(CombatEffects::kRegen) + "\n";
-    // playerA->send(effectMsg);
-    // playerB->send(effectMsg);
+    if (regenSlot.has_value()) {
+        regenSlot->first += regenValue;
+    } else {
+        regenSlot = std::make_pair(regenValue, 2);
+    }
 
     std::string msg = "REGEN_SET " + std::to_string(players[targetPlayerIndex].id) + " "
-                    + std::to_string(lane) + " " + std::to_string(regenValue) + "\n";
+                    + std::to_string(lane) + " " + std::to_string(regenSlot->first) + "\n";
     playerA->send(msg);
     playerB->send(msg);
 }
@@ -1202,6 +1209,7 @@ void MatchSession::resolveLaneCombat(int lane) {
             int toughnessAug = augOpt ? augOpt->second : 0;
             int missing = (toughnessAug < 0) ? -toughnessAug : 0;
             int heal = std::min(regenValue, missing);
+            // std::cout << "[MatchSession] Regen of "<< regenValue << "\n";
 
             if (heal > 0) {
                 augmentCreature(playerIndex, lane, {0, heal});

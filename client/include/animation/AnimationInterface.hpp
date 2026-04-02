@@ -9,6 +9,9 @@ public:
     virtual void start() {}
     virtual void update(float dt) = 0;
     virtual bool isFinished() const = 0;
+    
+    virtual bool isBlocking() const { return true; }
+
 };
 
 #endif

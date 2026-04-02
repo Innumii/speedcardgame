@@ -24,6 +24,7 @@
 #include <objects/CreatureCard.h>
 #include <utils/PlayingRenderUtil.hpp>
 #include <animation/SummonAnimation.hpp>
+#include <animation/FatigueAnimation.hpp>
 // #include <functional>
 
 // -------------------------
@@ -244,6 +245,7 @@ void Playing::setup(const Game& game) {
     deferredStatUpdates.clear(); 
     lastEndState = PlayingGameState::Playing;
     gameEndStartTick = 0;
+    cachedFont = game.getUIFonts().medium;
 
     if (!authority) {
         authority = std::make_unique<LocalAuthority>(
@@ -276,6 +278,20 @@ SDL_Rect Playing::computeSelfDeckRect(int screenW, int screenH) const {
     );
 }
 
+SDL_Rect Playing::computeOpponentDeckRect(int screenW, int screenH) const {
+    if (screenW <= 0 || screenH <= 0 || opponentSlots.empty()) {
+        return SDL_Rect{0, 0, 0, 0};
+    }
+
+    return PlayingLayoutUtil::computeDeckRect(
+        opponentSlots,
+        screenW,
+        Theme::Playing::CARD_WIDTH,
+        Theme::Playing::CARD_HEIGHT,
+        Theme::Playing::SELF_DECK_GAP,
+        Theme::Playing::SIDE_ZONE_MARGIN
+    );
+}
 // -------------------------
 // Event handling
 // -------------------------
@@ -751,8 +767,20 @@ bool Playing::handleServerMessage(const std::string& msg) {
         }
     } else if (cmd == "FATIGUE") {
         int playerId, fatigueDamage;
-        iss >> playerId, fatigueDamage;
+        iss >> playerId >> fatigueDamage;
 
+        if (animationsEnabled) {
+            int screenW = 0, screenH = 0;
+            SDL_GetRendererOutputSize(renderer, &screenW, &screenH);
+
+            const SDL_Rect deckRect = (playerId == localPlayer.id)
+                ? computeSelfDeckRect(screenW, screenH)
+                : computeOpponentDeckRect(screenW, screenH);
+
+            animationQueue.enqueue(
+                std::make_shared<FatigueAnimation>(deckRect, fatigueDamage, 400U, cachedFont)
+            );
+        }
     }
     //add a mana command later -> decouple discard logic to offload to mana logic
     else if (cmd == "MATCH_LOST") {

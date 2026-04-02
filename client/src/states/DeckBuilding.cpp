@@ -70,6 +70,7 @@ void DeckBuilding::enter(Game& game) {
     deckScrollOffset = 0;
     statusMessage.clear();
     statusMessageUntil = 0;
+
 }
 
 void DeckBuilding::exit(Game& game) {

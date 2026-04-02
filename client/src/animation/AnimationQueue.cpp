@@ -63,7 +63,10 @@ void AnimationQueue::update(Uint32 nowTick) {
 }
 
 bool AnimationQueue::hasActiveAnimation() const {
-    return !activeAnimations.empty() || !animationQueue.empty();
+    return std::any_of(activeAnimations.begin(), activeAnimations.end(),
+        [](const auto& anim) {
+            return anim && !anim->isFinished() && anim->isBlocking();
+        });
 }
 
 std::shared_ptr<const AnimationInterface> AnimationQueue::getActiveAnimation() const {
