@@ -263,16 +263,16 @@ void Login::render(Game& game) {
     );
 
     // ── banner ───────────────────────────────────────────────────────
-    SDL_Rect bannerRect = {
-        screenW / 2 - cachedBannerW / 2,
-        cachedBannerY,
-        cachedBannerW,
-        cachedBannerH
-    };
-    RenderBanner::drawBanner(r, bannerRect, "Archcast",
-                             titleFonts.large,
-                             Theme::BANNER_FILL,  Theme::BANNER_BORDER,
-                             Theme::BANNER_TEXT,  Theme::BANNER_GLOW);
+    // SDL_Rect bannerRect = {
+    //     screenW / 2 - cachedBannerW / 2,
+    //     cachedBannerY,
+    //     cachedBannerW,
+    //     cachedBannerH
+    // };
+    // RenderBanner::drawBanner(r, bannerRect, "Archcast",
+    //                          titleFonts.large,
+    //                          Theme::BANNER_FILL,  Theme::BANNER_BORDER,
+    //                          Theme::BANNER_TEXT,  Theme::BANNER_GLOW);
 
     // ── panel ────────────────────────────────────────────────────────
     RenderUtil::drawRoundedShadow(r, panelRect, Theme::PANEL_RADIUS,
@@ -352,4 +352,6 @@ void Login::render(Game& game) {
     RenderButton::drawButton(r, backButtonRect, "Register", uiFonts.large,
                              Theme::BTN_SECONDARY, Theme::BTN_BORDER,
                              Theme::BTN_TEXT, backHover, false);
+
+                    
 }

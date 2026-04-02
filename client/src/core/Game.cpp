@@ -235,6 +235,10 @@ void Game::setPlayingDeck() {
     playingSetup = false;
 }
 
+const Deck& Game::getDeck() const { 
+    return deck; 
+}
+
 bool Game::refreshPlayerDeckFromService() {
     Deck loadedDeck;
     if (!loadPlayerDeckFromService(*this, loadedDeck)) {

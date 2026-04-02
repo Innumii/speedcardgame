@@ -442,6 +442,7 @@ namespace Theme {
     }
 
     namespace Title {
+        constexpr int CARD_WIDTH                      = 170;
         constexpr int START_BUTTON_INITIAL_X          = 300;
         constexpr int START_BUTTON_INITIAL_Y          = 150;
         constexpr int MAIN_BUTTON_WIDTH               = 280;

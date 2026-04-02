@@ -66,6 +66,7 @@ public:
     void setPlayingDeck();
     bool refreshPlayerDeckFromService();
     Playing& getPlayingState();
+    const Deck& getDeck() const;
 
 
     bool tryStartPlayingWithBuiltDeck();

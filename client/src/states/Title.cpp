@@ -3,11 +3,14 @@
 #include "featureFlag/AnimationFlag.hpp"
 #include "render/RenderBackdrop.hpp"
 #include "render/RenderText.hpp"
-#include "render/RenderBanner.hpp"
 #include "render/RenderButton.hpp"
+#include "render/RenderMenuButton.hpp"
+#include "render/RenderCard.hpp"
 #include "render/Theme.hpp"
+#include "objects/Deck.h"
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_ttf.h>
+#include <algorithm>
 #include <cmath>
 #include <utils/RenderUtil.hpp>
 #include <core/Audio.hpp>
@@ -22,169 +25,105 @@ namespace {
 void Title::enter(Game& game) {
     Audio::playMusic("title");
 
-    // Invalidate cached button textures — SDL render-target textures can
-    // become stale after window resize events that occur in other states.
-    for (auto& cache : cachedButtons) {
-        if (cache.texture) {
-            SDL_DestroyTexture(cache.texture);
-            cache.texture = nullptr;
-        }
-    }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// buildButtonTexture
-// ─────────────────────────────────────────────────────────────────────────────
-SDL_Texture* Title::buildButtonTexture(SDL_Renderer* renderer,
-                                       const SDL_Rect& rect,
-                                       const std::string& text,
-                                       SDL_Color fill,
-                                       bool hovered,
-                                       const RenderText::FontSet& fonts)
-{
-    SDL_Texture* tex = SDL_CreateTexture(
-        renderer,
-        SDL_PIXELFORMAT_RGBA8888,
-        SDL_TEXTUREACCESS_TARGET,
-        rect.w,
-        rect.h
-    );
-    if (!tex) return nullptr;
-
-    SDL_SetTextureBlendMode(tex, SDL_BLENDMODE_BLEND);
-    SDL_SetRenderTarget(renderer, tex);
-    SDL_SetRenderDrawColor(renderer, 0, 0, 0, 0);
-    SDL_RenderClear(renderer);
-
-    SDL_Rect local{0, 0, rect.w, rect.h};
-    RenderButton::drawButton(
-        renderer, local, text, fonts.large,
-        fill, Theme::BTN_BORDER, Theme::BTN_TEXT, hovered
-    );
-
-    SDL_SetRenderTarget(renderer, nullptr);
-    return tex;
+    // Reshuffle the deck and reset conveyor state.  Card pre-population is
+    // deferred to the first renderShowcase() call so layout dims are known.
+    prepareShowcaseDeck(game);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Layout constants
 // ─────────────────────────────────────────────────────────────────────────────
-static constexpr float kRefW = 1200.0F;
-static constexpr float kRefH = 850.0F;
+static constexpr float kRefW = 1200.0f;
+static constexpr float kRefH = 850.0f;
 
 // ─────────────────────────────────────────────────────────────────────────────
-// updateLayout  —  all main-menu button / banner rects
+// updateLayout
 // ─────────────────────────────────────────────────────────────────────────────
-void Title::updateLayout(SDL_Renderer* renderer) {
-    int screenW = 800;
-    int screenH = 600;
-    if (renderer) {
-        SDL_GetRendererOutputSize(renderer, &screenW, &screenH);
-    }
+void Title::updateLayout(SDL_Renderer* renderer,
+                         TTF_Font*     titleFont,
+                         TTF_Font*     menuFont)
+{
+    int screenW = 800, screenH = 600;
+    if (renderer) SDL_GetRendererOutputSize(renderer, &screenW, &screenH);
 
     scale = std::min(
         static_cast<float>(screenW) / kRefW,
         static_cast<float>(screenH) / kRefH);
 
-    const int mainBtnW   = static_cast<int>(Theme::Title::MAIN_BUTTON_WIDTH   * scale);
-    const int mainBtnH   = static_cast<int>(Theme::Title::MAIN_BUTTON_HEIGHT  * scale);
-    const int smallBtnW  = static_cast<int>(Theme::Title::SMALL_BUTTON_WIDTH  * scale);
-    const int smallBtnH  = static_cast<int>(Theme::Title::SMALL_BUTTON_HEIGHT * scale);
-    const int bannerW    = static_cast<int>(Theme::Title::BANNER_WIDTH         * scale);
-    const int bannerH    = static_cast<int>(Theme::Title::BANNER_HEIGHT        * scale);
-    const int bannerGap  = static_cast<int>(24 * scale);
-    const int buttonGap  = static_cast<int>(16 * scale);
-    const int smallRowGap = static_cast<int>(12 * scale);
+    const int padX     = static_cast<int>(70  * scale);
+    const int padY     = static_cast<int>(55  * scale);
+    const int indent   = static_cast<int>(22  * scale);
+    const int titleGap = static_cast<int>(44  * scale);
+    const int btnGap   = static_cast<int>(16  * scale);
+    const int groupGap = static_cast<int>(30  * scale);
 
-    startButton.w     = mainBtnW;   startButton.h     = mainBtnH;
-    BuildDeckButton.w = mainBtnW;   BuildDeckButton.h = mainBtnH;
-    OpenPacksButton.w = mainBtnW;   OpenPacksButton.h = mainBtnH;
-    ShopButton.w      = mainBtnW;   ShopButton.h      = mainBtnH;
-    logoutButton.w    = smallBtnW;  logoutButton.h    = smallBtnH;
-    settingsButton.w  = smallBtnW;  settingsButton.h  = smallBtnH;
-    quitButton.w      = smallBtnW;  quitButton.h      = smallBtnH;
-    titleBanner.w     = bannerW;    titleBanner.h     = bannerH;
+    titlePos = {padX, padY};
 
-    const int buttonsTotalH = (mainBtnH * 4) + (buttonGap * 3) + smallBtnH;
-    const int totalH        = bannerH + bannerGap + buttonsTotalH;
-    int topY = (screenH - totalH) / 2;
-    if (topY < static_cast<int>(20 * scale)) topY = static_cast<int>(20 * scale);
+    int titleH = static_cast<int>(64 * scale);
+    if (titleFont) {
+        int tw = 0;
+        TTF_SizeText(titleFont, "Archcast", &tw, &titleH);
+    }
 
-    const int centerX = screenW / 2;
+    const int btnX = padX + indent;
+    int       btnY = padY + titleH + titleGap;
 
-    titleBanner.x     = centerX - (bannerW / 2);
-    titleBanner.y     = topY;
+    auto nextRect = [&](const std::string& label, int extraGap = 0) -> SDL_Rect {
+        btnY += extraGap;
+        SDL_Rect r = RenderMenuButton::measure(menuFont, label, btnX, btnY);
+        if (r.h < 4) r.h = static_cast<int>(32 * scale);
+        btnY += r.h + btnGap;
+        return r;
+    };
 
-    startButton.x     = centerX - (mainBtnW / 2);
-    startButton.y     = titleBanner.y + bannerH + bannerGap;
+    startButton     = nextRect("Start Game");
+    BuildDeckButton = nextRect("Build Deck");
+    OpenPacksButton = nextRect("Open Packs");
+    ShopButton      = nextRect("Coin Shop");
+    settingsButton  = nextRect("Settings",  groupGap);
+    logoutButton    = nextRect("Logout");
+    quitButton      = nextRect("Quit Game");
 
-    BuildDeckButton.x = startButton.x;
-    BuildDeckButton.y = startButton.y + mainBtnH + buttonGap;
+    buttonAreaRight = std::max({
+        startButton.x     + startButton.w,
+        BuildDeckButton.x + BuildDeckButton.w,
+        OpenPacksButton.x + OpenPacksButton.w,
+        ShopButton.x      + ShopButton.w,
+        settingsButton.x  + settingsButton.w,
+        logoutButton.x    + logoutButton.w,
+        quitButton.x      + quitButton.w
+    });
 
-    OpenPacksButton.x = startButton.x;
-    OpenPacksButton.y = BuildDeckButton.y + mainBtnH + buttonGap;
+    buttonGroupCenterY = (startButton.y + quitButton.y + quitButton.h) / 2;
 
-    ShopButton.x      = startButton.x;
-    ShopButton.y      = OpenPacksButton.y + mainBtnH + buttonGap;
-
-    // Bottom row: three small buttons side-by-side — Logout | Settings | Quit
-    const int smallTotalW = (smallBtnW * 3) + (smallRowGap * 2);
-    const int smallStartX = centerX - (smallTotalW / 2);
-    const int smallY      = ShopButton.y + mainBtnH + buttonGap;
-
-    logoutButton.x   = smallStartX;
-    logoutButton.y   = smallY;
-
-    settingsButton.x = smallStartX + smallBtnW + smallRowGap;
-    settingsButton.y = smallY;
-
-    quitButton.x     = settingsButton.x + smallBtnW + smallRowGap;
-    quitButton.y     = smallY;
-
-    // Keep the settings modal geometry in sync with the window
     updateSettingsLayout(screenW, screenH);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// updateSettingsLayout  —  modal panel, slider tracks, close button
+// updateSettingsLayout
 // ─────────────────────────────────────────────────────────────────────────────
 void Title::updateSettingsLayout(int screenW, int screenH) {
-    // Modal panel dimensions (reference: 480 × 280)
     const int modalW = static_cast<int>(480 * scale);
     const int modalH = static_cast<int>(280 * scale);
     settingsModal = {(screenW - modalW) / 2, (screenH - modalH) / 2, modalW, modalH};
 
-    // Slider shared geometry
-    const int trackH     = static_cast<int>(14 * scale);
-    const int trackPadX  = static_cast<int>(40 * scale);   // left/right inset inside modal
-    const int trackW     = modalW - (trackPadX * 2);
-    const int labelRowH  = static_cast<int>(28 * scale);   // space above each slider for the label
+    const int trackH    = static_cast<int>(14 * scale);
+    const int trackPadX = static_cast<int>(40 * scale);
+    const int trackW    = modalW - (trackPadX * 2);
+    const int labelRowH = static_cast<int>(28 * scale);
 
-    // First slider (music) — starts ~90px below the modal top
-    const int firstTrackY = settingsModal.y + static_cast<int>(90 * scale);
-    musicSliderTrack = {
-        settingsModal.x + trackPadX,
-        firstTrackY,
-        trackW,
-        trackH
-    };
+    const int firstY = settingsModal.y + static_cast<int>(90 * scale);
+    musicSliderTrack = {settingsModal.x + trackPadX, firstY, trackW, trackH};
 
-    // Second slider (SFX) — 80px below the first
-    const int secondTrackY = firstTrackY + labelRowH + trackH + static_cast<int>(40 * scale);
-    sfxSliderTrack = {
-        settingsModal.x + trackPadX,
-        secondTrackY,
-        trackW,
-        trackH
-    };
+    const int secondY = firstY + labelRowH + trackH + static_cast<int>(40 * scale);
+    sfxSliderTrack   = {settingsModal.x + trackPadX, secondY, trackW, trackH};
 
     const int closeBtnW = static_cast<int>(120 * scale);
-    const int closeBtnH = static_cast<int>(36 * scale);
+    const int closeBtnH = static_cast<int>(36  * scale);
     settingsCloseButton = {
         settingsModal.x + (settingsModal.w - closeBtnW) / 2,
         settingsModal.y + settingsModal.h - closeBtnH - static_cast<int>(16 * scale),
-        closeBtnW,
-        closeBtnH
+        closeBtnW, closeBtnH
     };
 }
 
@@ -201,103 +140,81 @@ int Title::sliderVolumeFromMouseX(const SDL_Rect& track, int mouseX) {
 // handleEvents
 // ─────────────────────────────────────────────────────────────────────────────
 void Title::handleEvents(Game& game, const SDL_Event& event) {
-    updateLayout(game.getRenderer());
+    const auto& tFonts = game.getTitleFonts();
+    updateLayout(game.getRenderer(), tFonts.large, tFonts.medium);
 
     if (event.type == SDL_QUIT) {
         game.setNextState(GameState::Quit);
         return;
     }
 
-    // ── Settings modal is open — intercept all mouse events ──────────
     if (settingsOpen) {
         switch (event.type) {
             case SDL_MOUSEBUTTONDOWN: {
                 if (event.button.button != SDL_BUTTON_LEFT) break;
-                const int mx = event.button.x;
-                const int my = event.button.y;
+                const int mx = event.button.x, my = event.button.y;
 
-                // Close button
                 if (RenderUtil::pointInRect(settingsCloseButton, mx, my)) {
-                    settingsOpen = false;
-                    draggingMusicSlider = false;
-                    draggingSFXSlider   = false;
+                    settingsOpen = draggingMusicSlider = draggingSFXSlider = false;
                     break;
                 }
-
-                // Click anywhere on the music track — jump thumb + begin drag
                 if (RenderUtil::pointInRect(musicSliderTrack, mx, my)) {
                     Audio::setMusicVolume(sliderVolumeFromMouseX(musicSliderTrack, mx));
                     draggingMusicSlider = true;
                     break;
                 }
-
-                // Click anywhere on the SFX track
                 if (RenderUtil::pointInRect(sfxSliderTrack, mx, my)) {
                     Audio::setSFXVolume(sliderVolumeFromMouseX(sfxSliderTrack, mx));
                     draggingSFXSlider = true;
                     break;
                 }
-
-                // Click outside modal closes it
-                if (!RenderUtil::pointInRect(settingsModal, mx, my)) {
+                if (!RenderUtil::pointInRect(settingsModal, mx, my))
                     settingsOpen = false;
-                }
                 break;
             }
-
-            case SDL_MOUSEMOTION: {
-                if (draggingMusicSlider) {
+            case SDL_MOUSEMOTION:
+                if (draggingMusicSlider)
                     Audio::setMusicVolume(sliderVolumeFromMouseX(musicSliderTrack, event.motion.x));
-                } else if (draggingSFXSlider) {
+                else if (draggingSFXSlider)
                     Audio::setSFXVolume(sliderVolumeFromMouseX(sfxSliderTrack, event.motion.x));
-                }
                 break;
-            }
-
-            case SDL_MOUSEBUTTONUP: {
-                if (event.button.button == SDL_BUTTON_LEFT) {
-                    draggingMusicSlider = false;
-                    draggingSFXSlider   = false;
-                }
+            case SDL_MOUSEBUTTONUP:
+                if (event.button.button == SDL_BUTTON_LEFT)
+                    draggingMusicSlider = draggingSFXSlider = false;
                 break;
-            }
-
             default: break;
         }
-        return; // swallow all events while settings is open
+        return;
     }
 
-    // ── Normal title-screen click handling ───────────────────────────
     if (event.type == SDL_MOUSEBUTTONDOWN && event.button.button == SDL_BUTTON_LEFT) {
-        const int mouseX = event.button.x;
-        const int mouseY = event.button.y;
+        const int mx = event.button.x, my = event.button.y;
 
-        auto inRect = [&](const SDL_Rect& r) {
-            return mouseX >= r.x && mouseX <= r.x + r.w &&
-                   mouseY >= r.y && mouseY <= r.y + r.h;
+        auto hit = [&](const SDL_Rect& r) {
+            return mx >= r.x && mx <= r.x + r.w &&
+                   my >= r.y && my <= r.y + r.h;
         };
 
-        if (inRect(startButton)) {
-            game.setNextState(GameState::Connecting);
-        } else if (inRect(BuildDeckButton)) {
-            game.setNextState(GameState::DeckBuilding);
-        } else if (inRect(OpenPacksButton)) {
-            game.setNextState(GameState::PackOpening);
-        } else if (inRect(ShopButton)) {
-            game.setNextState(GameState::Payment);
-        } else if (inRect(logoutButton)) {
+        if      (hit(startButton))     game.setNextState(GameState::Connecting);
+        else if (hit(BuildDeckButton)) game.setNextState(GameState::DeckBuilding);
+        else if (hit(OpenPacksButton)) game.setNextState(GameState::PackOpening);
+        else if (hit(ShopButton))      game.setNextState(GameState::Payment);
+        else if (hit(settingsButton))  settingsOpen = true;
+        else if (hit(logoutButton)) {
             RenderBackdrop::resetElapsed();
             Audio::stopMusic();
             animInitialized = false;
+            showcase.active.clear();
+            showcase.deckReady  = false;
+            showcase.prePopDone = false;
+            cardTexCache_.clear();
+            cachedTexW_ = cachedTexH_ = 0;
             game.endUserSession();
             game.getNetworkClient().disconnect();
             game.setPlayerUsername("Player");
             game.setNextState(GameState::Login);
-        } else if (inRect(settingsButton)) {
-            settingsOpen = true;
-        } else if (inRect(quitButton)) {
-            game.setNextState(GameState::Quit);
         }
+        else if (hit(quitButton))      game.setNextState(GameState::Quit);
     }
 }
 
@@ -305,77 +222,374 @@ void Title::handleEvents(Game& game, const SDL_Event& event) {
 // update
 // ─────────────────────────────────────────────────────────────────────────────
 void Title::update(Game& game) {
-    int mouseX, mouseY;
-    SDL_GetMouseState(&mouseX, &mouseY);
+    int mx, my;
+    SDL_GetMouseState(&mx, &my);
 
     hoveredButton = -1;
-    if (settingsOpen) return; // no button hover while modal is open
+    if (settingsOpen) return;
 
     auto checkHover = [&](const SDL_Rect& r, int idx) {
-        if (mouseX >= r.x && mouseX <= r.x + r.w &&
-            mouseY >= r.y && mouseY <= r.y + r.h) {
+        if (mx >= r.x && mx <= r.x + r.w && my >= r.y && my <= r.y + r.h)
             hoveredButton = idx;
-        }
     };
 
     checkHover(startButton,     0);
     checkHover(BuildDeckButton, 1);
     checkHover(OpenPacksButton, 2);
     checkHover(ShopButton,      3);
-    checkHover(logoutButton,    4);
-    checkHover(settingsButton,  5);
+    checkHover(settingsButton,  4);
+    checkHover(logoutButton,    5);
     checkHover(quitButton,      6);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// renderSlider  —  draws one labelled slider inside the settings modal
+// renderSlider
 // ─────────────────────────────────────────────────────────────────────────────
-void Title::renderSlider(SDL_Renderer*   renderer,
-                         TTF_Font*       labelFont,
-                         RenderText&     textRenderer,
-                         const SDL_Rect& track,
-                         int             volume,
+void Title::renderSlider(SDL_Renderer*      renderer,
+                         TTF_Font*          labelFont,
+                         RenderText&        textRenderer,
+                         const SDL_Rect&    track,
+                         int                volume,
                          const std::string& label) const
 {
-    // Label + percentage, e.g.  "Music Volume   89%"
-    const std::string pct    = std::to_string(static_cast<int>(volume / 1.28f)) + "%";
+    const std::string pct      = std::to_string(static_cast<int>(volume / 1.28f)) + "%";
     const std::string fullLabel = label + "   " + pct;
 
-    const int labelGap = static_cast<int>(6 * scale);
-    const int labelY   = track.y - static_cast<int>(26 * scale);
-
-    if (labelFont) {
-        int lw = 0, lh = 0;
-        TTF_SizeText(labelFont, fullLabel.c_str(), &lw, &lh);
-        // Left-align with track
+    if (labelFont)
         textRenderer.drawText(renderer, fullLabel, labelFont,
-                              Theme::TEXT_IVORY, track.x, labelY);
-    }
+                              Theme::TEXT_IVORY,
+                              track.x,
+                              track.y - static_cast<int>(26 * scale));
 
-    // Track background
     const int cornerR = track.h / 2;
     RenderUtil::drawRoundedRect(renderer, track, cornerR,
                                 SDL_Color{40, 40, 60, 200},
                                 SDL_Color{80, 80, 110, 220});
 
-    // Filled portion
-    const float ratio   = std::clamp(static_cast<float>(volume) / 128.0f, 0.0f, 1.0f);
-    const int   fillW   = static_cast<int>(track.w * ratio);
+    const float ratio = std::clamp(static_cast<float>(volume) / 128.0f, 0.0f, 1.0f);
+    const int   fillW = static_cast<int>(track.w * ratio);
     if (fillW > 0) {
         SDL_Rect fill{track.x, track.y, fillW, track.h};
         RenderUtil::drawRoundedRect(renderer, fill, cornerR,
-                                    Theme::BTN_PRIMARY,
-                                    SDL_Color{0, 0, 0, 0});
+                                    Theme::BTN_PRIMARY, SDL_Color{0, 0, 0, 0});
     }
 
-    // Thumb (circle-ish square)
-    const int thumbSz  = static_cast<int>(track.h * 1.8f);
-    const int thumbX   = track.x + fillW - thumbSz / 2;
-    const int thumbY   = track.y + (track.h - thumbSz) / 2;
-    SDL_Rect  thumb    = {thumbX, thumbY, thumbSz, thumbSz};
+    const int thumbSz = static_cast<int>(track.h * 1.8f);
+    SDL_Rect  thumb   = {track.x + fillW - thumbSz / 2,
+                         track.y + (track.h - thumbSz) / 2,
+                         thumbSz, thumbSz};
     RenderUtil::drawRoundedRect(renderer, thumb, thumbSz / 4,
-                                Theme::BTN_PRIMARY,
-                                Theme::BTN_BORDER);
+                                Theme::BTN_PRIMARY, Theme::BTN_BORDER);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// prepareShowcaseDeck
+// ─────────────────────────────────────────────────────────────────────────────
+void Title::prepareShowcaseDeck(Game& game) {
+    showcase.deck.clear();
+    showcase.cardLookup.clear();   // ← ADD THIS
+    showcase.nextIdx       = 0;
+    showcase.active.clear();
+    showcase.animTime      = 0.0f;
+    showcase.lastTick      = 0;
+    showcase.lastSpawnTime = 0.0f;
+    showcase.deckReady     = false;
+    showcase.prePopDone    = false;
+
+    const Deck& gameDeck = game.getDeck();
+    if (!gameDeck.isEmpty()) {
+        Deck copy = gameDeck.clone();
+        copy.shuffle();
+        while (!copy.isEmpty()) {
+            auto uniqueCard = copy.draw();
+            auto sharedCard = std::shared_ptr<Card>(std::move(uniqueCard));
+
+            showcase.cardLookup[sharedCard->getId()] = sharedCard;
+            showcase.deck.push_back(sharedCard);
+        }
+    }
+
+    showcase.deckReady = true;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// getOrBuildCardTex
+//
+// Returns the CachedCardTex entry for cardId, building it first if absent.
+// Pass cardId = -1 for the shared card-back-only entry (front will be null).
+//
+// Cache invalidation: if the caller detects a dimension change it must clear
+// cardTexCache_ and reset cachedTexW_/cachedTexH_ before calling here.
+// ─────────────────────────────────────────────────────────────────────────────
+Title::CachedCardTex& Title::getOrBuildCardTex(SDL_Renderer*                renderer,
+                                                Game&                        game,
+                                                int                          cardId,
+                                                const std::shared_ptr<Card>& card,
+                                                int                          texW,
+                                                int                          texH)
+{
+    auto it = cardTexCache_.find(cardId);
+    if (it != cardTexCache_.end())
+        return it->second;
+
+    // Entry not found — build it now.
+    CachedCardTex entry;
+
+    if (!renderer || !SDL_RenderTargetSupported(renderer)) {
+        cardTexCache_.emplace(cardId, std::move(entry));
+        return cardTexCache_.at(cardId);
+    }
+
+    SDL_Texture* const prevTarget = SDL_GetRenderTarget(renderer);
+
+    auto makeTarget = [&]() -> SDL_Texture* {
+        SDL_Texture* t = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888,
+                                           SDL_TEXTUREACCESS_TARGET, texW, texH);
+        if (t) SDL_SetTextureBlendMode(t, SDL_BLENDMODE_BLEND);
+        return t;
+    };
+
+    auto clearTarget = [&](SDL_Texture* t) {
+        SDL_SetRenderTarget(renderer, t);
+        SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
+        SDL_SetRenderDrawColor(renderer, 0, 0, 0, 0);
+        SDL_RenderClear(renderer);
+        SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+    };
+
+    // ── Front face (only for real cards; not the back-only sentinel) ──
+    if (card && cardId != -1) {
+        if (SDL_Texture* ft = makeTarget()) {
+            clearTarget(ft);
+            RenderText dummy;
+            const SDL_Rect cardRect{0, 0, texW, texH};
+            RenderCard::drawHandCard(renderer, dummy, *card, cardRect,
+                                     game.getUIFonts().large,
+                                     game.getUIFonts().medium);
+            entry.front = TexPtr(ft, SDL_DestroyTexture);
+        }
+    }
+
+    // ── Card back ─────────────────────────────────────────────────────
+    // Stored in every entry so each lookup has both textures without a
+    // second map hit.  The texture itself is built fresh per entry, but
+    // it's trivially cheap (no card-specific data).
+    if (SDL_Texture* bt = makeTarget()) {
+        clearTarget(bt);
+        RenderCard::drawCardBack(renderer, {0, 0, texW, texH});
+        entry.back = TexPtr(bt, SDL_DestroyTexture);
+    }
+
+    SDL_SetRenderTarget(renderer, prevTarget);
+    SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+
+    auto [ins, _] = cardTexCache_.emplace(cardId, std::move(entry));
+    return ins->second;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// renderShowcase
+//
+// Conveyor model  (unchanged from original — only texture and shading code
+// has been modified)
+// ─────────────────────────────────────────────────────────────────────────────
+void Title::renderShowcase(SDL_Renderer* renderer, Game& game,
+                           int screenW, int screenH, float elapsed)
+{
+    // ── Advance animation clock ───────────────────────────────────────
+    const Uint32 now = SDL_GetTicks();
+    if (showcase.lastTick == 0) showcase.lastTick = now;
+    showcase.animTime += static_cast<float>(now - showcase.lastTick) / 1000.0f;
+    showcase.lastTick  = now;
+
+    if (!showcase.deckReady) return;
+
+    const int texW = static_cast<int>(kShowcaseW * scale);
+    const int texH = static_cast<int>(kShowcaseH * scale);
+
+    // ── Invalidate texture cache on dimension change (window resize) ──
+    if (texW != cachedTexW_ || texH != cachedTexH_) {
+        cardTexCache_.clear();
+        cachedTexW_ = texW;
+        cachedTexH_ = texH;
+    }
+
+    // ── Conveyor X bounds (card centres) ─────────────────────────────
+    const float leftX  = static_cast<float>(buttonAreaRight)
+                         + static_cast<float>(texW) * 0.5f
+                         + 40.0f * scale;
+    const float rightX = static_cast<float>(screenW) + texW * 0.6f;
+
+    const float travelDist = rightX - leftX;
+    if (travelDist <= 0.0f) return;
+
+    // ── Derived conveyor values ───────────────────────────────────────
+    const float speed         = kCardSpeedRef * scale;
+    const float gapPx         = kCardGapRef   * scale;
+    const float spawnInterval = kCardGapRef   / kCardSpeedRef;
+    const float cardLifetime  = travelDist    / speed;
+
+    // ── Pre-populate on first call ────────────────────────────────────
+    if (!showcase.prePopDone) {
+        const int numCards = static_cast<int>(travelDist / gapPx) + 2;
+        for (int i = 0; i < numCards; ++i) {
+            ActiveCard ac;
+            if (!showcase.deck.empty()) {
+                ac.cardId = showcase.deck[showcase.nextIdx % showcase.deck.size()]->getId();
+                showcase.nextIdx++;
+            }
+            ac.birthTime  = -static_cast<float>(i) * spawnInterval;
+            ac.flipOffset = static_cast<float>(i) * 2.1f;
+            showcase.active.push_back(std::move(ac));
+        }
+        showcase.lastSpawnTime = 0.0f;
+        showcase.prePopDone    = true;
+    }
+
+    // ── Spawn one new card each interval ─────────────────────────────
+    if (showcase.animTime - showcase.lastSpawnTime >= spawnInterval) {
+        ActiveCard ac;
+        if (!showcase.deck.empty()) {
+            ac.cardId = showcase.deck[showcase.nextIdx % showcase.deck.size()]->getId();
+            showcase.nextIdx++;
+        }
+        ac.birthTime  = showcase.animTime;
+        ac.flipOffset = static_cast<float>(showcase.nextIdx) * 1.3f;
+        showcase.active.push_back(std::move(ac));
+        showcase.lastSpawnTime = showcase.animTime;
+    }
+
+    // ── Retire cards that have fully crossed to the left ─────────────
+    showcase.active.erase(
+        std::remove_if(showcase.active.begin(), showcase.active.end(),
+            [&](const ActiveCard& ac) {
+                return (showcase.animTime - ac.birthTime) >= cardLifetime;
+            }),
+        showcase.active.end());
+
+    // ── Global fade-in ────────────────────────────────────────────────
+    const float fadeDelay  = 0.55f;
+    const float fadeDur    = 0.50f;
+    const float fadeT      = std::clamp((elapsed - fadeDelay) / fadeDur, 0.0f, 1.0f);
+    const float globalFade = 1.0f - (1.0f - fadeT) * (1.0f - fadeT);
+    if (globalFade < 0.01f) return;
+
+    // ── Render — oldest card first (back-to-front) ────────────────────
+    for (auto& ac : showcase.active) {
+        const float age   = showcase.animTime - ac.birthTime;
+        const float phase = (age * speed) / travelDist;
+        if (phase < 0.0f || phase >= 1.0f) continue;
+
+        // ── Flip geometry ─────────────────────────────────────────────
+        const float cosA       = std::cos(showcase.animTime * kFlipSpeed + ac.flipOffset);
+        const bool  showFront  = (cosA >= 0.0f);
+        const float widthFactor = std::abs(cosA);
+        if (widthFactor < 0.01f) continue;
+
+        // ── Look up (or build) cached textures ────────────────────────
+        const int cardId = ac.cardId;
+        auto card = getCardById(cardId);
+
+        CachedCardTex& cached = getOrBuildCardTex(renderer, game,
+                                                cardId, card,
+                                                texW, texH);
+
+        SDL_Texture* activeTex = showFront ? cached.front.get() : cached.back.get();
+        if (!activeTex) activeTex = cached.back.get() ? cached.back.get()
+                                                       : cached.front.get();
+        if (!activeTex) continue;
+
+        // ── Per-card alpha (fade in/out) × global fade ────────────────
+        float cardAlpha = 1.0f;
+        if (phase < kCardFadeInPhase)
+            cardAlpha = phase / kCardFadeInPhase;
+        else if (phase > kCardFadeOutPhase)
+            cardAlpha = 1.0f - (phase - kCardFadeOutPhase)
+                              / (1.0f - kCardFadeOutPhase);
+        cardAlpha = std::clamp(cardAlpha * globalFade, 0.0f, 1.0f);
+        if (cardAlpha < 0.01f) continue;
+
+        // ── Card centre ───────────────────────────────────────────────
+        const float cx = rightX + (leftX - rightX) * phase;
+        const float floatOffY = std::sin(showcase.animTime * kFloatSpeed + ac.flipOffset)
+                                * kFloatAmpRef * scale;
+        const float cy = static_cast<float>(buttonGroupCenterY) + floatOffY;
+
+        // ── Geometry: tilt + flip squish ──────────────────────────────
+        const float halfW0 = texW * 0.5f;
+        const float halfH0 = texH * 0.5f;
+
+        constexpr float kPi = 3.14159265358979323846f;
+        const float axisAngle = kFlipAxisAngleDeg * (kPi / 180.0f);
+        const float cosT      = std::cos(axisAngle);
+        const float sinT      = std::sin(axisAngle);
+
+        auto rotate = [&](float lx, float ly) -> SDL_FPoint {
+            return { cx + lx * cosT - ly * sinT,
+                     cy + lx * sinT + ly * cosT };
+        };
+
+        SDL_FPoint A = rotate(-halfW0, -halfH0);
+        SDL_FPoint B = rotate( halfW0, -halfH0);
+        SDL_FPoint C = rotate( halfW0,  halfH0);
+        SDL_FPoint D = rotate(-halfW0,  halfH0);
+
+        const float axisX = std::sin(axisAngle);
+        const float axisY = std::cos(axisAngle);
+        for (SDL_FPoint* p : {&A, &B, &C, &D}) {
+            const float px    = p->x - cx;
+            const float py    = p->y - cy;
+            const float dot   = px * axisX + py * axisY;
+            const float parX  = dot * axisX;
+            const float parY  = dot * axisY;
+            const float perpX = px - parX;
+            const float perpY = py - parY;
+            p->x = cx + parX + perpX * widthFactor;
+            p->y = cy + parY + perpY * widthFactor;
+        }
+
+        // ── Directional shading ───────────────────────────────────────
+        //
+        // Old code used widthFactor (abs(cosA)) as the brightness driver,
+        // which is symmetrical: both the front and back face go dark at the
+        // flip midpoint, making the card appear to vanish.
+        //
+        // New approach: measure how directly the *visible* face is turned
+        // toward the viewer.
+        //   cosA  +1 → front fully face-on  (bright)
+        //   cosA   0 → edge-on              (kMinBrightness)
+        //   cosA  -1 → back fully face-on   (bright)
+        //
+        // faceToViewer is always in [0, 1] for the face we are drawing,
+        // so brightness climbs from kMinBrightness at the edge toward 1.0
+        // as either face turns to face the camera.  The shadow therefore
+        // favours the side of the card facing away, never both sides at once.
+        constexpr float kMinBrightness = 0.52f;
+        const float faceToViewer = showFront ? cosA : -cosA;  // 0..1
+        const float bright = kMinBrightness
+                             + (1.0f - kMinBrightness) * faceToViewer;
+        const Uint8 b = static_cast<Uint8>(std::clamp(bright, 0.0f, 1.0f) * 255.0f);
+        const Uint8 a = static_cast<Uint8>(cardAlpha * 255.0f);
+        const SDL_Color col{b, b, b, a};
+
+        // Mirror U when showing back so the texture reads correctly.
+        const float u0 = showFront ? 0.0f : 1.0f;
+        const float u1 = showFront ? 1.0f : 0.0f;
+
+        const SDL_Vertex verts[4] = {
+            {A, col, {u0, 0.0f}},
+            {B, col, {u1, 0.0f}},
+            {C, col, {u1, 1.0f}},
+            {D, col, {u0, 1.0f}},
+        };
+        const int indices[6] = {0, 1, 2, 0, 2, 3};
+        SDL_RenderGeometry(renderer, activeTex, verts, 4, indices, 6);
+    }
+}
+
+std::shared_ptr<Card> Title::getCardById(int cardId) const {
+    auto it = showcase.cardLookup.find(cardId);
+    return (it != showcase.cardLookup.end()) ? it->second : nullptr;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -386,14 +600,13 @@ void Title::render(Game& game) {
     const RenderText::FontSet& titleFonts = game.getTitleFonts();
     const RenderText::FontSet& uiFonts    = game.getUIFonts();
 
-    updateLayout(renderer);
+    updateLayout(renderer, titleFonts.large, titleFonts.medium);
 
     int screenW, screenH;
     SDL_GetRendererOutputSize(renderer, &screenW, &screenH);
 
     const bool animationsEnabled = AnimationFlag::getAnimationsEnabled();
 
-    // ── animation timer ──────────────────────────────────────────────
     float elapsed = 999.0f;
     if (animationsEnabled) {
         if (!animInitialized) {
@@ -403,151 +616,119 @@ void Title::render(Game& game) {
         elapsed = (SDL_GetTicks() - animStartTick) / 1000.0f;
     }
 
-    // ── background + vignette ────────────────────────────────────────
-    if (animationsEnabled) {
+    if (animationsEnabled)
         RenderBackdrop::drawTitleBackdrop(renderer, screenW, screenH);
-    } else {
+    else
         RenderBackdrop::drawBackgroundWithVignette(
             renderer, screenW, screenH,
-            Theme::BG,
-            SDL_Color{0, 0, 0, 255},
-            80, 1.5f, 120
-        );
-    }
+            Theme::BG, SDL_Color{0, 0, 0, 255},
+            80, 1.5f, 120);
 
-    // ── banner animation ─────────────────────────────────────────────
-    float bannerT     = std::min(elapsed / 0.6f, 1.0f);
-    float bannerEase  = 1.0f - (1.0f - bannerT) * (1.0f - bannerT);
-    Uint8 bannerAlpha = static_cast<Uint8>(bannerEase * 255);
-    int   bannerOffY  = static_cast<int>((1.0f - bannerEase) * -40);
-
-    SDL_Rect  animBanner     = {titleBanner.x, titleBanner.y + bannerOffY,
-                                titleBanner.w, titleBanner.h};
-    SDL_Color animBannerFill = {Theme::BANNER_FILL.r,   Theme::BANNER_FILL.g,
-                                Theme::BANNER_FILL.b,   bannerAlpha};
-    SDL_Color animGold       = {Theme::BANNER_BORDER.r, Theme::BANNER_BORDER.g,
-                                Theme::BANNER_BORDER.b, bannerAlpha};
-    SDL_Color animText       = {Theme::BANNER_TEXT.r,   Theme::BANNER_TEXT.g,
-                                Theme::BANNER_TEXT.b,   bannerAlpha};
-    SDL_Color animGlow       = {Theme::BANNER_GLOW.r,   Theme::BANNER_GLOW.g,
-                                Theme::BANNER_GLOW.b,   bannerAlpha};
-
-    if (bannerAlpha > 0) {
-        RenderBanner::drawBanner(renderer, animBanner, "Archcast",
-                                 titleFonts.large, animBannerFill, animGold,
-                                 animText, animGlow);
-    }
-
-    // ── button slide-in animation helper ─────────────────────────────
-    auto buttonSlide = [&](int index) -> std::pair<Uint8, int> {
-        float delay = 0.3f + index * 0.15f;
-        float t     = std::min(std::max((elapsed - delay) / 0.5f, 0.0f), 1.0f);
-        float ease  = 1.0f - (1.0f - t) * (1.0f - t);
-        return {static_cast<Uint8>(ease * 255), static_cast<int>((1.0f - ease) * -40)};
-    };
-
-    auto drawBtn = [&](const SDL_Rect& rect, SDL_Color fill,
-                       const std::string& text, int index)
+    // ── Title text with glow ──────────────────────────────────────────
     {
-        auto [alpha, offY] = buttonSlide(index);
-        if (alpha == 0) return;
+        const float t     = std::min(elapsed / 0.6f, 1.0f);
+        const float ease  = 1.0f - (1.0f - t) * (1.0f - t);
+        const Uint8 alpha = static_cast<Uint8>(ease * 255);
+        const int   offY  = static_cast<int>((1.0f - ease) * -30);
 
-        bool isHovered = (hoveredButton == index);
-        auto& cache    = cachedButtons[static_cast<std::size_t>(index)];
+        if (alpha > 0 && titleFonts.large) {
+            SDL_Surface* surf = TTF_RenderText_Blended(
+                titleFonts.large, "Archcast", {255, 255, 255, 255});
+            if (surf) {
+                SDL_Texture* tex = SDL_CreateTextureFromSurface(renderer, surf);
+                SDL_FreeSurface(surf);
+                if (tex) {
+                    int tw = 0, th = 0;
+                    SDL_QueryTexture(tex, nullptr, nullptr, &tw, &th);
+                    SDL_SetTextureBlendMode(tex, SDL_BLENDMODE_BLEND);
 
-        if (!cache.texture      ||
-            cache.w       != rect.w    ||
-            cache.h       != rect.h    ||
-            cache.label   != text      ||
-            cache.hovered != isHovered ||
-            cache.lastScale != scale)
-        {
-            if (cache.texture) SDL_DestroyTexture(cache.texture);
+                    struct GlowPass { int spread; Uint8 a; };
+                    constexpr GlowPass passes[] = {{5, 12}, {3, 20}, {2, 30}};
 
-            const int sOff = Theme::Effects::SHADOW_OFFSET;
+                    SDL_SetTextureColorMod(tex,
+                        Theme::BANNER_GLOW.r,
+                        Theme::BANNER_GLOW.g,
+                        Theme::BANNER_GLOW.b);
 
-            SDL_Texture* tex = SDL_CreateTexture(
-                renderer,
-                SDL_PIXELFORMAT_RGBA8888,
-                SDL_TEXTUREACCESS_TARGET,
-                rect.w + sOff,
-                rect.h + sOff
-            );
-            if (!tex) return;
+                    for (const auto& p : passes) {
+                        SDL_SetTextureAlphaMod(tex,
+                            static_cast<Uint8>(p.a * alpha / 255));
+                        for (int dx = -p.spread; dx <= p.spread; dx += p.spread) {
+                            for (int dy = -p.spread; dy <= p.spread; dy += p.spread) {
+                                if (dx == 0 && dy == 0) continue;
+                                SDL_Rect d{titlePos.x + dx,
+                                           titlePos.y + offY + dy, tw, th};
+                                SDL_RenderCopy(renderer, tex, nullptr, &d);
+                            }
+                        }
+                    }
 
-            SDL_SetTextureBlendMode(tex, SDL_BLENDMODE_BLEND);
-            SDL_SetRenderTarget(renderer, tex);
-            SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
-            SDL_SetRenderDrawColor(renderer, 0, 0, 0, 0);
-            SDL_RenderClear(renderer);
+                    SDL_SetTextureColorMod(tex,
+                        Theme::BANNER_TEXT.r,
+                        Theme::BANNER_TEXT.g,
+                        Theme::BANNER_TEXT.b);
+                    SDL_SetTextureAlphaMod(tex, alpha);
+                    SDL_Rect dst{titlePos.x, titlePos.y + offY, tw, th};
+                    SDL_RenderCopy(renderer, tex, nullptr, &dst);
 
-            SDL_Rect shadowLocal{sOff, sOff, rect.w, rect.h};
-            RenderUtil::drawRoundedShadow(renderer, shadowLocal,
-                Theme::BTN_RADIUS, 0, Theme::Effects::SHADOW_COLOR);
-
-            SDL_Rect local{0, 0, rect.w, rect.h};
-            RenderButton::Style style{};
-            style.fill       = fill;
-            style.border     = Theme::BTN_BORDER;
-            style.text       = Theme::BTN_TEXT;
-            style.drawShadow = false;
-
-            RenderButton::drawButton(renderer, local, text, uiFonts.large, style, isHovered);
-
-            SDL_SetRenderTarget(renderer, nullptr);
-
-            cache.texture   = tex;
-            cache.w         = rect.w;
-            cache.h         = rect.h;
-            cache.label     = text;
-            cache.hovered   = isHovered;
-            cache.lastScale = scale;
+                    SDL_DestroyTexture(tex);
+                }
+            }
         }
+    }
 
-        if (!cache.texture) return;
+    // ── Menu buttons (staggered slide-in) ────────────────────────────
+    auto drawMenuBtn = [&](const SDL_Rect& rect,
+                           const std::string& label,
+                           int index)
+    {
+        const float delay = 0.25f + index * 0.10f;
+        const float t     = std::min(std::max((elapsed - delay) / 0.4f, 0.0f), 1.0f);
+        const float ease  = 1.0f - (1.0f - t) * (1.0f - t);
+        const Uint8 alpha = static_cast<Uint8>(ease * 255);
+        const int   offY  = static_cast<int>((1.0f - ease) * -20);
 
-        const int sOff = Theme::Effects::SHADOW_OFFSET;
-        SDL_SetTextureAlphaMod(cache.texture, alpha);
-        SDL_Rect dst{rect.x, rect.y + offY, rect.w + sOff, rect.h + sOff};
-        SDL_RenderCopy(renderer, cache.texture, nullptr, &dst);
+        if (alpha == 0 || !titleFonts.medium) return;
+
+        RenderMenuButton::draw(renderer,
+                               rect.x, rect.y + offY,
+                               label, titleFonts.medium,
+                               hoveredButton == index,
+                               alpha);
     };
 
-    // Draw all seven buttons
-    // Indices must match cachedButtons and hoveredButton checks in update()
-    drawBtn(startButton,     Theme::BTN_START,     "Start Game", 0);
-    drawBtn(BuildDeckButton, Theme::BTN_BUILD,      "Build Deck", 1);
-    drawBtn(OpenPacksButton, Theme::BTN_PACKS,      "Open Packs", 2);
-    drawBtn(ShopButton,      Theme::BTN_PRIMARY,    "Coin Shop",  3);
-    drawBtn(logoutButton,    Theme::BTN_CONNECT,    "Logout",     4);
-    drawBtn(settingsButton,  Theme::BTN_SECONDARY,  "Settings",   5);
-    drawBtn(quitButton,      Theme::BTN_QUIT,       "Quit Game",  6);
+    drawMenuBtn(startButton,     "Play",       0);
+    drawMenuBtn(BuildDeckButton, "Deck",       1);
+    drawMenuBtn(OpenPacksButton, "Open Packs", 2);
+    drawMenuBtn(ShopButton,      "Coin Shop",  3);
+    drawMenuBtn(settingsButton,  "Settings",   4);
+    drawMenuBtn(logoutButton,    "Logout",     5);
+    drawMenuBtn(quitButton,      "Quit Game",  6);
 
-    // ── Settings modal ───────────────────────────────────────────────
+    // ── Showcase card conveyor ────────────────────────────────────────
+    renderShowcase(renderer, game, screenW, screenH, elapsed);
+
+    // ── Settings modal ────────────────────────────────────────────────
     if (settingsOpen) {
-        // Dim overlay
         SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
         SDL_SetRenderDrawColor(renderer, 0, 0, 0, 160);
         SDL_RenderFillRect(renderer, nullptr);
 
-        // Modal panel
         RenderUtil::drawRoundedRect(renderer, settingsModal,
                                     static_cast<int>(14 * scale),
-                                    Theme::PANEL_FILL,
-                                    Theme::BTN_BORDER);
+                                    Theme::PANEL_FILL, Theme::BTN_BORDER);
 
-        // ── Title ─────────────────────────────────────────────────
         const char* modalTitle = "Settings";
         int titleW = 0, titleH = 0;
-        if (titleFonts.medium) {
+        if (titleFonts.medium)
             TTF_SizeText(titleFonts.medium, modalTitle, &titleW, &titleH);
-        }
+
         RenderText textRenderer;
         textRenderer.drawText(renderer, modalTitle, titleFonts.medium,
                               Theme::TEXT_IVORY,
                               settingsModal.x + (settingsModal.w - titleW) / 2,
                               settingsModal.y + static_cast<int>(20 * scale));
 
-        // ── Close button  ( × ) ──────────────────────────────────
         int mouseX, mouseY;
         SDL_GetMouseState(&mouseX, &mouseY);
         const bool hoverClose = RenderUtil::pointInRect(settingsCloseButton, mouseX, mouseY);
@@ -558,25 +739,11 @@ void Title::render(Game& game) {
         closeStyle.text   = Theme::BTN_TEXT;
         closeStyle.radius = static_cast<int>(8 * scale);
         RenderButton::drawButton(renderer, settingsCloseButton, "Close",
-                                uiFonts.medium, closeStyle, hoverClose, false);
+                                 uiFonts.medium, closeStyle, hoverClose, false);
 
-        // ── Volume sliders ───────────────────────────────────────
         renderSlider(renderer, uiFonts.medium, textRenderer,
                      musicSliderTrack, Audio::getMusicVolume(), "Music Volume");
-
         renderSlider(renderer, uiFonts.medium, textRenderer,
                      sfxSliderTrack,   Audio::getSFXVolume(),   "SFX Volume");
-    }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// ~Title
-// ─────────────────────────────────────────────────────────────────────────────
-Title::~Title() {
-    for (auto& cache : cachedButtons) {
-        if (cache.texture) {
-            SDL_DestroyTexture(cache.texture);
-            cache.texture = nullptr;
-        }
     }
 }

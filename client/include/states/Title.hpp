@@ -1,10 +1,17 @@
 #pragma once
 
-#include "StateInterface.hpp"
-#include "render/RenderText.hpp"
 #include <SDL2/SDL.h>
-#include <array>
+#include <SDL2/SDL_ttf.h>
+#include <memory>
+#include <vector>
 #include <string>
+#include <algorithm>
+#include <unordered_map>
+
+#include "states/StateInterface.hpp"
+#include "render/RenderText.hpp"
+#include "objects/Card.h"
+#include "render/Theme.hpp"
 
 class Game;
 
@@ -14,70 +21,118 @@ public:
     void handleEvents(Game& game, const SDL_Event& event) override;
     void update(Game& game) override;
     void render(Game& game) override;
-    ~Title() override;
 
 private:
-    // ── Layout ───────────────────────────────────────────────────────
-    void updateLayout(SDL_Renderer* renderer);
+    // ─── SDL texture RAII handle ──────────────────────────────────────
+    using TexPtr = std::unique_ptr<SDL_Texture, decltype(&SDL_DestroyTexture)>;
 
-    SDL_Rect startButton{};
-    SDL_Rect BuildDeckButton{};
-    SDL_Rect OpenPacksButton{};
-    SDL_Rect ShopButton{};
-    SDL_Rect logoutButton{};
-    SDL_Rect settingsButton{};   // NEW — sits between logout and quit
-    SDL_Rect quitButton{};
-    SDL_Rect titleBanner{};
+    // ─── Showcase animation constants ─────────────────────────────────
+    static constexpr float kShowcaseW        = Theme::Title::CARD_WIDTH;
+    static constexpr float kShowcaseH        = kShowcaseW * Theme::PREVIEW_ASPECT_RATIO;
 
-    // ── Button texture cache ─────────────────────────────────────────
-    // Indices: 0 Start | 1 Build | 2 Packs | 3 Shop | 4 Logout | 5 Settings | 6 Quit
-    struct ButtonCache {
-        SDL_Texture* texture = nullptr;
-        int          w       = 0;
-        int          h       = 0;
-        std::string  label;
-        bool         hovered  = false;
-        float        lastScale = 0.0f;
+    static constexpr float kFlipSpeed        = 0.85f;   // ← tune flip cadence here
+    static constexpr float kFlipAxisAngleDeg = 15.0f;
+    static constexpr float kFloatSpeed       = 0.75f;
+    static constexpr float kFloatAmpRef      = 12.0f;   // pixels at ref scale
+
+    static constexpr float kCardSpeedRef     = 150.0f;  // ← tune travel speed here
+    static constexpr float kCardGapRef       = 280.0f;  // ← tune inter-card gap here
+
+    // ── Fade thresholds (as fraction of total travel, 0 = right, 1 = left) ──
+    static constexpr float kCardFadeInPhase  = 0.10f;   // fully opaque by this phase
+    static constexpr float kCardFadeOutPhase = 0.78f;   // begin fade-out at this phase
+
+    // ─── Texture cache ────────────────────────────────────────────────
+    // Keyed by card ID.  The shared card back is stored under key -1.
+    // The whole cache is invalidated whenever target texture dimensions
+    // change (window resize), so entries are always the right pixel size.
+    struct CachedCardTex {
+        TexPtr front { nullptr, SDL_DestroyTexture };
+        TexPtr back  { nullptr, SDL_DestroyTexture };
     };
-    std::array<ButtonCache, 7> cachedButtons{};
+    std::unordered_map<int, CachedCardTex> cardTexCache_;
+    int cachedTexW_ = 0;   // dimensions at which the cache was last built
+    int cachedTexH_ = 0;
 
-    int hoveredButton = -1;
+    // ─── Per-card conveyor state ──────────────────────────────────────
+    // Textures are NOT stored here; look them up in cardTexCache_ by card ID.
+    struct ActiveCard {
+        int cardId;
+        float birthTime  = 0.0f;   // showcase.animTime when card entered from right
+        float flipOffset = 0.0f;   // per-card phase offset for flip + float bob
 
-    SDL_Texture* buildButtonTexture(SDL_Renderer* renderer,
-                                    const SDL_Rect& rect,
-                                    const std::string& text,
-                                    SDL_Color fill,
-                                    bool hovered,
-                                    const RenderText::FontSet& fonts);
+        ActiveCard() = default;
+        ActiveCard(ActiveCard&&) = default;
+        ActiveCard& operator=(ActiveCard&&) = default;
+        ActiveCard(const ActiveCard&) = delete;
+        ActiveCard& operator=(const ActiveCard&) = delete;
+    };
 
-    // ── Animation ────────────────────────────────────────────────────
+    // ─── Whole-showcase state ─────────────────────────────────────────
+    struct ShowcaseState {
+        std::vector<std::shared_ptr<Card>> deck;          // shuffled full deck
+        std::unordered_map<int, std::shared_ptr<Card>> cardLookup; // ← ADD THIS
+
+        int                                nextIdx       = 0;
+        std::vector<ActiveCard>            active;
+        float                              animTime      = 0.0f;
+        Uint32                             lastTick      = 0;
+        float                              lastSpawnTime = 0.0f;
+        bool                               deckReady     = false;
+        bool                               prePopDone    = false;
+    } showcase;
+    std::shared_ptr<Card> getCardById(int cardId) const;
+    
+    // ─── Layout ───────────────────────────────────────────────────────
+    SDL_Point titlePos          {};
+    SDL_Rect  startButton       {};
+    SDL_Rect  BuildDeckButton   {};
+    SDL_Rect  OpenPacksButton   {};
+    SDL_Rect  ShopButton        {};
+    SDL_Rect  settingsButton    {};
+    SDL_Rect  logoutButton      {};
+    SDL_Rect  quitButton        {};
+    int       buttonGroupCenterY = 0;
+    int       buttonAreaRight    = 0;
+    int       hoveredButton      = -1;
+
+    // ─── Settings modal ───────────────────────────────────────────────
+    bool     settingsOpen        = false;
+    bool     draggingMusicSlider = false;
+    bool     draggingSFXSlider   = false;
+    SDL_Rect settingsModal       {};
+    SDL_Rect musicSliderTrack    {};
+    SDL_Rect sfxSliderTrack      {};
+    SDL_Rect settingsCloseButton {};
+
+    // ─── Entry animation ──────────────────────────────────────────────
     bool   animInitialized = false;
     Uint32 animStartTick   = 0;
 
-    // ── Settings modal ───────────────────────────────────────────────
-    bool     settingsOpen        = false;
-    SDL_Rect settingsModal{};
-    SDL_Rect settingsCloseButton{};
-
-    // Slider tracks (the full bar the thumb slides along)
-    SDL_Rect musicSliderTrack{};
-    SDL_Rect sfxSliderTrack{};
-
-    // Active drag state — only one slider can be dragged at a time
-    bool draggingMusicSlider = false;
-    bool draggingSFXSlider   = false;
-
-    // Helper: recompute modal / slider rects from current screen size
+    // ─── Private helpers ──────────────────────────────────────────────
+    void updateLayout(SDL_Renderer* renderer, TTF_Font* titleFont, TTF_Font* menuFont);
     void updateSettingsLayout(int screenW, int screenH);
 
-    // Helper: clamp mouse X into [track.x, track.x+track.w] → volume 0-128
     static int sliderVolumeFromMouseX(const SDL_Rect& track, int mouseX);
 
-    // Helper: render a single labelled volume slider
-    void renderSlider(SDL_Renderer* renderer,
-                      TTF_Font*     labelFont,
-                      RenderText&   textRenderer,
-                      const SDL_Rect& track,
-                      int            volume,
+    void renderSlider(SDL_Renderer*      renderer,
+                      TTF_Font*          labelFont,
+                      RenderText&        textRenderer,
+                      const SDL_Rect&    track,
+                      int                volume,
                       const std::string& label) const;
+
+    /// Shuffle the player's deck into showcase.deck and reset conveyor state.
+    void prepareShowcaseDeck(Game& game);
+
+    /// Return (building if necessary) the cached texture entry for cardId.
+    /// Pass cardId = -1 to get/build the shared card-back entry.
+    CachedCardTex& getOrBuildCardTex(SDL_Renderer* renderer, Game& game,
+                                     int cardId,
+                                     const std::shared_ptr<Card>& card,
+                                     int texW, int texH);
+
+    /// Advance the conveyor clock, spawn/expire cards, and draw them.
+    void renderShowcase(SDL_Renderer* renderer, Game& game,
+                        int screenW, int screenH, float elapsed);
 };
