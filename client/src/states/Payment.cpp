@@ -632,7 +632,7 @@ bool Payment::requestCheckoutSession(Game& game, const ShopPackage::Package& pac
     const std::string host = EnvUtil::getCardsServiceHost();
     const int         port = EnvUtil::getCardsServicePort();
     const std::string path = "/cards/payments/checkout-session";
-    const std::string callbackScheme = (EnvUtil::isAwsEnabled() || port == 443) ? "https" : "http";
+    const std::string callbackScheme = "https";
 
     std::ostringstream callbackSuccess;
     callbackSuccess << callbackScheme << "://" << host << ":" << port << "/cards/payments/checkout-complete?status=success";

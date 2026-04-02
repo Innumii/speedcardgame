@@ -23,6 +23,11 @@ WORKDIR /app
 # Copy the compiled binary from the builder stage
 COPY --from=builder /app/main .
 COPY --from=builder /app/cards.csv ./cards.csv
+COPY --from=builder /app/assets/cards ./assets/cards
+
+# Copy TLS certificates into the runtime image so the service
+# uses the shared CA-signed server certificate/key for HTTPS.
+COPY --from=builder /app/certs ./certs
 
 # Copy entrypoint for TLS secret materialization
 COPY entrypoint.sh /entrypoint.sh
