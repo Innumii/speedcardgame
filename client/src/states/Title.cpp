@@ -154,16 +154,6 @@ void Title::updateSettingsLayout(int screenW, int screenH) {
     const int modalH = static_cast<int>(280 * scale);
     settingsModal = {(screenW - modalW) / 2, (screenH - modalH) / 2, modalW, modalH};
 
-    // Close button — top-right corner of the modal
-    const int closeSz = static_cast<int>(36 * scale);
-    const int closePad = static_cast<int>(10 * scale);
-    settingsCloseButton = {
-        settingsModal.x + settingsModal.w - closeSz - closePad,
-        settingsModal.y + closePad,
-        closeSz,
-        closeSz
-    };
-
     // Slider shared geometry
     const int trackH     = static_cast<int>(14 * scale);
     const int trackPadX  = static_cast<int>(40 * scale);   // left/right inset inside modal
@@ -186,6 +176,15 @@ void Title::updateSettingsLayout(int screenW, int screenH) {
         secondTrackY,
         trackW,
         trackH
+    };
+
+    const int closeBtnW = static_cast<int>(120 * scale);
+    const int closeBtnH = static_cast<int>(36 * scale);
+    settingsCloseButton = {
+        settingsModal.x + (settingsModal.w - closeBtnW) / 2,
+        settingsModal.y + settingsModal.h - closeBtnH - static_cast<int>(16 * scale),
+        closeBtnW,
+        closeBtnH
     };
 }
 
@@ -374,7 +373,7 @@ void Title::renderSlider(SDL_Renderer*   renderer,
     const int thumbX   = track.x + fillW - thumbSz / 2;
     const int thumbY   = track.y + (track.h - thumbSz) / 2;
     SDL_Rect  thumb    = {thumbX, thumbY, thumbSz, thumbSz};
-    RenderUtil::drawRoundedRect(renderer, thumb, thumbSz / 2,
+    RenderUtil::drawRoundedRect(renderer, thumb, thumbSz / 4,
                                 Theme::BTN_PRIMARY,
                                 Theme::BTN_BORDER);
 }
@@ -557,9 +556,9 @@ void Title::render(Game& game) {
         closeStyle.fill   = hoverClose ? Theme::BTN_QUIT : Theme::BTN_SECONDARY;
         closeStyle.border = Theme::BTN_BORDER;
         closeStyle.text   = Theme::BTN_TEXT;
-        closeStyle.radius = settingsCloseButton.w / 2;
-        RenderButton::drawButton(renderer, settingsCloseButton, "X",
-                                 uiFonts.medium, closeStyle, hoverClose, false);
+        closeStyle.radius = static_cast<int>(8 * scale);
+        RenderButton::drawButton(renderer, settingsCloseButton, "Close",
+                                uiFonts.medium, closeStyle, hoverClose, false);
 
         // ── Volume sliders ───────────────────────────────────────
         renderSlider(renderer, uiFonts.medium, textRenderer,

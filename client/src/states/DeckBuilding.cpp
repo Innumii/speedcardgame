@@ -18,6 +18,7 @@
 #include <iostream>
 #include <algorithm>
 #include <cstdlib>
+#include <render/RenderCard.hpp>
 
 
 namespace {
@@ -65,12 +66,17 @@ bool DeckBuilding::refreshFromService(Game& game) {
 }
 
 void DeckBuilding::enter(Game& game) {
+    RenderCard::clearRenderCache();
     refreshFromService(game);
     collectionPage = 0;
     deckScrollOffset = 0;
     statusMessage.clear();
     statusMessageUntil = 0;
-
+    hoverIndex = static_cast<std::size_t>(-1);
+    hoverStartTick = SDL_GetTicks();
+    dragging = false;
+    draggingFromDeck = false;
+    draggedCardIndex = -1;
 }
 
 void DeckBuilding::exit(Game& game) {

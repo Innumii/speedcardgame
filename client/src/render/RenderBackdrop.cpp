@@ -255,7 +255,7 @@ void RenderBackdrop::drawStars(
             s.yFrac = std::pow(raw, 1.5f);  // >1 pulls toward 0 (top of sky)
             s.phaseOffset = rng() * 6.2832f;
             s.rotSpeed    = 0.25f + rng() * 0.55f;
-            s.size        = 4.0f  + rng() * 10.0f;
+            s.size = 8.0f + rng() * 10.0f;
             stars.push_back(s);
         }
     }
