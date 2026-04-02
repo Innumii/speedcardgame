@@ -8,10 +8,10 @@ import (
 	"os"
 	"testing"
 
-	"github.com/joho/godotenv"
 	"github.com/Ryanljk/speedcardgame/auth/models"
 	"github.com/Ryanljk/speedcardgame/auth/repositories"
 	"github.com/Ryanljk/speedcardgame/auth/services"
+	"github.com/joho/godotenv"
 	"github.com/redis/go-redis/v9"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"

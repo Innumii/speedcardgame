@@ -39,13 +39,6 @@ func sessionIDFromRequest(c *gin.Context) (string, bool) {
 	return "", false
 }
 
-func isHTTPSRequest(c *gin.Context) bool {
-	if c.Request != nil && c.Request.TLS != nil {
-		return true
-	}
-	return strings.EqualFold(strings.TrimSpace(c.GetHeader("X-Forwarded-Proto")), "https")
-}
-
 // Constructor function
 // Accepts an instance of authService and returns a new authController
 func NewAuthController(authService *services.AuthService) *AuthController {

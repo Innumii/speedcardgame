@@ -106,22 +106,22 @@ func TestIntegration_Login_UserNotFound(t *testing.T) {
 }
 
 func TestIntegration_Login_ReplacesExistingSession(t *testing.T) {
-    deps := setupAuthTest(t)
-    ctx := context.Background()
+	deps := setupAuthTest(t)
+	ctx := context.Background()
 
-    deps.authSvc.Register(dtos.RegisterDTO{Name: "Dave", Email: "dave@example.com", Password: "pass123"})
+	deps.authSvc.Register(dtos.RegisterDTO{Name: "Dave", Email: "dave@example.com", Password: "pass123"})
 
-    _, firstSession, _ := deps.authSvc.Login(ctx, dtos.LoginDTO{Email: "dave@example.com", Password: "pass123"})
-    _, secondSession, _ := deps.authSvc.Login(ctx, dtos.LoginDTO{Email: "dave@example.com", Password: "pass123"})
+	_, firstSession, _ := deps.authSvc.Login(ctx, dtos.LoginDTO{Email: "dave@example.com", Password: "pass123"})
+	_, secondSession, _ := deps.authSvc.Login(ctx, dtos.LoginDTO{Email: "dave@example.com", Password: "pass123"})
 
-    if firstSession == secondSession {
-        t.Error("expected new session ID on second login")
-    }
+	if firstSession == secondSession {
+		t.Error("expected new session ID on second login")
+	}
 
-    _, err := deps.sessionSvc.GetSessionBySessionId(ctx, firstSession)
-    if err == nil {
-        t.Error("expected old session to be invalidated")
-    }
+	_, err := deps.sessionSvc.GetSessionBySessionId(ctx, firstSession)
+	if err == nil {
+		t.Error("expected old session to be invalidated")
+	}
 }
 
 // ════════════════════════════════════════════════════════════════

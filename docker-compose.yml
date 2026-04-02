@@ -6,6 +6,8 @@ services:
     ports:
       - "${AUTH_APP_PORT:-8081}:8080"
     restart: unless-stopped
+    volumes:
+      - ./auth/certs:/app/certs:ro
     environment:
       POSTGRES_HOST: auth-db
       POSTGRES_USER: ${AUTH_POSTGRES_USER}
@@ -68,6 +70,7 @@ services:
       dockerfile: Dockerfile
     volumes:
       - ./cards/assets/cards:/app/assets/cards:ro
+      - ./cards/certs:/app/certs:ro
     env_file:
       - ./.env
     depends_on:

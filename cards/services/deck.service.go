@@ -101,7 +101,6 @@ func CreateDeck(w http.ResponseWriter, r *http.Request) {
 	util.RespondWithJSON(w, http.StatusOK, deck)
 }
 
-
 // ListDecks godoc
 // @Summary      List all decks
 // @Description  Returns all decks for all users
@@ -122,7 +121,6 @@ func ListDecks(w http.ResponseWriter, _ *http.Request) {
 	// Return the list of decks
 	util.RespondWithJSON(w, http.StatusOK, decks)
 }
-
 
 // DeleteDeck godoc
 // @Summary      Delete a deck

@@ -97,8 +97,8 @@ func TestSeedCardsFromCSV_EmptyIntField(t *testing.T) {
 func TestSeedCardsFromCSV_LookupError(t *testing.T) {
 	db, _ := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{Logger: logger.Default.LogMode(logger.Silent)})
 	if err := db.AutoMigrate(&models.Card{}); err != nil {
-    t.Fatalf("failed to migrate: %v", err)
-}
+		t.Fatalf("failed to migrate: %v", err)
+	}
 	sqlDB, _ := db.DB()
 	sqlDB.Close()
 	f := writeTempCSV(t, "lookup.csv", "cid,name,type,cost,value,power,toughness,effect\n1,Card,Spell,1,1,1,1,none\n")

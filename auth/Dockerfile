@@ -23,10 +23,6 @@ WORKDIR /app
 # Copy the compiled binary from the builder stage
 COPY --from=builder /app/main .
 
-# Copy TLS certificates into the runtime image so the service
-# uses the shared CA-signed server certificate/key for HTTPS.
-COPY --from=builder /app/certs ./certs
-
 # Copy entrypoint for TLS secret materialization
 COPY entrypoint.sh /entrypoint.sh
 RUN sed -i 's/\r$//' /entrypoint.sh && chmod +x /entrypoint.sh
