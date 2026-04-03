@@ -96,42 +96,8 @@ resource "aws_lb_target_group" "cards" {
 
   health_check {
     protocol = "HTTPS"
-    path     = "/cards/health"
-    matcher  = "200-299"
-  }
-}
-
-resource "aws_lb_listener" "http_redirect" {
-  count             = var.enable_https_listener ? 1 : 0
-  load_balancer_arn = aws_lb.shared.arn
-  port              = 80
-  protocol          = "HTTP"
-
-  default_action {
-    type = "redirect"
-
-    redirect {
-      port        = "443"
-      protocol    = "HTTPS"
-      status_code = "HTTP_301"
-    }
-  }
-}
-
-resource "aws_lb_listener" "http" {
-  count             = var.enable_https_listener ? 0 : 1
-  load_balancer_arn = aws_lb.shared.arn
-  port              = 80
-  protocol          = "HTTP"
-
-  default_action {
-    type = "fixed-response"
-
-    fixed_response {
-      content_type = "application/json"
-      message_body = "{\"message\":\"Not Found\"}"
-      status_code  = "404"
-    }
+    path    = "/cards/health"
+    matcher = "200-299"
   }
 }
 
