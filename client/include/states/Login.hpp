@@ -23,7 +23,7 @@ public:
 private:
     enum class Field {
         None,
-        email,
+        Username,
         Password
     };
 
@@ -31,13 +31,13 @@ private:
     void setActiveField(Field field);
 
     SDL_Rect panelRect{0, 0, 0, 0};
-    SDL_Rect emailRect{0, 0, 0, 0};
+    SDL_Rect usernameRect{0, 0, 0, 0};
     SDL_Rect passwordRect{0, 0, 0, 0};
     SDL_Rect loginButtonRect{0, 0, 0, 0};
     SDL_Rect backButtonRect{0, 0, 0, 0};
 
-    Field activeField{Field::email};
-    std::string email;
+    Field activeField{Field::Username};
+    std::string username;
     std::string password;
     std::string statusMessage; // add auth status msg
 
