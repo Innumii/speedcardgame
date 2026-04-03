@@ -159,8 +159,8 @@ Then open in your browser:
 
 | Service | URL |
 |---------|-----|
-| Auth    | https://localhost:8081/swagger/index.html |
-| Cards   | https://localhost:8082/cards/swagger/index.html |
+| Auth    | http://localhost:8081/swagger/index.html |
+| Cards   | http://localhost:8082/cards/swagger/index.html |
 
 ---
 

@@ -37,7 +37,7 @@ variable "base_domain" {
 variable "enable_https_listener" {
   description = "Enable HTTPS listener and redirect HTTP to HTTPS"
   type        = bool
-  default     = true
+  default     = false
 }
 
 variable "environment" {

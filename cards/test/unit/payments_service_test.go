@@ -109,7 +109,7 @@ func TestListCoinPackages_Success(t *testing.T) {
 func TestCreateCoinCheckoutSession_NilClient(t *testing.T) {
 	setupTestDB(t)
 	cardservices.SetPaymentClientForTests(nil)
-	body := map[string]interface{}{"uid": 1, "package_id": "coin_pack_small", "success_url": "https://success", "cancel_url": "https://cancel"}
+	body := map[string]interface{}{"uid": 1, "package_id": "coin_pack_small", "success_url": "http://success", "cancel_url": "http://cancel"}
 	rr := httptest.NewRecorder()
 	cardservices.CreateCoinCheckoutSession(rr, jsonRequest(t, http.MethodPost, "/payments/checkout", body))
 	if rr.Code != http.StatusServiceUnavailable {
@@ -130,7 +130,7 @@ func TestCreateCoinCheckoutSession_InvalidBody(t *testing.T) {
 func TestCreateCoinCheckoutSession_InvalidUID(t *testing.T) {
 	setupTestDB(t)
 	setupMockPaymentClient(t, &mockPaymentClient{})
-	body := map[string]interface{}{"uid": 0, "package_id": "coin_pack_small", "success_url": "https://success", "cancel_url": "https://cancel"}
+	body := map[string]interface{}{"uid": 0, "package_id": "coin_pack_small", "success_url": "http://success", "cancel_url": "http://cancel"}
 	rr := httptest.NewRecorder()
 	cardservices.CreateCoinCheckoutSession(rr, jsonRequest(t, http.MethodPost, "/payments/checkout", body))
 	if rr.Code != http.StatusBadRequest {
@@ -141,7 +141,7 @@ func TestCreateCoinCheckoutSession_InvalidUID(t *testing.T) {
 func TestCreateCoinCheckoutSession_InvalidPackage(t *testing.T) {
 	setupTestDB(t)
 	setupMockPaymentClient(t, &mockPaymentClient{})
-	body := map[string]interface{}{"uid": 1, "package_id": "invalid_pack", "success_url": "https://success", "cancel_url": "https://cancel"}
+	body := map[string]interface{}{"uid": 1, "package_id": "invalid_pack", "success_url": "http://success", "cancel_url": "http://cancel"}
 	rr := httptest.NewRecorder()
 	cardservices.CreateCoinCheckoutSession(rr, jsonRequest(t, http.MethodPost, "/payments/checkout", body))
 	if rr.Code != http.StatusBadRequest {
@@ -156,7 +156,7 @@ func TestCreateCoinCheckoutSession_ClientError(t *testing.T) {
 			return payments.CheckoutSessionResponse{}, errors.New("stripe error")
 		},
 	})
-	body := map[string]interface{}{"uid": 1, "package_id": "coin_pack_small", "success_url": "https://success", "cancel_url": "https://cancel"}
+	body := map[string]interface{}{"uid": 1, "package_id": "coin_pack_small", "success_url": "http://success", "cancel_url": "http://cancel"}
 	rr := httptest.NewRecorder()
 	cardservices.CreateCoinCheckoutSession(rr, jsonRequest(t, http.MethodPost, "/payments/checkout", body))
 	if rr.Code != http.StatusBadGateway {
@@ -168,10 +168,10 @@ func TestCreateCoinCheckoutSession_Success(t *testing.T) {
 	setupTestDB(t)
 	setupMockPaymentClient(t, &mockPaymentClient{
 		createCheckoutSessionFn: func(_ context.Context, _ payments.CheckoutSessionRequest) (payments.CheckoutSessionResponse, error) {
-			return payments.CheckoutSessionResponse{ID: "cs_123", URL: "https://stripe.com/pay"}, nil
+			return payments.CheckoutSessionResponse{ID: "cs_123", URL: "http://stripe.com/pay"}, nil
 		},
 	})
-	body := map[string]interface{}{"uid": 1, "package_id": "coin_pack_small", "success_url": "https://success", "cancel_url": "https://cancel"}
+	body := map[string]interface{}{"uid": 1, "package_id": "coin_pack_small", "success_url": "http://success", "cancel_url": "http://cancel"}
 	rr := httptest.NewRecorder()
 	cardservices.CreateCoinCheckoutSession(rr, jsonRequest(t, http.MethodPost, "/payments/checkout", body))
 	if rr.Code != http.StatusOK {

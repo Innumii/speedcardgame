@@ -13,9 +13,6 @@ RUN go mod download
 # Copy the rest of the application code to the container
 COPY . .
 
-# Copy TLS certificates
-COPY certs/ certs/
-
 # Set default environment variables
 ENV POSTGRES_HOST=host.docker.internal
 ENV REDIS_HOST=host.docker.internal

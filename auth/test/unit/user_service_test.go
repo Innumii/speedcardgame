@@ -20,8 +20,6 @@ func TestRegister_Success(t *testing.T) {
 	defer fakeServer.Close()
 	t.Setenv("CARDS_SERVICE_HOST", host)
 	t.Setenv("CARDS_SERVICE_PORT", port)
-	t.Setenv("CARDS_SERVICE_SCHEME", "https")
-	t.Setenv("TLS_VERIFY_CERTS", "false")
 
 	repo := &MockUserRepository{
 		FindByEmailFn: func(email string) (*models.User, error) { return nil, errors.New("not found") },
@@ -51,8 +49,6 @@ func TestRegister_EmailAlreadyTaken(t *testing.T) {
 
 func TestRegister_InventoryFailure_RollsBackUser(t *testing.T) {
 	fakeServer, host, port := newFakeInventoryServer(t, false)
-	t.Setenv("CARDS_SERVICE_SCHEME", "https")
-	t.Setenv("TLS_VERIFY_CERTS", "false")
 	defer fakeServer.Close()
 	t.Setenv("CARDS_SERVICE_HOST", host)
 	t.Setenv("CARDS_SERVICE_PORT", port)
@@ -74,8 +70,6 @@ func TestRegister_InventoryFailure_RollsBackUser(t *testing.T) {
 }
 
 func TestRegister_InventoryFailure_RollbackAlsoFails(t *testing.T) {
-	t.Setenv("CARDS_SERVICE_SCHEME", "https")
-	t.Setenv("TLS_VERIFY_CERTS", "false")
 	fakeServer, host, port := newFakeInventoryServer(t, false)
 	defer fakeServer.Close()
 	t.Setenv("CARDS_SERVICE_HOST", host)
@@ -94,8 +88,6 @@ func TestRegister_InventoryFailure_RollbackAlsoFails(t *testing.T) {
 }
 
 func TestRegisterDevUser_Success(t *testing.T) {
-	t.Setenv("CARDS_SERVICE_SCHEME", "https")
-	t.Setenv("TLS_VERIFY_CERTS", "false")
 	fakeServer, host, port := newFakeInventoryServer(t, true)
 	defer fakeServer.Close()
 	t.Setenv("CARDS_SERVICE_HOST", host)

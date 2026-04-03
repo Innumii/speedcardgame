@@ -79,7 +79,7 @@ go mod tidy
 ```
 
 - wgo runs the app in watch mode
-- App will be running on <https://localhost:8080>
+- App will be running on <http://localhost:8080>
 
 ## Setting up Makefile
 

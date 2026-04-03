@@ -8,8 +8,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	_ "github.com/Ryanljk/speedcardgame/cards/docs"
 	httpSwagger "github.com/swaggo/http-swagger"
+	_ "github.com/Ryanljk/speedcardgame/cards/docs"
 
 	"github.com/Ryanljk/speedcardgame/cards/config"
 	"github.com/Ryanljk/speedcardgame/cards/models"
@@ -95,26 +95,14 @@ func main() {
 	if httpRequestLoggingEnabled {
 		router.Use(util.HTTPRequestLogger(debugLoggingEnabled))
 	}
-	allowedOrigins := []string{"https://api.fylstudios.xyz", "https://localhost:3000"}
-	if configuredOrigins := strings.TrimSpace(util.GetEnvOrDefault("CORS_ALLOWED_ORIGINS", "")); configuredOrigins != "" {
-		parts := strings.Split(configuredOrigins, ",")
-		allowedOrigins = allowedOrigins[:0]
-		for _, part := range parts {
-			origin := strings.TrimSpace(part)
-			if origin != "" {
-				allowedOrigins = append(allowedOrigins, origin)
-			}
-		}
-	}
 	router.Use(cors.Handler(cors.Options{
-		AllowedOrigins:   allowedOrigins,
+		AllowedOrigins:   []string{"https://*", "http://*"},
 		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowedHeaders:   []string{"*"},
 		ExposedHeaders:   []string{"Link"},
 		AllowCredentials: false,
 		MaxAge:           300,
 	}))
-	router.Use(httpsSecurityMiddleware)
 
 	r := chi.NewRouter()
 	//define routes
@@ -158,6 +146,7 @@ func main() {
 	r.Get("/payments/checkout-complete", services.RenderCheckoutCompletePage)
 	r.Get("/payments/coin-packages", services.ListCoinPackages) // List available coin packages
 
+
 	r.Get("/swagger/*", httpSwagger.Handler(
 		httpSwagger.URL("/cards/swagger/doc.json"),
 	))
@@ -170,8 +159,8 @@ func main() {
 		Addr:    ":" + portString,
 	}
 
-	//start server on port with TLS
-	if err := srv.ListenAndServeTLS("certs/server.crt", "certs/server.key"); err != nil {
+	//start server on port
+	if err := srv.ListenAndServe(); err != nil {
 		log.Fatal(err)
 	}
 
@@ -180,29 +169,4 @@ func main() {
 func health(w http.ResponseWriter, r *http.Request) {
 	response := map[string]string{"message": "Healthy"}
 	util.RespondWithJSON(w, 200, response)
-}
-
-func isHTTPSRequest(r *http.Request) bool {
-	if r != nil && r.TLS != nil {
-		return true
-	}
-	if r == nil {
-		return false
-	}
-	return strings.EqualFold(strings.TrimSpace(r.Header.Get("X-Forwarded-Proto")), "https")
-}
-
-func httpsSecurityMiddleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if !isHTTPSRequest(r) {
-			host := strings.TrimSpace(r.Host)
-			if host != "" {
-				http.Redirect(w, r, "https://"+host+r.URL.RequestURI(), http.StatusMovedPermanently)
-				return
-			}
-		}
-
-		w.Header().Set("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
-		next.ServeHTTP(w, r)
-	})
 }

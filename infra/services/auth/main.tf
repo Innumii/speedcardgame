@@ -60,7 +60,6 @@ locals {
   postgres_port                     = var.postgres_port != null ? var.postgres_port : try(local.data_outputs.auth_postgres_port, null)
   redis_host                        = var.redis_host != null ? var.redis_host : try(local.data_outputs.auth_redis_endpoint, null)
   redis_port                        = var.redis_port != null ? var.redis_port : try(local.data_outputs.auth_redis_port, null)
-  cards_service_scheme              = "https"
 }
 
 module "service" {
@@ -110,12 +109,8 @@ module "service" {
       REDIS_HOST               = local.redis_host
       REDIS_PORT               = tostring(local.redis_port)
       AWS_ENABLED              = tostring(var.use_aws_services)
-      CARDS_SERVICE_SCHEME     = local.cards_service_scheme
       CARDS_SERVICE_HOST       = local.cards_service_host
       CARDS_SERVICE_PORT       = tostring(var.cards_service_port)
-      AWS_CARDS_SERVICE_SCHEME = local.cards_service_scheme
-      AWS_CARDS_SERVICE_HOST   = local.cards_service_host
-      AWS_CARDS_SERVICE_PORT   = tostring(var.cards_service_port)
       DEBUG_LOG_ENABLED        = tostring(var.debug_log_enabled)
       HTTP_REQUEST_LOG_ENABLED = tostring(var.http_request_log_enabled)
     },

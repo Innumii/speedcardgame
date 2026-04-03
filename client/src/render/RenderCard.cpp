@@ -74,17 +74,17 @@ void scheduleCardImageRetry(int cardId, Uint32 now) {
 bool downloadImageBody(const std::string& host, int port, int cardId,
                        const std::string& extension, std::string& responseBody) {
     const std::string path = "/cards/images/" + std::to_string(cardId) + "." + extension;
-    std::string normalizedHost = host;
-    if (normalizedHost.rfind("https://", 0) == 0) {
-        normalizedHost = normalizedHost.substr(8);
-    }
-
-    const bool useHttps = true;
-    const bool verifyTlsCerts = EnvUtil::getEnvBoolOrDefault("TLS_VERIFY_CERTS", EnvUtil::isAwsEnabled());
     httplib::Result res;
-    if (useHttps) {
-        httplib::SSLClient client(normalizedHost.c_str(), port);
-        client.enable_server_certificate_verification(verifyTlsCerts);
+    if (port == 443) {
+        httplib::SSLClient client(host.c_str(), port);
+        client.enable_server_certificate_verification(false);
+        client.set_follow_location(true);
+        client.set_connection_timeout(0, 150000);
+        client.set_read_timeout(0, 250000);
+        client.set_write_timeout(0, 250000);
+        res = client.Get(path.c_str());
+    } else {
+        httplib::Client client(host.c_str(), port);
         client.set_follow_location(true);
         client.set_connection_timeout(0, 150000);
         client.set_read_timeout(0, 250000);

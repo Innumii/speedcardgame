@@ -3,7 +3,6 @@ package services
 import (
 	"bytes"
 	"context"
-	"crypto/tls"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -80,47 +79,26 @@ func (service *AuthService) registerUser(registerDTO dtos.RegisterDTO, createInv
 }
 
 func (service *AuthService) createStarterInventory(userID uint) error {
-	baseURLs := utils.ResolveCardsServiceBaseURLs()
-	if len(baseURLs) == 0 {
-		baseURLs = []string{utils.ResolveCardsServiceBaseURL()}
-	}
+	baseURL := utils.ResolveCardsServiceBaseURL()
 
 	payload, err := json.Marshal(inventoryCreateRequest{Uid: userID})
 	if err != nil {
 		return err
 	}
 
-	verifyTLS := utils.GetEnvAsBool("TLS_VERIFY_CERTS", utils.GetEnvAsBool("AWS_ENABLED", false))
-	client := &http.Client{
-		Timeout: 5 * time.Second,
-		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: !verifyTLS}, //nolint:gosec // Controlled by TLS_VERIFY_CERTS for local/self-signed test environments.
-		},
-	}
+	client := &http.Client{Timeout: 5 * time.Second}
 
 	inventoryPaths := []string{"/cards/inventories", "/cardbase/inventories"}
+	if err := service.postWithFallback(client, baseURL, inventoryPaths, payload, "cards service"); err != nil {
+		return err
+	}
+
 	deckPaths := []string{"/cards/decks/fill", "/cardbase/decks/fill"}
-
-	var lastErr error
-	for _, baseURL := range baseURLs {
-		if err := service.postWithFallback(client, baseURL, inventoryPaths, payload, "cards service"); err != nil {
-			lastErr = err
-			continue
-		}
-
-		if err := service.postWithFallback(client, baseURL, deckPaths, payload, "deck fill"); err != nil {
-			lastErr = err
-			continue
-		}
-
-		return nil
+	if err := service.postWithFallback(client, baseURL, deckPaths, payload, "deck fill"); err != nil {
+		return err
 	}
 
-	if lastErr != nil {
-		return lastErr
-	}
-
-	return fmt.Errorf("inventory creation failed: no cards service base URL candidates available")
+	return nil
 }
 
 func (service *AuthService) postWithFallback(client *http.Client, baseURL string, paths []string, payload []byte, operation string) error {
