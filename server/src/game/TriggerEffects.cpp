@@ -351,7 +351,7 @@ const std::unordered_map<int, std::vector<CardEffectEntry>> TriggerEffects::card
     //Gun
     {27, { CardEffectEntry{
         .effectId = 3,
-        .amount   = -1,
+        .amount   = -10,
         .target   = Target::Opponent,
         .trigger  = TriggerType::OnKill
     }}},

@@ -25,7 +25,7 @@ cid,name,type,cost,value,power,toughness,effect
 24,Bushcamper,Creature,3,2,2,2,"When summoned, deal 2 damage to your opponent."
 25,Holy Blessing,Spell,2,2,0,0,Gain 2 health for each creature you control.
 26,Aura,Spell,6,3,0,0,Give all your creatures +2/+2.
-27,Gun,Creature,3,1,3,1,"When this creature kills another creature, deal 1 damage to your opponent."
+27,Gun,Creature,3,1,3,1,"When this creature kills another creature, deal 10 damage to your opponent."
 28,Ay Lmao,Creature,2,2,5,1,"When summoned, you take 5 damage."
 29,Final Gambit,Spell,6,3,0,0,"Reduce your HP to 10, deal the difference to your opponent as damage."
 30,Dynamic Duo,Creature,5,3,3,5,Double Strike

@@ -92,6 +92,10 @@ void DeckBuilding::handleEvents(Game& game, const SDL_Event& event) {
         game.setNextState(GameState::Title);
     }
 
+    if (event.type == SDL_WINDOWEVENT && event.window.event == SDL_WINDOWEVENT_SIZE_CHANGED) {
+        RenderCard::clearRenderCache();
+    }
+
     auto layout = buildLayout(game);
     const int previousScrollOffset = deckScrollOffset;
     deckScrollOffset = clampScrollOffset(deckScrollOffset, layout.maxDeckScrollOffset);
