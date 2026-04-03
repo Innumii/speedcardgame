@@ -134,6 +134,7 @@ module "service" {
   environment = merge(
     local.cards_service_host != null ? {
       USE_AWS_SERVICES       = "true"
+      TLS_VERIFY_CERTS       = "true"
       CARDS_SERVICE_HOST     = local.cards_service_host
       CARDS_SERVICE_PORT     = tostring(local.cards_service_port)
       AWS_CARDS_SERVICE_HOST = local.cards_service_host

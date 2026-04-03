@@ -3,13 +3,17 @@ package services
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"log"
 	"net/http"
+	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/Ryanljk/speedcardgame/auth/dtos"
@@ -78,6 +82,46 @@ func (service *AuthService) registerUser(registerDTO dtos.RegisterDTO, createInv
 	return &user, nil
 }
 
+func buildCardsTLSConfig() (*tls.Config, error) {
+	verifyTLS := utils.GetEnvAsBool("TLS_VERIFY_CERTS", true)
+	serverName := strings.TrimSpace(os.Getenv("CARDS_TLS_SERVER_NAME"))
+	caCertPath := strings.TrimSpace(os.Getenv("CARDS_CA_CERT_PATH"))
+
+	tlsConfig := &tls.Config{
+		MinVersion:         tls.VersionTLS12,
+		InsecureSkipVerify: !verifyTLS, //nolint:gosec // Explicit opt-out via TLS_VERIFY_CERTS for isolated local test environments only.
+	}
+
+	if !verifyTLS {
+		return tlsConfig, nil
+	}
+
+	rootCAs, err := x509.SystemCertPool()
+	if err != nil {
+		return nil, fmt.Errorf("load system cert pool: %w", err)
+	}
+	if rootCAs == nil {
+		rootCAs = x509.NewCertPool()
+	}
+
+	if caCertPath != "" {
+		caPem, err := os.ReadFile(caCertPath)
+		if err != nil {
+			return nil, fmt.Errorf("read CARDS_CA_CERT_PATH %q: %w", caCertPath, err)
+		}
+		if ok := rootCAs.AppendCertsFromPEM(caPem); !ok {
+			return nil, fmt.Errorf("CARDS_CA_CERT_PATH %q does not contain a valid PEM certificate", caCertPath)
+		}
+	}
+
+	tlsConfig.RootCAs = rootCAs
+	if serverName != "" {
+		tlsConfig.ServerName = serverName
+	}
+
+	return tlsConfig, nil
+}
+
 func (service *AuthService) createStarterInventory(userID uint) error {
 	baseURL := utils.ResolveCardsServiceBaseURL()
 
@@ -86,7 +130,17 @@ func (service *AuthService) createStarterInventory(userID uint) error {
 		return err
 	}
 
-	client := &http.Client{Timeout: 5 * time.Second}
+	tlsConfig, err := buildCardsTLSConfig()
+	if err != nil {
+		return err
+	}
+
+	client := &http.Client{
+		Timeout: 5 * time.Second,
+		Transport: &http.Transport{
+			TLSClientConfig: tlsConfig,
+		},
+	}
 
 	inventoryPaths := []string{"/cards/inventories", "/cardbase/inventories"}
 	if err := service.postWithFallback(client, baseURL, inventoryPaths, payload, "cards service"); err != nil {
