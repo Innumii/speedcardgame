@@ -4,7 +4,6 @@
 #include <cstring>
 #include <cerrno>
 #include <sstream>
-#include <fstream>
 
 NetworkClient::NetworkClient(SocketMode m) : socketFd(-1), connected(false), mode(m) {
 #ifdef _WIN32
@@ -30,20 +29,18 @@ bool NetworkClient::initOpenSSL() {
     SSL_load_error_strings();
 
     sslCtx = SSL_CTX_new(TLS_client_method());
+    SSL_CTX_load_verify_locations(sslCtx, "./certs/ca.crt", nullptr);
     if (!sslCtx) {
         std::cerr << "[NetworkClient] Failed to create SSL_CTX\n";
         return false;
     }
 
-    const char* caPath = "./certs/ca.crt";
-    std::ifstream file(caPath);
-    if (!file.good() || !SSL_CTX_load_verify_locations(sslCtx, caPath, nullptr)) {
-        std::cerr << "[NetworkClient] Failed to load a CA certificate bundle\n";
-        return false;
-    }
-
     // Optional: verify server certificate
     SSL_CTX_set_verify(sslCtx, SSL_VERIFY_PEER, nullptr);
+    if (!SSL_CTX_load_verify_locations(sslCtx, "./certs/ca.crt", nullptr)) {
+        std::cerr << "[NetworkClient] Failed to load CA certificate\n";
+        // You can choose to return false if you want strict verification
+    }
 
     return true;
 }
@@ -138,7 +135,10 @@ bool NetworkClient::connectTo(const std::string& ip, int port) {
     }
     SSL_set_fd(ssl, socketFd);
 
-    // 5️⃣ Perform TLS handshake
+    // 5️⃣ Configure verification
+    SSL_CTX_set_verify(sslCtx, SSL_VERIFY_NONE, nullptr);
+
+    // 6️⃣ Perform TLS handshake
     int ret = 0;
     while ((ret = SSL_connect(ssl)) != 1) {
         int err = SSL_get_error(ssl, ret);

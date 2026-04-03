@@ -23,7 +23,6 @@ WORKDIR /app
 # Copy the compiled binary from the builder stage
 COPY --from=builder /app/main .
 COPY --from=builder /app/cards.csv ./cards.csv
-COPY --from=builder /app/assets/cards ./assets/cards
 
 # Copy entrypoint for TLS secret materialization
 COPY entrypoint.sh /entrypoint.sh

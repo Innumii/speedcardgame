@@ -83,7 +83,7 @@ resource "aws_lb" "shared" {
 resource "aws_lb_target_group" "auth" {
   name        = var.auth_target_group_name
   port        = 8080
-  protocol    = "HTTPS"
+  protocol    = "HTTP"
   vpc_id      = data.aws_vpc.default.id
   target_type = "ip"
 
@@ -96,7 +96,7 @@ resource "aws_lb_target_group" "auth" {
 resource "aws_lb_target_group" "cards" {
   name        = var.cards_target_group_name
   port        = 8080
-  protocol    = "HTTPS"
+  protocol    = "HTTP"
   vpc_id      = data.aws_vpc.default.id
   target_type = "ip"
 
@@ -106,7 +106,42 @@ resource "aws_lb_target_group" "cards" {
   }
 }
 
+resource "aws_lb_listener" "http_redirect" {
+  count             = var.enable_https_listener ? 1 : 0
+  load_balancer_arn = aws_lb.shared.arn
+  port              = 80
+  protocol          = "HTTP"
+
+  default_action {
+    type = "redirect"
+
+    redirect {
+      port        = "443"
+      protocol    = "HTTPS"
+      status_code = "HTTP_301"
+    }
+  }
+}
+
+resource "aws_lb_listener" "http" {
+  count             = var.enable_https_listener ? 0 : 1
+  load_balancer_arn = aws_lb.shared.arn
+  port              = 80
+  protocol          = "HTTP"
+
+  default_action {
+    type = "fixed-response"
+
+    fixed_response {
+      content_type = "application/json"
+      message_body = "{\"message\":\"Not Found\"}"
+      status_code  = "404"
+    }
+  }
+}
+
 resource "aws_lb_listener" "https" {
+  count             = var.enable_https_listener ? 1 : 0
   load_balancer_arn = aws_lb.shared.arn
   port              = 443
   protocol          = "HTTPS"
@@ -125,7 +160,7 @@ resource "aws_lb_listener" "https" {
 }
 
 resource "aws_lb_listener_rule" "auth" {
-  listener_arn = aws_lb_listener.https.arn
+  listener_arn = var.enable_https_listener ? aws_lb_listener.https[0].arn : aws_lb_listener.http[0].arn
   priority     = 100
 
   action {
@@ -141,7 +176,7 @@ resource "aws_lb_listener_rule" "auth" {
 }
 
 resource "aws_lb_listener_rule" "cards" {
-  listener_arn = aws_lb_listener.https.arn
+  listener_arn = var.enable_https_listener ? aws_lb_listener.https[0].arn : aws_lb_listener.http[0].arn
   priority     = 200
 
   action {

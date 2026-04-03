@@ -47,7 +47,7 @@ func ResolveCardsServiceBaseURL() string {
 			return scheme + "://" + host + ":" + port
 		}
 	}
-	scheme := GetEnvOrDefault("CARDS_SERVICE_SCHEME", "https")
+	scheme := GetEnvOrDefault("CARDS_SERVICE_SCHEME", "http")
 	host := GetEnvOrDefault("CARDS_SERVICE_HOST", "host.docker.internal")
 	port := GetEnvOrDefault("CARDS_SERVICE_PORT", "8082")
 	return scheme + "://" + host + ":" + port

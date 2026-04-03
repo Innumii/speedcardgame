@@ -1,7 +1,6 @@
 #include "utils/HttpUtil.hpp"
 #include "utils/EnvUtil.hpp"
 
-#include <fstream>
 #define CPPHTTPLIB_OPENSSL_SUPPORT
 #if defined(__GNUC__)
 #pragma GCC diagnostic push
@@ -16,36 +15,18 @@
 namespace HttpUtil {
     namespace {
         std::string normalizeHost(const std::string& host) {
-            if (host.rfind("http://", 0) == 0) {
-                return host.substr(7);
-            }
             if (host.rfind("https://", 0) == 0) {
                 return host.substr(8);
             }
             return host;
         }
 
-        bool tryLoadCaCert(httplib::SSLClient& client) {
-            // For the C++ game server running in Docker, the shared
-            // CA bundle is mounted at /certs/ca.crt. Use this single
-            // canonical path instead of guessing.
-            constexpr const char* kCaPath = "/certs/ca.crt";
-
-            std::ifstream file(kCaPath);
-            if (!file.good()) {
-                return false;
-            }
-
-            client.set_ca_cert_path(kCaPath);
-            return true;
-        }
-
         bool shouldUseHttps() {
             return true;
         }
 
-        bool shouldVerifyCerts() {
-            return EnvUtil::getEnvBoolOrDefault("TLS_VERIFY_CERTS", true);
+        bool shouldVerifyTlsCerts() {
+            return EnvUtil::getEnvBoolOrDefault("TLS_VERIFY_CERTS", EnvUtil::useAwsServices());
         }
     }
 
@@ -59,11 +40,7 @@ namespace HttpUtil {
 
         if (useHttps) {
             httplib::SSLClient client(normalizedHost.c_str(), port);
-            const bool verifyCerts = shouldVerifyCerts();
-            client.enable_server_certificate_verification(verifyCerts);
-            if (verifyCerts) {
-                tryLoadCaCert(client);
-            }
+            client.enable_server_certificate_verification(shouldVerifyTlsCerts());
             client.set_follow_location(true);
 
             if (method == "GET") res = client.Get(path.c_str());
