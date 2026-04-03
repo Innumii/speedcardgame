@@ -70,7 +70,13 @@ validate_tls_cert() {
         return 1
     fi
 
-    if ! grep -Eq '^-----BEGIN CERTIFICATE-----$' "$CRT_FILE"; then
+    if command -v openssl >/dev/null 2>&1; then
+        if ! openssl x509 -in "$CRT_FILE" -noout >/dev/null 2>&1; then
+            echo "Error: $CRT_FILE is not a valid PEM certificate"
+            head -n 1 "$CRT_FILE" || true
+            return 1
+        fi
+    elif ! grep -Eq 'BEGIN CERTIFICATE' "$CRT_FILE"; then
         echo "Error: $CRT_FILE is not a valid PEM certificate (missing BEGIN CERTIFICATE header)"
         head -n 1 "$CRT_FILE" || true
         return 1
@@ -83,7 +89,13 @@ validate_tls_key() {
         return 1
     fi
 
-    if ! grep -Eq '^-----BEGIN (RSA )?PRIVATE KEY-----$' "$KEY_FILE"; then
+    if command -v openssl >/dev/null 2>&1; then
+        if ! openssl pkey -in "$KEY_FILE" -noout >/dev/null 2>&1; then
+            echo "Error: $KEY_FILE is not a valid PEM private key"
+            head -n 1 "$KEY_FILE" || true
+            return 1
+        fi
+    elif ! grep -Eq 'BEGIN (RSA )?PRIVATE KEY' "$KEY_FILE"; then
         echo "Error: $KEY_FILE is not a valid PEM private key (missing BEGIN PRIVATE KEY header)"
         head -n 1 "$KEY_FILE" || true
         return 1

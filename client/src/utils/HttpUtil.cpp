@@ -1,6 +1,9 @@
 #include "utils/HttpUtil.hpp"
 #include "utils/EnvUtil.hpp"
 
+#include <array>
+#include <cstdlib>
+#include <cstring>
 #include <fstream>
 #include <map>
 
@@ -27,14 +30,44 @@ namespace HttpUtil {
             return host;
         }
 
-        bool tryLoadCaCert(httplib::SSLClient& client) {
-            const char* caPath = "./certs/ca.crt";
-            std::ifstream file(caPath);
-            if (!file.good()) {
-                return false;
+        bool fileExists(const std::string& path) {
+            std::ifstream file(path);
+            return file.good();
+        }
+
+        bool configureTrustStore(httplib::SSLClient& client) {
+            const char* explicitCaPath = std::getenv("API_CA_CERT_PATH");
+            if (explicitCaPath != nullptr && std::strlen(explicitCaPath) > 0) {
+                const std::string path(explicitCaPath);
+                if (!fileExists(path)) {
+                    return false;
+                }
+                client.set_ca_cert_path(path.c_str());
+                return true;
             }
 
-            client.set_ca_cert_path(caPath);
+            // In AWS mode, API endpoints are expected to use ACM/public chains.
+            // Prefer system trust roots unless an explicit API_CA_CERT_PATH is set.
+            if (EnvUtil::isAwsEnabled()) {
+                return true;
+            }
+
+            static const std::array<const char*, 4> candidatePaths = {
+                "./certs/ca.crt",
+                "../certs/ca.crt",
+                "client/certs/ca.crt",
+                "/certs/ca.crt",
+            };
+
+            for (const char* candidatePath : candidatePaths) {
+                if (!fileExists(candidatePath)) {
+                    continue;
+                }
+                client.set_ca_cert_path(candidatePath);
+                return true;
+            }
+
+            // Fall back to system trust roots (required for ACM/public certs in AWS).
             return true;
         }
 
@@ -55,7 +88,7 @@ namespace HttpUtil {
         if (useHttps) {
             httplib::SSLClient client(normalizedHost.c_str(), port);
             client.enable_server_certificate_verification(true);
-            if (!tryLoadCaCert(client)) {
+            if (!configureTrustStore(client)) {
                 statusCode = -1;
                 responseBody.clear();
                 return false;

@@ -22,6 +22,8 @@ services:
       CARDS_SERVICE_PORT: ${CARDS_PORT}
       CARDS_SERVICE_SCHEME: ${CARDS_SERVICE_SCHEME:-https}
       AWS_CARDS_SERVICE_SCHEME: ${AWS_CARDS_SERVICE_SCHEME:-https}
+      TLS_VERIFY_CERTS: ${TLS_VERIFY_CERTS:-true}
+      CARDS_CA_CERT_PATH: ${CARDS_CA_CERT_PATH:-/app/certs/ca.crt}
       DEBUG_LOG_ENABLED: ${DEBUG_LOG_ENABLED:-false}
       HTTP_REQUEST_LOG_ENABLED: ${HTTP_REQUEST_LOG_ENABLED:-true}
     depends_on:
@@ -112,7 +114,7 @@ services:
       - ./.env
     environment:
       USE_AWS_SERVICES: "false"
-      TLS_VERIFY_CERTS: "false"
+      TLS_VERIFY_CERTS: "true"
       CARDS_SERVICE_HOST: cards
       CARDS_SERVICE_PORT: ${CARDS_PORT}
     ports:
