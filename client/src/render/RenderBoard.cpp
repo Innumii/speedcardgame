@@ -74,12 +74,14 @@ void RenderBoard::drawDiscardZone(SDL_Renderer* renderer, RenderText& textRender
 	const int textPadding = Theme::Board::DISCARD_TEXT_PADDING;
 	const int maxTextWidth = discardZone.w - (textPadding * 2);
 
+	int yOffset = discardZone.y + textPadding;
+
 	// Title
 	textRenderer.drawWrappedText(
 		renderer,
 		"Discard",
 		fontSmall,
-		Theme::Board::DISCARD_TITLE_TEXT,
+		Theme::Board::DISCARD_DESCRIPTION_TEXT,
 		discardZone.x + textPadding,
 		discardZone.y + textPadding,
 		maxTextWidth

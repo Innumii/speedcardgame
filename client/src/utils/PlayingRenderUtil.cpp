@@ -127,7 +127,8 @@ namespace PlayingRenderUtil {
             sideGap,
             sideMargin
         );
-
+        const int textPadding = Theme::Board::DISCARD_TEXT_PADDING;
+        const int maxTextWidth = opponentDiscard.w - (textPadding * 2);
         // Rounded discard zone — matches local player style
         RenderUtil::drawRoundedRect(
             renderer,
@@ -136,13 +137,14 @@ namespace PlayingRenderUtil {
             Theme::Playing::OPPONENT_DISCARD_FILL,
             Theme::Playing::OPPONENT_DISCARD_BORDER
         );
-        textRenderer.drawText(
+        textRenderer.drawWrappedText(
             renderer,
             "Opponent Discard",
             fontSmall,
             Theme::TEXT_PRIMARY,
             opponentDiscard.x + textPad,
-            opponentDiscard.y + textPad
+            opponentDiscard.y + textPad,
+            maxTextWidth
         );
 
         const int stackCount = static_cast<int>(

@@ -291,7 +291,7 @@ void Login::render(Game& game) {
 
     // ── field labels ─────────────────────────────────────────────────
     if (uiFonts.large) {
-        RenderText::drawText(r, "Username", uiFonts.large,
+        RenderText::drawText(r, "Email", uiFonts.large,
                              Theme::TEXT_MUTED,
                              usernameRect.x, usernameRect.y - cachedLabelOffY);
         RenderText::drawText(r, "Password", uiFonts.large,

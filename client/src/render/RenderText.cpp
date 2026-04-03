@@ -127,12 +127,32 @@ void RenderText::drawText(SDL_Renderer* renderer, const std::string& text, TTF_F
     SDL_FreeSurface(surface);
 }
 
-void RenderText::drawWrappedText(SDL_Renderer* renderer, const std::string& text, TTF_Font* font, SDL_Color color, int x, int y, std::size_t maxLineLen) {
+void RenderText::drawWrappedText(SDL_Renderer* renderer, const std::string& text, 
+                                 TTF_Font* font, SDL_Color color, int x, int y, int maxWidth) {
     if (!renderer || !font) return;
 
-    const auto lines = wrapWords(text, maxLineLen);
+    std::istringstream words(text);
+    std::string word;
+    std::string line;
     int lineSkip = TTF_FontLineSkip(font);
-    for (std::size_t i = 0; i < lines.size(); ++i) {
-        drawText(renderer, lines[i], font, color, x, y + static_cast<int>(i) * lineSkip);
+    int yOffset = y;
+
+    while (words >> word) {
+        std::string testLine = line.empty() ? word : line + " " + word;
+
+        int w = 0, h = 0;
+        TTF_SizeUTF8(font, testLine.c_str(), &w, &h);
+        if (w > maxWidth && !line.empty()) {
+            // draw the current line
+            drawText(renderer, line, font, color, x, yOffset);
+            yOffset += lineSkip;
+            line = word; // start new line
+        } else {
+            line = testLine;
+        }
+    }
+
+    if (!line.empty()) {
+        drawText(renderer, line, font, color, x, yOffset);
     }
 }
