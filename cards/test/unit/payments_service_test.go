@@ -608,8 +608,8 @@ func TestIsDuplicateEventIDError_Nil(t *testing.T) {
 	// This test verifies the webhook handles a second identical event gracefully
 	db := setupTestDB(t)
 	if err := db.AutoMigrate(&models.PaymentLedger{}); err != nil {
-		t.Fatalf("failed to migrate: %v", err)
-	}
+	t.Fatalf("failed to migrate: %v", err)
+}
 
 	setupMockPaymentClient(t, &mockPaymentClient{
 		parseWebhookFn: func(_ []byte, _ http.Header) (payments.WebhookEvent, error) {

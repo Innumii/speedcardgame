@@ -44,11 +44,6 @@ data "terraform_remote_state" "data" {
   }
 }
 
-data "aws_secretsmanager_secret" "auth_tls" {
-  count = var.tls_secret_name != null ? 1 : 0
-  name  = var.tls_secret_name
-}
-
 locals {
   alb_outputs                       = var.use_managed_alb_stack ? data.terraform_remote_state.alb[0].outputs : {}
   alb_security_group_id             = var.alb_security_group_id != null ? var.alb_security_group_id : try(local.alb_outputs.alb_security_group_id, null)
@@ -65,7 +60,6 @@ locals {
   postgres_port                     = var.postgres_port != null ? var.postgres_port : try(local.data_outputs.auth_postgres_port, null)
   redis_host                        = var.redis_host != null ? var.redis_host : try(local.data_outputs.auth_redis_endpoint, null)
   redis_port                        = var.redis_port != null ? var.redis_port : try(local.data_outputs.auth_redis_port, null)
-  auth_tls_secret_arn               = try(data.aws_secretsmanager_secret.auth_tls[0].arn, null)
   cards_service_scheme              = "https"
 }
 
@@ -93,8 +87,7 @@ module "service" {
 
   task_secret_arns = toset(compact([
     local.postgres_password_secret_arn,
-    local.cards_service_base_url_secret_arn,
-    local.auth_tls_secret_arn
+    local.cards_service_base_url_secret_arn
   ]))
 
   secrets = merge(
@@ -103,10 +96,6 @@ module "service" {
     } : {},
     local.cards_service_base_url_secret_arn != null ? {
       CARDS_SERVICE_BASE_URL = "${local.cards_service_base_url_secret_arn}:CARDS_SERVICE_BASE_URL::"
-    } : {},
-    local.auth_tls_secret_arn != null ? {
-      TLS_CERT = "${local.auth_tls_secret_arn}:cert::"
-      TLS_KEY  = "${local.auth_tls_secret_arn}:key::"
     } : {}
   )
 

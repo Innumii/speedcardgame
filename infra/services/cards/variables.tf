@@ -120,12 +120,6 @@ variable "cards_runtime_secret_name" {
   default     = "speedcardgame-cards-runtime"
 }
 
-variable "tls_secret_name" {
-  description = "Secrets Manager secret name containing TLS cert/key JSON keys (cert, key)"
-  type        = string
-  default     = "game-server-tls"
-}
-
 variable "postgres_db" {
   type    = string
   default = null

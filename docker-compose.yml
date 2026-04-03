@@ -111,8 +111,6 @@ services:
     env_file:
       - ./.env
     environment:
-      USE_AWS_SERVICES: "false"
-      TLS_VERIFY_CERTS: "false"
       CARDS_SERVICE_HOST: cards
       CARDS_SERVICE_PORT: ${CARDS_PORT}
     ports:
