@@ -51,13 +51,6 @@ resource "aws_security_group" "alb" {
   vpc_id      = data.aws_vpc.default.id
 
   ingress {
-    from_port   = 80
-    to_port     = 80
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  ingress {
     from_port   = 443
     to_port     = 443
     protocol    = "tcp"
@@ -88,8 +81,9 @@ resource "aws_lb_target_group" "auth" {
   target_type = "ip"
 
   health_check {
-    path    = "/health"
-    matcher = "200-299"
+    protocol = "HTTPS"
+    path     = "/health"
+    matcher  = "200-299"
   }
 }
 
@@ -101,25 +95,9 @@ resource "aws_lb_target_group" "cards" {
   target_type = "ip"
 
   health_check {
-    path    = "/cards/health"
-    matcher = "200-299"
-  }
-}
-
-resource "aws_lb_listener" "http_redirect" {
-  count             = var.enable_https_listener ? 1 : 0
-  load_balancer_arn = aws_lb.shared.arn
-  port              = 80
-  protocol          = "HTTP"
-
-  default_action {
-    type = "redirect"
-
-    redirect {
-      port        = "443"
-      protocol    = "HTTPS"
-      status_code = "HTTP_301"
-    }
+    protocol = "HTTPS"
+    path     = "/cards/health"
+    matcher  = "200-299"
   }
 }
 

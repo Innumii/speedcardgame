@@ -39,15 +39,15 @@ func GinRequestLogger(debugEnabled bool) gin.HandlerFunc {
 		}
 
 		if errors != "" {
-			log.Printf("HTTP method=%s path=%s status=%d latency=%s ip=%s bytes=%d errors=%s", method, path, statusCode, latency, clientIP, c.Writer.Size(), errors)
+			log.Printf("HTTPS method=%s path=%s status=%d latency=%s ip=%s bytes=%d errors=%s", method, path, statusCode, latency, clientIP, c.Writer.Size(), errors)
 			return
 		}
 
 		if debugEnabled {
-			log.Printf("HTTP method=%s path=%s status=%d latency=%s ip=%s bytes=%d userAgent=%q referer=%q", method, path, statusCode, latency, clientIP, c.Writer.Size(), c.Request.UserAgent(), c.Request.Referer())
+			log.Printf("HTTPS method=%s path=%s status=%d latency=%s ip=%s bytes=%d userAgent=%q referer=%q", method, path, statusCode, latency, clientIP, c.Writer.Size(), c.Request.UserAgent(), c.Request.Referer())
 			return
 		}
 
-		log.Printf("HTTP method=%s path=%s status=%d latency=%s ip=%s bytes=%d", method, path, statusCode, latency, clientIP, c.Writer.Size())
+		log.Printf("HTTPS method=%s path=%s status=%d latency=%s ip=%s bytes=%d", method, path, statusCode, latency, clientIP, c.Writer.Size())
 	}
 }

@@ -40,11 +40,11 @@ func HTTPRequestLogger(debugEnabled bool) func(http.Handler) http.Handler {
 
 			latency := time.Since(start)
 			if debugEnabled {
-				log.Printf("HTTP method=%s path=%s status=%d latency=%s ip=%s bytes=%d userAgent=%q referer=%q", r.Method, r.URL.RequestURI(), wrapped.statusCode, latency, r.RemoteAddr, wrapped.bytes, r.UserAgent(), r.Referer())
+				log.Printf("HTTPS method=%s path=%s status=%d latency=%s ip=%s bytes=%d userAgent=%q referer=%q", r.Method, r.URL.RequestURI(), wrapped.statusCode, latency, r.RemoteAddr, wrapped.bytes, r.UserAgent(), r.Referer())
 				return
 			}
 
-			log.Printf("HTTP method=%s path=%s status=%d latency=%s ip=%s bytes=%d", r.Method, r.URL.RequestURI(), wrapped.statusCode, latency, r.RemoteAddr, wrapped.bytes)
+			log.Printf("HTTPS method=%s path=%s status=%d latency=%s ip=%s bytes=%d", r.Method, r.URL.RequestURI(), wrapped.statusCode, latency, r.RemoteAddr, wrapped.bytes)
 		})
 	}
 }
