@@ -48,6 +48,17 @@ struct Layout {
     int pageCount{1};
     int pageIndex{0};
     int maxDeckScrollOffset{0};
+	void applyYOffset(int yOffset) {
+			collectionArea.y += yOffset;
+			deckArea.y += yOffset;
+			deckEntriesClipRect.y += yOffset;
+			for (auto &r : collectionCardRects) r.y += yOffset;
+			for (auto &r : deckEntryRects) r.y += yOffset;
+			for (auto &r : deckEntryRemoveRects) r.y += yOffset;
+			prevPageButton.y += yOffset;
+			nextPageButton.y += yOffset;
+			pageLabelRect.y += yOffset;
+		}
 };
 
 	Layout buildLayout(const Game& game) const;

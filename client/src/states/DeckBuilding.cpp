@@ -479,17 +479,22 @@ void DeckBuilding::updateMenuButtons(const Layout& layout) {
     int startX = contentX + (contentW - totalButtonsW) / 2;
     if (startX < Theme::DeckBuilding::MENU_MIN_LEFT) startX = Theme::DeckBuilding::MENU_MIN_LEFT;
 
-    int buttonY = layout.collectionArea.y - TitleButton.h - Theme::DeckBuilding::MENU_TOP_GAP;
+    int buttonY = layout.collectionArea.y - TitleButton.h + Theme::DeckBuilding::MENU_TOP_GAP;
     if (buttonY < Theme::DeckBuilding::MENU_MIN_TOP) buttonY = Theme::DeckBuilding::MENU_MIN_TOP;
 
     TitleButton.x = startX;
     TitleButton.y = buttonY;
-    SaveButton.x = startX + TitleButton.w + buttonGap;
+
+    ClearButton.x = startX + TitleButton.w + buttonGap;
+    ClearButton.y = buttonY;
+
+    SaveButton.x = ClearButton.x + ClearButton.w + buttonGap;
     SaveButton.y = buttonY;
+
     PlayButton.x = SaveButton.x + SaveButton.w + buttonGap;
     PlayButton.y = buttonY;
-    ClearButton.x = PlayButton.x + PlayButton.w + buttonGap;
-    ClearButton.y = buttonY;
+
+    
 }
 
 std::vector<int> DeckBuilding::getDeckEntryOrder() const {

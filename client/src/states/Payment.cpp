@@ -375,10 +375,10 @@ void Payment::render(Game& game) {
     RenderText::measureText(uiFonts.large, coinText, coinW, coinH);
     RenderText::drawText(renderer, coinText, uiFonts.large, Theme::BANNER_BORDER, screenW - coinW - 24, 32);
 
-    RenderButton::drawButton(renderer, backTitleButton, "Back Title", uiFonts.small,
+    RenderButton::drawButton(renderer, backTitleButton, "Back to Title", uiFonts.small,
                              Theme::BTN_QUIT, Theme::BTN_BORDER, Theme::BTN_TEXT, backTitleHovered);
-    RenderButton::drawButton(renderer, backPacksButton, "Back Open Packs", uiFonts.small,
-                             Theme::BTN_CONNECT, Theme::BTN_BORDER, Theme::BTN_TEXT, backPacksHovered);
+    RenderButton::drawButton(renderer, backPacksButton, "Open Packs", uiFonts.small,
+                             Theme::BTN_PRIMARY, Theme::BTN_BORDER, Theme::BTN_TEXT, backPacksHovered);
     RenderButton::drawButton(renderer, refreshButton, "Refresh", uiFonts.small,
                              Theme::BTN_SECONDARY, Theme::BTN_BORDER, Theme::BTN_TEXT, refreshHovered);
 

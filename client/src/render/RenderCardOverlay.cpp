@@ -144,3 +144,42 @@ void RenderCardOverlay::overlaySSR(SDL_Renderer* renderer, const SDL_Rect& panel
         }
     }
 }
+
+void RenderCardOverlay::overlayDim(SDL_Renderer* renderer, const SDL_Rect& panel, Uint8 alpha) {
+    if (!renderer) return;
+
+    const int r = std::max(Theme::Card::MIN_CORNER_RADIUS, panel.w / 20);
+
+    auto insideRoundedRect = [&](int x, int y) -> bool {
+        if (x < panel.x || x >= panel.x + panel.w) return false;
+        if (y < panel.y || y >= panel.y + panel.h) return false;
+
+        const int cx = (x < panel.x + r)            ? panel.x + r
+                     : (x >= panel.x + panel.w - r) ? panel.x + panel.w - r
+                                                     : x;
+        const int cy = (y < panel.y + r)            ? panel.y + r
+                     : (y >= panel.y + panel.h - r) ? panel.y + panel.h - r
+                                                     : y;
+
+        int dx = x - cx;
+        int dy = y - cy;
+        return dx*dx + dy*dy <= r*r;
+    };
+
+    SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+    SDL_SetRenderDrawColor(renderer, 0, 0, 0, alpha);
+
+    // Fill the panel efficiently with step = 2 or more if you want
+    for (int y = panel.y; y < panel.y + panel.h; ++y) {
+        int xStart = panel.x;
+        int xEnd   = panel.x + panel.w;
+        // Optional optimization: skip corners
+        for (int x = xStart; x < xEnd; ++x) {
+            if (insideRoundedRect(x, y)) {
+                SDL_RenderDrawPoint(renderer, x, y);
+            }
+        }
+    }
+
+    SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
+}

@@ -239,7 +239,8 @@ namespace Theme {
         constexpr SDL_Color ENTRY_NAME_TEXT            = {255, 255, 255, 255};
         constexpr SDL_Color ENTRY_COST_TEXT            = {200, 200, 200, 255};
         constexpr SDL_Color ENTRY_COUNT_TEXT           = {255, 255, 255, 255};
-
+        
+        constexpr int HEADER_Y                        = 14;
         constexpr int STATUS_MSG_TOP_OFFSET            = 22;
         constexpr int STATUS_MSG_MIN_Y                 = 10;
         constexpr int STATUS_MSG_FALLBACK_Y_OFFSET     = 6;
@@ -260,8 +261,8 @@ namespace Theme {
         constexpr int DEFAULT_SCREEN_WIDTH             = 800;
         constexpr int DEFAULT_SCREEN_HEIGHT            = 600;
 
-        constexpr Uint32 HOVER_PREVIEW_DELAY_MS        = 350;
-        constexpr int PREVIEW_MAX_WIDTH                = 360;
+        constexpr Uint32 HOVER_PREVIEW_DELAY_MS        = 100;
+        constexpr int PREVIEW_MAX_WIDTH                = 280;
         constexpr int PREVIEW_SCREEN_WIDTH_RATIO_DIV   = 2;
         constexpr int PREVIEW_EDGE_MARGIN              = 20;
         constexpr int PREVIEW_DECK_GAP                 = 16;
@@ -300,7 +301,7 @@ namespace Theme {
         constexpr int SCROLL_STEP_PIXELS               = 24;
         constexpr int MENU_BUTTON_GAP                  = 12;
         constexpr int MENU_MIN_LEFT                    = 20;
-        constexpr int MENU_TOP_GAP                     = 12;
+        constexpr int MENU_TOP_GAP                     = 6;
         constexpr int MENU_MIN_TOP                     = 20;
         constexpr int MENU_BUTTON_INITIAL_X            = 20;
         constexpr int MENU_BUTTON_INITIAL_Y            = 20;

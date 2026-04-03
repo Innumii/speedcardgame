@@ -6,4 +6,6 @@ class RenderCardOverlay {
 public:
     static void overlayShimmer(SDL_Renderer* renderer, const SDL_Rect& panel, Uint32 now); //for spell usage
     static void overlaySSR(SDL_Renderer* renderer, const SDL_Rect& panel, Uint32 now);
+    static void overlayDim(SDL_Renderer* renderer, const SDL_Rect& panel, Uint8 alpha);
+
 };
