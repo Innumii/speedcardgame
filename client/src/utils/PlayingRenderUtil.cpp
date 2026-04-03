@@ -90,10 +90,11 @@ namespace PlayingRenderUtil {
         return nullptr;
     }
 
-    void drawOpponentDeckAndDiscard(SDL_Renderer* renderer, RenderText& textRenderer,
-                                    const std::vector<SDL_Rect>& opponentSlots,
-                                    std::size_t deckSize, int screenW, int screenH,
-                                    TTF_Font* fontSmall) {
+    // AFTER
+    void drawOpponentDeck(SDL_Renderer* renderer, RenderText& textRenderer,
+                        const std::vector<SDL_Rect>& opponentSlots,
+                        std::size_t deckSize, int screenW, int screenH,
+                        TTF_Font* fontSmall) {
         if (!renderer || !fontSmall || opponentSlots.empty()) {
             return;
         }
@@ -102,23 +103,15 @@ namespace PlayingRenderUtil {
             static_cast<float>(screenW) / 1200.0F,
             static_cast<float>(screenH) / 850.0F);
 
-        const int cardW       = static_cast<int>(Theme::Playing::CARD_WIDTH        * scale);
-        const int cardH       = static_cast<int>(Theme::Playing::CARD_HEIGHT       * scale);
-        const int sideGap     = static_cast<int>(Theme::Playing::OPPONENT_SIDE_GAP * scale);
-        const int sideMargin  = static_cast<int>(Theme::Playing::SIDE_ZONE_MARGIN  * scale);
-        const int textPad     = static_cast<int>(Theme::Playing::ZONE_TEXT_PADDING * scale);
-        const int stackXOff   = static_cast<int>(Theme::Playing::DECK_STACK_X_OFFSET * scale);
-        const int stackYOff   = static_cast<int>(Theme::Playing::DECK_STACK_Y_OFFSET * scale);
-        const int stackMax    = Theme::Playing::DECK_STACK_MAX_CARDS;
-        const int cornerRadius = std::max(2, static_cast<int>(Theme::Board::DISCARD_CORNER_RADIUS * scale));
+        const int cardW      = static_cast<int>(Theme::Playing::CARD_WIDTH          * scale);
+        const int cardH      = static_cast<int>(Theme::Playing::CARD_HEIGHT         * scale);
+        const int sideGap    = static_cast<int>(Theme::Playing::OPPONENT_SIDE_GAP   * scale);
+        const int sideMargin = static_cast<int>(Theme::Playing::SIDE_ZONE_MARGIN    * scale);
+        const int textPad    = static_cast<int>(Theme::Playing::ZONE_TEXT_PADDING   * scale);
+        const int stackXOff  = static_cast<int>(Theme::Playing::DECK_STACK_X_OFFSET * scale);
+        const int stackYOff  = static_cast<int>(Theme::Playing::DECK_STACK_Y_OFFSET * scale);
+        const int stackMax   = Theme::Playing::DECK_STACK_MAX_CARDS;
 
-        const SDL_Rect opponentDiscard = PlayingLayoutUtil::computeDiscardRect(
-            opponentSlots,
-            cardW,
-            cardH,
-            sideGap,
-            sideMargin
-        );
         const SDL_Rect deckBase = PlayingLayoutUtil::computeDeckRect(
             opponentSlots,
             screenW,
@@ -126,25 +119,6 @@ namespace PlayingRenderUtil {
             cardH,
             sideGap,
             sideMargin
-        );
-        const int textPadding = Theme::Board::DISCARD_TEXT_PADDING;
-        const int maxTextWidth = opponentDiscard.w - (textPadding * 2);
-        // Rounded discard zone — matches local player style
-        RenderUtil::drawRoundedRect(
-            renderer,
-            opponentDiscard,
-            cornerRadius,
-            Theme::Playing::OPPONENT_DISCARD_FILL,
-            Theme::Playing::OPPONENT_DISCARD_BORDER
-        );
-        textRenderer.drawWrappedText(
-            renderer,
-            "Opponent Discard",
-            fontSmall,
-            Theme::TEXT_PRIMARY,
-            opponentDiscard.x + textPad,
-            opponentDiscard.y + textPad,
-            maxTextWidth
         );
 
         const int stackCount = static_cast<int>(

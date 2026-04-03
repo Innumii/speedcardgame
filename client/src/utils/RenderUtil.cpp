@@ -94,6 +94,75 @@ void RenderUtil::drawRoundedRect(SDL_Renderer* renderer, const SDL_Rect& rect, i
     drawRoundedBorder(renderer, rect, radius, border, 1);
 }
 
+// ── Plain (non-rounded) rect helpers ─────────────────────────────────────────
+
+void RenderUtil::drawPlainBorder(SDL_Renderer* renderer, const SDL_Rect& rect,
+                                  SDL_Color border, int thickness) {
+    if (!renderer || rect.w <= 0 || rect.h <= 0 || thickness <= 0) return;
+
+    SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+    SDL_SetRenderDrawColor(renderer, border.r, border.g, border.b, border.a);
+
+    const int t = std::max(1, thickness);
+    // Top
+    SDL_Rect top    = {rect.x,              rect.y,              rect.w, t};
+    // Bottom
+    SDL_Rect bottom = {rect.x,              rect.y + rect.h - t, rect.w, t};
+    // Left (inner edges avoid doubling corners)
+    SDL_Rect left   = {rect.x,              rect.y + t,          t, rect.h - 2 * t};
+    // Right
+    SDL_Rect right  = {rect.x + rect.w - t, rect.y + t,          t, rect.h - 2 * t};
+
+    SDL_RenderFillRect(renderer, &top);
+    SDL_RenderFillRect(renderer, &bottom);
+    SDL_RenderFillRect(renderer, &left);
+    SDL_RenderFillRect(renderer, &right);
+}
+
+// Draws a bold L-shaped accent at each of the four corners of `rect`.
+//   accentLength    — how far the accent runs along each edge (pixels)
+//   accentThickness — how thick the accent arm is (pixels)
+void RenderUtil::drawCornerAccents(SDL_Renderer* renderer, const SDL_Rect& rect,
+                                    SDL_Color color,
+                                    int accentLength, int accentThickness) {
+    if (!renderer || rect.w <= 0 || rect.h <= 0) return;
+
+    const int L = std::max(2, std::min(accentLength,    std::min(rect.w, rect.h) / 2));
+    const int t = std::max(1, std::min(accentThickness, L));
+
+    SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+    SDL_SetRenderDrawColor(renderer, color.r, color.g, color.b, color.a);
+
+    const int x = rect.x;
+    const int y = rect.y;
+    const int w = rect.w;
+    const int h = rect.h;
+
+    // ── Top-left ──────────────────────────────────────────────────────
+    SDL_Rect tl_h = {x,         y,     L, t};  // horizontal arm
+    SDL_Rect tl_v = {x,         y + t, t, L - t};  // vertical arm (avoids double-drawing corner px)
+    // ── Top-right ─────────────────────────────────────────────────────
+    SDL_Rect tr_h = {x + w - L, y,     L, t};
+    SDL_Rect tr_v = {x + w - t, y + t, t, L - t};
+    // ── Bottom-left ───────────────────────────────────────────────────
+    SDL_Rect bl_h = {x,         y + h - t,     L, t};
+    SDL_Rect bl_v = {x,         y + h - L,     t, L - t};
+    // ── Bottom-right ──────────────────────────────────────────────────
+    SDL_Rect br_h = {x + w - L, y + h - t,     L, t};
+    SDL_Rect br_v = {x + w - t, y + h - L,     t, L - t};
+
+    SDL_RenderFillRect(renderer, &tl_h);
+    SDL_RenderFillRect(renderer, &tl_v);
+    SDL_RenderFillRect(renderer, &tr_h);
+    SDL_RenderFillRect(renderer, &tr_v);
+    SDL_RenderFillRect(renderer, &bl_h);
+    SDL_RenderFillRect(renderer, &bl_v);
+    SDL_RenderFillRect(renderer, &br_h);
+    SDL_RenderFillRect(renderer, &br_v);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 void RenderUtil::drawRoundedShadow(SDL_Renderer* renderer, const SDL_Rect& rect, int radius, int offset, SDL_Color color) {
     if (!renderer || rect.w <= 0 || rect.h <= 0) return;
 
@@ -165,8 +234,6 @@ void RenderUtil::drawHexagon(SDL_Renderer* renderer, int centerX, int centerY, i
     SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
     SDL_SetRenderDrawColor(renderer, fill.r, fill.g, fill.b, fill.a);
 
-    // Precompute the 6 vertices of a flat-top hexagon, starting from the top
-    // Each vertex is separated by 60 degrees (PI / 3 radians)
     const double angleStep = M_PI / 3;
     double vx[6], vy[6];
     for (int i = 0; i < 6; ++i) {
@@ -175,30 +242,21 @@ void RenderUtil::drawHexagon(SDL_Renderer* renderer, int centerX, int centerY, i
         vy[i] = centerY + size * std::sin(angle);
     }
 
-    // Determine the vertical scan range (top to bottom of the hexagon)
-    int yMin = static_cast<int>(std::ceil(vy[0]));   // topmost vertex
-    int yMax = static_cast<int>(std::floor(vy[3]));  // bottommost vertex
+    int yMin = static_cast<int>(std::ceil(vy[0]));
+    int yMax = static_cast<int>(std::floor(vy[3]));
 
-    // Fill the hexagon row by row using edge intersection (scanline rasterisation)
     for (int y = yMin; y <= yMax; ++y) {
-        // For each scanline, find the left and right x boundaries by intersecting
-        // the horizontal line with each of the 6 edges of the hexagon
-        double xLeft  = static_cast<double>(centerX + size); // start wide right
-        double xRight = static_cast<double>(centerX - size); // start wide left
+        double xLeft  = static_cast<double>(centerX + size);
+        double xRight = static_cast<double>(centerX - size);
 
         for (int i = 0; i < 6; ++i) {
-            // Wrap around so the last edge connects back to the first vertex
             const int j = (i + 1) % 6;
-
             const double y0 = vy[i], y1 = vy[j];
             const double x0 = vx[i], x1 = vx[j];
 
-            // Skip edges that don't cross this scanline
             if ((y < std::min(y0, y1)) || (y > std::max(y0, y1))) continue;
-            // Skip perfectly horizontal edges (no unique x intersection)
             if (y0 == y1) continue;
 
-            // Linear interpolation: find x where the edge crosses scanline y
             const double t = (y - y0) / (y1 - y0);
             const double xIntersect = x0 + t * (x1 - x0);
 
@@ -206,7 +264,6 @@ void RenderUtil::drawHexagon(SDL_Renderer* renderer, int centerX, int centerY, i
             xRight = std::max(xRight, xIntersect);
         }
 
-        // Draw the horizontal span between the two boundary intersections
         SDL_RenderDrawLine(renderer,
             static_cast<int>(std::ceil(xLeft)),
             y,
