@@ -106,7 +106,7 @@ namespace Theme {
         constexpr Uint32 SPELL_CAST_PREVIEW_DURATION_MS = 1000;
         constexpr int OVERLAY_MARGIN                   = 20;
 
-        constexpr int OPPONENT_BAR_WIDTH               = 480;
+        constexpr int OPPONENT_BAR_WIDTH               = 400;
         constexpr int OPPONENT_BAR_HEIGHT              = 40;
         constexpr int OPPONENT_BAR_TOP                 = 12;
         constexpr int OPPONENT_BAR_TEXT_PADDING        = 12;
@@ -114,7 +114,7 @@ namespace Theme {
         constexpr int OPPONENT_BAR_DIVIDER_INSET       = 8;
 
         constexpr int PLAYER_BAR_WIDTH                 = 400;
-        constexpr int PLAYER_BAR_HEIGHT                = 50;
+        constexpr int PLAYER_BAR_HEIGHT                = 40;
         constexpr int PLAYER_BAR_BOTTOM_MARGIN         = 20;
         constexpr int PLAYER_BAR_GLOW_INSET            = 3;
         constexpr int PLAYER_BAR_DIVIDER_INSET         = 10;
@@ -147,8 +147,6 @@ namespace Theme {
         constexpr int TARGET_PROMPT_X                  = 20;
         constexpr int TARGET_PROMPT_Y                  = 130;
 
-        constexpr SDL_Color OPPONENT_DISCARD_FILL      = {70, 60, 80, 255};
-        constexpr SDL_Color OPPONENT_DISCARD_BORDER    = {170, 150, 190, 255};
         constexpr SDL_Color OPPONENT_BAR_BORDER        = {100, 80, 120, 255};
         constexpr SDL_Color OPPONENT_BAR_DIVIDER       = {100, 80, 120, 200};
         constexpr SDL_Color OPPONENT_LABEL             = {180, 170, 200, 255};
@@ -184,27 +182,41 @@ namespace Theme {
     namespace Board {
         constexpr int LABEL_MIN_Y                      = 10;
         constexpr int LABEL_OFFSET_Y                   = 22;
-        constexpr int ZONE_CORNER_RADIUS               = 8;
+        constexpr int ZONE_CORNER_RADIUS               = 8;   // kept for reference, no longer used for play zones
         constexpr int ZONE_BORDER_THICKNESS            = 2;
-        constexpr int DISCARD_CORNER_RADIUS            = 10;
+        constexpr int DISCARD_CORNER_RADIUS            = 10;  // kept for reference, no longer used for discard zone
         constexpr int DISCARD_TEXT_PADDING             = 6;
         constexpr int DISCARD_BORDER_THICKNESS         = 2;
         constexpr int DISCARD_HOVER_BORDER_THICKNESS   = 3;
 
+        // ── Corner accent: bold L-shaped marks drawn at each corner ──
+        // Values are at reference resolution (1200x850); RenderBoard scales them.
+        constexpr int ZONE_CORNER_ACCENT_LENGTH        = 14;  // px along each edge
+        constexpr int ZONE_CORNER_ACCENT_THICKNESS     = 3;   // px perpendicular to edge
+        constexpr int DISCARD_CORNER_ACCENT_LENGTH     = 12;
+        constexpr int DISCARD_CORNER_ACCENT_THICKNESS  = 3;
+
         constexpr SDL_Color OPPONENT_LABEL             = {180, 160, 200, 255};
         constexpr SDL_Color OPPONENT_ZONE_FILL         = {50, 40, 55, 180};
         constexpr SDL_Color OPPONENT_ZONE_BORDER       = {120, 90, 130, 255};
+        constexpr SDL_Color OPPONENT_ZONE_ACCENT       = {175, 135, 200, 255}; // brighter corner marks
 
         constexpr SDL_Color PLAYER_LABEL               = {180, 220, 180, 255};
         constexpr SDL_Color PLAYER_ZONE_FILL           = {40, 60, 50, 180};
         constexpr SDL_Color PLAYER_ZONE_BORDER         = {100, 160, 120, 255};
+        constexpr SDL_Color PLAYER_ZONE_ACCENT         = {155, 225, 170, 255}; // brighter corner marks
 
         constexpr SDL_Color DISCARD_FILL               = {45, 60, 80, 180};
         constexpr SDL_Color DISCARD_FILL_HOVER         = {60, 75, 100, 200};
         constexpr SDL_Color DISCARD_BORDER             = {90, 120, 160, 255};
         constexpr SDL_Color DISCARD_BORDER_HOVER       = {120, 150, 200, 255};
+        constexpr SDL_Color DISCARD_ACCENT             = {145, 180, 225, 255};
+        constexpr SDL_Color DISCARD_ACCENT_HOVER       = {185, 215, 255, 255};
         constexpr SDL_Color DISCARD_TITLE_TEXT         = {220, 230, 255, 255};
         constexpr SDL_Color DISCARD_DESCRIPTION_TEXT   = {180, 200, 230, 255};
+        constexpr SDL_Color OPPONENT_DISCARD_FILL          = {50,  40,  65,  180};
+        constexpr SDL_Color OPPONENT_DISCARD_BORDER        = {120, 90,  140, 255};
+        constexpr SDL_Color OPPONENT_DISCARD_ACCENT        = {175, 135, 205, 255};
     }
 
     namespace CombatWidget {

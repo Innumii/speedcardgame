@@ -345,7 +345,10 @@ void RenderPlaying::render(Playing& playing, const Game& game) {
 	// ── draw zones ───────────────────────────────────────────────────
 	RenderBoard::drawOpponentPlayZones(renderer, textRenderer, playing.opponentSlots, uiFonts.small);
 	const int opponentDeckCount = playing.remotePlayer.getDeck().size();
-	PlayingRenderUtil::drawOpponentDeckAndDiscard(
+	const SDL_Rect opponentDiscardRect = PlayingRenderUtil::computeOpponentDiscardRect(
+		playing.opponentSlots, screenW, screenH);
+
+	PlayingRenderUtil::drawOpponentDeck(   // deck only — no discard drawing
 		renderer,
 		textRenderer,
 		playing.opponentSlots,
@@ -354,6 +357,7 @@ void RenderPlaying::render(Playing& playing, const Game& game) {
 		screenH,
 		uiFonts.small
 	);
+	RenderBoard::drawOpponentDiscardZone(renderer, textRenderer, opponentDiscardRect, uiFonts.small);
 	RenderBoard::drawPlayZones(renderer, textRenderer, playing.playSlots, uiFonts.small);
 	RenderBoard::drawDiscardZone(renderer, textRenderer, playing.discardZone, hoveringDiscard, uiFonts.small);
 	const int selfDeckCount = playing.localPlayer.getDeck().size();

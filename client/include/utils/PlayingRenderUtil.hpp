@@ -33,10 +33,10 @@ namespace PlayingRenderUtil {
     std::shared_ptr<const DrawCardAnimation> findDrawAnimation(
         const std::shared_ptr<const AnimationInterface>& animation);
 
-    void drawOpponentDeckAndDiscard(SDL_Renderer* renderer, RenderText& textRenderer,
-                                    const std::vector<SDL_Rect>& opponentSlots,
-                                    std::size_t deckSize, int screenW, int screenH,
-                                    TTF_Font* fontSmall);
+    void drawOpponentDeck(SDL_Renderer* renderer, RenderText& textRenderer,
+                        const std::vector<SDL_Rect>& opponentSlots,
+                        std::size_t deckSize, int screenW, int screenH,
+                        TTF_Font* fontSmall);
 
     void drawSelfDeck(SDL_Renderer* renderer, RenderText& textRenderer,
                       const std::vector<SDL_Rect>& playSlots,

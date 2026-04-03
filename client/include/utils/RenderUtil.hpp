@@ -21,6 +21,12 @@ namespace RenderUtil {
 
     SDL_Color brighten(SDL_Color color, int amount);
     SDL_Color darken(SDL_Color color, int amount);
+
+    void drawPlainBorder(SDL_Renderer* renderer, const SDL_Rect& rect,
+                                SDL_Color border, int thickness);
+    void drawCornerAccents(SDL_Renderer* renderer, const SDL_Rect& rect,
+                                  SDL_Color color,
+                                  int accentLength, int accentThickness);
 }
 
 #endif
