@@ -253,6 +253,7 @@ namespace Theme {
         constexpr SDL_Color ENTRY_COUNT_TEXT           = {255, 255, 255, 255};
         
         constexpr int HEADER_Y                        = 14;
+        constexpr int HEADER_CLEARANCE                = 44;
         constexpr int STATUS_MSG_TOP_OFFSET            = 22;
         constexpr int STATUS_MSG_MIN_Y                 = 10;
         constexpr int STATUS_MSG_FALLBACK_Y_OFFSET     = 6;

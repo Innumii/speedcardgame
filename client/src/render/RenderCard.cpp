@@ -681,7 +681,9 @@ void drawTemplateLayout(SDL_Renderer* renderer, const Card& card, const SDL_Rect
     }
 
     if (expandedMode && showTextBox) {
-        const int halvedNameH = std::max(1, nameH / 2);
+        // Never let the name plate collapse below one line of text + padding.
+        const int minNameH    = TTF_FontHeight(uiFont) + sc(4);
+        const int halvedNameH = std::max(minNameH, nameH / 2);
         const int halvedTextH = std::max(1, textH);
         artH  += (nameH - halvedNameH) + (textH - halvedTextH);
         nameH  = halvedNameH;
@@ -751,9 +753,12 @@ void drawTemplateLayout(SDL_Renderer* renderer, const Card& card, const SDL_Rect
             {card.getName(), uiFont, Theme::Card::NAME_TEXT,
              nameClip.w, TTF_WRAPPED_ALIGN_CENTER});
         if (ne && ne->texture) {
+            // Centre vertically; clamp so text never starts above nameClip.y.
+            // SDL_RenderSetClipRect (set just above) hard-prevents downward bleed.
+            const int ny = nameClip.y + std::max(0, (nameClip.h - ne->h) / 2);
             const SDL_Rect dst{
                 nameClip.x + std::max(0, (nameClip.w - ne->w) / 2),
-                nameClip.y + std::max(0, (nameClip.h - ne->h) / 2),
+                ny,
                 ne->w, ne->h
             };
             SDL_RenderCopy(renderer, ne->texture, nullptr, &dst);

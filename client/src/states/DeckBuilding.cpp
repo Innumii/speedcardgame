@@ -96,12 +96,21 @@ void DeckBuilding::handleEvents(Game& game, const SDL_Event& event) {
         RenderCard::clearRenderCache();
     }
 
+    // Compute the same Y offset applied in RenderDeckBuilding::render so that
+    // all hit-rects in handleEvents match the actual drawn positions.
+    int screenW_ev = 0, screenH_ev = 0;
+    if (SDL_Renderer* renderer = game.getRenderer()) {
+        SDL_GetRendererOutputSize(renderer, &screenW_ev, &screenH_ev);
+    }
+    const int contentYOffset = static_cast<int>(screenH_ev * 0.02f);
+
     auto layout = buildLayout(game);
     const int previousScrollOffset = deckScrollOffset;
     deckScrollOffset = clampScrollOffset(deckScrollOffset, layout.maxDeckScrollOffset);
     if (deckScrollOffset != previousScrollOffset) {
         layout = buildLayout(game);
     }
+    layout.applyYOffset(contentYOffset);
 
     if (event.type == SDL_MOUSEWHEEL) {
         int mouseX = 0;
@@ -186,6 +195,47 @@ void DeckBuilding::handleEvents(Game& game, const SDL_Event& event) {
         return;
     }
 
+    // ── Right-click: add copy from collection, remove copy from deck ──────────
+    if (event.type == SDL_MOUSEBUTTONDOWN && event.button.button == SDL_BUTTON_RIGHT) {
+        const SDL_Point point = getPoint(event.button.x, event.button.y);
+
+        // Right-click on collection card → add one copy to deck
+        for (std::size_t i = 0; i < layout.collectionCardRects.size(); ++i) {
+            if (pointInRect(point, layout.collectionCardRects[i])) {
+                if (i < layout.collectionCardIndices.size()) {
+                    const int cardIndex = layout.collectionCardIndices[i];
+                    const int remaining = Inventory::getRemainingCount(
+                        inventoryCopies,
+                        inventoryLoaded,
+                        deckCopies,
+                        cardIndex,
+                        Deck::getDeckCopiesLimit()
+                    );
+                    Deck::addCopy(
+                        deckCopies,
+                        cardIndex,
+                        Deck::getDeckCopiesLimit(),
+                        Deck::getDeckSizeLimit(),
+                        remaining
+                    );
+                }
+                return;
+            }
+        }
+
+        // Right-click on deck entry → remove one copy (use hoverIndex for accurate targeting)
+        if (pointInRect(point, layout.deckEntriesClipRect) &&
+            hoverIndex != static_cast<std::size_t>(-1)) {
+            const int cardIndex = static_cast<int>(hoverIndex);
+            if (cardIndex >= 0 &&
+                cardIndex < static_cast<int>(deckCopies.size()) &&
+                deckCopies[cardIndex] > 0) {
+                Deck::removeCopy(deckCopies, cardIndex);
+                return;
+            }
+        }
+    }
+
     if (event.type == SDL_MOUSEBUTTONDOWN && event.button.button == SDL_BUTTON_LEFT) {
         const SDL_Point point = getPoint(event.button.x, event.button.y);
 
@@ -196,20 +246,6 @@ void DeckBuilding::handleEvents(Game& game, const SDL_Event& event) {
         if (layout.pageCount > 1 && pointInRect(point, layout.nextPageButton) && collectionPage < layout.pageCount - 1) {
             collectionPage += 1;
             return;
-        }
-
-        // ── Remove button hit-test (must come before drag initiation) ─────────
-        if (!dragging) {
-            for (std::size_t i = 0; i < layout.deckEntryRemoveRects.size(); ++i) {
-                if (pointInRect(point, layout.deckEntriesClipRect) &&
-                    pointInRect(point, layout.deckEntryRemoveRects[i])) {
-                    const int cardIndex = layout.deckEntryCardIndices[i];
-                    if (cardIndex >= 0 && cardIndex < static_cast<int>(deckCopies.size())) {
-                        Deck::removeCopy(deckCopies, cardIndex);
-                    }
-                    return;
-                }
-            }
         }
 
         for (std::size_t i = 0; i < layout.collectionCardRects.size(); ++i) {
@@ -239,14 +275,28 @@ void DeckBuilding::handleEvents(Game& game, const SDL_Event& event) {
             }
         }
 
-        for (std::size_t i = 0; i < layout.deckEntryRects.size(); ++i) {
-            if (pointInRect(point, layout.deckEntriesClipRect) && pointInRect(point, layout.deckEntryRects[i])) {
+        // ── Drag from deck: use hoverIndex for accurate entry targeting ──────
+        if (pointInRect(point, layout.deckEntriesClipRect) &&
+            hoverIndex != static_cast<std::size_t>(-1)) {
+            const int cardIdx = static_cast<int>(hoverIndex);
+            if (cardIdx >= 0 &&
+                cardIdx < static_cast<int>(deckCopies.size()) &&
+                deckCopies[cardIdx] > 0) {
                 dragging = true;
                 draggingFromDeck = true;
-                draggedCardIndex = layout.deckEntryCardIndices[i];
+                draggedCardIndex = cardIdx;
                 dragPos = point;
-                dragOffset.x = point.x - layout.deckEntryRects[i].x;
-                dragOffset.y = point.y - layout.deckEntryRects[i].y;
+                // Find the matching entry rect for a natural drag offset
+                auto it = std::find(layout.deckEntryCardIndices.begin(),
+                                    layout.deckEntryCardIndices.end(), cardIdx);
+                if (it != layout.deckEntryCardIndices.end()) {
+                    const std::size_t idx = static_cast<std::size_t>(
+                        std::distance(layout.deckEntryCardIndices.begin(), it));
+                    dragOffset.x = point.x - layout.deckEntryRects[idx].x;
+                    dragOffset.y = point.y - layout.deckEntryRects[idx].y;
+                } else {
+                    dragOffset = {0, 0};
+                }
                 return;
             }
         }
@@ -293,7 +343,12 @@ void DeckBuilding::update(Game& game) {
 void DeckBuilding::render(Game& game) {
     SDL_Renderer* renderer = game.getRenderer();
 
-    const auto layout = buildLayout(game);
+    int screenW = 0, screenH = 0;
+    SDL_GetRendererOutputSize(renderer, &screenW, &screenH);
+    const int contentYOffset = static_cast<int>(screenH * 0.02f);
+
+    auto layout = buildLayout(game);
+    layout.applyYOffset(contentYOffset);
     updateMenuButtons(layout);
 
     RenderDeckBuilding::render(*this, game);
@@ -425,7 +480,6 @@ DeckBuilding::Layout DeckBuilding::buildLayout(const Game& game) const {
     const auto deckOrder = getDeckEntryOrder();
     layout.deckEntryCardIndices = deckOrder;
     layout.deckEntryRects.reserve(deckOrder.size());
-    layout.deckEntryRemoveRects.reserve(deckOrder.size()); // ← NEW
 
     const int entryStartY   = layout.deckArea.y + sc(Theme::DeckBuilding::ENTRY_START_Y_PADDING);
     const int entriesBottom = layout.deckArea.y + layout.deckArea.h - sc(Theme::DeckBuilding::ENTRY_BOTTOM_PADDING);
@@ -444,9 +498,6 @@ DeckBuilding::Layout DeckBuilding::buildLayout(const Game& game) const {
     }
     layout.maxDeckScrollOffset = std::max(0, contentHeight - layout.deckEntriesClipRect.h);
 
-    const int removeBtnSize   = sc(Theme::DeckBuilding::ENTRY_REMOVE_BTN_SIZE);
-    const int removeBtnMargin = sc(Theme::DeckBuilding::ENTRY_REMOVE_BTN_MARGIN);
-
     for (std::size_t i = 0; i < deckOrder.size(); ++i) {
         SDL_Rect entryRect{
             layout.deckArea.x + sc(Theme::DeckBuilding::ENTRY_X_PADDING),
@@ -455,46 +506,31 @@ DeckBuilding::Layout DeckBuilding::buildLayout(const Game& game) const {
             entryHeight
         };
         layout.deckEntryRects.push_back(entryRect);
-
-        // ── Remove button: vertically centred, right-aligned inside entry ─────
-        SDL_Rect removeRect{
-            entryRect.x + entryRect.w - removeBtnSize - removeBtnMargin,
-            entryRect.y + (entryRect.h - removeBtnSize) / 2,
-            removeBtnSize,
-            removeBtnSize
-        };
-        layout.deckEntryRemoveRects.push_back(removeRect); // ← NEW
     }
 
     return layout;
 }
 
 void DeckBuilding::updateMenuButtons(const Layout& layout) {
-    const int contentX = layout.collectionArea.x;
-    const int contentRight = layout.deckArea.x + layout.deckArea.w;
-    const int contentW = contentRight - contentX;
+    const int NAV_BTN_W = layout.prevPageButton.w;
+    const int NAV_BTN_H = layout.prevPageButton.h;
+    constexpr int BTN_GAP = 6;
 
-    const int buttonGap = Theme::DeckBuilding::MENU_BUTTON_GAP;
-    const int totalButtonsW = TitleButton.w + SaveButton.w + PlayButton.w + ClearButton.w + (buttonGap * 3);
-    int startX = contentX + (contentW - totalButtonsW) / 2;
-    if (startX < Theme::DeckBuilding::MENU_MIN_LEFT) startX = Theme::DeckBuilding::MENU_MIN_LEFT;
+    // ── Back to Title ─────────────────────────────────────────────────────
+    const int topButtonY = Theme::DeckBuilding::HEADER_Y + Theme::DeckBuilding::HEADER_CLEARANCE + 20;
+    const int leftX      = 36;
 
-    int buttonY = layout.collectionArea.y - TitleButton.h + Theme::DeckBuilding::MENU_TOP_GAP;
-    if (buttonY < Theme::DeckBuilding::MENU_MIN_TOP) buttonY = Theme::DeckBuilding::MENU_MIN_TOP;
+    TitleButton  = {leftX, topButtonY, 110, 34};
 
-    TitleButton.x = startX;
-    TitleButton.y = buttonY;
+    // ── Play — centered horizontally above the deck panel ─────────────────
+    PlayButton.w = Theme::DeckBuilding::MENU_BUTTON_WIDTH;
+    PlayButton.h = Theme::DeckBuilding::MENU_BUTTON_HEIGHT;
+    PlayButton.x = layout.deckArea.x + (layout.deckArea.w - PlayButton.w) / 2;
+    PlayButton.y = layout.deckArea.y - PlayButton.h - BTN_GAP;
 
-    ClearButton.x = startX + TitleButton.w + buttonGap;
-    ClearButton.y = buttonY;
-
-    SaveButton.x = ClearButton.x + ClearButton.w + buttonGap;
-    SaveButton.y = buttonY;
-
-    PlayButton.x = SaveButton.x + SaveButton.w + buttonGap;
-    PlayButton.y = buttonY;
-
-    
+    // ── Clear / Save — aligned with pager row ─────────────────────────────
+    ClearButton = {layout.deckArea.x,                                  layout.prevPageButton.y, NAV_BTN_W, NAV_BTN_H};
+    SaveButton  = {layout.deckArea.x + layout.deckArea.w - NAV_BTN_W, layout.prevPageButton.y, NAV_BTN_W, NAV_BTN_H};
 }
 
 std::vector<int> DeckBuilding::getDeckEntryOrder() const {

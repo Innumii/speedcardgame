@@ -180,8 +180,7 @@ void PackOpening::handleEvents(Game& game, const SDL_Event& event) {
             }
             (void)screenH;
 
-            const auto [cardW, cardH, totalW, startX, groupY, summaryY, evenCardY, oddCardY] =
-                computeCardLayout(screenW, backButton.y, PackSize, StaggerOffsetY);
+            const auto [cardW, cardH, totalW, startX, groupY, summaryY, evenCardY, oddCardY] =computeCardLayout(screenW, openPackButton.y, PackSize, StaggerOffsetY);
             const int cardGap = Theme::PackOpening::CARD_GAP;
             const Uint32 now  = SDL_GetTicks();
 
@@ -244,8 +243,7 @@ void PackOpening::handleEvents(Game& game, const SDL_Event& event) {
             }
             (void)screenH;
 
-            const auto [cardW, cardH, totalW, startX, groupY, summaryY, evenCardY, oddCardY] =
-                computeCardLayout(screenW, backButton.y, PackSize, StaggerOffsetY);
+            const auto [cardW, cardH, totalW, startX, groupY, summaryY, evenCardY, oddCardY] = computeCardLayout(screenW, openPackButton.y, PackSize, StaggerOffsetY);
             const int cardGap = Theme::PackOpening::CARD_GAP;
             const Uint32 now  = SDL_GetTicks();
 
@@ -304,8 +302,8 @@ void PackOpening::render(Game& game) {
     const int headerY = Theme::PackOpening::HEADER_Y;
     {
         int titleW = 0, titleH = 0;
-        RenderText::measureText(titleFonts.large, "Pack Opening", titleW, titleH);
-        RenderText::drawText(renderer, "Pack Opening", titleFonts.large, Theme::BANNER_TEXT, 40, headerY);
+        RenderText::measureText(titleFonts.large, "Open Packs", titleW, titleH);
+        RenderText::drawText(renderer, "Open Packs", titleFonts.large, Theme::BANNER_TEXT, 40, headerY);
 
         const std::string coinsText = "Coins: " + std::to_string(game.getPackRefundCoins());
         int coinsW = 0, coinsH = 0;
@@ -318,10 +316,10 @@ void PackOpening::render(Game& game) {
     // ── Buttons ───────────────────────────────────────────────────────────────
     const bool canOpenPack = game.getPackRefundCoins() >= PackCostCoins;
 
-    RenderButton::drawButton(renderer, backButton, "Back to Title", uiFonts.large,
-                             Theme::BTN_QUIT, Theme::BTN_BORDER, Theme::BTN_TEXT, backHovered);
-    RenderButton::drawButton(renderer, shopButton, "Coin Shop", uiFonts.large,
-                             Theme::BTN_PRIMARY, Theme::BTN_BORDER, Theme::BTN_TEXT, shopHovered);
+    RenderButton::drawButton(renderer, backButton, "Back to Title", uiFonts.small,
+                            Theme::BTN_QUIT, Theme::BTN_BORDER, Theme::BTN_TEXT, backHovered);
+    RenderButton::drawButton(renderer, shopButton, "Coin Shop", uiFonts.small,
+                            Theme::BTN_PRIMARY, Theme::BTN_BORDER, Theme::BTN_TEXT, shopHovered);
     RenderButton::drawButton(renderer, openPackButton, "Open Pack (100c)", uiFonts.large,
                              canOpenPack ? Theme::BTN_START    : Theme::BTN_DISABLED,
                              canOpenPack ? Theme::BTN_BORDER   : Theme::BTN_DISABLED_BORDER,
@@ -346,8 +344,7 @@ void PackOpening::render(Game& game) {
 
     // ── Layout ────────────────────────────────────────────────────────────────
     const int cardGap = Theme::PackOpening::CARD_GAP;
-    const auto [cardW, cardH, totalW, startX, groupY, summaryY, evenCardY, oddCardY] =
-        computeCardLayout(screenW, backButton.y, PackSize, StaggerOffsetY);
+    const auto [cardW, cardH, totalW, startX, groupY, summaryY, evenCardY, oddCardY] = computeCardLayout(screenW, openPackButton.y, PackSize, StaggerOffsetY);
 
     const int badgeH    = Theme::PackOpening::CARD_BADGE_HEIGHT;
     const int summaryH  = Theme::PackOpening::SUMMARY_HEIGHT;
@@ -489,20 +486,18 @@ void PackOpening::updateLayout(SDL_Renderer* renderer) {
         SDL_GetRendererOutputSize(renderer, &screenW, &screenH);
     }
 
-    const int gap    = 20;
-    const int groupW = backButton.w + gap + shopButton.w + gap + openPackButton.w;
-    const int maxButtonH = std::max(backButton.h, std::max(shopButton.h, openPackButton.h));
-    const int startX = (screenW - groupW) / 2;
-    const int y      = screenH - maxButtonH - Theme::PackOpening::BUTTON_BOTTOM_MARGIN;
+    // Back to Title and Coin Shop sit in the top-left, mirroring Payment's nav bar.
+    const int topButtonY = Theme::PackOpening::HEADER_Y + Theme::PackOpening::HEADER_CLEARANCE + 20;
+    const int smallGap   = 12;
+    const int leftX      = 36;
 
-    backButton.x = startX;
-    backButton.y = y;
+    backButton  = {leftX, topButtonY, 110, 34};
+    shopButton  = {leftX + 110 + smallGap, topButtonY, 160, 34};
 
-    shopButton.x = backButton.x + backButton.w + gap;
-    shopButton.y = y;
-
-    openPackButton.x = shopButton.x + shopButton.w + gap;
-    openPackButton.y = y;
+    // Open Pack stays at the bottom, centered horizontally.
+    const int openPackY  = screenH - openPackButton.h - Theme::PackOpening::BUTTON_BOTTOM_MARGIN;
+    openPackButton.x     = (screenW - openPackButton.w) / 2;
+    openPackButton.y     = openPackY;
 }
 
 // ── openPack ─────────────────────────────────────────────────────────────────
