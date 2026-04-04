@@ -1,7 +1,7 @@
 #!/bin/sh
 set -e
 
-CERT_DIR=/certs
+CERT_DIR=/app/certs
 CRT_FILE="$CERT_DIR/server.crt"
 KEY_FILE="$CERT_DIR/server.key"
 
@@ -32,7 +32,6 @@ normalize_secret_value() {
 write_secret_file_if_missing() {
     file_path="$1"
     secret_value="$2"
-    file_label="$3"
 
     if [ -s "$file_path" ]; then
         return 0
@@ -45,6 +44,24 @@ write_secret_file_if_missing() {
     normalized_value="$(normalize_secret_value "$secret_value")"
     printf '%s\n' "$normalized_value" > "$file_path"
     return 0
+}
+
+generate_self_signed_cert_if_missing() {
+    if [ -s "$CRT_FILE" ] && [ -s "$KEY_FILE" ]; then
+        return 0
+    fi
+
+    if ! command -v openssl >/dev/null 2>&1; then
+        echo "Error: openssl not found and TLS cert/key are missing."
+        return 1
+    fi
+
+    echo "Info: generating self-signed TLS certificate for local runtime"
+    openssl req -x509 -nodes -newkey rsa:2048 \
+        -keyout "$KEY_FILE" \
+        -out "$CRT_FILE" \
+        -days 365 \
+        -subj "/CN=localhost" >/dev/null 2>&1
 }
 
 validate_tls_cert() {
@@ -97,11 +114,13 @@ if ! write_secret_file_if_missing "$KEY_FILE" "$TLS_KEY" "TLS_KEY"; then
     fi
 fi
 
+generate_self_signed_cert_if_missing
+
 chmod 600 "$KEY_FILE" 2>/dev/null || true
 chmod 644 "$CRT_FILE" 2>/dev/null || true
 
 validate_tls_cert
 validate_tls_key
 
-# Execute the original server binary
-exec /app/server "$@"
+# Execute the service binary
+exec /app/main "$@"

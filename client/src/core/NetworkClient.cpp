@@ -1,9 +1,87 @@
 //This class is used for creation/handling of the Client connection to the server
 #include "core/NetworkClient.hpp"
+#include "utils/EnvUtil.hpp"
 #include <iostream>
 #include <cstring>
 #include <cerrno>
 #include <sstream>
+#include <fstream>
+#include <array>
+#include <cstdlib>
+
+#include <openssl/x509v3.h>
+
+namespace {
+    bool fileExists(const std::string& path) {
+        std::ifstream file(path);
+        return file.good();
+    }
+
+    bool loadTlsTrustStore(SSL_CTX* sslCtx) {
+        const char* explicitCaPath = std::getenv("GAME_SERVER_CA_CERT_PATH");
+        if (explicitCaPath != nullptr && explicitCaPath[0] != '\0') {
+            if (!fileExists(explicitCaPath)) {
+                std::cerr << "[NetworkClient] GAME_SERVER_CA_CERT_PATH not found: " << explicitCaPath << "\n";
+                return false;
+            }
+
+            if (SSL_CTX_load_verify_locations(sslCtx, explicitCaPath, nullptr) != 1) {
+                std::cerr << "[NetworkClient] Failed to load GAME_SERVER_CA_CERT_PATH: " << explicitCaPath << "\n";
+                return false;
+            }
+
+            return true;
+        }
+
+        static const std::array<const char*, 4> candidatePaths = {
+            "./certs/ca.crt",
+            "../certs/ca.crt",
+            "client/certs/ca.crt",
+            "/certs/ca.crt",
+        };
+
+        for (const char* candidatePath : candidatePaths) {
+            if (!fileExists(candidatePath)) {
+                continue;
+            }
+
+            if (SSL_CTX_load_verify_locations(sslCtx, candidatePath, nullptr) != 1) {
+                std::cerr << "[NetworkClient] Failed to load CA certificate bundle: " << candidatePath << "\n";
+                return false;
+            }
+
+            return true;
+        }
+
+        if (SSL_CTX_set_default_verify_paths(sslCtx) != 1) {
+            std::cerr << "[NetworkClient] Failed to load system certificate trust store\n";
+            return false;
+        }
+
+        return true;
+    }
+
+    bool configureHostnameVerification(SSL* ssl, const std::string& host) {
+        if (SSL_set_tlsext_host_name(ssl, host.c_str()) != 1) {
+            std::cerr << "[NetworkClient] Failed to configure TLS SNI host\n";
+            return false;
+        }
+
+        X509_VERIFY_PARAM* verifyParam = SSL_get0_param(ssl);
+        X509_VERIFY_PARAM_set_hostflags(verifyParam, X509_CHECK_FLAG_NO_PARTIAL_WILDCARDS);
+
+        if (X509_VERIFY_PARAM_set1_host(verifyParam, host.c_str(), 0) == 1) {
+            return true;
+        }
+
+        if (X509_VERIFY_PARAM_set1_ip_asc(verifyParam, host.c_str()) == 1) {
+            return true;
+        }
+
+        std::cerr << "[NetworkClient] Failed to configure TLS hostname/IP verification\n";
+        return false;
+    }
+}
 
 NetworkClient::NetworkClient(SocketMode m) : socketFd(-1), connected(false), mode(m) {
 #ifdef _WIN32
@@ -35,7 +113,16 @@ bool NetworkClient::initOpenSSL() {
         return false;
     }
 
-    // Optional: verify server certificate
+    if (SSL_CTX_set_min_proto_version(sslCtx, TLS1_2_VERSION) != 1) {
+        std::cerr << "[NetworkClient] Failed to set minimum TLS version\n";
+        return false;
+    }
+
+    if (!loadTlsTrustStore(sslCtx)) {
+        return false;
+    }
+
+    // Always verify the server certificate and hostname.
     SSL_CTX_set_verify(sslCtx, SSL_VERIFY_PEER, nullptr);
     if (!SSL_CTX_load_verify_locations(sslCtx, "./certs/ca.crt", nullptr)) {
         std::cerr << "[NetworkClient] Failed to load CA certificate\n";
@@ -134,6 +221,15 @@ bool NetworkClient::connectTo(const std::string& ip, int port) {
         return false;
     }
     SSL_set_fd(ssl, socketFd);
+
+    const std::string tlsServerName = EnvUtil::getEnvOrDefault("GAME_SERVER_TLS_SERVER_NAME", ip.c_str());
+    if (!configureHostnameVerification(ssl, tlsServerName)) {
+        SSL_free(ssl);
+        ssl = nullptr;
+        CLOSE_SOCKET(socketFd);
+        socketFd = -1;
+        return false;
+    }
 
     // 5️⃣ Configure verification
     SSL_CTX_set_verify(sslCtx, SSL_VERIFY_NONE, nullptr);
