@@ -82,6 +82,18 @@ variable "secrets" {
   default     = {}
 }
 
+variable "container_entrypoint" {
+  description = "Optional container entrypoint override"
+  type        = list(string)
+  default     = null
+}
+
+variable "container_command" {
+  description = "Optional container command override"
+  type        = list(string)
+  default     = null
+}
+
 variable "assign_public_ip" {
   description = "Assign public IP"
   type        = bool

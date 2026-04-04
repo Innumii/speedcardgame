@@ -14,8 +14,12 @@ COPY . .
 # Build the Go application
 RUN go build -o main .
 
+# Bootstrap TLS cert/key files from secret env vars when file mounts are unavailable.
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
 # Expose the application port (this should match the port in your .env file)
 EXPOSE 8080
 
 # Command to run the application
-CMD ["./main"]
+ENTRYPOINT ["/entrypoint.sh"]

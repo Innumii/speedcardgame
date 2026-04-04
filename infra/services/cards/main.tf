@@ -54,6 +54,10 @@ data "aws_secretsmanager_secret" "cards_runtime" {
   name  = var.cards_runtime_secret_name
 }
 
+data "aws_secretsmanager_secret" "service_tls" {
+  name = var.tls_secret_name
+}
+
 locals {
   alb_outputs                  = local.use_alb_remote_state ? data.terraform_remote_state.alb[0].outputs : {}
   alb_security_group_id        = var.alb_security_group_id != null ? var.alb_security_group_id : try(local.alb_outputs.alb_security_group_id, null)
@@ -67,6 +71,7 @@ locals {
   postgres_port                = var.postgres_port != null ? var.postgres_port : try(local.data_outputs.cards_postgres_port, null)
   redis_host                   = var.redis_host != null ? var.redis_host : try(local.data_outputs.auth_redis_endpoint, null)
   redis_port                   = var.redis_port != null ? var.redis_port : try(local.data_outputs.auth_redis_port, null)
+  tls_secret_arn               = data.aws_secretsmanager_secret.service_tls.arn
   cards_runtime_secret_arn     = coalesce(local.postgres_password_secret_arn, try(data.aws_secretsmanager_secret.cards_runtime[0].arn, null))
   cards_database_url           = "postgres://${local.postgres_user}:${local.postgres_password}@${local.postgres_host}:${local.postgres_port}/${local.postgres_db}?sslmode=${var.postgres_sslmode}"
 }
@@ -93,13 +98,26 @@ module "service" {
   desired_count         = 1
   target_group_arn      = local.cards_target_group_arn
   alb_security_group_id = local.alb_security_group_id
+  container_entrypoint  = ["/bin/sh", "-c"]
+  container_command = [
+    "mkdir -p certs; if [ -n \"$TLS_CERT\" ]; then printf '%b\\n' \"$TLS_CERT\" > certs/server.crt; fi; if [ -n \"$TLS_KEY\" ]; then printf '%b\\n' \"$TLS_KEY\" > certs/server.key; fi; chmod 644 certs/server.crt 2>/dev/null || true; chmod 600 certs/server.key 2>/dev/null || true; exec ./main"
+  ]
 
-  task_secret_arns = local.cards_runtime_secret_arn != null ? toset([local.cards_runtime_secret_arn]) : toset([])
+  task_secret_arns = toset(compact([
+    local.cards_runtime_secret_arn,
+    local.tls_secret_arn
+  ]))
 
-  secrets = local.cards_runtime_secret_arn != null ? {
-    STRIPE_SECRET_KEY     = "${local.cards_runtime_secret_arn}:STRIPE_SECRET_KEY::"
-    STRIPE_WEBHOOK_SECRET = "${local.cards_runtime_secret_arn}:STRIPE_WEBHOOK_SECRET::"
-  } : {}
+  secrets = merge(
+    {
+      TLS_CERT = "${local.tls_secret_arn}:cert::"
+      TLS_KEY  = "${local.tls_secret_arn}:key::"
+    },
+    local.cards_runtime_secret_arn != null ? {
+      STRIPE_SECRET_KEY     = "${local.cards_runtime_secret_arn}:STRIPE_SECRET_KEY::"
+      STRIPE_WEBHOOK_SECRET = "${local.cards_runtime_secret_arn}:STRIPE_WEBHOOK_SECRET::"
+    } : {}
+  )
 
   environment = merge(
     {

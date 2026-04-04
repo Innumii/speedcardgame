@@ -44,12 +44,17 @@ data "terraform_remote_state" "data" {
   }
 }
 
+data "aws_secretsmanager_secret" "service_tls" {
+  name = var.tls_secret_name
+}
+
 locals {
   alb_outputs                       = var.use_managed_alb_stack ? data.terraform_remote_state.alb[0].outputs : {}
   alb_security_group_id             = var.alb_security_group_id != null ? var.alb_security_group_id : try(local.alb_outputs.alb_security_group_id, null)
   auth_target_group_arn             = var.target_group_arn != null ? var.target_group_arn : try(local.alb_outputs.auth_target_group_arn, null)
   cards_service_base_url            = var.cards_service_base_url != null ? var.cards_service_base_url : try(local.alb_outputs.api_base_url, null)
   cards_service_host                = var.cards_service_host != null ? var.cards_service_host : try(local.alb_outputs.api_domain_name, null)
+  tls_secret_arn                    = data.aws_secretsmanager_secret.service_tls.arn
   data_outputs                      = var.use_managed_data_stack ? data.terraform_remote_state.data[0].outputs : {}
   postgres_host                     = var.postgres_host != null ? var.postgres_host : try(local.data_outputs.auth_postgres_endpoint, null)
   postgres_user                     = var.postgres_user != null ? var.postgres_user : try(local.data_outputs.auth_postgres_user, null)
@@ -83,13 +88,22 @@ module "service" {
   desired_count         = 1
   target_group_arn      = local.auth_target_group_arn
   alb_security_group_id = local.alb_security_group_id
+  container_entrypoint  = ["/bin/sh", "-c"]
+  container_command = [
+    "mkdir -p certs; if [ -n \"$TLS_CERT\" ]; then printf '%b\\n' \"$TLS_CERT\" > certs/server.crt; fi; if [ -n \"$TLS_KEY\" ]; then printf '%b\\n' \"$TLS_KEY\" > certs/server.key; fi; chmod 644 certs/server.crt 2>/dev/null || true; chmod 600 certs/server.key 2>/dev/null || true; exec ./main"
+  ]
 
   task_secret_arns = toset(compact([
     local.postgres_password_secret_arn,
-    local.cards_service_base_url_secret_arn
+    local.cards_service_base_url_secret_arn,
+    local.tls_secret_arn
   ]))
 
   secrets = merge(
+    {
+      TLS_CERT = "${local.tls_secret_arn}:cert::"
+      TLS_KEY  = "${local.tls_secret_arn}:key::"
+    },
     local.postgres_password_secret_arn != null ? {
       POSTGRES_PASSWORD = "${local.postgres_password_secret_arn}:POSTGRES_PASSWORD::"
     } : {},

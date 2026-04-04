@@ -152,6 +152,38 @@ resource "aws_lb_listener_rule" "cards" {
   }
 }
 
+resource "aws_lb_listener_rule" "cards_inventories" {
+  listener_arn = aws_lb_listener.https[0].arn
+  priority     = 210
+
+  action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.cards.arn
+  }
+
+  condition {
+    path_pattern {
+      values = ["/inventories", "/inventories/*"]
+    }
+  }
+}
+
+resource "aws_lb_listener_rule" "cards_decks" {
+  listener_arn = aws_lb_listener.https[0].arn
+  priority     = 220
+
+  action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.cards.arn
+  }
+
+  condition {
+    path_pattern {
+      values = ["/decks", "/decks/*"]
+    }
+  }
+}
+
 resource "aws_route53_record" "api" {
   zone_id = data.aws_route53_zone.primary.zone_id
   name    = local.api_domain_name

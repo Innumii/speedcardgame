@@ -25,6 +25,12 @@ variable "ghcr_pat_secret_arn" {
   description = "The ARN of the AWS Secret containing the GHCR PAT (username/password)"
   type        = string
 }
+
+variable "tls_secret_name" {
+  description = "Secrets Manager secret containing TLS cert/key fields for service HTTPS startup"
+  type        = string
+  default     = "game-server-tls"
+}
 # -------------------------------------------
 
 variable "image_tag" {
