@@ -4,8 +4,8 @@ import (
 	"os"
 	"testing"
 
-	"github.com/Ryanljk/speedcardgame/cards/models"
-	cardservices "github.com/Ryanljk/speedcardgame/cards/services"
+	"github.com/FYL-Studios/speedcardgame/cards/models"
+	cardservices "github.com/FYL-Studios/speedcardgame/cards/services"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"

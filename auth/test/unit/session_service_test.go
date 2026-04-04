@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/Ryanljk/speedcardgame/auth/services"
+	"github.com/FYL-Studios/speedcardgame/auth/services"
 )
 
 func TestCreateSession_StoresAndReturnsSessionID(t *testing.T) {

@@ -5,16 +5,14 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"path/filepath"
-	"strings"
 
 	httpSwagger "github.com/swaggo/http-swagger"
-	_ "github.com/Ryanljk/speedcardgame/cards/docs"
+	_ "github.com/FYL-Studios/speedcardgame/cards/docs"
 
-	"github.com/Ryanljk/speedcardgame/cards/config"
-	"github.com/Ryanljk/speedcardgame/cards/models"
-	"github.com/Ryanljk/speedcardgame/cards/services"
-	"github.com/Ryanljk/speedcardgame/cards/util"
+	"github.com/FYL-Studios/speedcardgame/cards/config"
+	"github.com/FYL-Studios/speedcardgame/cards/models"
+	"github.com/FYL-Studios/speedcardgame/cards/services"
+	"github.com/FYL-Studios/speedcardgame/cards/util"
 	"github.com/go-chi/chi"
 	"github.com/go-chi/cors"
 	"github.com/joho/godotenv"
@@ -79,94 +77,59 @@ func main() {
 		} else {
 			log.Printf("Card seed failed: %v", err)
 		}
-	} else {
-		log.Printf("Card seed loaded from %s", seedPath)
 	}
 
 	if err := services.FillDecksFromInventories(config.DB); err != nil {
 		log.Printf("Deck fill failed: %v", err)
 	}
 
-	fmt.Println("Connecting to database:", dsn)
-	//db.Exec("CREATE TABLE test_table (id SERIAL PRIMARY KEY, name VARCHAR(100));")  //create table just for testing purposes
-
-	//Define the router
-	router := chi.NewRouter() //setup router
-	if httpRequestLoggingEnabled {
-		router.Use(util.HTTPRequestLogger(debugLoggingEnabled))
-	}
-	router.Use(cors.Handler(cors.Options{
+	r := chi.NewRouter()
+	r.Use(cors.Handler(cors.Options{
 		AllowedOrigins:   []string{"https://*", "http://*"},
 		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
-		AllowedHeaders:   []string{"*"},
+		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token", "X-Session-ID"},
 		ExposedHeaders:   []string{"Link"},
-		AllowCredentials: false,
+		AllowCredentials: true,
 		MaxAge:           300,
 	}))
+	if httpRequestLoggingEnabled {
+		r.Use(util.HTTPRequestLogger(debugLoggingEnabled))
+	}
 
-	r := chi.NewRouter()
-	//define routes
-	r.Get("/health", health) // Check health of service
+	// Serve card images for the client
 	imageDir := resolveImageDir()
 	log.Printf("Serving card images from %s", imageDir)
-	r.Get("/images/{filename}", func(w http.ResponseWriter, req *http.Request) {
-		filename := chi.URLParam(req, "filename")
-		if filename == "" {
-			http.NotFound(w, req)
-			return
-		}
+	r.Handle("/cards/assets/*", http.StripPrefix("/cards/assets", http.FileServer(http.Dir(imageDir))))
 
-		cleaned := filepath.Clean(filename)
-		if cleaned == "." || strings.Contains(cleaned, "..") || cleaned != filepath.Base(cleaned) {
-			http.NotFound(w, req)
-			return
-		}
-
-		http.ServeFile(w, req, filepath.Join(imageDir, cleaned))
-	})
-
-	r.Get("/decks/{uid}", services.GetDeckByUserID) // Get deck by user ID
-	r.Post("/decks", services.CreateDeck)           // Create deck
-	r.Post("/decks/fill", services.FillDeckForUser)
-	r.Get("/decks", services.ListDecks) // List all decks
-
-	r.Get("/cards", services.ListCards)         // List all cards
-	r.Get("/cards/size", services.GetCardCount) // Get total card count
-
-	r.Post("/inventories", services.CreateInventory)            // Create inventory
-	r.Get("/inventories", services.ListInventories)             // List all inventories
-	r.Get("/inventories/{uid}", services.GetInventoryByUserID)  // Get inventory by user ID
-	r.Put("/inventories", services.UpdateInventory)             // Update inventory by user ID
-	r.Put("/inventories/coins", services.UpdateInventoryCoins)  // Update inventory coins by user ID
-	r.Put("/inventories/coins/add", services.AddInventoryCoins) // Add coins/subtract
-
-	r.Post("/payments/checkout-session", services.CreateCoinCheckoutSession) // Create checkout session for purchasing coins
-	r.Post("/payments/webhook", services.HandlePaymentWebhook)               // Handle payment provider webhook events
-	r.Get("/payments/checkout-status", services.GetCheckoutSessionStatus)    // Verify checkout session and apply coins
-	r.Get("/payments/checkout-complete", services.RenderCheckoutCompletePage)
-	r.Get("/payments/coin-packages", services.ListCoinPackages) // List available coin packages
-
-
-	r.Get("/swagger/*", httpSwagger.Handler(
+	r.Get("/cards/swagger/*", httpSwagger.Handler(
 		httpSwagger.URL("/cards/swagger/doc.json"),
 	))
 
-	// router.Mount("/cardbase", r) //api prefix
-	router.Mount("/cards", r)
+	r.Get("/cards/list", services.ListCards)
+	r.Get("/cards/count", services.GetCardCount)
+	r.Post("/cards/create", services.CreateCard)
+	r.Put("/cards/update", services.UpdateCard)
+	r.Delete("/cards/delete", services.DeleteCard)
+	r.Get("/inventories/{uid}", services.GetInventoryByUserID)
+	r.Post("/inventories", services.CreateInventory)
+	r.Get("/inventories", services.ListInventories)
+	r.Put("/inventories", services.UpdateInventory)
+	r.Put("/inventories/coins", services.UpdateInventoryCoins)
+	r.Put("/inventories/coins/add", services.AddInventoryCoins)
+	r.Post("/decks", services.CreateDeck)
+	r.Get("/decks", services.ListDecks)
+	r.Get("/decks/{uid}", services.GetDeckByUserID)
+	r.Delete("/decks", services.DeleteDeck)
+	r.Post("/decks/fill", services.FillDeckForUser)
+	r.Get("/payments/packages", services.ListCoinPackages)
+	r.Post("/payments/checkout-session", services.CreateCoinCheckoutSession)
+	r.Post("/payments/process-card", services.ProcessCardPayment)
+	r.Post("/payments/webhook", services.HandlePaymentWebhook)
+	r.Post("/payments/stripe-webhook", services.HandleStripeWebhook)
+	r.Get("/payments/checkout-complete", services.RenderCheckoutCompletePage)
+	r.Get("/payments/checkout-session-status", services.GetCheckoutSessionStatus)
 
-	srv := &http.Server{
-		Handler: router,
-		Addr:    ":" + portString,
-	}
-
-	//start server on port
-	if err := srv.ListenAndServe(); err != nil {
+	if err := http.ListenAndServe(":"+portString, r); err != nil {
 		log.Fatal(err)
 	}
-
-}
-
-func health(w http.ResponseWriter, r *http.Request) {
-	response := map[string]string{"message": "Healthy"}
-	util.RespondWithJSON(w, 200, response)
 }

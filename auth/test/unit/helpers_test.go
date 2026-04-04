@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/Ryanljk/speedcardgame/auth/services"
-	"github.com/Ryanljk/speedcardgame/auth/utils"
+	"github.com/FYL-Studios/speedcardgame/auth/services"
+	"github.com/FYL-Studios/speedcardgame/auth/utils"
 	"github.com/alicebob/miniredis/v2"
 	"github.com/redis/go-redis/v9"
 )

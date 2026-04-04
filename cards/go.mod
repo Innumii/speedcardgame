@@ -1,4 +1,4 @@
-module github.com/Ryanljk/speedcardgame/cards
+module github.com/FYL-Studios/speedcardgame/cards
 
 go 1.24
 

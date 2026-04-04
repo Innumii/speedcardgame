@@ -1,9 +1,9 @@
 aws_region = "us-east-1"
 image_tag  = "latest"
-image_repo = "ryanljk/g4t2-server-service"
+image_repo = "FYL-Studios/g4t2-server-service"
 assign_public_ip = true
 
-github_username     = "Ryanljk"
+github_username     = "FYL-Studios"
 github_repo_name    = "speedcardgame"
 ghcr_pat_secret_arn = "arn:aws:secretsmanager:us-east-1:123456789012:secret:ghcr-auth-credentials-xxxxxx"
 

@@ -8,9 +8,9 @@ import (
 	"os"
 	"testing"
 
-	"github.com/Ryanljk/speedcardgame/auth/models"
-	"github.com/Ryanljk/speedcardgame/auth/repositories"
-	"github.com/Ryanljk/speedcardgame/auth/services"
+	"github.com/FYL-Studios/speedcardgame/auth/models"
+	"github.com/FYL-Studios/speedcardgame/auth/repositories"
+	"github.com/FYL-Studios/speedcardgame/auth/services"
 	"github.com/joho/godotenv"
 	"github.com/redis/go-redis/v9"
 	"gorm.io/driver/postgres"

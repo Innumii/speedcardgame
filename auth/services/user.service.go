@@ -16,10 +16,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Ryanljk/speedcardgame/auth/dtos"
-	"github.com/Ryanljk/speedcardgame/auth/models"
-	"github.com/Ryanljk/speedcardgame/auth/repositories"
-	"github.com/Ryanljk/speedcardgame/auth/utils"
+	"github.com/FYL-Studios/speedcardgame/auth/dtos"
+	"github.com/FYL-Studios/speedcardgame/auth/models"
+	"github.com/FYL-Studios/speedcardgame/auth/repositories"
+	"github.com/FYL-Studios/speedcardgame/auth/utils"
 )
 
 type AuthService struct {

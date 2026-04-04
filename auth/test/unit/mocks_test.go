@@ -3,8 +3,8 @@ package services_test
 import (
 	"time"
 
-	"github.com/Ryanljk/speedcardgame/auth/models"
-	"github.com/Ryanljk/speedcardgame/auth/repositories"
+	"github.com/FYL-Studios/speedcardgame/auth/models"
+	"github.com/FYL-Studios/speedcardgame/auth/repositories"
 )
 
 // MockUserRepository implements repositories.UserRepository for testing

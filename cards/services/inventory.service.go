@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/Ryanljk/speedcardgame/cards/config"
-	"github.com/Ryanljk/speedcardgame/cards/models"
-	"github.com/Ryanljk/speedcardgame/cards/util"
+	"github.com/FYL-Studios/speedcardgame/cards/config"
+	"github.com/FYL-Studios/speedcardgame/cards/models"
+	"github.com/FYL-Studios/speedcardgame/cards/util"
 	"github.com/go-chi/chi"
 )
 
@@ -150,8 +150,8 @@ func ListInventories(w http.ResponseWriter, _ *http.Request) {
 // @Produce      json
 // @Param        uid  path      int  true  "User ID"
 // @Success      200  {object}  models.Inventory
-// @Failure      400  {string}  string  "Missing uid"
-// @Failure      500  {string}  string  "Failed to retrieve inventory"
+// @Failure      400   {string}  string  "Missing uid"
+// @Failure      500   {string}  string  "Failed to retrieve inventory"
 // @Router       /inventories/{uid} [get]
 func GetInventoryByUserID(w http.ResponseWriter, r *http.Request) {
 	uidParam := chi.URLParam(r, "uid")
