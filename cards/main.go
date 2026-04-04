@@ -109,6 +109,7 @@ func main() {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte("{\"status\":\"healthy\"}"))
 	})
+	r.Get("/cards/cards", services.ListCards)
 
 	r.Get("/cards/list", services.ListCards)
 	r.Get("/cards/count", services.GetCardCount)
