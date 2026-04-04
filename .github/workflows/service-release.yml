@@ -1,10 +1,10 @@
-
 name: Build and Push Docker to GHCR
 
 on:
   push:
     branches:
       - main
+      - https
     paths:
       - 'auth/**'
       - 'cards/**'
@@ -38,7 +38,24 @@ jobs:
       - name: Build and Push ${{ matrix.service }} Service
         run: |
           OWNER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+          BRANCH=$(echo "${GITHUB_REF_NAME}" | tr '[:upper:]' '[:lower:]' | sed 's#[^a-z0-9._-]#-#g')
+          SHORT_SHA=$(git rev-parse --short HEAD)
+          DATE_TAG=$(date -u +%Y%m%d)
+          IMAGE_BASE="ghcr.io/$OWNER/g4t2-${{ matrix.service }}-service"
+          IMAGE_TAG="$BRANCH-$DATE_TAG-$SHORT_SHA"
+
           docker build -f ${{ matrix.service }}/Dockerfile \
-            -t ghcr.io/$OWNER/g4t2-${{ matrix.service }}-service:latest \
+            -t $IMAGE_BASE:$IMAGE_TAG \
             ${{ matrix.service }}/
-          docker push ghcr.io/$OWNER/g4t2-${{ matrix.service }}-service:latest
+
+          docker push $IMAGE_BASE:$IMAGE_TAG
+
+          if [ "${GITHUB_REF_NAME}" = "main" ]; then
+            docker tag $IMAGE_BASE:$IMAGE_TAG $IMAGE_BASE:latest
+            docker push $IMAGE_BASE:latest
+          fi
+
+          if [ "${GITHUB_REF_NAME}" = "https" ]; then
+            docker tag $IMAGE_BASE:$IMAGE_TAG $IMAGE_BASE:https
+            docker push $IMAGE_BASE:https
+          fi
