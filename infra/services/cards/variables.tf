@@ -172,3 +172,9 @@ variable "http_request_log_enabled" {
   type        = bool
   default     = true
 }
+
+variable "use_aws_services" {
+  description = "When true, enables AWS Secrets Manager integration and VPC endpoints for data services"
+  type        = bool
+  default     = true
+}

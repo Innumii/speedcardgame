@@ -121,7 +121,7 @@ resource "aws_lb_listener" "https" {
 }
 
 resource "aws_lb_listener_rule" "auth" {
-  listener_arn = var.enable_https_listener ? aws_lb_listener.https[0].arn : aws_lb_listener.http[0].arn
+  listener_arn = aws_lb_listener.https[0].arn
   priority     = 100
 
   action {
@@ -137,7 +137,7 @@ resource "aws_lb_listener_rule" "auth" {
 }
 
 resource "aws_lb_listener_rule" "cards" {
-  listener_arn = var.enable_https_listener ? aws_lb_listener.https[0].arn : aws_lb_listener.http[0].arn
+  listener_arn = aws_lb_listener.https[0].arn
   priority     = 200
 
   action {

@@ -5,6 +5,7 @@
 #include <cstring>
 #include <fstream>
 #include <map>
+#include "utils/EnvUtil.hpp"
 
 #define CPPHTTPLIB_OPENSSL_SUPPORT
 #if defined(__GNUC__)
@@ -82,6 +83,7 @@ namespace HttpUtil {
 
         const bool useHttps = (port == 443);
         httplib::Result res;
+        const std::string normalizedHost = normalizeHost(host);
 
         if (useHttps) {
             httplib::SSLClient client(normalizedHost.c_str(), port);

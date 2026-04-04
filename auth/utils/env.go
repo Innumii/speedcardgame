@@ -24,17 +24,8 @@ func GetEnvAsBool(key string, defaultValue bool) bool {
 	return value
 }
 
-func isAwsEnabled() bool {
-	awsEnabledStr := GetEnvOrDefault("AWS_ENABLED", "false")
-	awsEnabled, err := strconv.ParseBool(awsEnabledStr)
-	if err != nil {
-		return true
-	}
-	return awsEnabled
-}
-
 func ResolveCardsServiceBaseURL() string {
-	if isAwsEnabled() {
+	if GetEnvAsBool("AWS_ENABLED", false) {
 		host := GetEnvOrDefault("AWS_CARDS_SERVICE_HOST", "api.fylstudios.xyz")
 		port := GetEnvOrDefault("AWS_CARDS_SERVICE_PORT", "80")
 		if host != "" && port != "" {

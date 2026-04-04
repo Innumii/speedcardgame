@@ -111,11 +111,9 @@ module "service" {
       AWS_ENABLED              = tostring(var.use_aws_services)
       CARDS_SERVICE_HOST       = local.cards_service_host
       CARDS_SERVICE_PORT       = tostring(var.cards_service_port)
-      AWS_CARDS_SERVICE_SCHEME = local.cards_service_scheme
       AWS_CARDS_SERVICE_HOST   = local.cards_service_host
       AWS_CARDS_SERVICE_PORT   = tostring(var.cards_service_port)
       TLS_VERIFY_CERTS         = tostring(true)
-      CARDS_TLS_SERVER_NAME    = local.cards_service_host
       DEBUG_LOG_ENABLED        = tostring(var.debug_log_enabled)
       HTTP_REQUEST_LOG_ENABLED = tostring(var.http_request_log_enabled)
     },

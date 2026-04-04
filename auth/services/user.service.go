@@ -84,7 +84,7 @@ func (service *AuthService) registerUser(registerDTO dtos.RegisterDTO, createInv
 
 func buildCardsTLSConfig() (*tls.Config, error) {
 	verifyTLS := utils.GetEnvAsBool("TLS_VERIFY_CERTS", true)
-	serverName := strings.TrimSpace(os.Getenv("CARDS_TLS_SERVER_NAME"))
+	serverName := strings.TrimSpace(os.Getenv("AWS_CARDS_SERVICE_HOST"))
 	caCertPath := strings.TrimSpace(os.Getenv("CARDS_CA_CERT_PATH"))
 
 	tlsConfig := &tls.Config{
