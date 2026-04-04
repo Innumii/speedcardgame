@@ -90,7 +90,7 @@ void RenderDeckBuilding::render(DeckBuilding& deckBuilding, Game& game) {
                               hoverPlay, !canPlay);
 
     RenderButton::drawButton(renderer, deckBuilding.SaveButton,
-                              "Save Deck", buttonFont,
+                              "Save", buttonFont,
                               canSave ? Theme::BTN_PRIMARY     : Theme::BTN_SECONDARY,
                               Theme::BTN_BORDER, Theme::BTN_TEXT,
                               hoverSave, !canSave);
@@ -102,7 +102,7 @@ void RenderDeckBuilding::render(DeckBuilding& deckBuilding, Game& game) {
                               hoverTitle, false);
 
     RenderButton::drawButton(renderer, deckBuilding.ClearButton,
-                              "Clear Deck", buttonFont,
+                              "Clear", buttonFont,
                               Theme::BTN_PRIMARY,
                               Theme::BTN_BORDER, Theme::BTN_TEXT,
                               hoverClear, false);
@@ -199,20 +199,20 @@ void RenderDeckBuilding::render(DeckBuilding& deckBuilding, Game& game) {
         const bool hoverNext = canNext && SDL_PointInRect(&mousePoint, &layout.nextPageButton) == SDL_TRUE;
 
         RenderButton::drawButton(renderer, layout.prevPageButton,
-                                  "Prev", fontTiny,
+                                  "Prev", buttonFont,
                                   canPrev ? Theme::BTN_PRIMARY : Theme::BTN_SECONDARY,
                                   Theme::BTN_BORDER,
                                   canPrev ? Theme::DeckBuilding::PAGER_TEXT : Theme::DeckBuilding::PAGER_DISABLED_TEXT,
                                   hoverPrev, !canPrev);
 
         RenderButton::drawButton(renderer, layout.nextPageButton,
-                                  "Next", fontTiny,
+                                  "Next", buttonFont,
                                   canNext ? Theme::BTN_PRIMARY : Theme::BTN_SECONDARY,
                                   Theme::BTN_BORDER,
                                   canNext ? Theme::DeckBuilding::PAGER_TEXT : Theme::DeckBuilding::PAGER_DISABLED_TEXT,
                                   hoverNext, !canNext);
 
-        if (fontTiny) {
+        if (buttonFont) {
             const std::string pageText = "Page " + std::to_string(layout.pageIndex + 1) + " / " + std::to_string(layout.pageCount);
             textRenderer.drawText(renderer, pageText, fontTiny, Theme::DeckBuilding::PAGE_LABEL_TEXT,
                 layout.pageLabelRect.x + Theme::DeckBuilding::PAGE_LABEL_X_OFFSET,
@@ -285,45 +285,10 @@ void RenderDeckBuilding::render(DeckBuilding& deckBuilding, Game& game) {
                 entryRect.x + Theme::DeckBuilding::ENTRY_COST_X_OFFSET,
                 entryRect.y + Theme::DeckBuilding::ENTRY_TEXT_Y_OFFSET);
 
-            // Copy count — nudged left to make room for the remove button
-            const int removeBtnSize   = Theme::DeckBuilding::ENTRY_REMOVE_BTN_SIZE;
-            const int removeBtnMargin = Theme::DeckBuilding::ENTRY_REMOVE_BTN_MARGIN;
             textRenderer.drawText(renderer, "x" + std::to_string(copies), fontTiny,
                 Theme::DeckBuilding::ENTRY_COUNT_TEXT,
-                entryRect.x + entryRect.w
-                    - removeBtnSize - removeBtnMargin
-                    - Theme::DeckBuilding::ENTRY_COUNT_X_RIGHT_INSET,
+                entryRect.x + entryRect.w - Theme::DeckBuilding::ENTRY_COUNT_X_RIGHT_INSET,
                 entryRect.y + Theme::DeckBuilding::ENTRY_TEXT_Y_OFFSET);
-        }
-
-        // ── Feature 3: remove (✕) button ─────────────────────────────
-        if (i < layout.deckEntryRemoveRects.size()) {
-            const SDL_Rect& removeRect = layout.deckEntryRemoveRects[i];
-            const bool hoverRemove =
-                SDL_PointInRect(&mousePoint, &layout.deckEntriesClipRect) == SDL_TRUE &&
-                SDL_PointInRect(&mousePoint, &removeRect) == SDL_TRUE;
-
-            SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
-            SDL_SetRenderDrawColor(renderer,
-                hoverRemove ? 220 : 160,
-                40, 40,
-                hoverRemove ? 255 : 210);
-            SDL_RenderFillRect(renderer, &removeRect);
-
-            // Thin white border
-            SDL_SetRenderDrawColor(renderer, 255, 255, 255, hoverRemove ? 200 : 120);
-            SDL_RenderDrawRect(renderer, &removeRect);
-            SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
-
-            if (fontTiny) {
-                // Centre "x" label inside the button
-                int textW = 0, textH = 0;
-                TTF_SizeText(fontTiny, "x", &textW, &textH);
-                textRenderer.drawText(renderer, "x", fontTiny,
-                    SDL_Color{255, 255, 255, 255},
-                    removeRect.x + (removeRect.w - textW) / 2,
-                    removeRect.y + (removeRect.h - textH) / 2);
-            }
         }
     }
     SDL_RenderSetClipRect(renderer, nullptr);
@@ -423,28 +388,34 @@ void RenderDeckBuilding::render(DeckBuilding& deckBuilding, Game& game) {
     if (showPreview) {
         const int hoveredCardIndex = static_cast<int>(deckBuilding.hoverIndex);
         const SDL_Rect* hoveredRect = nullptr;
+        bool hoveredFromDeck = false;
 
-        // Look up visible rect in collection first
-        if (hoveredCardIndex >= 0 && hoveredCardIndex < static_cast<int>(availableCards.size())) {
+    if (hoveredCardIndex >= 0 && hoveredCardIndex < static_cast<int>(availableCards.size())) {
+        const bool mouseOverDeck =
+            SDL_PointInRect(&mousePoint, &layout.deckEntriesClipRect) == SDL_TRUE;
+
+        if (mouseOverDeck) {
+            auto itDeck = std::find(layout.deckEntryCardIndices.begin(),
+                                    layout.deckEntryCardIndices.end(),
+                                    hoveredCardIndex);
+            if (itDeck != layout.deckEntryCardIndices.end()) {
+                hoveredRect = &layout.deckEntryRects[
+                    std::distance(layout.deckEntryCardIndices.begin(), itDeck)];
+                hoveredFromDeck = true;
+            }
+        } else {
             auto it = std::find(layout.collectionCardIndices.begin(),
                                 layout.collectionCardIndices.end(),
                                 hoveredCardIndex);
             if (it != layout.collectionCardIndices.end()) {
-                hoveredRect = &layout.collectionCardRects[std::distance(layout.collectionCardIndices.begin(), it)];
-            } else {
-                // Look in deck entries
-                auto itDeck = std::find(layout.deckEntryCardIndices.begin(),
-                                        layout.deckEntryCardIndices.end(),
-                                        hoveredCardIndex);
-                if (itDeck != layout.deckEntryCardIndices.end()) {
-                    hoveredRect = &layout.deckEntryRects[std::distance(layout.deckEntryCardIndices.begin(), itDeck)];
-                }
+                hoveredRect = &layout.collectionCardRects[
+                    std::distance(layout.collectionCardIndices.begin(), it)];
+                hoveredFromDeck = false;
             }
         }
+    }
 
-        // Only render preview if we found a visible rect
         if (hoveredRect) {
-            // Compute preview size once
             int previewWidth  = std::min(
                 Theme::DeckBuilding::PREVIEW_MAX_WIDTH,
                 screenW / Theme::DeckBuilding::PREVIEW_SCREEN_WIDTH_RATIO_DIV
@@ -457,16 +428,28 @@ void RenderDeckBuilding::render(DeckBuilding& deckBuilding, Game& game) {
             }
 
             constexpr int gap = 8;
+            int previewX, previewY;
 
-            // Position right of hovered card
-            int previewX = hoveredRect->x + hoveredRect->w + gap;
-            if (previewX + previewWidth > screenW - Theme::DeckBuilding::PREVIEW_EDGE_MARGIN) {
+            if (hoveredFromDeck) {
+                // ── Deck entry: always show preview to the left, vertically centred ──
                 previewX = hoveredRect->x - previewWidth - gap;
                 if (previewX < Theme::DeckBuilding::PREVIEW_EDGE_MARGIN)
                     previewX = Theme::DeckBuilding::PREVIEW_EDGE_MARGIN;
+
+                previewY = hoveredRect->y + hoveredRect->h / 2 - previewHeight / 2;
+            } else {
+                // ── Collection card: prefer right, fall back to left ───────────────
+                previewX = hoveredRect->x + hoveredRect->w + gap;
+                if (previewX + previewWidth > screenW - Theme::DeckBuilding::PREVIEW_EDGE_MARGIN) {
+                    previewX = hoveredRect->x - previewWidth - gap;
+                    if (previewX < Theme::DeckBuilding::PREVIEW_EDGE_MARGIN)
+                        previewX = Theme::DeckBuilding::PREVIEW_EDGE_MARGIN;
+                }
+
+                previewY = hoveredRect->y;
             }
 
-            int previewY = hoveredRect->y;
+            // Clamp vertically for both cases
             if (previewY + previewHeight > screenH - Theme::DeckBuilding::PREVIEW_EDGE_MARGIN)
                 previewY = screenH - previewHeight - Theme::DeckBuilding::PREVIEW_EDGE_MARGIN;
             if (previewY < Theme::DeckBuilding::PREVIEW_EDGE_MARGIN)
@@ -474,7 +457,6 @@ void RenderDeckBuilding::render(DeckBuilding& deckBuilding, Game& game) {
 
             SDL_Rect panel{previewX, previewY, previewWidth, previewHeight};
 
-            // Draw preview
             RenderCard::drawPreview(
                 renderer, textRenderer,
                 *availableCards[hoveredCardIndex],
