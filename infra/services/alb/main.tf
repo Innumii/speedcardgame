@@ -76,7 +76,7 @@ resource "aws_lb" "shared" {
 resource "aws_lb_target_group" "auth" {
   name        = var.auth_target_group_name
   port        = 8080
-  protocol    = "HTTP"
+  protocol    = "HTTPS"
   vpc_id      = data.aws_vpc.default.id
   target_type = "ip"
 
@@ -90,7 +90,7 @@ resource "aws_lb_target_group" "auth" {
 resource "aws_lb_target_group" "cards" {
   name        = var.cards_target_group_name
   port        = 8080
-  protocol    = "HTTP"
+  protocol    = "HTTPS"
   vpc_id      = data.aws_vpc.default.id
   target_type = "ip"
 

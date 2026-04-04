@@ -104,6 +104,11 @@ func main() {
 	r.Get("/cards/swagger/*", httpSwagger.Handler(
 		httpSwagger.URL("/cards/swagger/doc.json"),
 	))
+	r.Get("/cards/health", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("{\"status\":\"healthy\"}"))
+	})
 
 	r.Get("/cards/list", services.ListCards)
 	r.Get("/cards/count", services.GetCardCount)

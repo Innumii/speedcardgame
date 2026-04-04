@@ -28,6 +28,16 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Resolve branch tag
+        id: branch_tag
+        run: |
+          BRANCH="${{ github.ref_name }}"
+          if [[ "$BRANCH" == "main" ]]; then
+            echo "tag=latest" >> $GITHUB_OUTPUT
+          else
+            echo "tag=$BRANCH" >> $GITHUB_OUTPUT
+          fi
+
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
         with:
@@ -39,12 +49,13 @@ jobs:
         run: |
           OWNER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
           IMAGE=ghcr.io/$OWNER/g4t2-${{ matrix.service }}-service
+          TAG=${{ steps.branch_tag.outputs.tag }}
 
           docker build -f ${{ matrix.service }}/Dockerfile \
-            -t $IMAGE:latest \
+            -t $IMAGE:$TAG \
             ${{ matrix.service }}/
 
-          docker push $IMAGE:latest
+          docker push $IMAGE:$TAG
 
       - name: Clean up old GHCR images (keep only latest + https)
         env:
@@ -55,7 +66,6 @@ jobs:
 
           echo "Cleaning package: $PACKAGE"
 
-          # Get all versions
           VERSIONS=$(gh api \
             /users/$OWNER/packages/container/$PACKAGE/versions \
             --jq '.[].id')
