@@ -109,7 +109,6 @@ services:
     env_file:
       - ./.env
     environment:
-      TLS_VERIFY_CERTS: "true"
       CARDS_SERVICE_HOST: cards
       CARDS_SERVICE_PORT: ${CARDS_PORT}
     ports:
