@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - main
-      - https
     paths:
       - 'auth/**'
       - 'cards/**'
@@ -38,24 +37,47 @@ jobs:
       - name: Build and Push ${{ matrix.service }} Service
         run: |
           OWNER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
-          BRANCH=$(echo "${GITHUB_REF_NAME}" | tr '[:upper:]' '[:lower:]' | sed 's#[^a-z0-9._-]#-#g')
-          SHORT_SHA=$(git rev-parse --short HEAD)
-          DATE_TAG=$(date -u +%Y%m%d)
-          IMAGE_BASE="ghcr.io/$OWNER/g4t2-${{ matrix.service }}-service"
-          IMAGE_TAG="$BRANCH-$DATE_TAG-$SHORT_SHA"
+          IMAGE=ghcr.io/$OWNER/g4t2-${{ matrix.service }}-service
 
           docker build -f ${{ matrix.service }}/Dockerfile \
-            -t $IMAGE_BASE:$IMAGE_TAG \
+            -t $IMAGE:latest \
             ${{ matrix.service }}/
 
-          docker push $IMAGE_BASE:$IMAGE_TAG
+          docker push $IMAGE:latest
 
-          if [ "${GITHUB_REF_NAME}" = "main" ]; then
-            docker tag $IMAGE_BASE:$IMAGE_TAG $IMAGE_BASE:latest
-            docker push $IMAGE_BASE:latest
-          fi
+      - name: Clean up old GHCR images (keep only latest + https)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          OWNER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+          PACKAGE="g4t2-${{ matrix.service }}-service"
 
-          if [ "${GITHUB_REF_NAME}" = "https" ]; then
-            docker tag $IMAGE_BASE:$IMAGE_TAG $IMAGE_BASE:https
-            docker push $IMAGE_BASE:https
-          fi
+          echo "Cleaning package: $PACKAGE"
+
+          # Get all versions
+          VERSIONS=$(gh api \
+            /users/$OWNER/packages/container/$PACKAGE/versions \
+            --jq '.[].id')
+
+          for VERSION_ID in $VERSIONS; do
+            TAGS=$(gh api \
+              /users/$OWNER/packages/container/$PACKAGE/versions/$VERSION_ID \
+              --jq '.metadata.container.tags[]')
+
+            KEEP=false
+
+            for TAG in $TAGS; do
+              if [[ "$TAG" == "latest" || "$TAG" == "https" ]]; then
+                KEEP=true
+              fi
+            done
+
+            if [ "$KEEP" = false ]; then
+              echo "Deleting version $VERSION_ID (tags: $TAGS)"
+              gh api \
+                --method DELETE \
+                /users/$OWNER/packages/container/$PACKAGE/versions/$VERSION_ID
+            else
+              echo "Keeping version $VERSION_ID (tags: $TAGS)"
+            fi
+          done

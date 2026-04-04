@@ -42,13 +42,14 @@ func hashedPassword(t *testing.T, plain string) string {
 
 func fakeServerHostPort(rawURL string) (host, port string) {
 	rawURL = strings.TrimPrefix(rawURL, "http://")
+	rawURL = strings.TrimPrefix(rawURL, "https://")
 	parts := strings.SplitN(rawURL, ":", 2)
 	return parts[0], parts[1]
 }
 
 func newFakeInventoryServer(t *testing.T, succeed bool) (*httptest.Server, string, string) {
 	t.Helper()
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if succeed {
 			w.WriteHeader(http.StatusCreated)
 		} else {

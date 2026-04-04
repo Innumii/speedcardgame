@@ -110,7 +110,7 @@ func main() {
 
 	// Allow CORS
 	r.Use(cors.New(cors.Config{
-		AllowOrigins:     []string{"http://localhost:3000"}, // Add your frontend domain
+		AllowOrigins:     []string{"https://localhost:3000"}, // Add your frontend domain
 		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization"},
 		AllowCredentials: true,
@@ -133,8 +133,8 @@ func main() {
 	//Swagger docs
 	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
-	// Start server
-	err = r.Run(":8080")
+	// Start server (HTTPS only)
+	err = r.RunTLS(":8080", "certs/server.crt", "certs/server.key")
 	if err != nil {
 		log.Fatalf("Failed to start the server: %v", err)
 	}

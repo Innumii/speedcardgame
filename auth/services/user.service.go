@@ -3,6 +3,7 @@ package services
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -86,7 +87,13 @@ func (service *AuthService) createStarterInventory(userID uint) error {
 		return err
 	}
 
-	client := &http.Client{Timeout: 5 * time.Second}
+	verifyTLS := utils.GetEnvAsBool("TLS_VERIFY_CERTS", false)
+	client := &http.Client{
+		Timeout: 5 * time.Second,
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: !verifyTLS}, // #nosec G402
+		},
+	}
 
 	inventoryPaths := []string{"/cards/inventories", "/cardbase/inventories"}
 	if err := service.postWithFallback(client, baseURL, inventoryPaths, payload, "cards service"); err != nil {

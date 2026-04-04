@@ -6,8 +6,8 @@ import (
 	"net/http"
 	"os"
 
-	httpSwagger "github.com/swaggo/http-swagger"
 	_ "github.com/FYL-Studios/speedcardgame/cards/docs"
+	httpSwagger "github.com/swaggo/http-swagger"
 
 	"github.com/FYL-Studios/speedcardgame/cards/config"
 	"github.com/FYL-Studios/speedcardgame/cards/models"
@@ -85,7 +85,7 @@ func main() {
 
 	r := chi.NewRouter()
 	r.Use(cors.Handler(cors.Options{
-		AllowedOrigins:   []string{"https://*", "http://*"},
+		AllowedOrigins:   []string{"https://*"},
 		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token", "X-Session-ID"},
 		ExposedHeaders:   []string{"Link"},
@@ -129,7 +129,7 @@ func main() {
 	r.Get("/payments/checkout-complete", services.RenderCheckoutCompletePage)
 	r.Get("/payments/checkout-session-status", services.GetCheckoutSessionStatus)
 
-	if err := http.ListenAndServe(":"+portString, r); err != nil {
+	if err := http.ListenAndServeTLS(":"+portString, "certs/server.crt", "certs/server.key", r); err != nil {
 		log.Fatal(err)
 	}
 }
