@@ -18,6 +18,9 @@ import (
 	"github.com/joho/godotenv"
 )
 
+// resolveImageDir finds the directory containing card images by checking
+// a list of common relative paths. Returns the first valid directory found,
+// or falls back to "assets/cards" if none exist.
 func resolveImageDir() string {
 	candidates := []string{
 		"assets/cards",
@@ -36,37 +39,56 @@ func resolveImageDir() string {
 }
 
 func main() {
+	// --- Environment Setup ---
+
+	// Load environment variables from .env file (non-fatal if missing).
 	if err := godotenv.Load(".env"); err != nil {
 		log.Printf(".env not loaded: %v", err)
 	}
 
+	// Read logging flags from environment.
 	debugLoggingEnabled := util.GetEnvAsBool("DEBUG_LOG_ENABLED", false)
 	httpRequestLoggingEnabled := util.GetEnvAsBool("HTTP_REQUEST_LOG_ENABLED", true)
 	util.LogStartupConfiguration("cards", debugLoggingEnabled, httpRequestLoggingEnabled)
 
-	portString := os.Getenv("PORT") //grab port value from .env
+	// --- Server Port ---
+
+	portString := os.Getenv("PORT")
 	if portString == "" {
 		log.Fatal("PORT not found in env")
 	}
-	fmt.Println("Port", portString)
+	fmt.Println("Port:", portString)
 
-	// Connect to PostgreSQL database using GORM
-	dsn := os.Getenv("DATABASE_URL") // You can set this in your .env file
+	// --- Database ---
+
+	// Connect to PostgreSQL via GORM using the DATABASE_URL env variable.
+	dsn := os.Getenv("DATABASE_URL")
 	if err := config.InitializeDatabase(dsn); err != nil {
-		log.Fatal("Failed to connect to database", err)
+		log.Fatal("Failed to connect to database:", err)
 	}
 
-	// Migrate models
-	if err := config.DB.AutoMigrate(&models.Deck{}, &models.Card{}, &models.Inventory{}, &models.PaymentLedger{}); err != nil {
+	// Auto-migrate all models to keep the schema in sync.
+	if err := config.DB.AutoMigrate(
+		&models.Deck{},
+		&models.Card{},
+		&models.Inventory{},
+		&models.PaymentLedger{},
+	); err != nil {
 		log.Fatalf("Error auto-migrating tables: %v", err)
 	}
 
+	// --- Payments ---
+
+	// Initialize the payments module. Logs a warning and continues if unavailable.
 	if err := services.InitializePaymentsFromEnv(); err != nil {
 		log.Printf("Payments module disabled: %v", err)
 	} else {
 		log.Printf("Payments module initialized")
 	}
 
+	// --- Seeding ---
+
+	// Seed card data from a CSV file (defaults to "cards.csv").
 	seedPath := os.Getenv("CARD_CSV_PATH")
 	if seedPath == "" {
 		seedPath = "cards.csv"
@@ -79,11 +101,16 @@ func main() {
 		}
 	}
 
+	// Populate decks for any inventories that don't have one yet.
 	if err := services.FillDecksFromInventories(config.DB); err != nil {
 		log.Printf("Deck fill failed: %v", err)
 	}
 
+	// --- Router Setup ---
+
 	r := chi.NewRouter()
+
+	// CORS — restrict to HTTPS origins only.
 	r.Use(cors.Handler(cors.Options{
 		AllowedOrigins:   []string{"https://*"},
 		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
@@ -92,59 +119,71 @@ func main() {
 		AllowCredentials: true,
 		MaxAge:           300,
 	}))
+
+	// Optionally attach HTTP request logging middleware.
 	if httpRequestLoggingEnabled {
 		r.Use(util.HTTPRequestLogger(debugLoggingEnabled))
 	}
 
-	// Serve card images for the client
+	// --- Routes ---
+
 	imageDir := resolveImageDir()
 	log.Printf("Serving card images from %s", imageDir)
-	r.Handle("/cards/assets/*", http.StripPrefix("/cards/assets", http.FileServer(http.Dir(imageDir))))
 
-	r.Get("/cards/swagger/*", httpSwagger.Handler(
-		httpSwagger.URL("/cards/swagger/doc.json"),
-	))
-	r.Get("/cards/health", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte("{\"status\":\"healthy\"}"))
+	r.Route("/cards", func(r chi.Router) {
+
+		// Swagger UI
+		r.Get("/swagger/*", httpSwagger.Handler(
+			httpSwagger.URL("/cards/swagger/doc.json"),
+		))
+
+		// Health check
+		r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"status":"healthy"}`))
+		})
+
+		// Static assets — primary and legacy endpoints
+		r.Handle("/images/*", http.StripPrefix("/cards/images", http.FileServer(http.Dir(imageDir))))
+
+		// Cards
+		r.Get("/cards", services.ListCards)
+		r.Get("/list", services.ListCards)     // Alias for /cards/cards
+		r.Get("/count", services.GetCardCount)
+		r.Post("/create", services.CreateCard)
+		r.Put("/update", services.UpdateCard)
+		r.Delete("/delete", services.DeleteCard)
+
+		// Inventories
+		r.Get("/inventories/{uid}", services.GetInventoryByUserID)
+		r.Get("/inventories", services.ListInventories)
+		r.Post("/inventories", services.CreateInventory)
+		r.Put("/inventories", services.UpdateInventory)
+		r.Put("/inventories/coins", services.UpdateInventoryCoins)
+		r.Put("/inventories/coins/add", services.AddInventoryCoins)
+
+		// Decks
+		r.Get("/decks", services.ListDecks)
+		r.Get("/decks/{uid}", services.GetDeckByUserID)
+		r.Post("/decks", services.CreateDeck)
+		r.Post("/decks/fill", services.FillDeckForUser)
+		r.Delete("/decks", services.DeleteDeck)
+
+		// Payments
+		r.Route("/payments", func(r chi.Router) {
+			r.Get("/coin-packages", services.ListCoinPackages)
+			r.Post("/checkout-session", services.CreateCoinCheckoutSession)
+			r.Post("/process-card", services.ProcessCardPayment)
+			r.Post("/webhook", services.HandlePaymentWebhook)
+			r.Post("/stripe-webhook", services.HandleStripeWebhook)
+			r.Get("/checkout-complete", services.RenderCheckoutCompletePage)
+			r.Get("/checkout-status", services.GetCheckoutSessionStatus)
+			r.Get("/checkout-session-status", services.GetCheckoutSessionStatus) // Legacy alias
+		})
 	})
-	r.Get("/cards/cards", services.ListCards)
 
-	r.Get("/cards/list", services.ListCards)
-	r.Get("/cards/count", services.GetCardCount)
-	r.Post("/cards/create", services.CreateCard)
-	r.Put("/cards/update", services.UpdateCard)
-	r.Delete("/cards/delete", services.DeleteCard)
-	r.Get("/cards/inventories/{uid}", services.GetInventoryByUserID)
-	r.Post("/cards/inventories", services.CreateInventory)
-	r.Get("/cards/inventories", services.ListInventories)
-	r.Put("/cards/inventories", services.UpdateInventory)
-	r.Put("/cards/inventories/coins", services.UpdateInventoryCoins)
-	r.Put("/cards/inventories/coins/add", services.AddInventoryCoins)
-	r.Post("/cards/decks", services.CreateDeck)
-	r.Get("/cards/decks", services.ListDecks)
-	r.Get("/cards/decks/{uid}", services.GetDeckByUserID)
-	r.Delete("/cards/decks", services.DeleteDeck)
-	r.Post("/cards/decks/fill", services.FillDeckForUser)
-	r.Get("/inventories/{uid}", services.GetInventoryByUserID)
-	r.Post("/inventories", services.CreateInventory)
-	r.Get("/inventories", services.ListInventories)
-	r.Put("/inventories", services.UpdateInventory)
-	r.Put("/inventories/coins", services.UpdateInventoryCoins)
-	r.Put("/inventories/coins/add", services.AddInventoryCoins)
-	r.Post("/decks", services.CreateDeck)
-	r.Get("/decks", services.ListDecks)
-	r.Get("/decks/{uid}", services.GetDeckByUserID)
-	r.Delete("/decks", services.DeleteDeck)
-	r.Post("/decks/fill", services.FillDeckForUser)
-	r.Get("/payments/packages", services.ListCoinPackages)
-	r.Post("/payments/checkout-session", services.CreateCoinCheckoutSession)
-	r.Post("/payments/process-card", services.ProcessCardPayment)
-	r.Post("/payments/webhook", services.HandlePaymentWebhook)
-	r.Post("/payments/stripe-webhook", services.HandleStripeWebhook)
-	r.Get("/payments/checkout-complete", services.RenderCheckoutCompletePage)
-	r.Get("/payments/checkout-session-status", services.GetCheckoutSessionStatus)
+	// --- Start HTTPS Server ---
 
 	if err := http.ListenAndServeTLS(":"+portString, "certs/server.crt", "certs/server.key", r); err != nil {
 		log.Fatal(err)
