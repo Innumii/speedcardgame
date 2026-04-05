@@ -9,10 +9,10 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/Ryanljk/speedcardgame/cards/config"
-	"github.com/Ryanljk/speedcardgame/cards/models"
-	"github.com/Ryanljk/speedcardgame/cards/payments"
-	"github.com/Ryanljk/speedcardgame/cards/util"
+	"github.com/FYL-Studios/speedcardgame/cards/config"
+	"github.com/FYL-Studios/speedcardgame/cards/models"
+	"github.com/FYL-Studios/speedcardgame/cards/payments"
+	"github.com/FYL-Studios/speedcardgame/cards/util"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )

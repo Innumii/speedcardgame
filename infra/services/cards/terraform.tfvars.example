@@ -9,7 +9,7 @@ use_managed_data_stack = true
 use_managed_alb_stack = true
 # alb_stack_state_path = "../alb/terraform.tfstate"
 
-github_username     = "Ryanljk"
+github_username     = "FYL-Studios"
 github_repo_name    = "speedcardgame"
 ghcr_pat_secret_arn = "arn:aws:secretsmanager:us-east-1:123456789012:secret:ghcr-auth-credentials-xxxxxx"
 

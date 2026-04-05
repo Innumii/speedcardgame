@@ -80,7 +80,7 @@ go test ./test/unit/... -p=1 -count=1 -v
 
 With coverage:
 ```bash
-go test ./test/unit/... -p=1 -count=1 -coverprofile=coverage.out -coverpkg=github.com/Ryanljk/speedcardgame/auth/services/...
+go test ./test/unit/... -p=1 -count=1 -coverprofile=coverage.out -coverpkg=github.com/FYL-Studios/speedcardgame/auth/services/...
 go tool cover -func=coverage.out       # summary
 go tool cover -html=coverage.out -o coverage.html  # HTML report
 ```
@@ -94,7 +94,7 @@ go test ./test/unit/... -p=1 -count=1 -v
 
 With coverage:
 ```bash
-go test ./test/unit/... -p=1 -count=1 -coverprofile=coverage.out -coverpkg=github.com/Ryanljk/speedcardgame/cards/services/...
+go test ./test/unit/... -p=1 -count=1 -coverprofile=coverage.out -coverpkg=github.com/FYL-Studios/speedcardgame/cards/services/...
 go tool cover -func=coverage.out
 go tool cover -html=coverage.out -o coverage.html
 ```

@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/Ryanljk/speedcardgame/cards/config"
-	"github.com/Ryanljk/speedcardgame/cards/models"
-	"github.com/Ryanljk/speedcardgame/cards/util"
+	"github.com/FYL-Studios/speedcardgame/cards/config"
+	"github.com/FYL-Studios/speedcardgame/cards/models"
+	"github.com/FYL-Studios/speedcardgame/cards/util"
 )
 
 type cardRequest struct {

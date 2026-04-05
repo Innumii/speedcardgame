@@ -15,8 +15,8 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/Ryanljk/speedcardgame/auth/dtos"
-	"github.com/Ryanljk/speedcardgame/auth/services"
+	"github.com/FYL-Studios/speedcardgame/auth/dtos"
+	"github.com/FYL-Studios/speedcardgame/auth/services"
 
 	"github.com/gin-gonic/gin"
 )

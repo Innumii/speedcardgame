@@ -6,9 +6,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Ryanljk/speedcardgame/auth/dtos"
-	"github.com/Ryanljk/speedcardgame/auth/models"
-	"github.com/Ryanljk/speedcardgame/auth/services"
+	"github.com/FYL-Studios/speedcardgame/auth/dtos"
+	"github.com/FYL-Studios/speedcardgame/auth/models"
+	"github.com/FYL-Studios/speedcardgame/auth/services"
 	"github.com/alicebob/miniredis/v2"
 	"github.com/redis/go-redis/v9"
 )

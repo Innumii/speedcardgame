@@ -3,7 +3,7 @@ package repositories
 import (
 	"time"
 
-	"github.com/Ryanljk/speedcardgame/auth/models"
+	"github.com/FYL-Studios/speedcardgame/auth/models"
 )
 
 type UserRepository interface {

@@ -20,7 +20,7 @@ linters-settings:
   gocyclo:
     min-complexity: 15  # Set threshold for cyclomatic complexity
   goimports:
-    local-prefixes: "github.com/Ryanljk/speedcardgame"  # Replace with your project path
+    local-prefixes: "github.com/FYL-Studios/speedcardgame"  # Replace with your project path
 
 issues:
   max-issues-per-linter: 0

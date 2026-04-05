@@ -25,6 +25,12 @@ variable "ghcr_pat_secret_arn" {
   description = "The ARN of the AWS Secret containing the GHCR PAT (username/password)"
   type        = string
 }
+
+variable "tls_secret_name" {
+  description = "Secrets Manager secret containing TLS cert/key fields for service HTTPS startup"
+  type        = string
+  default     = "game-server-tls"
+}
 # -------------------------------------------
 
 variable "image_tag" {
@@ -169,6 +175,12 @@ variable "debug_log_enabled" {
 
 variable "http_request_log_enabled" {
   description = "Enable HTTP request logging in cards service"
+  type        = bool
+  default     = true
+}
+
+variable "use_aws_services" {
+  description = "When true, enables AWS Secrets Manager integration and VPC endpoints for data services"
   type        = bool
   default     = true
 }

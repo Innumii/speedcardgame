@@ -20,8 +20,12 @@ ENV REDIS_HOST=host.docker.internal
 # Build the Go application
 RUN go build -o main -buildvcs=false .
 
+# Bootstrap TLS cert/key files from secret env vars when file mounts are unavailable.
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
 # Expose the port the app runs on (if needed)
 EXPOSE 8080
 
 # Command to run the executable
-CMD ["./main"]
+ENTRYPOINT ["/entrypoint.sh"]

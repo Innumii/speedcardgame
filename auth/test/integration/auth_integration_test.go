@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Ryanljk/speedcardgame/auth/dtos"
+	"github.com/FYL-Studios/speedcardgame/auth/dtos"
 )
 
 // ════════════════════════════════════════════════════════════════

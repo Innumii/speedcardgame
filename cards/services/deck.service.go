@@ -8,9 +8,9 @@ import (
 	"sort"
 	"strconv"
 
-	"github.com/Ryanljk/speedcardgame/cards/config"
-	"github.com/Ryanljk/speedcardgame/cards/models"
-	"github.com/Ryanljk/speedcardgame/cards/util"
+	"github.com/FYL-Studios/speedcardgame/cards/config"
+	"github.com/FYL-Studios/speedcardgame/cards/models"
+	"github.com/FYL-Studios/speedcardgame/cards/util"
 	"github.com/go-chi/chi"
 	"gorm.io/gorm"
 )

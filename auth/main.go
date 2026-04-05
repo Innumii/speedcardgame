@@ -14,13 +14,13 @@ import (
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
 
-	"github.com/Ryanljk/speedcardgame/auth/controllers"
-	_ "github.com/Ryanljk/speedcardgame/auth/docs"
-	"github.com/Ryanljk/speedcardgame/auth/dtos"
-	"github.com/Ryanljk/speedcardgame/auth/models"
-	"github.com/Ryanljk/speedcardgame/auth/repositories"
-	"github.com/Ryanljk/speedcardgame/auth/services"
-	"github.com/Ryanljk/speedcardgame/auth/utils"
+	"github.com/FYL-Studios/speedcardgame/auth/controllers"
+	_ "github.com/FYL-Studios/speedcardgame/auth/docs"
+	"github.com/FYL-Studios/speedcardgame/auth/dtos"
+	"github.com/FYL-Studios/speedcardgame/auth/models"
+	"github.com/FYL-Studios/speedcardgame/auth/repositories"
+	"github.com/FYL-Studios/speedcardgame/auth/services"
+	"github.com/FYL-Studios/speedcardgame/auth/utils"
 
 	"github.com/redis/go-redis/v9"
 	"gorm.io/driver/postgres"
@@ -110,7 +110,7 @@ func main() {
 
 	// Allow CORS
 	r.Use(cors.New(cors.Config{
-		AllowOrigins:     []string{"http://localhost:3000"}, // Add your frontend domain
+		AllowOrigins:     []string{"https://localhost:3000"}, // Add your frontend domain
 		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization"},
 		AllowCredentials: true,
@@ -133,8 +133,8 @@ func main() {
 	//Swagger docs
 	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
-	// Start server
-	err = r.Run(":8080")
+	// Start server (HTTPS only)
+	err = r.RunTLS(":8080", "certs/server.crt", "certs/server.key")
 	if err != nil {
 		log.Fatalf("Failed to start the server: %v", err)
 	}

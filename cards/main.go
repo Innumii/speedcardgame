@@ -5,21 +5,22 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"path/filepath"
-	"strings"
 
+	_ "github.com/FYL-Studios/speedcardgame/cards/docs"
 	httpSwagger "github.com/swaggo/http-swagger"
-	_ "github.com/Ryanljk/speedcardgame/cards/docs"
 
-	"github.com/Ryanljk/speedcardgame/cards/config"
-	"github.com/Ryanljk/speedcardgame/cards/models"
-	"github.com/Ryanljk/speedcardgame/cards/services"
-	"github.com/Ryanljk/speedcardgame/cards/util"
+	"github.com/FYL-Studios/speedcardgame/cards/config"
+	"github.com/FYL-Studios/speedcardgame/cards/models"
+	"github.com/FYL-Studios/speedcardgame/cards/services"
+	"github.com/FYL-Studios/speedcardgame/cards/util"
 	"github.com/go-chi/chi"
 	"github.com/go-chi/cors"
 	"github.com/joho/godotenv"
 )
 
+// resolveImageDir finds the directory containing card images by checking
+// a list of common relative paths. Returns the first valid directory found,
+// or falls back to "assets/cards" if none exist.
 func resolveImageDir() string {
 	candidates := []string{
 		"assets/cards",
@@ -38,37 +39,56 @@ func resolveImageDir() string {
 }
 
 func main() {
+	// --- Environment Setup ---
+
+	// Load environment variables from .env file (non-fatal if missing).
 	if err := godotenv.Load(".env"); err != nil {
 		log.Printf(".env not loaded: %v", err)
 	}
 
+	// Read logging flags from environment.
 	debugLoggingEnabled := util.GetEnvAsBool("DEBUG_LOG_ENABLED", false)
 	httpRequestLoggingEnabled := util.GetEnvAsBool("HTTP_REQUEST_LOG_ENABLED", true)
 	util.LogStartupConfiguration("cards", debugLoggingEnabled, httpRequestLoggingEnabled)
 
-	portString := os.Getenv("PORT") //grab port value from .env
+	// --- Server Port ---
+
+	portString := os.Getenv("PORT")
 	if portString == "" {
 		log.Fatal("PORT not found in env")
 	}
-	fmt.Println("Port", portString)
+	fmt.Println("Port:", portString)
 
-	// Connect to PostgreSQL database using GORM
-	dsn := os.Getenv("DATABASE_URL") // You can set this in your .env file
+	// --- Database ---
+
+	// Connect to PostgreSQL via GORM using the DATABASE_URL env variable.
+	dsn := os.Getenv("DATABASE_URL")
 	if err := config.InitializeDatabase(dsn); err != nil {
-		log.Fatal("Failed to connect to database", err)
+		log.Fatal("Failed to connect to database:", err)
 	}
 
-	// Migrate models
-	if err := config.DB.AutoMigrate(&models.Deck{}, &models.Card{}, &models.Inventory{}, &models.PaymentLedger{}); err != nil {
+	// Auto-migrate all models to keep the schema in sync.
+	if err := config.DB.AutoMigrate(
+		&models.Deck{},
+		&models.Card{},
+		&models.Inventory{},
+		&models.PaymentLedger{},
+	); err != nil {
 		log.Fatalf("Error auto-migrating tables: %v", err)
 	}
 
+	// --- Payments ---
+
+	// Initialize the payments module. Logs a warning and continues if unavailable.
 	if err := services.InitializePaymentsFromEnv(); err != nil {
 		log.Printf("Payments module disabled: %v", err)
 	} else {
 		log.Printf("Payments module initialized")
 	}
 
+	// --- Seeding ---
+
+	// Seed card data from a CSV file (defaults to "cards.csv").
 	seedPath := os.Getenv("CARD_CSV_PATH")
 	if seedPath == "" {
 		seedPath = "cards.csv"
@@ -79,94 +99,93 @@ func main() {
 		} else {
 			log.Printf("Card seed failed: %v", err)
 		}
-	} else {
-		log.Printf("Card seed loaded from %s", seedPath)
 	}
 
+	// Populate decks for any inventories that don't have one yet.
 	if err := services.FillDecksFromInventories(config.DB); err != nil {
 		log.Printf("Deck fill failed: %v", err)
 	}
 
-	fmt.Println("Connecting to database:", dsn)
-	//db.Exec("CREATE TABLE test_table (id SERIAL PRIMARY KEY, name VARCHAR(100));")  //create table just for testing purposes
+	// --- Router Setup ---
 
-	//Define the router
-	router := chi.NewRouter() //setup router
-	if httpRequestLoggingEnabled {
-		router.Use(util.HTTPRequestLogger(debugLoggingEnabled))
-	}
-	router.Use(cors.Handler(cors.Options{
-		AllowedOrigins:   []string{"https://*", "http://*"},
+	r := chi.NewRouter()
+
+	// CORS — restrict to HTTPS origins only.
+	r.Use(cors.Handler(cors.Options{
+		AllowedOrigins:   []string{"https://*"},
 		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
-		AllowedHeaders:   []string{"*"},
+		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token", "X-Session-ID"},
 		ExposedHeaders:   []string{"Link"},
-		AllowCredentials: false,
+		AllowCredentials: true,
 		MaxAge:           300,
 	}))
 
-	r := chi.NewRouter()
-	//define routes
-	r.Get("/health", health) // Check health of service
+	// Optionally attach HTTP request logging middleware.
+	if httpRequestLoggingEnabled {
+		r.Use(util.HTTPRequestLogger(debugLoggingEnabled))
+	}
+
+	// --- Routes ---
+
 	imageDir := resolveImageDir()
 	log.Printf("Serving card images from %s", imageDir)
-	r.Get("/images/{filename}", func(w http.ResponseWriter, req *http.Request) {
-		filename := chi.URLParam(req, "filename")
-		if filename == "" {
-			http.NotFound(w, req)
-			return
-		}
 
-		cleaned := filepath.Clean(filename)
-		if cleaned == "." || strings.Contains(cleaned, "..") || cleaned != filepath.Base(cleaned) {
-			http.NotFound(w, req)
-			return
-		}
+	r.Route("/cards", func(r chi.Router) {
 
-		http.ServeFile(w, req, filepath.Join(imageDir, cleaned))
+		// Swagger UI
+		r.Get("/swagger/*", httpSwagger.Handler(
+			httpSwagger.URL("/cards/swagger/doc.json"),
+		))
+
+		// Health check
+		r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"status":"healthy"}`))
+		})
+
+		// Static assets — primary and legacy endpoints
+		r.Handle("/images/*", http.StripPrefix("/cards/images", http.FileServer(http.Dir(imageDir))))
+
+		// Cards
+		r.Get("/cards", services.ListCards)
+		r.Get("/list", services.ListCards)     // Alias for /cards/cards
+		r.Get("/count", services.GetCardCount)
+		r.Post("/create", services.CreateCard)
+		r.Put("/update", services.UpdateCard)
+		r.Delete("/delete", services.DeleteCard)
+
+		// Inventories
+		r.Get("/inventories/{uid}", services.GetInventoryByUserID)
+		r.Get("/inventories", services.ListInventories)
+		r.Post("/inventories", services.CreateInventory)
+		r.Put("/inventories", services.UpdateInventory)
+		r.Put("/inventories/coins", services.UpdateInventoryCoins)
+		r.Put("/inventories/coins/add", services.AddInventoryCoins)
+
+		// Decks
+		r.Get("/decks", services.ListDecks)
+		r.Get("/decks/{uid}", services.GetDeckByUserID)
+		r.Post("/decks", services.CreateDeck)
+		r.Post("/decks/fill", services.FillDeckForUser)
+		r.Delete("/decks", services.DeleteDeck)
+
+		// Payments
+		r.Route("/payments", func(r chi.Router) {
+			r.Get("/coin-packages", services.ListCoinPackages)
+			r.Post("/checkout-session", services.CreateCoinCheckoutSession)
+			r.Post("/process-card", services.ProcessCardPayment)
+			r.Post("/webhook", services.HandlePaymentWebhook)
+			r.Post("/stripe-webhook", services.HandleStripeWebhook)
+			r.Get("/checkout-complete", services.RenderCheckoutCompletePage)
+			r.Get("/checkout-status", services.GetCheckoutSessionStatus)
+			r.Get("/checkout-session-status", services.GetCheckoutSessionStatus) // Legacy alias
+		})
 	})
 
-	r.Get("/decks/{uid}", services.GetDeckByUserID) // Get deck by user ID
-	r.Post("/decks", services.CreateDeck)           // Create deck
-	r.Post("/decks/fill", services.FillDeckForUser)
-	r.Get("/decks", services.ListDecks) // List all decks
+	// --- Start HTTPS Server ---
 
-	r.Get("/cards", services.ListCards)         // List all cards
-	r.Get("/cards/size", services.GetCardCount) // Get total card count
-
-	r.Post("/inventories", services.CreateInventory)            // Create inventory
-	r.Get("/inventories", services.ListInventories)             // List all inventories
-	r.Get("/inventories/{uid}", services.GetInventoryByUserID)  // Get inventory by user ID
-	r.Put("/inventories", services.UpdateInventory)             // Update inventory by user ID
-	r.Put("/inventories/coins", services.UpdateInventoryCoins)  // Update inventory coins by user ID
-	r.Put("/inventories/coins/add", services.AddInventoryCoins) // Add coins/subtract
-
-	r.Post("/payments/checkout-session", services.CreateCoinCheckoutSession) // Create checkout session for purchasing coins
-	r.Post("/payments/webhook", services.HandlePaymentWebhook)               // Handle payment provider webhook events
-	r.Get("/payments/checkout-status", services.GetCheckoutSessionStatus)    // Verify checkout session and apply coins
-	r.Get("/payments/checkout-complete", services.RenderCheckoutCompletePage)
-	r.Get("/payments/coin-packages", services.ListCoinPackages) // List available coin packages
-
-
-	r.Get("/swagger/*", httpSwagger.Handler(
-		httpSwagger.URL("/cards/swagger/doc.json"),
-	))
-
-	// router.Mount("/cardbase", r) //api prefix
-	router.Mount("/cards", r)
-
-	srv := &http.Server{
-		Handler: router,
-		Addr:    ":" + portString,
-	}
-
-	//start server on port
-	if err := srv.ListenAndServe(); err != nil {
+	if err := http.ListenAndServeTLS(":"+portString, "certs/server.crt", "certs/server.key", r); err != nil {
 		log.Fatal(err)
 	}
-
-}
-
-func health(w http.ResponseWriter, r *http.Request) {
-	response := map[string]string{"message": "Healthy"}
-	util.RespondWithJSON(w, 200, response)
 }

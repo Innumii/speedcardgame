@@ -103,7 +103,7 @@ resource "aws_ecs_task_definition" "this" {
   task_role_arn            = aws_iam_role.task_execution.arn
 
   container_definitions = jsonencode([
-    {
+    merge({
       name      = var.service_name
       image     = "ghcr.io/${var.image_repo}:${var.image_tag}"
       essential = true
@@ -143,7 +143,14 @@ resource "aws_ecs_task_definition" "this" {
           awslogs-stream-prefix = "ecs"
         }
       }
-    }
+      },
+      var.container_entrypoint != null ? {
+        entryPoint = var.container_entrypoint
+      } : {},
+      var.container_command != null ? {
+        command = var.container_command
+      } : {}
+    )
   ])
 }
 

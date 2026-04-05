@@ -1,4 +1,4 @@
-module github.com/Ryanljk/speedcardgame/auth
+module github.com/FYL-Studios/speedcardgame/auth
 
 go 1.23.0
 

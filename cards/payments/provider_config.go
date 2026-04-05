@@ -8,8 +8,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/Ryanljk/speedcardgame/cards/util"
-	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/FYL-Studios/speedcardgame/cards/util"
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
 )
@@ -78,21 +77,20 @@ func loadStripeSecretsFromAWS(ctx context.Context) (stripeSecrets, error) {
 	}
 
 	client := secretsmanager.NewFromConfig(cfg)
-	result, err := client.GetSecretValue(ctx, &secretsmanager.GetSecretValueInput{
-		SecretId: aws.String(secretName),
-	})
+	output, err := client.GetSecretValue(ctx, &secretsmanager.GetSecretValueInput{SecretId: &secretName})
 	if err != nil {
-		return stripeSecrets{}, fmt.Errorf("failed to get secret %q: %w", secretName, err)
+		return stripeSecrets{}, fmt.Errorf("failed to fetch secret %s: %w", secretName, err)
 	}
 
-	if result.SecretString == nil {
-		return stripeSecrets{}, fmt.Errorf("secret %q has no string value", secretName)
+	secretValue := output.SecretString
+	if secretValue == nil {
+		return stripeSecrets{}, fmt.Errorf("secret %s has no secret string", secretName)
 	}
 
-	var s stripeSecrets
-	if err := json.Unmarshal([]byte(*result.SecretString), &s); err != nil {
-		return stripeSecrets{}, fmt.Errorf("failed to parse secret JSON: %w", err)
+	var secrets stripeSecrets
+	if err := json.Unmarshal([]byte(*secretValue), &secrets); err != nil {
+		return stripeSecrets{}, fmt.Errorf("failed to unmarshal secret %s: %w", secretName, err)
 	}
 
-	return s, nil
+	return secrets, nil
 }

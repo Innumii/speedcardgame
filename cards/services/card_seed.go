@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/Ryanljk/speedcardgame/cards/models"
+	"github.com/FYL-Studios/speedcardgame/cards/models"
 	"gorm.io/gorm"
 )
 

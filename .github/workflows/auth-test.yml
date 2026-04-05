@@ -34,7 +34,7 @@ jobs:
             -p=1 \
             -count=1 \
             -v \
-            -coverpkg=github.com/Ryanljk/speedcardgame/auth/services/... \
+            -coverpkg=github.com/FYL-Studios/speedcardgame/auth/services/... \
             -coverprofile=coverage.out \
             -covermode=atomic \
             -race
