@@ -57,7 +57,7 @@ private:
     // ─── Per-card conveyor state ──────────────────────────────────────
     // Textures are NOT stored here; look them up in cardTexCache_ by card ID.
     struct ActiveCard {
-        int cardId;
+        int cardId = -1;
         float birthTime  = 0.0f;   // showcase.animTime when card entered from right
         float flipOffset = 0.0f;   // per-card phase offset for flip + float bob
 

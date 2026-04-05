@@ -47,7 +47,7 @@ func (r *GormUserRepository) Delete(userID uint) error {
 func (r *GormUserRepository) StorePasswordResetToken(userID uint, tokenHash string, expiry time.Time) error {
 	log.Println("Storing password reset token", tokenHash, "for user", userID)
 	return r.db.Model(&models.User{}).Where("id = ?", userID).Updates(map[string]interface{}{
-		"password_reset_token":       tokenHash,
+		"password_reset_token":        tokenHash,
 		"password_reset_token_expiry": expiry,
 	}).Error
 }
