@@ -367,7 +367,7 @@ void PackOpening::render(Game& game) {
 
         SDL_Color badgeFill;
         std::string badgeLabel;
-        if (result.resultingCopies > MaxCardCopies) {
+        if (result.resultingCopies >= MaxCardCopies) {
             badgeFill  = Theme::PackOpening::DUPLICATE_FILL;
             badgeLabel = "DUPE  +" + std::to_string(RefundCoinsPerExtra) + "c";
         } else if (result.resultingCopies == 1) {
