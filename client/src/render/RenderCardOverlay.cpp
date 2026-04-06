@@ -3,9 +3,62 @@
 
 #include <algorithm>
 #include <cmath>
+#include <functional>
 
 namespace {
 
+
+    struct DimSpan { int xOffset, spanW; };  // relative to panel.x
+    struct SizeKey { int w, h; };
+
+    struct SizeKeyHash {
+        std::size_t operator()(const SizeKey& k) const noexcept {
+            return std::hash<int>{}(k.w) ^ (std::hash<int>{}(k.h) << 16);
+        }
+    };
+    struct SizeKeyEq {
+        bool operator()(const SizeKey& a, const SizeKey& b) const noexcept {
+            return a.w == b.w && a.h == b.h;
+        }
+    };
+
+    using SpanRow  = DimSpan;                         // one span per row
+    using SpanGrid = std::vector<SpanRow>;            // indexed by (y - panel.y)
+
+    static std::unordered_map<SizeKey, SpanGrid, SizeKeyHash, SizeKeyEq> sDimSpanCache;
+
+    const SpanGrid& getDimSpans(int w, int h) {
+        const SizeKey key{w, h};
+        auto it = sDimSpanCache.find(key);
+        if (it != sDimSpanCache.end()) return it->second;
+
+        const int r = std::max(Theme::Card::MIN_CORNER_RADIUS, w / 20);
+        SpanGrid grid;
+        grid.reserve(h);
+
+        for (int row = 0; row < h; ++row) {
+            int xStart = 0;
+            int xEnd   = w;
+
+            const int cy = (row < r)       ? r
+                         : (row >= h - r)  ? h - r
+                                           : row;
+            if (cy != row) {
+                const int dy = row - cy;
+                const int dx = static_cast<int>(std::sqrt(static_cast<float>(r * r - dy * dy)));
+                xStart = r - dx;
+                xEnd   = w - r + dx;
+            }
+
+            if (xEnd > xStart)
+                grid.push_back({ xStart, xEnd - xStart });
+            else
+                grid.push_back({ 0, 0 });   // fully clipped corner pixel
+        }
+
+        return sDimSpanCache.emplace(key, std::move(grid)).first->second;
+    }
+    
     struct RGB { Uint8 r, g, b; };
 
     // Converts a hue in [0, 360) to an RGB colour (full saturation and value).
@@ -148,37 +201,16 @@ void RenderCardOverlay::overlaySSR(SDL_Renderer* renderer, const SDL_Rect& panel
 void RenderCardOverlay::overlayDim(SDL_Renderer* renderer, const SDL_Rect& panel, Uint8 alpha) {
     if (!renderer) return;
 
-    const int r = std::max(Theme::Card::MIN_CORNER_RADIUS, panel.w / 20);
-
-    auto insideRoundedRect = [&](int x, int y) -> bool {
-        if (x < panel.x || x >= panel.x + panel.w) return false;
-        if (y < panel.y || y >= panel.y + panel.h) return false;
-
-        const int cx = (x < panel.x + r)            ? panel.x + r
-                     : (x >= panel.x + panel.w - r) ? panel.x + panel.w - r
-                                                     : x;
-        const int cy = (y < panel.y + r)            ? panel.y + r
-                     : (y >= panel.y + panel.h - r) ? panel.y + panel.h - r
-                                                     : y;
-
-        int dx = x - cx;
-        int dy = y - cy;
-        return dx*dx + dy*dy <= r*r;
-    };
+    const SpanGrid& spans = getDimSpans(panel.w, panel.h);
 
     SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
     SDL_SetRenderDrawColor(renderer, 0, 0, 0, alpha);
 
-    // Fill the panel efficiently with step = 2 or more if you want
-    for (int y = panel.y; y < panel.y + panel.h; ++y) {
-        int xStart = panel.x;
-        int xEnd   = panel.x + panel.w;
-        // Optional optimization: skip corners
-        for (int x = xStart; x < xEnd; ++x) {
-            if (insideRoundedRect(x, y)) {
-                SDL_RenderDrawPoint(renderer, x, y);
-            }
-        }
+    for (int row = 0; row < static_cast<int>(spans.size()); ++row) {
+        const auto& span = spans[row];
+        if (span.spanW <= 0) continue;
+        const SDL_Rect rect{ panel.x + span.xOffset, panel.y + row, span.spanW, 1 };
+        SDL_RenderFillRect(renderer, &rect);
     }
 
     SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
