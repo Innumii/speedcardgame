@@ -45,3 +45,4 @@ cid,name,type,cost,value,power,toughness,effect
 44,Vampire Bat,Creature,2,1,1,1,"Lifesteal"
 45,Vampire Bite,Spell,2,1,0,0,"Target creature gains Lifesteal."
 46,Jew-Jitsu Black Belt,Creature,5,2,3,2,"When this creature kills another creature, steal 1 mana from your opponent."
+47,jonam T,Creature,6,4,9,9,"When this creature enters the battlefield, gain 2 mana, draw 1 card."

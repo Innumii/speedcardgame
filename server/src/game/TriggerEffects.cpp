@@ -390,4 +390,19 @@ const std::unordered_map<int, std::vector<CardEffectEntry>> TriggerEffects::card
           }
     }},
 
+    //Jonam T
+    {47, { CardEffectEntry{
+            .effectId = 5,
+            .amount   = 2,
+            .target   = Target::Self,
+            .trigger  = TriggerType::OnSummon
+          },
+          CardEffectEntry{
+            .effectId = 12,
+            .amount   = 1,
+            .target   = Target::Self,
+            .trigger  = TriggerType::OnSummon
+          }
+    }},
+
 };
