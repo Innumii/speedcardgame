@@ -634,9 +634,9 @@ bool Payment::requestCheckoutSession(Game& game, const ShopPackage::Package& pac
     const std::string path = "/cards/payments/checkout-session";
 
     std::ostringstream callbackSuccess;
-    callbackSuccess << "http://" << host << ":" << port << "/cards/payments/checkout-complete?status=success";
+    callbackSuccess << "https://" << host << ":" << port << "/cards/payments/checkout-complete?status=success";
     std::ostringstream callbackCancel;
-    callbackCancel << "http://" << host << ":" << port << "/cards/payments/checkout-complete?status=cancel";
+    callbackCancel << "https://" << host << ":" << port << "/cards/payments/checkout-complete?status=cancel";
 
     std::ostringstream payload;
     payload << "{"
