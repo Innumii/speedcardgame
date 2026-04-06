@@ -12,8 +12,8 @@ import (
 	"os"
 	"testing"
 
-	"github.com/Ryanljk/speedcardgame/cards/config"
-	"github.com/Ryanljk/speedcardgame/cards/models"
+	"github.com/FYL-Studios/speedcardgame/cards/config"
+	"github.com/FYL-Studios/speedcardgame/cards/models"
 	"github.com/go-chi/chi"
 	"github.com/joho/godotenv"
 	"gorm.io/driver/postgres"

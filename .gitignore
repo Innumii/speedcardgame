@@ -27,3 +27,8 @@ build/
 coverage.out
 coverage.html
 *.out
+
+# builder cache
+Output/
+GameBuild/
+Archcast.exe
