@@ -828,5 +828,5 @@ void RenderPlaying::render(Playing& playing, const Game& game) {
 		RenderButton::drawButton(renderer, shakenRequeue, "Requeue",         uiFonts.large, returnStyle, hoveringRequeue, false);
 	}
 
-	SDL_RenderPresent(renderer);
+	// SDL_RenderPresent(renderer);
 }

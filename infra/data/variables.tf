@@ -174,3 +174,4 @@ variable "stripe_webhook_secret" {
   sensitive   = true
   default     = null
 }
+

@@ -1,9 +1,71 @@
 //This class is used for creation/handling of the Client connection to the server
 #include "core/NetworkClient.hpp"
+#include <cstdlib>
 #include <iostream>
 #include <cstring>
 #include <cerrno>
+#include <filesystem>
 #include <sstream>
+#include <vector>
+
+#ifdef _WIN32
+#include <windows.h>
+#elif defined(__APPLE__)
+#include <mach-o/dyld.h>
+#else
+#include <limits.h>
+#include <unistd.h>
+#endif
+
+namespace {
+    std::string getExecutableDir() {
+#ifdef _WIN32
+        char buffer[MAX_PATH];
+        const DWORD len = GetModuleFileNameA(nullptr, buffer, MAX_PATH);
+        if (len == 0 || len >= MAX_PATH) return "";
+        return std::filesystem::path(std::string(buffer, len)).parent_path().string();
+#elif defined(__APPLE__)
+        uint32_t size = 0;
+        (void)_NSGetExecutablePath(nullptr, &size);
+        if (size == 0) return "";
+
+        std::string path(size, '\0');
+        if (_NSGetExecutablePath(path.data(), &size) != 0) return "";
+        if (!path.empty() && path.back() == '\0') path.pop_back();
+        return std::filesystem::path(path).parent_path().string();
+#else
+        char buffer[PATH_MAX];
+        const ssize_t len = readlink("/proc/self/exe", buffer, sizeof(buffer) - 1);
+        if (len <= 0) return "";
+        buffer[len] = '\0';
+        return std::filesystem::path(buffer).parent_path().string();
+#endif
+    }
+
+    std::vector<std::string> getCertCandidatePaths() {
+        std::vector<std::string> paths = {
+            "./certs/ca.crt"
+        };
+
+        const std::string exeDir = getExecutableDir();
+        if (!exeDir.empty()) {
+            const std::filesystem::path exePath(exeDir);
+            paths.push_back((exePath / "certs" / "ca.crt").string());
+            paths.push_back((exePath / ".." / "Resources" / "certs" / "ca.crt").string());
+        }
+
+        return paths;
+    }
+
+    bool loadCaCert(SSL_CTX* ctx) {
+        for (const std::string& path : getCertCandidatePaths()) {
+            if (SSL_CTX_load_verify_locations(ctx, path.c_str(), nullptr) == 1) {
+                return true;
+            }
+        }
+        return false;
+    }
+}
 
 NetworkClient::NetworkClient(SocketMode m) : socketFd(-1), connected(false), mode(m) {
 #ifdef _WIN32
@@ -29,17 +91,19 @@ bool NetworkClient::initOpenSSL() {
     SSL_load_error_strings();
 
     sslCtx = SSL_CTX_new(TLS_client_method());
-    SSL_CTX_load_verify_locations(sslCtx, "./certs/ca.crt", nullptr);
     if (!sslCtx) {
         std::cerr << "[NetworkClient] Failed to create SSL_CTX\n";
         return false;
     }
 
-    // Optional: verify server certificate
     SSL_CTX_set_verify(sslCtx, SSL_VERIFY_PEER, nullptr);
-    if (!SSL_CTX_load_verify_locations(sslCtx, "./certs/ca.crt", nullptr)) {
-        std::cerr << "[NetworkClient] Failed to load CA certificate\n";
-        // You can choose to return false if you want strict verification
+
+    if (!loadCaCert(sslCtx)) {
+        // Fallback to platform trust store for public CA chains.
+        if (SSL_CTX_set_default_verify_paths(sslCtx) != 1) {
+            std::cerr << "[NetworkClient] Failed to load CA certificates from app bundle and system store\n";
+            return false;
+        }
     }
 
     return true;
@@ -135,10 +199,7 @@ bool NetworkClient::connectTo(const std::string& ip, int port) {
     }
     SSL_set_fd(ssl, socketFd);
 
-    // 5️⃣ Configure verification
-    SSL_CTX_set_verify(sslCtx, SSL_VERIFY_NONE, nullptr);
-
-    // 6️⃣ Perform TLS handshake
+    // 5️⃣ Perform TLS handshake
     int ret = 0;
     while ((ret = SSL_connect(ssl)) != 1) {
         int err = SSL_get_error(ssl, ret);

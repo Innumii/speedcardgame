@@ -154,15 +154,17 @@ resource "aws_security_group_rule" "allow_cards_service" {
 }
 
 resource "random_password" "auth_postgres" {
-  count   = var.auth_postgres_password == null ? 1 : 0
-  length  = 24
-  special = true
+  count            = var.auth_postgres_password == null ? 1 : 0
+  length           = 24
+  special          = true
+  override_special = "!#$%^&*()-_=+[]{}:?"
 }
 
 resource "random_password" "cards_postgres" {
-  count   = var.cards_postgres_password == null ? 1 : 0
-  length  = 24
-  special = true
+  count            = var.cards_postgres_password == null ? 1 : 0
+  length           = 24
+  special          = true
+  override_special = "!#$%^&*()-_=+[]{}:?"
 }
 
 locals {
@@ -237,8 +239,7 @@ resource "null_resource" "skip_secrets_manager" {
 }
 
 locals {
-  cards_database_url              = "postgres://${var.cards_postgres_user}:${local.cards_postgres_password_resolved}@${module.cards_postgres.endpoint}:${module.cards_postgres.port}/${var.cards_postgres_db}?sslmode=disable"
-  cards_service_base_url_resolved = coalesce(var.cards_service_base_url, "https://${trimsuffix(var.base_domain, ".")}")
+  cards_service_base_url_resolved = "https://api.${var.base_domain}"
 }
 
 # Secrets
@@ -247,10 +248,9 @@ module "secrets" {
   github_username          = var.github_username
   github_token             = var.github_token
   existing_ghcr_secret_arn = var.existing_ghcr_secret_arn
-  auth_postgres_password   = local.auth_postgres_password_resolved
   cards_service_base_url   = local.cards_service_base_url_resolved
-  cards_database_url       = local.cards_database_url
   stripe_secret_key        = var.stripe_secret_key
   stripe_webhook_secret    = var.stripe_webhook_secret
   count                    = var.skip_secrets_manager ? 0 : 1
 }
+

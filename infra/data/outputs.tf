@@ -50,12 +50,6 @@ output "cards_postgres_db" {
   value       = module.cards_postgres.db_name
 }
 
-output "cards_database_url" {
-  description = "Cards DATABASE_URL"
-  value       = "postgres://${module.cards_postgres.username}:${module.cards_postgres.password}@${module.cards_postgres.endpoint}:${module.cards_postgres.port}/${module.cards_postgres.db_name}?sslmode=disable"
-  sensitive   = true
-}
-
 output "ghcr_pat_secret_arn" {
   description = "Secrets Manager ARN containing GHCR credentials"
   value       = var.skip_secrets_manager ? null : module.secrets[0].ghcr_secret_arn
@@ -80,3 +74,4 @@ output "auth_redis_port" {
   description = "Auth redis port"
   value       = module.auth_redis.port
 }
+

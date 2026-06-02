@@ -27,6 +27,7 @@
 #include <unordered_map>
 #include <render/RenderBackdrop.hpp>
 #include <iostream>
+#include <utils/SessionUtil.hpp>
 
 namespace {
     void drawCenteredText(SDL_Renderer* renderer, const std::string& text, TTF_Font* font, SDL_Color color, const SDL_Rect& box) {
@@ -367,14 +368,14 @@ void PackOpening::render(Game& game) {
 
         SDL_Color badgeFill;
         std::string badgeLabel;
-        if (result.resultingCopies >= MaxCardCopies) {
+        if (result.refunded) {
             badgeFill  = Theme::PackOpening::DUPLICATE_FILL;
             badgeLabel = "DUPE  +" + std::to_string(RefundCoinsPerExtra) + "c";
         } else if (result.resultingCopies == 1) {
             badgeFill  = Theme::PackOpening::NEW_FILL;
             badgeLabel = "NEW!";
         } else {
-            badgeFill  = Theme::PackOpening::NEW_FILL;
+            badgeFill  = Theme::PackOpening::OWNED_FILL;
             badgeLabel = std::to_string(result.resultingCopies)
                        + "/" + std::to_string(MaxCardCopies) + " OWNED!";
         }
@@ -655,7 +656,7 @@ bool PackOpening::applyInventoryDelta(const Game& game,
 
     int statusCode = -1;
     std::string responseBody;
-    if (!HttpUtil::sendHttp(host, port, "PUT", path, payload.str(), statusCode, responseBody)) {
+    if (!HttpUtil::sendHttp(host, port, "PUT", path, payload.str(), statusCode, responseBody, SessionUtil::get())) {
         return false;
     }
 

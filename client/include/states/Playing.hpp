@@ -65,7 +65,7 @@ private:
     Uint32 lastDrawTick{0};
     bool running{false};
     PlayingGameState state = PlayingGameState::Playing;
-    std::string recvBuffer; // handles partial TCP messages
+    std::string recvBuffer;
     int coinReward{0};
 
     // -------------------------
@@ -73,7 +73,7 @@ private:
     // -------------------------
     struct DragState {
         bool active{false};
-        std::size_t index{0}; // index into localPlayer.hand
+        std::size_t index{0};
         int offsetX{0};
         int offsetY{0};
         int x{0};
@@ -84,7 +84,7 @@ private:
     // -------------------------
     // Rendering
     // -------------------------
-    SDL_Renderer* renderer{nullptr}; // non-owning
+    SDL_Renderer* renderer{nullptr};
     std::vector<SDL_Rect> cardRects;
     std::vector<SDL_Rect> playSlots;
     std::vector<SDL_Rect> opponentSlots;
@@ -109,7 +109,6 @@ private:
     bool menuOpen{false};
     bool pauseModalOpen{false};
     bool exitModalOpen{false};
-    // bool surrendered{false};
     Uint32 combatCycleStartTick{0};
     Uint32 lastCombatSyncTick{0};
     bool animationsEnabled{true};
@@ -127,14 +126,13 @@ private:
     Uint32 recentSpellPreviewUntil{0};
     Uint32 recentSpellPreviewStartTick{0};
 
-
     // -------------------------
     // Pending action (targeting system)
     // -------------------------
     struct PendingActionState {
         bool active{false};
         std::size_t cardId{static_cast<std::size_t>(-1)};
-        int sourceLane{-1}; // lane where the spell was dropped
+        int sourceLane{-1};
         int targetIndex{-1};
 
         void clear() {
@@ -161,8 +159,9 @@ private:
     void computeZones(int screenW, int screenH);
     void computeUiRects(int screenW, int screenH);
     SDL_Rect computeSelfDeckRect(int screenW, int screenH) const;
+    SDL_Rect computeOpponentDeckRect(int screenW, int screenH) const;
 
-    //Game related
+    // Game related
     bool handleServerMessage(const std::string& msg);
     bool drawCard(int playerId, int cardId);
     void discardCard(int playerId, int cardId);
@@ -174,7 +173,11 @@ private:
     void resolveLaneCombat(int playerAId, int playerBId, int lane, int powerA, int powerB);
     void resolveDirectCombat(int playerId, int lane, int damage);
     void augmentHP(int playerId, int delta);
-    void augmentMana(int playerId, int delta); 
+    void augmentMana(int playerId, int delta);
+
+    // Full state snapshot
+    void handleFullStateMessage(const std::string& json);
+    void syncEffectsFromMask(Card* card, int fx);
 
     // Animation related
     bool tryDrawCardWithAnimation(Uint32 now);
@@ -182,7 +185,6 @@ private:
     Uint32 gameEndStartTick = 0;
     PlayingGameState lastEndState = PlayingGameState::Playing;
     TTF_Font* cachedFont{nullptr};
-    SDL_Rect computeOpponentDeckRect(int screenW, int screenH) const;
 };
 
 #endif

@@ -52,14 +52,13 @@ locals {
   alb_outputs                       = var.use_managed_alb_stack ? data.terraform_remote_state.alb[0].outputs : {}
   alb_security_group_id             = var.alb_security_group_id != null ? var.alb_security_group_id : try(local.alb_outputs.alb_security_group_id, null)
   auth_target_group_arn             = var.target_group_arn != null ? var.target_group_arn : try(local.alb_outputs.auth_target_group_arn, null)
-  cards_service_base_url            = var.cards_service_base_url != null ? var.cards_service_base_url : try(local.alb_outputs.api_base_url, null)
-  cards_service_host                = var.cards_service_host != null ? var.cards_service_host : try(local.alb_outputs.api_domain_name, null)
+  cards_service_base_url            = "https://api.${var.base_domain}"
+  cards_service_host                = "api.${var.base_domain}"
   tls_secret_arn                    = data.aws_secretsmanager_secret.service_tls.arn
   data_outputs                      = var.use_managed_data_stack ? data.terraform_remote_state.data[0].outputs : {}
   postgres_host                     = var.postgres_host != null ? var.postgres_host : try(local.data_outputs.auth_postgres_endpoint, null)
   postgres_user                     = var.postgres_user != null ? var.postgres_user : try(local.data_outputs.auth_postgres_user, null)
   postgres_password                 = var.postgres_password != null ? var.postgres_password : try(local.data_outputs.auth_postgres_password, null)
-  postgres_password_secret_arn      = var.postgres_password_secret_arn != null ? var.postgres_password_secret_arn : try(local.data_outputs.auth_postgres_runtime_secret_arn, null)
   cards_service_base_url_secret_arn = var.cards_service_base_url_secret_arn != null ? var.cards_service_base_url_secret_arn : try(local.data_outputs.auth_postgres_runtime_secret_arn, null)
   postgres_db                       = var.postgres_db != null ? var.postgres_db : try(local.data_outputs.auth_postgres_db, null)
   postgres_port                     = var.postgres_port != null ? var.postgres_port : try(local.data_outputs.auth_postgres_port, null)
@@ -81,11 +80,11 @@ module "service" {
   subnet_ids            = data.aws_subnets.default.ids
   container_port        = 8080
   image_tag             = var.image_tag
-  image_repo            = var.image_repo
-  cpu                   = var.cpu
-  memory                = var.memory
+  image_repo            = var.auth_image_repo
+  cpu                   = var.auth_cpu
+  memory                = var.auth_memory
   assign_public_ip      = var.assign_public_ip
-  desired_count         = 1
+  desired_count         = var.auth_desired_count
   target_group_arn      = local.auth_target_group_arn
   alb_security_group_id = local.alb_security_group_id
   container_entrypoint  = ["/bin/sh", "-c"]
@@ -94,7 +93,6 @@ module "service" {
   ]
 
   task_secret_arns = toset(compact([
-    local.postgres_password_secret_arn,
     local.cards_service_base_url_secret_arn,
     local.tls_secret_arn
   ]))
@@ -104,9 +102,6 @@ module "service" {
       TLS_CERT = "${local.tls_secret_arn}:cert::"
       TLS_KEY  = "${local.tls_secret_arn}:key::"
     },
-    local.postgres_password_secret_arn != null ? {
-      POSTGRES_PASSWORD = "${local.postgres_password_secret_arn}:POSTGRES_PASSWORD::"
-    } : {},
     local.cards_service_base_url_secret_arn != null ? {
       CARDS_SERVICE_BASE_URL = "${local.cards_service_base_url_secret_arn}:CARDS_SERVICE_BASE_URL::"
     } : {}
@@ -116,6 +111,7 @@ module "service" {
     {
       POSTGRES_HOST            = local.postgres_host
       POSTGRES_USER            = local.postgres_user
+      POSTGRES_PASSWORD        = local.postgres_password
       POSTGRES_DB              = local.postgres_db
       POSTGRES_PORT            = tostring(local.postgres_port)
       POSTGRES_SSLMODE         = var.postgres_sslmode
@@ -124,18 +120,16 @@ module "service" {
       REDIS_PORT               = tostring(local.redis_port)
       AWS_ENABLED              = tostring(var.use_aws_services)
       CARDS_SERVICE_HOST       = local.cards_service_host
-      CARDS_SERVICE_PORT       = tostring(var.cards_service_port)
+      CARDS_SERVICE_PORT       = 443
       AWS_CARDS_SERVICE_HOST   = local.cards_service_host
-      AWS_CARDS_SERVICE_PORT   = tostring(var.cards_service_port)
+      AWS_CARDS_SERVICE_PORT   = 443
       TLS_VERIFY_CERTS         = tostring(true)
       DEBUG_LOG_ENABLED        = tostring(var.debug_log_enabled)
       HTTP_REQUEST_LOG_ENABLED = tostring(var.http_request_log_enabled)
+      INTERNAL_API_KEY         = var.internal_api_key
     },
     local.cards_service_base_url_secret_arn == null && local.cards_service_base_url != null ? {
       CARDS_SERVICE_BASE_URL = local.cards_service_base_url
     } : {},
-    local.postgres_password_secret_arn == null && local.postgres_password != null ? {
-      POSTGRES_PASSWORD = local.postgres_password
-    } : {}
   )
 }

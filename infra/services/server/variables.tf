@@ -16,9 +16,10 @@ variable "image_tag" {
   default     = "latest"
 }
 
-variable "image_repo" {
-  description = "GHCR image repo path, e.g. owner/g4t2-server-service"
+variable "server_image_repo" {
+  description = "Server-specific image repository fallback when using a shared tfvars file"
   type        = string
+  default     = null
 }
 
 variable "github_username" {
@@ -36,13 +37,13 @@ variable "ghcr_pat_secret_arn" {
   type        = string
 }
 
-variable "cpu" {
+variable "server_cpu" {
   description = "Fargate CPU units"
   type        = string
   default     = "256"
 }
 
-variable "memory" {
+variable "server_memory" {
   description = "Fargate memory"
   type        = string
   default     = "512"
@@ -78,14 +79,21 @@ variable "cards_service_port" {
   default     = null
 }
 
-variable "cards_service_base_url" {
-  description = "Base URL for cards service (e.g. https://example.com)"
-  type        = string
-  default     = null
-}
-
 variable "base_domain" {
   description = "Base public domain used for DNS records and endpoints"
   type        = string
   sensitive   = true
 }
+
+variable "server_desired_count" {
+  description = "Number of desired server service tasks"
+  type        = number
+  default     = 1
+}
+
+variable "internal_api_key" {
+  description = "API key used for internal service-to-service authentication"
+  type        = string
+  sensitive   = true
+}
+

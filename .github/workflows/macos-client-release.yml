@@ -1,0 +1,302 @@
+name: release-macos
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'client/**'
+      - '.github/workflows/macos-client-release.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-macos-installer:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          brew install sdl2 sdl2_ttf sdl2_image sdl2_mixer openssl@3 pkg-config
+
+      - name: Build macOS client
+        run: |
+          cd client
+          make -f Makefile.mac clean
+          make -f Makefile.mac
+          test -f main
+
+      - name: Build macOS app bundle
+        env:
+          CERT_SECRET: ${{ secrets.CERT }}
+          MACOS_CODESIGN_IDENTITY: ${{ secrets.MACOS_CODESIGN_IDENTITY }}
+        run: |
+          set -euo pipefail
+          cd client
+
+          APP_NAME="Archcast.app"
+          APP_ROOT="dist/${APP_NAME}"
+          APP_MACOS="${APP_ROOT}/Contents/MacOS"
+          APP_RES="${APP_ROOT}/Contents/Resources"
+
+          rm -rf dist
+          mkdir -p "${APP_MACOS}" "${APP_RES}/env" "${APP_RES}/certs"
+
+          cp main "${APP_MACOS}/Archcast"
+          chmod +x "${APP_MACOS}/Archcast"
+
+          cat > "${APP_ROOT}/Contents/Info.plist" << 'PLIST'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>CFBundleDisplayName</key>
+            <string>Archcast</string>
+            <key>CFBundleExecutable</key>
+            <string>Archcast</string>
+            <key>CFBundleIdentifier</key>
+            <string>com.fylstudios.archcast</string>
+            <key>CFBundleName</key>
+            <string>Archcast</string>
+            <key>CFBundlePackageType</key>
+            <string>APPL</string>
+            <key>CFBundleShortVersionString</key>
+            <string>latest</string>
+            <key>CFBundleVersion</key>
+            <string>latest</string>
+            <key>LSMinimumSystemVersion</key>
+            <string>12.0</string>
+          </dict>
+          </plist>
+          PLIST
+
+          copy_dep() {
+            lib="$1"
+            lib_name="$(basename "$lib")"
+            dest="${APP_MACOS}/${lib_name}"
+
+            if [ ! -f "$dest" ]; then
+              cp "$lib" "$dest"
+              chmod +x "$dest"
+              install_name_tool -id "@executable_path/${lib_name}" "$dest" || true
+
+              while IFS= read -r dep; do
+                case "$dep" in
+                  /opt/homebrew/*|/usr/local/*)
+                    copy_dep "$dep"
+                    ;;
+                  @rpath/*)
+                    dep_name="$(basename "$dep")"
+                    resolved="$(find "$(brew --prefix)/lib" "$(brew --prefix)/opt" \
+                      -name "${dep_name}" -maxdepth 4 2>/dev/null | head -1)"
+                    if [ -f "$resolved" ]; then
+                      copy_dep "$resolved"
+                    fi
+                    ;;
+                esac
+              done < <(otool -L "$dest" | tail -n +2 | awk '{print $1}')
+            fi
+          }
+
+          rewrite_links() {
+            bin="$1"
+            while IFS= read -r dep; do
+              case "$dep" in
+                /opt/homebrew/*|/usr/local/*)
+                  dep_name="$(basename "$dep")"
+                  if [ -f "${APP_MACOS}/${dep_name}" ]; then
+                    install_name_tool -change "$dep" "@executable_path/${dep_name}" "$bin" || true
+                  fi
+                  ;;
+                @rpath/*)
+                  dep_name="$(basename "$dep")"
+                  if [ -f "${APP_MACOS}/${dep_name}" ]; then
+                    install_name_tool -change "$dep" "@executable_path/${dep_name}" "$bin" || true
+                  fi
+                  ;;
+              esac
+            done < <(otool -L "$bin" | tail -n +2 | awk '{print $1}')
+          }
+
+          while IFS= read -r dep; do
+            case "$dep" in
+              /opt/homebrew/*|/usr/local/*)
+                copy_dep "$dep"
+                ;;
+              @rpath/*)
+                dep_name="$(basename "$dep")"
+                resolved="$(find "$(brew --prefix)/lib" "$(brew --prefix)/opt" \
+                  -name "${dep_name}" -maxdepth 4 2>/dev/null | head -1)"
+                if [ -f "$resolved" ]; then
+                  copy_dep "$resolved"
+                fi
+                ;;
+            esac
+          done < <(otool -L "${APP_MACOS}/Archcast" | tail -n +2 | awk '{print $1}')
+
+          rewrite_links "${APP_MACOS}/Archcast"
+          for lib in "${APP_MACOS}"/*.dylib; do
+            [ -f "$lib" ] || continue
+            rewrite_links "$lib"
+          done
+
+          if [ -n "${CERT_SECRET:-}" ]; then
+            echo "$CERT_SECRET" > "${APP_RES}/certs/ca.crt"
+          fi
+
+          if [ -d assets ]; then
+            cp -r assets "${APP_RES}/assets"
+          fi
+
+          # Re-sign after install_name_tool mutations
+          CODESIGN_IDENTITY="${MACOS_CODESIGN_IDENTITY:--}"
+          find "${APP_MACOS}" -type f \( -name "*.dylib" -o -name "Archcast" \) -print0 | while IFS= read -r -d '' bin; do
+            codesign --remove-signature "$bin" 2>/dev/null || true
+            codesign --force --timestamp=none --sign "$CODESIGN_IDENTITY" "$bin"
+          done
+
+          codesign --remove-signature "${APP_ROOT}" 2>/dev/null || true
+          codesign --force --deep --timestamp=none --sign "$CODESIGN_IDENTITY" "${APP_ROOT}"
+          codesign --verify --deep --strict --verbose=2 "${APP_ROOT}"
+
+      - name: Package deployed build
+        env:
+          ENV_SECRET: ${{ secrets.ENV }}
+          MACOS_CODESIGN_IDENTITY: ${{ secrets.MACOS_CODESIGN_IDENTITY }}
+        run: |
+          set -euo pipefail
+          cd client
+
+          APP_ROOT="dist/Archcast.app"
+          APP_RES="${APP_ROOT}/Contents/Resources"
+          CODESIGN_IDENTITY="${MACOS_CODESIGN_IDENTITY:--}"
+
+          # Inject ENV
+          if [ -n "${ENV_SECRET:-}" ]; then
+            echo "$ENV_SECRET" > "${APP_RES}/env/.env"
+          elif [ -f env/.env.template ]; then
+            cp env/.env.template "${APP_RES}/env/.env"
+          fi
+
+          # Re-sign with env injected
+          codesign --remove-signature "${APP_ROOT}" 2>/dev/null || true
+          codesign --force --deep --timestamp=none --sign "$CODESIGN_IDENTITY" "${APP_ROOT}"
+
+          PKG_PAYLOAD="pkg-payload-deployed"
+          mkdir -p "${PKG_PAYLOAD}"
+          cp -R "${APP_ROOT}" "${PKG_PAYLOAD}/"
+
+          mkdir -p pkg-scripts-deployed
+          cat > pkg-scripts-deployed/postinstall << 'POSTINSTALL'
+          #!/bin/bash
+          set -euo pipefail
+          REAL_USER=$(stat -f '%Su' /dev/console 2>/dev/null || echo "$USER")
+          DESKTOP="/Users/${REAL_USER}/Desktop"
+          xattr -cr /Applications/Archcast.app
+          if ! codesign --verify --deep --strict /Applications/Archcast.app 2>/dev/null; then
+            codesign --force --deep --sign - /Applications/Archcast.app
+          fi
+          cp -R "/Applications/Archcast.app" "${DESKTOP}/Archcast.app" 2>/dev/null || true
+          chown -R "${REAL_USER}" "${DESKTOP}/Archcast.app" 2>/dev/null || true
+          exit 0
+          POSTINSTALL
+          chmod +x pkg-scripts-deployed/postinstall
+
+          pkgbuild \
+            --root "${PKG_PAYLOAD}" \
+            --install-location /Applications \
+            --identifier com.fylstudios.archcast \
+            --version "latest" \
+            --scripts pkg-scripts-deployed \
+            Archcast-component-deployed.pkg
+
+          productbuild \
+            --package Archcast-component-deployed.pkg \
+            --identifier com.fylstudios.archcast \
+            --version "latest" \
+            ArchcastSetup-deployed.pkg
+
+          ditto -c -k --sequesterRsrc --keepParent "${APP_ROOT}" "ArchcastSetup-deployed.zip"
+
+      - name: Package local build
+        env:
+          ENV_LOCAL_SECRET: ${{ secrets.ENV_LOCAL }}
+          MACOS_CODESIGN_IDENTITY: ${{ secrets.MACOS_CODESIGN_IDENTITY }}
+        run: |
+          set -euo pipefail
+          cd client
+
+          APP_ROOT="dist/Archcast.app"
+          APP_RES="${APP_ROOT}/Contents/Resources"
+          CODESIGN_IDENTITY="${MACOS_CODESIGN_IDENTITY:--}"
+
+          # Inject ENV_LOCAL
+          if [ -n "${ENV_LOCAL_SECRET:-}" ]; then
+            echo "$ENV_LOCAL_SECRET" > "${APP_RES}/env/.env"
+          elif [ -f env/.env.template ]; then
+            cp env/.env.template "${APP_RES}/env/.env"
+          fi
+
+          # Re-sign with env injected
+          codesign --remove-signature "${APP_ROOT}" 2>/dev/null || true
+          codesign --force --deep --timestamp=none --sign "$CODESIGN_IDENTITY" "${APP_ROOT}"
+
+          PKG_PAYLOAD="pkg-payload-local"
+          mkdir -p "${PKG_PAYLOAD}"
+          cp -R "${APP_ROOT}" "${PKG_PAYLOAD}/"
+
+          mkdir -p pkg-scripts-local
+          cat > pkg-scripts-local/postinstall << 'POSTINSTALL'
+          #!/bin/bash
+          set -euo pipefail
+          REAL_USER=$(stat -f '%Su' /dev/console 2>/dev/null || echo "$USER")
+          DESKTOP="/Users/${REAL_USER}/Desktop"
+          xattr -cr /Applications/Archcast.app
+          if ! codesign --verify --deep --strict /Applications/Archcast.app 2>/dev/null; then
+            codesign --force --deep --sign - /Applications/Archcast.app
+          fi
+          cp -R "/Applications/Archcast.app" "${DESKTOP}/Archcast.app" 2>/dev/null || true
+          chown -R "${REAL_USER}" "${DESKTOP}/Archcast.app" 2>/dev/null || true
+          exit 0
+          POSTINSTALL
+          chmod +x pkg-scripts-local/postinstall
+
+          pkgbuild \
+            --root "${PKG_PAYLOAD}" \
+            --install-location /Applications \
+            --identifier com.fylstudios.archcast \
+            --version "latest" \
+            --scripts pkg-scripts-local \
+            Archcast-component-local.pkg
+
+          productbuild \
+            --package Archcast-component-local.pkg \
+            --identifier com.fylstudios.archcast \
+            --version "latest" \
+            ArchcastSetup-local.pkg
+
+          ditto -c -k --sequesterRsrc --keepParent "${APP_ROOT}" "ArchcastSetup-local.zip"
+
+      - name: Validate macOS installer outputs
+        run: |
+          test -f client/ArchcastSetup-deployed.pkg
+          test -f client/ArchcastSetup-deployed.zip
+          test -f client/ArchcastSetup-local.pkg
+          test -f client/ArchcastSetup-local.zip
+
+      - name: Publish macOS release assets
+        uses: ncipollo/release-action@v1
+        with:
+          tag: client-latest
+          name: Archcast Client Latest
+          body: Automated latest build for Archcast.
+          allowUpdates: true
+          removeArtifacts: false
+          replacesArtifacts: true
+          artifactErrorsFailBuild: true
+          artifacts: client/ArchcastSetup-deployed.pkg,client/ArchcastSetup-deployed.zip,client/ArchcastSetup-local.pkg,client/ArchcastSetup-local.zip
+          makeLatest: true

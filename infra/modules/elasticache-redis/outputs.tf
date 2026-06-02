@@ -7,3 +7,4 @@ output "port" {
   description = "Redis port"
   value       = aws_elasticache_cluster.this.port
 }
+

@@ -1,5 +1,8 @@
 #include "utils/HttpUtil.hpp"
 
+#include <cstdlib>
+#include <map>
+
 #define CPPHTTPLIB_OPENSSL_SUPPORT
 #if defined(__GNUC__)
 #pragma GCC diagnostic push
@@ -27,7 +30,6 @@ namespace {
 
         return normalized;
     }
-
 }
 
 namespace HttpUtil {
@@ -42,16 +44,25 @@ namespace HttpUtil {
         client.enable_server_certificate_verification(false);
         client.set_follow_location(true);
 
-        if (method == "GET") res = client.Get(path.c_str());
-        else if (method == "POST") res = client.Post(path.c_str(), body, "application/json");
-        else if (method == "PUT") res = client.Put(path.c_str(), body, "application/json");
-        else if (method == "PATCH") res = client.Patch(path.c_str(), body, "application/json");
-        else if (method == "DELETE") res = client.Delete(path.c_str());
+        httplib::Headers headers;
+        const char* key = std::getenv("INTERNAL_API_KEY");
+        if (key && key[0] != '\0') {
+            headers.emplace("X-Internal-Key", key);
+        }
+
+        if (method == "GET") res = client.Get(path.c_str(), headers);
+        else if (method == "POST") res = client.Post(path.c_str(), headers, body, "application/json");
+        else if (method == "PUT") res = client.Put(path.c_str(), headers, body, "application/json");
+        else if (method == "PATCH") res = client.Patch(path.c_str(), headers, body, "application/json");
+        else if (method == "DELETE") res = client.Delete(path.c_str(), headers, body, "application/json");
         else return false;
 
         if (!res) {
             statusCode = -1;
             responseBody.clear();
+            auto err = res.error();
+            std::cerr << "[HttpUtil] Request failed: " << httplib::to_string(err)
+                    << " | " << method << " https://" << normalizedHost << ":" << port << path << "\n";
             return false;
         }
 

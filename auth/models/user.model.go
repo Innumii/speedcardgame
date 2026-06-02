@@ -13,14 +13,3 @@ type User struct {
 	ResetPasswordToken  string    `gorm:"default:null"`
 	PasswordResetExpiry time.Time `gorm:"default:null"`
 }
-
-/**
-Additional Attributes:
-- passwordResetToken (for password reset)
-
-Activity:
-- SearchHistory
-- recentlyViewedCards (up to 10, for recommendations)
-- favouriteCards
-- dislikedCards
-*/

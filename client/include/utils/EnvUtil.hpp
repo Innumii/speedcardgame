@@ -11,7 +11,7 @@ namespace EnvUtil {
 
     // AWS-specific helpers
     bool isAwsEnabled();
-    std::string resolveEndpoint(const std::string& dockerHostKey, const std::string& dockerPortKey, const std::string& awsEndpointKey);
+    std::string resolveEndpoint(const std::string& dockerKey, const std::string& awsKey);
     std::string resolveHostOrPort(const std::string& dockerKey, const std::string& awsKey, bool resolveHost);
 
     // Auth service

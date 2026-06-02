@@ -4,6 +4,11 @@ variable "aws_region" {
   type        = string
 }
 
+variable "base_domain" {
+  description = "Base public domain used for DNS records and endpoints"
+  type        = string
+}
+
 variable "service_name" {
   description = "Cards ECS service name"
   type        = string
@@ -39,18 +44,19 @@ variable "image_tag" {
   default     = "latest"
 }
 
-variable "image_repo" {
-  description = "Image repository for the cards service image"
+variable "cards_image_repo" {
+  description = "Cards-specific image repository fallback when using a shared tfvars file"
   type        = string
+  default     = null
 }
 
-variable "cpu" {
+variable "cards_cpu" {
   description = "Fargate CPU units"
   type        = string
   default     = "256"
 }
 
-variable "memory" {
+variable "cards_memory" {
   description = "Fargate memory"
   type        = string
   default     = "512"
@@ -87,7 +93,7 @@ variable "target_group_arn" {
 }
 
 variable "use_managed_data_stack" {
-  description = "When true, read Postgres/Redis values from infra/data stack remote state."
+  description = "When true, read Postgres values from infra/data stack remote state."
   type        = bool
   default     = true
 }
@@ -114,12 +120,6 @@ variable "postgres_password" {
   default   = null
 }
 
-variable "postgres_password_secret_arn" {
-  description = "Secrets Manager ARN containing POSTGRES_PASSWORD JSON key for auth runtime"
-  type        = string
-  default     = null
-}
-
 variable "cards_runtime_secret_name" {
   description = "Cards runtime secret name for IAM permission and ECS secret fallback when ARN is not present in remote state"
   type        = string
@@ -136,16 +136,6 @@ variable "postgres_port" {
   default = null
 }
 
-variable "postgres_sslmode" {
-  type    = string
-  default = "disable"
-}
-
-variable "postgres_timezone" {
-  type    = string
-  default = "UTC"
-}
-
 variable "redis_host" {
   type    = string
   default = null
@@ -156,9 +146,14 @@ variable "redis_port" {
   default = null
 }
 
-variable "cards_service_host" {
-  description = "Cards service host reachable from auth task"
-  type        = string
+variable "postgres_sslmode" {
+  type    = string
+  default = "disable"
+}
+
+variable "postgres_timezone" {
+  type    = string
+  default = "UTC"
 }
 
 variable "cards_service_port" {
@@ -183,4 +178,16 @@ variable "use_aws_services" {
   description = "When true, enables AWS Secrets Manager integration and VPC endpoints for data services"
   type        = bool
   default     = true
+}
+
+variable "cards_desired_count" {
+  description = "Number of desired cards service tasks"
+  type        = number
+  default     = 1
+}
+
+variable "internal_api_key" {
+  description = "api key for JWT"
+  type        = string
+  sensitive   = true
 }

@@ -53,6 +53,8 @@ public:
     void addGrantedEffect(const std::string& effectText);
     void removeGrantedEffect(const std::string& effectText);
     void clearGrantedEffects();
+    bool hasGrantedEffect(const std::string& effectText) const;
+    void removeGrantedEffectsWithPrefix(const std::string& prefix);
 
     // Polymorphic draw hook
     virtual void drawExtraInfo() const = 0;

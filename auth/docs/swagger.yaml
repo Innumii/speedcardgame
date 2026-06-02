@@ -57,27 +57,6 @@ definitions:
     required:
     - email
     type: object
-  models.User:
-    properties:
-      createdAt:
-        type: string
-      email:
-        type: string
-      id:
-        type: integer
-      name:
-        type: string
-      password:
-        type: string
-      passwordResetExpiry:
-        type: string
-      resetPasswordToken:
-        type: string
-      role:
-        type: string
-      updatedAt:
-        type: string
-    type: object
 info:
   contact: {}
 paths:
@@ -85,10 +64,11 @@ paths:
     patch:
       consumes:
       - application/json
+      description: Changes the user's password using their current password for verification
       parameters:
-      - description: Change password
+      - description: Old and new password
         in: body
-        name: changePasswordDto
+        name: body
         required: true
         schema:
           $ref: '#/definitions/dtos.ChangePasswordDTO'
@@ -97,23 +77,42 @@ paths:
       responses:
         "200":
           description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
         "400":
-          description: Bad Request
+          description: Validation error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
         "401":
-          description: Unauthorized
+          description: No session provided
+          schema:
+            additionalProperties:
+              type: string
+            type: object
         "500":
-          description: Internal Server Error
-      summary: Change password with old password
+          description: Failed to change password
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - SessionAuth: []
+      summary: Change password
       tags:
-      - users
+      - auth
   /login:
     post:
       consumes:
       - application/json
+      description: Authenticates a user and returns a session ID
       parameters:
       - description: Login details
         in: body
-        name: loginDTO
+        name: body
         required: true
         schema:
           $ref: '#/definitions/dtos.LoginDTO'
@@ -122,51 +121,96 @@ paths:
       responses:
         "200":
           description: OK
+          schema:
+            additionalProperties: true
+            type: object
         "401":
-          description: Unauthorized
+          description: Invalid credentials
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "409":
+          description: Already logged in
+          schema:
+            additionalProperties:
+              type: string
+            type: object
       summary: Login user
       tags:
-      - users
+      - auth
   /logout:
     post:
-      consumes:
-      - application/json
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-        "401":
-          description: Unauthorized
-        "500":
-          description: Internal Server Error
-      summary: Logout user
-      tags:
-      - users
-  /me:
-    get:
-      consumes:
-      - application/json
+      description: Invalidates the current session. Accepts session via X-Session-ID
+        header or session_id cookie.
+      parameters:
+      - description: Session ID
+        in: header
+        name: X-Session-ID
+        type: string
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/models.User'
+            additionalProperties:
+              type: string
+            type: object
         "401":
-          description: Unauthorized
-      summary: Get logged in user info using session id cookie
+          description: No session provided
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Failed to log out
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - SessionAuth: []
+      summary: Logout user
       tags:
-      - users
+      - auth
+  /me:
+    get:
+      description: Returns the logged-in user's details. Accepts session via X-Session-ID
+        header or session_id cookie.
+      parameters:
+      - description: Session ID
+        in: header
+        name: X-Session-ID
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Invalid or missing session
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - SessionAuth: []
+      summary: Get current user
+      tags:
+      - auth
   /register:
     post:
       consumes:
       - application/json
+      description: Creates a new user account and initialises their inventory
       parameters:
       - description: Registration details
         in: body
-        name: registerDTO
+        name: body
         required: true
         schema:
           $ref: '#/definitions/dtos.RegisterDTO'
@@ -175,19 +219,28 @@ paths:
       responses:
         "201":
           description: Created
+          schema:
+            additionalProperties: true
+            type: object
         "400":
-          description: Bad Request
+          description: Validation error or email taken
+          schema:
+            additionalProperties:
+              type: string
+            type: object
       summary: Register user
       tags:
-      - users
+      - auth
   /reset-password:
     post:
       consumes:
       - application/json
+      description: Generates a password reset token and returns it (token should be
+        emailed to the user)
       parameters:
-      - description: Request password reset
+      - description: Email address
         in: body
-        name: requestPasswordResetDTO
+        name: body
         required: true
         schema:
           $ref: '#/definitions/dtos.RequestPasswordResetDTO'
@@ -196,21 +249,34 @@ paths:
       responses:
         "200":
           description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
         "400":
-          description: Bad Request
+          description: Validation error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
         "500":
-          description: Internal Server Error
-      summary: Reset password request
+          description: Failed to generate token
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Request password reset
       tags:
-      - users
+      - auth
   /reset-password/confirm:
     post:
       consumes:
       - application/json
+      description: Verifies the reset token and updates the user's password
       parameters:
-      - description: Confirm password reset
+      - description: Reset token and new password
         in: body
-        name: confirmPasswordResetDTO
+        name: body
         required: true
         schema:
           $ref: '#/definitions/dtos.ConfirmPasswordResetDTO'
@@ -219,11 +285,23 @@ paths:
       responses:
         "200":
           description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
         "400":
-          description: Bad Request
+          description: Validation error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
         "500":
-          description: Internal Server Error
-      summary: Reset password request
+          description: Invalid or expired token
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Confirm password reset
       tags:
-      - users
+      - auth
 swagger: "2.0"

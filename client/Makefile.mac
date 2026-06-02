@@ -6,10 +6,16 @@ INCLUDES := -I include
 BREW_PREFIX    := $(shell brew --prefix)
 OPENSSL_PREFIX := $(shell brew --prefix openssl@3)
 
-# Use pkg-config for SDL2_ttf and SDL2_image; manually set SDL2 include
-# to parent dir so <SDL2/SDL.h> style includes resolve correctly
+SDL2_CFLAGS := $(shell pkg-config --cflags sdl2 SDL2_ttf SDL2_image SDL2_mixer 2>/dev/null)
+SDL2_LIBS   := $(shell pkg-config --libs sdl2 SDL2_ttf SDL2_image SDL2_mixer 2>/dev/null)
+
+ifeq ($(strip $(SDL2_CFLAGS)),)
 SDL2_CFLAGS := -I$(BREW_PREFIX)/include -D_THREAD_SAFE
+endif
+
+ifeq ($(strip $(SDL2_LIBS)),)
 SDL2_LIBS   := -L$(BREW_PREFIX)/lib -lSDL2 -lSDL2_ttf -lSDL2_image -lSDL2_mixer
+endif
 
 CXXFLAGS := $(STD) $(INCLUDES) $(SDL2_CFLAGS) \
              -I$(OPENSSL_PREFIX)/include
@@ -27,6 +33,7 @@ DYLIBS := \
 	$(BREW_PREFIX)/lib/libSDL2.dylib \
 	$(BREW_PREFIX)/lib/libSDL2_ttf.dylib \
 	$(BREW_PREFIX)/lib/libSDL2_image.dylib \
+	$(BREW_PREFIX)/lib/libSDL2_mixer.dylib \
 	$(OPENSSL_PREFIX)/lib/libssl.dylib \
 	$(OPENSSL_PREFIX)/lib/libcrypto.dylib
 

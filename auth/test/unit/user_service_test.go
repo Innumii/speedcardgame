@@ -36,6 +36,36 @@ func TestRegister_Success(t *testing.T) {
 	}
 }
 
+func TestRegister_AllowsDigitsInName(t *testing.T) {
+	fakeServer, host, port := newFakeInventoryServer(t, true)
+	defer fakeServer.Close()
+	t.Setenv("CARDS_SERVICE_HOST", host)
+	t.Setenv("CARDS_SERVICE_PORT", port)
+
+	repo := &MockUserRepository{
+		FindByEmailFn: func(email string) (*models.User, error) { return nil, errors.New("not found") },
+		CreateFn:      func(user *models.User) error { user.ID = 1; return nil },
+		DeleteFn:      func(userID uint) error { return nil },
+	}
+	svc, _ := newTestServices(t, repo)
+	user, err := svc.Register(dtos.RegisterDTO{Name: "Player123", Email: "player123@example.com", Password: "secret123"})
+	if err != nil {
+		t.Fatalf("expected no error, got: %v", err)
+	}
+	if user.Name != "Player123" {
+		t.Errorf("expected name 'Player123', got %q", user.Name)
+	}
+}
+
+func TestRegister_RejectsInjectionLikeName(t *testing.T) {
+	repo := &MockUserRepository{}
+	svc, _ := newTestServices(t, repo)
+	_, err := svc.Register(dtos.RegisterDTO{Name: "alice'; DROP TABLE users;--", Email: "alice@example.com", Password: "secret123"})
+	if err == nil || err.Error() != "name can only contain letters, digits, and spaces" {
+		t.Errorf("expected validation error, got: %v", err)
+	}
+}
+
 func TestRegister_EmailAlreadyTaken(t *testing.T) {
 	repo := &MockUserRepository{
 		FindByEmailFn: func(email string) (*models.User, error) { return &models.User{Email: email}, nil },

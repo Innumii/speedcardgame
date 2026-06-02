@@ -45,15 +45,15 @@ func NewAuthController(authService *services.AuthService) *AuthController {
 	return &AuthController{AuthService: authService}
 }
 
-// @Summary Register user
-// @Tags users
-// @Accept  json
-// @Produce  json
-// @Param registerDTO body dtos.RegisterDTO true "Registration details"
-// @Success 201
-// @Failure 400
-// @Router /register [post]
-// c *gin.Context is the context that is used to access the current request and response parameters
+// @Summary      Register user
+// @Description  Creates a new user account and initialises their inventory
+// @Tags         auth
+// @Accept       json
+// @Produce      json
+// @Param        body  body      dtos.RegisterDTO  true  "Registration details"
+// @Success      201   {object}  map[string]interface{}
+// @Failure      400   {object}  map[string]string  "Validation error or email taken"
+// @Router       /register [post]
 func (controller *AuthController) Register(c *gin.Context) {
 	var registerDTO dtos.RegisterDTO
 
@@ -74,14 +74,16 @@ func (controller *AuthController) Register(c *gin.Context) {
 	c.JSON(http.StatusCreated, gin.H{"message": "user created successfully", "user": user})
 }
 
-// @Summary Login user
-// @Tags users
-// @Accept  json
-// @Produce  json
-// @Param loginDTO body dtos.LoginDTO true "Login details"
-// @Success 200
-// @Failure 401
-// @Router /login [post]
+// @Summary      Login user
+// @Description  Authenticates a user and returns a session ID
+// @Tags         auth
+// @Accept       json
+// @Produce      json
+// @Param        body  body      dtos.LoginDTO  true  "Login details"
+// @Success      200   {object}  map[string]interface{}
+// @Failure      401   {object}  map[string]string  "Invalid credentials"
+// @Failure      409   {object}  map[string]string  "Already logged in"
+// @Router       /login [post]
 func (controller *AuthController) Login(c *gin.Context) {
 	var loginDTO dtos.LoginDTO
 
@@ -100,20 +102,23 @@ func (controller *AuthController) Login(c *gin.Context) {
 		return
 	}
 
-	// Set session ID as a cookie
-	c.SetCookie("session_id", sessionID, 3600*24, "/", "localhost", false, true)
-
-	c.JSON(http.StatusOK, gin.H{"message": "login successful", "user": user, "session_id": sessionID})
+	c.JSON(http.StatusOK, gin.H{
+		"message":    "login successful",
+		"user":       user,
+		"session_id": sessionID,
+	})
 }
 
-// @Summary Logout user
-// @Tags users
-// @Accept  json
-// @Produce  json
-// @Success 200
-// @Failure 401
-// @Failure 500
-// @Router /logout [post]
+// @Summary      Logout user
+// @Description  Invalidates the current session. Accepts session via X-Session-ID header or session_id cookie.
+// @Tags         auth
+// @Produce      json
+// @Param        X-Session-ID  header    string  false  "Session ID"
+// @Success      200           {object}  map[string]string
+// @Failure      401           {object}  map[string]string  "No session provided"
+// @Failure      500           {object}  map[string]string  "Failed to log out"
+// @Security     SessionAuth
+// @Router       /logout [post]
 func (controller *AuthController) Logout(c *gin.Context) {
 	sessionID, ok := sessionIDFromRequest(c)
 	if !ok {
@@ -135,13 +140,15 @@ func (controller *AuthController) Logout(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Logged out successfully"})
 }
 
-// @Summary Get logged in user info using session id cookie
-// @Tags users
-// @Accept  json
-// @Produce  json
-// @Success 200 {object} models.User
-// @Failure 401
-// @Router /me [get]
+// @Summary      Get current user
+// @Description  Returns the logged-in user's details. Accepts session via X-Session-ID header or session_id cookie.
+// @Tags         auth
+// @Produce      json
+// @Param        X-Session-ID  header    string  false  "Session ID"
+// @Success      200           {object}  map[string]interface{}
+// @Failure      401           {object}  map[string]string  "Invalid or missing session"
+// @Security     SessionAuth
+// @Router       /me [get]
 func (controller *AuthController) GetMe(c *gin.Context) {
 	sessionID, ok := sessionIDFromRequest(c)
 	if !ok {
@@ -159,15 +166,16 @@ func (controller *AuthController) GetMe(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"user": user})
 }
 
-// @Summary Reset password request
-// @Tags users
-// @Accept  json
-// @Produce  json
-// @Param requestPasswordResetDTO body dtos.RequestPasswordResetDTO true "Request password reset"
-// @Success 200
-// @Failure 400
-// @Failure 500
-// @Router /reset-password [post]
+// @Summary      Request password reset
+// @Description  Generates a password reset token and returns it (token should be emailed to the user)
+// @Tags         auth
+// @Accept       json
+// @Produce      json
+// @Param        body  body      dtos.RequestPasswordResetDTO  true  "Email address"
+// @Success      200   {object}  map[string]string
+// @Failure      400   {object}  map[string]string  "Validation error"
+// @Failure      500   {object}  map[string]string  "Failed to generate token"
+// @Router       /reset-password [post]
 func (controller *AuthController) RequestPasswordReset(c *gin.Context) {
 	var requestPasswordResetDTO dtos.RequestPasswordResetDTO
 
@@ -185,15 +193,16 @@ func (controller *AuthController) RequestPasswordReset(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Password reset requested successfully", "token": token})
 }
 
-// @Summary Reset password request
-// @Tags users
-// @Accept  json
-// @Produce  json
-// @Param confirmPasswordResetDTO body dtos.ConfirmPasswordResetDTO true "Confirm password reset"
-// @Success 200
-// @Failure 400
-// @Failure 500
-// @Router /reset-password/confirm [post]
+// @Summary      Confirm password reset
+// @Description  Verifies the reset token and updates the user's password
+// @Tags         auth
+// @Accept       json
+// @Produce      json
+// @Param        body  body      dtos.ConfirmPasswordResetDTO  true  "Reset token and new password"
+// @Success      200   {object}  map[string]string
+// @Failure      400   {object}  map[string]string  "Validation error"
+// @Failure      500   {object}  map[string]string  "Invalid or expired token"
+// @Router       /reset-password/confirm [post]
 func (controller *AuthController) ConfirmPasswordReset(c *gin.Context) {
 	var confirmPasswordResetDTO dtos.ConfirmPasswordResetDTO
 
@@ -211,16 +220,18 @@ func (controller *AuthController) ConfirmPasswordReset(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Password reset confirmed successfully"})
 }
 
-// @Summary Change password with old password
-// @Tags users
-// @Accept  json
-// @Produce  json
-// @Param changePasswordDto body dtos.ChangePasswordDTO true "Change password"
-// @Success 200
-// @Failure 400
-// @Failure 401
-// @Failure 500
-// @Router /change-password [patch]
+// @Summary      Change password
+// @Description  Changes the user's password using their current password for verification
+// @Tags         auth
+// @Accept       json
+// @Produce      json
+// @Param        body  body      dtos.ChangePasswordDTO  true  "Old and new password"
+// @Success      200   {object}  map[string]string
+// @Failure      400   {object}  map[string]string  "Validation error"
+// @Failure      401   {object}  map[string]string  "No session provided"
+// @Failure      500   {object}  map[string]string  "Failed to change password"
+// @Security     SessionAuth
+// @Router       /change-password [patch]
 func (controller *AuthController) ChangePassword(c *gin.Context) {
 	var changePasswordDto dtos.ChangePasswordDTO
 

@@ -2,7 +2,7 @@ CXX := g++
 STD := -std=c++17
 INCLUDES := -I include
 LIBDIR := -L lib
-LIBS := -lSDL2 -lSDL2_ttf -lSDL2_image -lSDL2_mixer -lssl -lcrypto -lcrypt32
+LIBS := -lSDL2 -lSDL2_ttf -lSDL2_image -lSDL2_mixer -lssl -lcrypto
 BUILD_DIR := build
 MKDIR_P := mkdir -p
 

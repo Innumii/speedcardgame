@@ -50,7 +50,7 @@ data "terraform_remote_state" "data" {
 }
 
 data "aws_secretsmanager_secret" "cards_runtime" {
-  count = local.postgres_password_secret_arn == null ? 1 : 0
+  count = try(local.data_outputs.cards_runtime_secret_arn, null) == null ? 1 : 0
   name  = var.cards_runtime_secret_name
 }
 
@@ -59,21 +59,20 @@ data "aws_secretsmanager_secret" "service_tls" {
 }
 
 locals {
-  alb_outputs                  = local.use_alb_remote_state ? data.terraform_remote_state.alb[0].outputs : {}
-  alb_security_group_id        = var.alb_security_group_id != null ? var.alb_security_group_id : try(local.alb_outputs.alb_security_group_id, null)
-  cards_target_group_arn       = var.target_group_arn != null ? var.target_group_arn : try(local.alb_outputs.cards_target_group_arn, null)
-  data_outputs                 = local.use_data_remote_state ? data.terraform_remote_state.data[0].outputs : {}
-  postgres_host                = var.postgres_host != null ? var.postgres_host : try(local.data_outputs.cards_postgres_endpoint, null)
-  postgres_user                = var.postgres_user != null ? var.postgres_user : try(local.data_outputs.cards_postgres_user, null)
-  postgres_password            = var.postgres_password != null ? var.postgres_password : try(local.data_outputs.cards_postgres_password, null)
-  postgres_password_secret_arn = var.postgres_password_secret_arn != null ? var.postgres_password_secret_arn : try(local.data_outputs.cards_runtime_secret_arn, null)
-  postgres_db                  = var.postgres_db != null ? var.postgres_db : try(local.data_outputs.cards_postgres_db, null)
-  postgres_port                = var.postgres_port != null ? var.postgres_port : try(local.data_outputs.cards_postgres_port, null)
-  redis_host                   = var.redis_host != null ? var.redis_host : try(local.data_outputs.auth_redis_endpoint, null)
-  redis_port                   = var.redis_port != null ? var.redis_port : try(local.data_outputs.auth_redis_port, null)
-  tls_secret_arn               = data.aws_secretsmanager_secret.service_tls.arn
-  cards_runtime_secret_arn     = coalesce(local.postgres_password_secret_arn, try(data.aws_secretsmanager_secret.cards_runtime[0].arn, null))
-  cards_database_url           = "postgres://${local.postgres_user}:${local.postgres_password}@${local.postgres_host}:${local.postgres_port}/${local.postgres_db}?sslmode=${var.postgres_sslmode}"
+  alb_outputs              = local.use_alb_remote_state ? data.terraform_remote_state.alb[0].outputs : {}
+  alb_security_group_id    = var.alb_security_group_id != null ? var.alb_security_group_id : try(local.alb_outputs.alb_security_group_id, null)
+  cards_target_group_arn   = var.target_group_arn != null ? var.target_group_arn : try(local.alb_outputs.cards_target_group_arn, null)
+  data_outputs             = local.use_data_remote_state ? data.terraform_remote_state.data[0].outputs : {}
+  postgres_host            = var.postgres_host != null ? var.postgres_host : try(local.data_outputs.cards_postgres_endpoint, null)
+  postgres_user            = var.postgres_user != null ? var.postgres_user : try(local.data_outputs.cards_postgres_user, null)
+  postgres_password        = var.postgres_password != null ? var.postgres_password : try(local.data_outputs.cards_postgres_password, null)
+  postgres_db              = var.postgres_db != null ? var.postgres_db : try(local.data_outputs.cards_postgres_db, null)
+  postgres_port            = var.postgres_port != null ? var.postgres_port : try(local.data_outputs.cards_postgres_port, null)
+  redis_host               = var.redis_host != null ? var.redis_host : try(local.data_outputs.auth_redis_endpoint, null)
+  redis_port               = var.redis_port != null ? var.redis_port : try(local.data_outputs.auth_redis_port, null)
+  tls_secret_arn           = data.aws_secretsmanager_secret.service_tls.arn
+  cards_runtime_secret_arn = coalesce(try(local.data_outputs.cards_runtime_secret_arn, null), try(data.aws_secretsmanager_secret.cards_runtime[0].arn, null))
+  cards_service_host       = "api.${var.base_domain}"
 }
 
 
@@ -91,11 +90,11 @@ module "service" {
   subnet_ids            = data.aws_subnets.default.ids
   container_port        = 8080
   image_tag             = var.image_tag
-  image_repo            = var.image_repo
-  cpu                   = var.cpu
-  memory                = var.memory
+  image_repo            = var.cards_image_repo
+  cpu                   = var.cards_cpu
+  memory                = var.cards_memory
   assign_public_ip      = var.assign_public_ip
-  desired_count         = 1
+  desired_count         = var.cards_desired_count
   target_group_arn      = local.cards_target_group_arn
   alb_security_group_id = local.alb_security_group_id
   container_entrypoint  = ["/bin/sh", "-c"]
@@ -121,22 +120,23 @@ module "service" {
 
   environment = merge(
     {
-      PORT                     = tostring(8080)
-      POSTGRES_HOST            = local.postgres_host
-      POSTGRES_USER            = local.postgres_user
-      POSTGRES_DB              = local.postgres_db
-      POSTGRES_PORT            = tostring(local.postgres_port)
-      POSTGRES_SSLMODE         = var.postgres_sslmode
-      POSTGRES_TIMEZONE        = var.postgres_timezone
-      DATABASE_URL             = local.cards_database_url
-      REDIS_HOST               = local.redis_host
-      REDIS_PORT               = tostring(local.redis_port)
-      CARDS_SERVICE_HOST       = var.cards_service_host
-      CARDS_SERVICE_PORT       = tostring(var.cards_service_port)
-      DEBUG_LOG_ENABLED        = tostring(var.debug_log_enabled)
-      HTTP_REQUEST_LOG_ENABLED = tostring(var.http_request_log_enabled)
-      AWS_ENABLED              = tostring(var.use_aws_services)
-    },
-    {}
+      POSTGRES_HOST             = local.postgres_host
+      POSTGRES_USER             = local.postgres_user
+      POSTGRES_PASSWORD         = local.postgres_password
+      POSTGRES_DB               = local.postgres_db
+      POSTGRES_PORT             = tostring(local.postgres_port)
+      POSTGRES_SSLMODE          = var.postgres_sslmode
+      POSTGRES_TIMEZONE         = var.postgres_timezone
+      REDIS_HOST                = local.redis_host
+      REDIS_PORT                = tostring(local.redis_port)
+      CARDS_SERVICE_HOST        = local.cards_service_host
+      CARDS_SERVICE_PORT        = tostring(var.cards_service_port)
+      DOCKER_CARDS_SERVICE_PORT = tostring(var.cards_service_port)
+      DEBUG_LOG_ENABLED         = tostring(var.debug_log_enabled)
+      HTTP_REQUEST_LOG_ENABLED  = tostring(var.http_request_log_enabled)
+      AWS_ENABLED               = tostring(var.use_aws_services)
+      INTERNAL_API_KEY          = var.internal_api_key
+    }
   )
 }
+

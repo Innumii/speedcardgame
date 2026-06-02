@@ -52,10 +52,29 @@ func SetPaymentClientForTests(client payments.Client) {
 	paymentClient = client
 }
 
+// ListCoinPackages godoc
+// @Summary      List coin packages
+// @Description  Returns all available coin packages for purchase
+// @Tags         payments
+// @Produce      json
+// @Success      200  {object}  map[string]interface{}
+// @Router       /payments/packages [get]
 func ListCoinPackages(w http.ResponseWriter, _ *http.Request) {
 	util.RespondWithJSON(w, http.StatusOK, map[string]interface{}{"packages": payments.ListCoinPackages()})
 }
 
+// CreateCoinCheckoutSession godoc
+// @Summary      Create checkout session
+// @Description  Creates a Stripe checkout session for a coin package purchase
+// @Tags         payments
+// @Accept       json
+// @Produce      json
+// @Param        body  body      createCoinCheckoutRequest  true  "Checkout session details"
+// @Success      200   {object}  map[string]interface{}
+// @Failure      400   {string}  string  "Invalid input or unsupported package"
+// @Failure      502   {string}  string  "Failed to create checkout session"
+// @Failure      503   {string}  string  "Payments module not configured"
+// @Router       /payments/checkout-session [post]
 func CreateCoinCheckoutSession(w http.ResponseWriter, r *http.Request) {
 	if paymentClient == nil {
 		util.RespondWithError(w, http.StatusServiceUnavailable, "payments module is not configured")
@@ -145,6 +164,20 @@ func RenderCheckoutCompletePage(w http.ResponseWriter, r *http.Request) {
 </html>`, message)
 }
 
+// ProcessCardPayment godoc
+// @Summary      Process direct card payment
+// @Description  Processes a direct card payment for a coin package. Only available when ALLOW_DIRECT_CARD_PAYMENTS is enabled.
+// @Tags         payments
+// @Accept       json
+// @Produce      json
+// @Param        body  body      processCardPaymentRequest  true  "Card payment details"
+// @Success      200   {object}  map[string]interface{}
+// @Failure      400   {string}  string  "Invalid input or unsupported package"
+// @Failure      402   {string}  string  "Payment not completed"
+// @Failure      403   {string}  string  "Direct card payments disabled"
+// @Failure      502   {string}  string  "Failed to process payment"
+// @Failure      503   {string}  string  "Payments module not configured"
+// @Router       /payments/card [post]
 func ProcessCardPayment(w http.ResponseWriter, r *http.Request) {
 	if !util.GetEnvAsBool("ALLOW_DIRECT_CARD_PAYMENTS", false) {
 		util.RespondWithError(w, http.StatusForbidden, "direct card payments are disabled; use /cards/payments/checkout-session")
@@ -203,6 +236,18 @@ func ProcessCardPayment(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// HandlePaymentWebhook godoc
+// @Summary      Handle payment webhook
+// @Description  Receives and processes Stripe webhook events. On successful checkout, credits coins to the user's inventory.
+// @Tags         payments
+// @Accept       json
+// @Produce      json
+// @Param        Stripe-Signature  header    string  true  "Stripe webhook signature"
+// @Success      200               {object}  map[string]string
+// @Failure      400               {string}  string  "Invalid webhook payload or metadata"
+// @Failure      500               {string}  string  "Failed to apply coin purchase"
+// @Failure      503               {string}  string  "Payments module not configured"
+// @Router       /payments/webhook [post]
 func HandlePaymentWebhook(w http.ResponseWriter, r *http.Request) {
 	if paymentClient == nil {
 		util.RespondWithError(w, http.StatusServiceUnavailable, "payments module is not configured")
@@ -277,6 +322,17 @@ func HandleStripeWebhook(w http.ResponseWriter, r *http.Request) {
 	HandlePaymentWebhook(w, r)
 }
 
+// GetCheckoutSessionStatus godoc
+// @Summary      Get checkout session status
+// @Description  Checks the status of a Stripe checkout session and credits coins if payment is confirmed
+// @Tags         payments
+// @Produce      json
+// @Param        session_id  query     string  true  "Stripe checkout session ID"
+// @Success      200         {object}  map[string]interface{}
+// @Failure      400         {string}  string  "Missing or invalid session data"
+// @Failure      502         {string}  string  "Failed to retrieve session"
+// @Failure      503         {string}  string  "Payments module not configured"
+// @Router       /payments/checkout-session/status [get]
 func GetCheckoutSessionStatus(w http.ResponseWriter, r *http.Request) {
 	if paymentClient == nil {
 		util.RespondWithError(w, http.StatusServiceUnavailable, "payments module is not configured")

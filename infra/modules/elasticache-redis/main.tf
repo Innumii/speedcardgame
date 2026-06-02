@@ -43,3 +43,4 @@ resource "aws_elasticache_cluster" "this" {
   security_group_ids   = [aws_security_group.this.id]
   apply_immediately    = true
 }
+

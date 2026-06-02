@@ -11,6 +11,7 @@
 #include <sstream>
 #include <string>
 #include <unordered_map>
+#include <utils/SessionUtil.hpp>
 
 namespace {
     std::vector<int>& cachedInventoryCopiesStorage() {
@@ -48,7 +49,7 @@ namespace {
 
         int statusCode = -1;
         std::string responseBody;
-        if (!HttpUtil::sendHttp(host, port, "GET", path, "", statusCode, responseBody)) {
+        if (!HttpUtil::sendHttp(host, port, "GET", path, "", statusCode, responseBody, SessionUtil::get())) {
             outInventoryCopies.assign(availableCards.size(), 0);
             return false;
         }
@@ -231,7 +232,7 @@ bool Inventory::updateCoinsOnService(const Game& game, int coins) {
 
     int statusCode = -1;
     std::string responseBody;
-    if (!HttpUtil::sendHttp(host, port, "PUT", path, payload.str(), statusCode, responseBody)) {
+    if (!HttpUtil::sendHttp(host, port, "PUT", path, payload.str(), statusCode, responseBody, SessionUtil::get())) {
         return false;
     }
 

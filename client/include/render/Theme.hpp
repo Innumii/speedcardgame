@@ -423,8 +423,9 @@ namespace Theme {
     namespace PackOpening {
         constexpr SDL_Color QTY_TEXT                  = {240, 220, 160, 255};
         constexpr SDL_Color QTY_CHIP_BG               = {0,   0,   0,   170};
-        constexpr SDL_Color DUPLICATE_FILL            = {190, 65,  20,  255};
-        constexpr SDL_Color NEW_FILL                  = {30,  155, 85,  255};
+        constexpr SDL_Color DUPLICATE_FILL            = {190, 65,  20,  255};   // reddish orange
+        constexpr SDL_Color OWNED_FILL                = {180, 140, 20,  255};   // amber
+        constexpr SDL_Color NEW_FILL                  = {30,  155, 85,  255};   // green
         constexpr SDL_Color BADGE_TEXT                = {255, 255, 255, 255};
         constexpr SDL_Color SUMMARY_FILL              = {50,  32,  85,  230};
 

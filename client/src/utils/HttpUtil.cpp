@@ -2,6 +2,7 @@
 
 #include <map>
 #include "utils/EnvUtil.hpp"
+#include "featureFlag/DebugFlag.hpp"
 
 #define CPPHTTPLIB_OPENSSL_SUPPORT
 #if defined(__GNUC__)
@@ -33,6 +34,17 @@ namespace {
 }
 
 namespace HttpUtil {
+
+    bool sendHttpAuthenticated(const std::string& host, int port, const std::string& method,
+                            const std::string& path, const std::string& body,
+                            const std::string& sessionId,
+                            int& statusCode, std::string& responseBody) {
+        const std::map<std::string, std::string> headers = {
+            {"X-Session-ID", sessionId}
+        };
+        return sendHttpWithHeaders(host, port, method, path, body, headers, statusCode, responseBody);
+    }
+
     bool sendHttpWithHeaders(const std::string& host, int port, const std::string& method,
                              const std::string& path, const std::string& body,
                              const std::map<std::string, std::string>& headers,
@@ -48,6 +60,19 @@ namespace HttpUtil {
         httplib::Headers requestHeaders;
         for (const auto& entry : headers) {
             requestHeaders.emplace(entry.first, entry.second);
+        }
+
+        if (DebugFlag::getDebugEnvHttp()) {
+            std::cout << "[HttpUtil] " << method << " https://" << host << ":" << port << path << "\n";
+            if (!headers.empty()) {
+                std::cout << "  Headers:\n";
+                for (const auto& entry : headers) {
+                    std::cout << "    " << entry.first << ": " << entry.second << "\n";
+                }
+            }
+            if (!body.empty()) {
+                std::cout << "  Body: " << body << "\n";
+            }
         }
 
         if (method == "GET") res = client.Get(path.c_str(), requestHeaders);
@@ -69,9 +94,13 @@ namespace HttpUtil {
     }
 
     bool sendHttp(const std::string& host, int port, const std::string& method,
-                  const std::string& path, const std::string& body,
-                  int& statusCode, std::string& responseBody) {
-        const std::map<std::string, std::string> noHeaders;
-        return sendHttpWithHeaders(host, port, method, path, body, noHeaders, statusCode, responseBody);
+                const std::string& path, const std::string& body,
+                int& statusCode, std::string& responseBody,
+                const std::string& sessionId) {
+        std::map<std::string, std::string> headers;
+        if (!sessionId.empty()) {
+            headers["X-Session-ID"] = sessionId;
+        }
+        return sendHttpWithHeaders(host, port, method, path, body, headers, statusCode, responseBody);
     }
 }

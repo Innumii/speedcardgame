@@ -8,8 +8,9 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
+	"os"
+	"regexp"
 	"strconv"
 	"time"
 
@@ -23,6 +24,8 @@ type AuthService struct {
 	UserRepository repositories.UserRepository
 	SessionService *SessionService
 }
+
+var usernamePattern = regexp.MustCompile(`^[a-zA-Z0-9 ]+$`)
 
 type inventoryCreateRequest struct {
 	Uid uint `json:"uid"`
@@ -42,6 +45,10 @@ func (service *AuthService) RegisterDevUser(registerDTO dtos.RegisterDTO) (*mode
 }
 
 func (service *AuthService) registerUser(registerDTO dtos.RegisterDTO, createInventory bool) (*models.User, error) {
+	if !usernamePattern.MatchString(registerDTO.Name) {
+		return nil, errors.New("name can only contain letters, digits, and spaces")
+	}
+
 	// Check if user already exists
 	_, err := service.UserRepository.FindByEmail(registerDTO.Email)
 	if err == nil { // If nill, user exists
@@ -82,6 +89,7 @@ func (service *AuthService) registerUser(registerDTO dtos.RegisterDTO, createInv
 func (service *AuthService) createStarterInventory(userID uint) error {
 	baseURL := utils.ResolveCardsServiceBaseURL()
 
+	internalKey := os.Getenv("INTERNAL_API_KEY")
 	payload, err := json.Marshal(inventoryCreateRequest{Uid: userID})
 	if err != nil {
 		return err
@@ -95,20 +103,25 @@ func (service *AuthService) createStarterInventory(userID uint) error {
 		},
 	}
 
+	headers := map[string]string{
+		"Content-Type":   "application/json",
+		"X-Internal-Key": internalKey,
+	}
+
 	inventoryPaths := []string{"/cards/inventories", "/cardbase/inventories"}
-	if err := service.postWithFallback(client, baseURL, inventoryPaths, payload, "cards service"); err != nil {
+	if err := service.postWithFallback(client, baseURL, inventoryPaths, payload, "cards service", headers); err != nil {
 		return err
 	}
 
 	deckPaths := []string{"/cards/decks/fill", "/cardbase/decks/fill"}
-	if err := service.postWithFallback(client, baseURL, deckPaths, payload, "deck fill"); err != nil {
+	if err := service.postWithFallback(client, baseURL, deckPaths, payload, "deck fill", headers); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func (service *AuthService) postWithFallback(client *http.Client, baseURL string, paths []string, payload []byte, operation string) error {
+func (service *AuthService) postWithFallback(client *http.Client, baseURL string, paths []string, payload []byte, operation string, headers map[string]string) error {
 	var operationErr error
 	for _, path := range paths {
 		url := fmt.Sprintf("%s%s", baseURL, path)
@@ -117,6 +130,9 @@ func (service *AuthService) postWithFallback(client *http.Client, baseURL string
 			return reqErr
 		}
 		req.Header.Set("Content-Type", "application/json")
+		for k, v := range headers {
+			req.Header.Set(k, v)
+		}
 
 		resp, doErr := client.Do(req)
 		if doErr != nil {
@@ -223,14 +239,14 @@ func (service *AuthService) RequestPasswordReset(requestPasswordResetDTO dtos.Re
 		return "", err
 	}
 
-	log.Println("Generated unhashed token:", token)
+	// log.Println("Generated unhashed token:", token)
 
 	hashedToken, err := utils.Hash(token)
 	if err != nil {
 		return "", err
 	}
 
-	log.Println("hashed token:", hashedToken)
+	// log.Println("hashed token:", hashedToken)
 
 	expiry := time.Now().Add(15 * time.Minute)
 	err = service.UserRepository.StorePasswordResetToken(user.ID, hashedToken, expiry)

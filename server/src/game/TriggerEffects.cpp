@@ -163,7 +163,7 @@ const std::unordered_map<int, std::vector<CardEffectEntry>> TriggerEffects::card
     //Jo
     {4, { CardEffectEntry{
             .effectId  = 0,
-            .augment   = std::make_pair(4,4),
+            .augment   = std::make_pair(3,3),
             .target    = Target::Nil,
             .condition = [](const MatchSession& session, int cardId, int, int) {
                 return session.getCard(cardId)->getName() == "Go";
@@ -171,7 +171,7 @@ const std::unordered_map<int, std::vector<CardEffectEntry>> TriggerEffects::card
           },
           CardEffectEntry{
             .effectId  = 0,
-            .augment   = std::make_pair(2,2),
+            .augment   = std::make_pair(1,1),
             .target    = Target::Nil,
             .condition = [](const MatchSession& session, int cardId, int, int) {
                 return session.getCard(cardId)->getName() != "Go";
@@ -226,7 +226,7 @@ const std::unordered_map<int, std::vector<CardEffectEntry>> TriggerEffects::card
     //Knockout
     {17, { CardEffectEntry{
         .effectId = 0,
-        .augment  = std::make_pair(-1,-1)
+        .augment  = std::make_pair(-2,-2)
     }}},
 
     //The Pass
@@ -239,12 +239,17 @@ const std::unordered_map<int, std::vector<CardEffectEntry>> TriggerEffects::card
     {20, { CardEffectEntry{
         .effectId = 0,
         .augment  = std::make_pair(0,3)
-    }}},
+        },
+        CardEffectEntry{
+        .effectId = 9,
+        .amount   = 2
+        }
+    }},
 
     //Grass Aint Green
     {22, { CardEffectEntry{
         .effectId = 10,
-        .amount   = -1,
+        .amount   = -5,
         .target   = Target::Opponent
     }}},
 
@@ -255,7 +260,7 @@ const std::unordered_map<int, std::vector<CardEffectEntry>> TriggerEffects::card
           },
           CardEffectEntry{
             .effectId = 5,
-            .amount   = 5
+            .amount   = 3
           }
     }},
 
@@ -359,7 +364,7 @@ const std::unordered_map<int, std::vector<CardEffectEntry>> TriggerEffects::card
     //Ay Lmao
     {28, { CardEffectEntry{
         .effectId = 3,
-        .amount   = -5,
+        .amount   = -10,
         .target   = Target::Self
     }}},
 

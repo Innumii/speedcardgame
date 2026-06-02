@@ -5,6 +5,7 @@
 #include "utils/JsonUtil.hpp"
 
 #include <algorithm>
+#include <utils/SessionUtil.hpp>
 
 namespace {
     std::vector<ShopPackage::Package> cachedPackages;
@@ -67,7 +68,7 @@ bool ShopPackage::loadPackagesFromService() {
 
     int statusCode = -1;
     std::string responseBody;
-    if (!HttpUtil::sendHttp(host, port, "GET", path, "", statusCode, responseBody)) {
+    if (!HttpUtil::sendHttp(host, port, "GET", path, "", statusCode, responseBody, SessionUtil::get())) {
         return false;
     }
 

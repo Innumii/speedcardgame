@@ -1,7 +1,7 @@
 package dtos
 
 type RegisterDTO struct {
-	Name     string `json:"name" binding:"required,min=3,max=50" validate:"regex=^[a-zA-Z ]*$"`
+	Name     string `json:"name" binding:"required,min=3,max=50" validate:"regex=^[a-zA-Z0-9 ]*$"`
 	Email    string `json:"email" binding:"required,email"`
 	Password string `json:"password" binding:"required,min=8"`
 }

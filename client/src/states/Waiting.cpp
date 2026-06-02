@@ -14,6 +14,7 @@
 #include <iostream>
 #include <sstream>
 #include <render/RenderBackdrop.hpp>
+#include <utils/SessionUtil.hpp>
 
 void Waiting::enter(Game& game) {
     (void)game;
@@ -127,7 +128,7 @@ void Waiting::update(Game& game) {
                     int statusCode = -1;
                     std::string responseBody;
 
-                    if (HttpUtil::sendHttp(host, port, "GET", path, "", statusCode, responseBody) && statusCode == 200) {
+                    if (HttpUtil::sendHttp(host, port, "GET", path, "", statusCode, responseBody, SessionUtil::get()) && statusCode == 200) {
                         std::cout << "[Waiting] Opponent Deck JSON: " << responseBody << "\n";
                         DeckBuilding& deckBuilding = game.getDeckBuildingState();
                         const auto& availableCards = LoadAvailableCardsUtil::getAvailableCards();

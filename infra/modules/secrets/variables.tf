@@ -33,23 +33,11 @@ variable "cards_runtime_secret_name" {
   default     = "speedcardgame-cards-runtime"
 }
 
-variable "auth_postgres_password" {
-  description = "Auth postgres password to store for runtime injection"
-  type        = string
-  sensitive   = true
-}
-
 variable "cards_service_base_url" {
   description = "Auth CARDS_SERVICE_BASE_URL to store for runtime injection"
   type        = string
   sensitive   = true
   default     = null
-}
-
-variable "cards_database_url" {
-  description = "Cards DATABASE_URL to store for runtime injection"
-  type        = string
-  sensitive   = true
 }
 
 variable "stripe_secret_key" {
@@ -65,4 +53,19 @@ variable "stripe_webhook_secret" {
   sensitive   = true
   default     = null
 }
+
+variable "tls_key" {
+  description = "TLS certificate and private key in PEM format for HTTPS support, stored as a single string with certificate followed by private key"
+  type        = string
+  sensitive   = true
+  default     = null
+}
+
+variable "tls_cert" {
+  description = "TLS certificate in PEM format for HTTPS support"
+  type        = string
+  sensitive   = true
+  default     = null
+}
+
 

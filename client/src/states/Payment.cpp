@@ -22,6 +22,7 @@
 #include <windows.h>
 #include <shellapi.h>
 #endif
+#include <utils/SessionUtil.hpp>
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Anonymous helpers (unchanged from original)
@@ -313,7 +314,7 @@ void Payment::update(Game& game) {
 
                 int statusCode = -1;
                 std::string statusBody;
-                (void)HttpUtil::sendHttp(host, port, "GET", statusPath, "", statusCode, statusBody);
+                (void)HttpUtil::sendHttp(host, port, "GET", statusPath, "", statusCode, statusBody, SessionUtil::get());
             }
 
             int latestCoins = game.getPackRefundCoins();
@@ -648,7 +649,7 @@ bool Payment::requestCheckoutSession(Game& game, const ShopPackage::Package& pac
 
     int         statusCode  = -1;
     std::string responseBody;
-    if (!HttpUtil::sendHttp(host, port, "POST", path, payload.str(), statusCode, responseBody)) {
+    if (!HttpUtil::sendHttp(host, port, "POST", path, payload.str(), statusCode, responseBody, SessionUtil::get())) {
         statusMessage = "There was an error processing payment.";
         return false;
     }
@@ -700,7 +701,7 @@ bool Payment::tryLoadLatestCoins(Game& game, int& outCoins) const {
 
     int statusCode = -1;
     std::string responseBody;
-    if (!HttpUtil::sendHttp(host, port, "GET", path, "", statusCode, responseBody)) {
+    if (!HttpUtil::sendHttp(host, port, "GET", path, "", statusCode, responseBody, SessionUtil::get())) {
         return false;
     }
     if (statusCode < 200 || statusCode >= 300) {

@@ -1,0 +1,145 @@
+name: release
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'client/**'
+      - 'installer.iss'
+      - '.github/workflows/windows-client-release.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-windows-installer:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup MSYS2 (MinGW)
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          update: true
+          install: >-
+            mingw-w64-x86_64-gcc
+            make
+            mingw-w64-x86_64-SDL2
+            mingw-w64-x86_64-SDL2_ttf
+            mingw-w64-x86_64-SDL2_image
+            mingw-w64-x86_64-SDL2_mixer
+            mingw-w64-x86_64-openssl
+
+      - name: Build Archcast.exe
+        shell: msys2 {0}
+        run: |
+          set -euo pipefail
+          cd client
+          make release
+
+      - name: Bundle GameBuilds (local + deployed)
+        shell: msys2 {0}
+        env:
+          ENV_LOCAL: ${{ secrets.ENV_LOCAL }}
+          ENV_DEPLOYED: ${{ secrets.ENV }}
+          CERT_SECRET: ${{ secrets.CERT }}
+        run: |
+          set -euo pipefail
+
+          bundle() {
+            local variant="$1"
+            local env_content="$2"
+            local dir="GameBuild-${variant}"
+
+            rm -rf "$dir"
+            mkdir -p "$dir" "$dir/env" "$dir/certs"
+
+            cp client/Archcast.exe "$dir/Archcast.exe"
+
+            if [ -d client/assets ]; then
+              cp -r client/assets "$dir/assets"
+            fi
+
+            if [ -n "${env_content}" ]; then
+              echo "$env_content" > "$dir/env/.env"
+            fi
+
+            if [ -n "${CERT_SECRET:-}" ]; then
+              echo "$CERT_SECRET" > "$dir/certs/ca.crt"
+            fi
+
+            ldd client/Archcast.exe \
+              | awk '/=> \/mingw64\/bin\// { print $3 }' \
+              | sort -u \
+              | while read -r dllpath; do
+                  if [ -f "$dllpath" ]; then
+                    cp "$dllpath" "$dir/"
+                  fi
+                done
+          }
+
+          bundle "local"    "${ENV_LOCAL:-}"
+          bundle "deployed" "${ENV_DEPLOYED:-}"
+
+      - name: Validate GameBuild outputs
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          foreach ($variant in @('local', 'deployed')) {
+            $exe = "GameBuild-$variant/Archcast.exe"
+            if (-not (Test-Path $exe)) {
+              throw "Expected $exe was not found."
+            }
+          }
+
+      - name: Install Inno Setup
+        shell: powershell
+        run: choco install innosetup -y
+
+      - name: Build installers (local + deployed)
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $iscc = 'C:\Program Files (x86)\Inno Setup 6\ISCC.exe'
+          $version = 'latest'
+
+          foreach ($variant in @('local', 'deployed')) {
+            & $iscc "/DMyAppVersion=$version" "/DGameBuildDir=GameBuild-$variant" "/DOutputBaseFilename=ArchcastSetup-$variant" 'installer.iss'
+
+            if (-not (Test-Path "Output/ArchcastSetup-$variant.exe")) {
+              throw "Installer for '$variant' was not generated."
+            }
+          }
+
+      - name: Build Windows zip packages (local + deployed)
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          foreach ($variant in @('local', 'deployed')) {
+            $dir = "GameBuild-$variant"
+            if (-not (Test-Path "$dir/Archcast.exe")) {
+              throw "Expected $dir/Archcast.exe was not found before zipping."
+            }
+            Compress-Archive -Path "$dir/*" -DestinationPath "client-$variant-windows.zip" -Force
+          }
+
+      - name: Publish Windows release assets
+        uses: ncipollo/release-action@v1
+        with:
+          tag: client-latest
+          name: Archcast Client Latest
+          body: Automated latest build for Archcast.
+          allowUpdates: true
+          removeArtifacts: false
+          replacesArtifacts: true
+          artifactErrorsFailBuild: true
+          artifacts: >-
+            Output/ArchcastSetup-local.exe,
+            Output/ArchcastSetup-deployed.exe,
+            client-local-windows.zip,
+            client-deployed-windows.zip
+          makeLatest: true

@@ -12,6 +12,7 @@
 #include <cctype>
 #include <fstream>
 #include <string>
+#include <utils/SessionUtil.hpp>
 
 namespace LoadAvailableCardsUtil {
 	bool loadFromService(std::vector<std::unique_ptr<Card>>& outCards);
@@ -40,7 +41,7 @@ bool LoadAvailableCardsUtil::loadFromService(std::vector<std::unique_ptr<Card>>&
 
 	int statusCode = -1;
 	std::string responseBody;
-	if (!HttpUtil::sendHttp(host, port, "GET", path, "", statusCode, responseBody)) {
+	if (!HttpUtil::sendHttp(host, port, "GET", path, "", statusCode, responseBody, SessionUtil::get())) {
 		return false;
 	}
 
@@ -188,7 +189,7 @@ int LoadAvailableCardsUtil::getNumberOfAvailableCards() {
 	const int port = EnvUtil::getCardsServicePort();
 	const std::string path = "/cards/size";
 
-	HttpUtil::sendHttp(host, port, "GET", path, "", statusCode, responseBody);
+	HttpUtil::sendHttp(host, port, "GET", path, "", statusCode, responseBody, SessionUtil::get());
 
 	if (statusCode != 200) {
 		return -1;

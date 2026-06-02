@@ -79,13 +79,18 @@ func (s *SessionService) DeleteSession(ctx context.Context, sessionID string) er
 		return err
 	}
 
-	// Delete the sessionID -> userID mapping
-	if err := s.RedisClient.Del(ctx, "session:"+sessionID).Err(); err != nil {
-		return err
-	}
+	// // Delete the sessionID -> userID mapping
+	// if err := s.RedisClient.Del(ctx, "session:"+sessionID).Err(); err != nil {
+	// 	return err
+	// }
 
-	// Delete the userID -> sessionID mapping
-	if err := s.RedisClient.Del(ctx, "userID:"+userID).Err(); err != nil {
+	// // Delete the userID -> sessionID mapping
+	// if err := s.RedisClient.Del(ctx, "userID:"+userID).Err(); err != nil {
+	// 	return err
+	// }
+
+	// Delete both userID and sessionID mappings at once
+	if err := s.RedisClient.Del(ctx, "session:"+sessionID, "userID:"+userID).Err(); err != nil {
 		return err
 	}
 

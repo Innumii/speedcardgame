@@ -41,18 +41,10 @@ data "terraform_remote_state" "alb" {
 }
 
 locals {
-  alb_outputs                  = local.use_alb_remote_state ? data.terraform_remote_state.alb[0].outputs : {}
-  route53_zone_name            = "${trimsuffix(var.base_domain, ".")}."
-  game_domain_name             = "game.${trimsuffix(var.base_domain, ".")}"
-  cards_service_base_url_local = var.cards_service_base_url != null ? var.cards_service_base_url : try(local.alb_outputs.api_base_url, null)
-  cards_service_host = var.cards_service_host != null ? var.cards_service_host : (
-    local.cards_service_base_url_local != null ? replace(replace(local.cards_service_base_url_local, "https://", ""), "http://", "") : try(local.alb_outputs.api_domain_name, null)
-  )
-  cards_service_port = var.cards_service_port != null ? var.cards_service_port : (
-    local.cards_service_base_url_local != null ? (
-      startswith(local.cards_service_base_url_local, "https://") ? 443 : 80
-    ) : 443
-  )
+  alb_outputs        = local.use_alb_remote_state ? data.terraform_remote_state.alb[0].outputs : {}
+  route53_zone_name  = "${trimsuffix(var.base_domain, ".")}."
+  game_domain_name   = "game.${trimsuffix(var.base_domain, ".")}"
+  cards_service_host = "https://api.${var.base_domain}"
 }
 
 data "aws_route53_zone" "primary" {
@@ -115,11 +107,11 @@ module "service" {
   subnet_ids       = data.aws_subnets.default.ids
   container_port   = 4000
   image_tag        = var.image_tag
-  image_repo       = var.image_repo
-  cpu              = var.cpu
-  memory           = var.memory
+  image_repo       = var.server_image_repo
+  cpu              = var.server_cpu
+  memory           = var.server_memory
   assign_public_ip = var.assign_public_ip
-  desired_count    = 1
+  desired_count    = var.server_desired_count
   target_group_arn = aws_lb_target_group.this.arn
 
   secrets = {
@@ -135,10 +127,14 @@ module "service" {
     local.cards_service_host != null ? {
       USE_AWS_SERVICES       = "true"
       CARDS_SERVICE_HOST     = local.cards_service_host
-      CARDS_SERVICE_PORT     = tostring(local.cards_service_port)
+      CARDS_SERVICE_PORT     = tostring(var.cards_service_port)
       AWS_CARDS_SERVICE_HOST = local.cards_service_host
-      AWS_CARDS_SERVICE_PORT = tostring(local.cards_service_port)
+      AWS_CARDS_SERVICE_PORT = tostring(var.cards_service_port)
+    } : {},
+    var.internal_api_key != null ? {
+      INTERNAL_API_KEY = var.internal_api_key
     } : {},
     {}
   )
 }
+

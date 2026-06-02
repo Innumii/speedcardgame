@@ -1,6 +1,6 @@
 output "ecr_repository_url" {
   description = "Cards container image reference"
-  value       = "ghcr.io/${var.image_repo}:${var.image_tag}"
+  value       = "ghcr.io/${var.cards_image_repo}:${var.image_tag}"
 }
 
 output "ecs_cluster_name" {
@@ -17,3 +17,4 @@ output "ecs_service_security_group_id" {
   description = "Cards ECS service security group ID"
   value       = module.service.security_group_id
 }
+

@@ -15,6 +15,7 @@
 #include "utils/GetValidTargets.hpp"
 #include "utils/PlayingLayoutUtil.hpp"
 #include "utils/RenderUtil.hpp"
+#include "utils/JsonUtil.hpp"
 
 #include <SDL2/SDL.h>
 #include <algorithm>
@@ -25,7 +26,6 @@
 #include <utils/PlayingRenderUtil.hpp>
 #include <animation/SummonAnimation.hpp>
 #include <animation/FatigueAnimation.hpp>
-// #include <functional>
 
 // -------------------------
 // Helpers
@@ -33,18 +33,206 @@
 
 namespace {
 
+static constexpr std::pair<int, const char*> kEffectBits[] = {
+    {  1, "Double Strike" },
+    {  2, "Trample"       },
+    {  4, "Deathtouch"    },
+    {  8, "Regen"         },
+    { 16, "Lifesteal"     },
+};
+
 std::string effectBitToLabel(int effectBit) {
-    switch (effectBit) {
-        case 1: return "Double Strike";
-        case 2: return "Trample";
-        case 4: return "Deathtouch";
-        case 8: return "Regen";
-        case 16: return "Lifesteal";
-        default: return "Effect(" + std::to_string(effectBit) + ")";
+    for (const auto& [bit, label] : kEffectBits)
+        if (bit == effectBit) return label;
+    return "Effect(" + std::to_string(effectBit) + ")";
+}
+
+// --------------------------------------------------
+// Minimal JSON parser for FULL_STATE payloads
+// --------------------------------------------------
+
+struct LaneSlot {
+    bool present{false};
+    int  cardId{-1};
+    int  augP{0};
+    int  augT{0};
+    int  fx{0};
+};
+
+struct PlayerSnap {
+    int id{-1};
+    int health{100};
+    int mana{0};
+    int fatigue{1};
+    std::vector<int> hand;
+};
+
+struct FullSnap {
+    PlayerSnap       players[2];
+    LaneSlot         lanes[2][5];
+    std::vector<int> discard[2];
+    bool             valid{false};
+};
+
+// --------------------------------------------------
+// Helpers NOT covered by JsonUtil
+// --------------------------------------------------
+
+// Skip leading whitespace; returns updated pos.
+static std::size_t skipWs(const std::string& s, std::size_t pos) {
+    while (pos < s.size() && std::isspace(static_cast<unsigned char>(s[pos])))
+        ++pos;
+    return pos;
+}
+
+// Parse a JSON integer array [ n, n, ... ] starting at pos; advances pos past ']'.
+static std::vector<int> parseIntArray(const std::string& s, std::size_t& pos) {
+    std::vector<int> result;
+    pos = skipWs(s, pos);
+    if (pos >= s.size() || s[pos] != '[') return result;
+    ++pos;
+    while (pos < s.size()) {
+        pos = skipWs(s, pos);
+        if (pos >= s.size()) break;
+        if (s[pos] == ']') { ++pos; break; }
+        if (s[pos] == ',') { ++pos; continue; }
+        int val = 0;
+        if (JsonUtil::parseJsonIntAt(s, pos, val))   // ← was local parseJsonInt
+            result.push_back(val);
+        else
+            break;
     }
+    return result;
+}
+
+// Returns the position of the first non-whitespace char after ':' for key,
+// searching forward from searchFrom.  Returns npos if not found.
+static std::size_t findKey(const std::string& s,
+                            std::size_t        searchFrom,
+                            const std::string& key) {
+    const std::string quoted = "\"" + key + "\"";
+    std::size_t found = s.find(quoted, searchFrom);
+    if (found == std::string::npos) return std::string::npos;
+    found += quoted.size();
+    found = skipWs(s, found);
+    if (found < s.size() && s[found] == ':') ++found;
+    return skipWs(s, found);
+}
+
+// --------------------------------------------------
+// Parsers
+// --------------------------------------------------
+
+// Parse a lane slot value (null or {...}) at pos; advances pos past the token.
+static LaneSlot parseLaneSlot(const std::string& s, std::size_t& pos) {
+    LaneSlot slot;
+    pos = skipWs(s, pos);
+    if (pos >= s.size()) return slot;
+
+    if (s.size() - pos >= 4 && s.compare(pos, 4, "null") == 0) {
+        pos += 4;
+        return slot;
+    }
+    if (s[pos] != '{') return slot;
+
+    const std::size_t objStart = pos;
+    std::size_t       closePos = std::string::npos;
+    if (!JsonUtil::findMatchingBrace(s, objStart, closePos)) return slot;  // ← was findMatchingClose
+    const std::size_t objEnd = closePos + 1;  // exclusive upper bound
+
+    // Operate on the bounded substring so readJsonIntField can't wander outside.
+    const std::string obj = s.substr(objStart, objEnd - objStart);
+    slot.present = true;
+    JsonUtil::readJsonIntField(obj, "id",   slot.cardId);   // ← were readIntField calls
+    JsonUtil::readJsonIntField(obj, "augP", slot.augP);
+    JsonUtil::readJsonIntField(obj, "augT", slot.augT);
+    JsonUtil::readJsonIntField(obj, "fx",   slot.fx);
+
+    pos = objEnd;
+    return slot;
+}
+
+// Parse a player sub-object; objStart points at the opening '{'.
+static PlayerSnap parsePlayerSnap(const std::string& s, std::size_t objStart) {
+    PlayerSnap p;
+    std::size_t closePos = std::string::npos;
+    if (!JsonUtil::findMatchingBrace(s, objStart, closePos)) return p;  // ← was findMatchingClose
+    const std::size_t objEnd = closePos + 1;
+
+    const std::string obj = s.substr(objStart, objEnd - objStart);
+    JsonUtil::readJsonIntField(obj, "id",      p.id);       // ← were readIntField calls
+    JsonUtil::readJsonIntField(obj, "health",  p.health);
+    JsonUtil::readJsonIntField(obj, "mana",    p.mana);
+    JsonUtil::readJsonIntField(obj, "fatigue", p.fatigue);
+
+    std::size_t hpos = findKey(obj, 0, "hand");
+    if (hpos != std::string::npos)
+        p.hand = parseIntArray(obj, hpos);
+
+    return p;
+}
+
+static FullSnap parseFullSnap(const std::string& json) {
+    FullSnap snap;
+
+    // Players
+    for (int p = 0; p < 2; ++p) {
+        std::size_t vpos = findKey(json, 0, "p" + std::to_string(p));
+        if (vpos == std::string::npos) return snap;
+        vpos = skipWs(json, vpos);
+        if (vpos >= json.size() || json[vpos] != '{') return snap;
+        snap.players[p] = parsePlayerSnap(json, vpos);
+    }
+
+    // Lanes: [[slot,...],[slot,...]]
+    std::size_t lanesPos = findKey(json, 0, "lanes");
+    if (lanesPos == std::string::npos) return snap;
+    lanesPos = skipWs(json, lanesPos);
+    if (lanesPos >= json.size() || json[lanesPos] != '[') return snap;
+    ++lanesPos; // skip outer '['
+
+    for (int p = 0; p < 2; ++p) {
+        lanesPos = skipWs(json, lanesPos);
+        if (lanesPos >= json.size()) break;
+        if (json[lanesPos] == ',') ++lanesPos;
+        lanesPos = skipWs(json, lanesPos);
+        if (lanesPos >= json.size() || json[lanesPos] != '[') break;
+        ++lanesPos; // skip inner '['
+
+        for (int lane = 0; lane < 5; ++lane) {
+            lanesPos = skipWs(json, lanesPos);
+            if (lanesPos >= json.size()) break;
+            if (json[lanesPos] == ',') { ++lanesPos; lanesPos = skipWs(json, lanesPos); }
+            snap.lanes[p][lane] = parseLaneSlot(json, lanesPos);
+        }
+        while (lanesPos < json.size() && json[lanesPos] != ']') ++lanesPos;
+        if (lanesPos < json.size()) ++lanesPos; // skip inner ']'
+    }
+
+    // Discard: [[id,...],[id,...]]
+    std::size_t discardPos = findKey(json, 0, "discard");
+    if (discardPos != std::string::npos) {
+        discardPos = skipWs(json, discardPos);
+        if (discardPos < json.size() && json[discardPos] == '[') {
+            ++discardPos;
+            for (int p = 0; p < 2; ++p) {
+                discardPos = skipWs(json, discardPos);
+                if (discardPos < json.size() && json[discardPos] == ',') ++discardPos;
+                snap.discard[p] = parseIntArray(json, discardPos);
+            }
+        }
+    }
+
+    snap.valid = true;
+    return snap;
 }
 
 }
+
+
+// -------------------------
+// Helpers (cont.)
+// -------------------------
 
 const Card* Playing::findPendingActionCard() const {
     if (!pendingAction.active) {
@@ -135,7 +323,6 @@ bool Playing::resolvePendingActionAt(int x, int y) {
     }
 
     if (clickedTarget == -9999) {
-        // Check local lanes first
         for (std::size_t slot = 0; slot < playSlots.size(); ++slot) {
             if (RenderUtil::pointInRect(playSlots[slot], x, y)) {
                 clickedTarget = 100 + static_cast<int>(slot);
@@ -145,7 +332,6 @@ bool Playing::resolvePendingActionAt(int x, int y) {
     }
 
     if (clickedTarget == -9999) {
-        // Check opponent lanes
         for (std::size_t slot = 0; slot < opponentSlots.size(); ++slot) {
             if (RenderUtil::pointInRect(opponentSlots[slot], x, y)) {
                 clickedTarget = 200 + static_cast<int>(slot);
@@ -154,17 +340,11 @@ bool Playing::resolvePendingActionAt(int x, int y) {
         }
     }
 
-    if (clickedTarget == -9999 && RenderUtil::pointInRect(localPlayerRect, x, y)) {
-        clickedTarget = -1;
-    }
-
-    if (clickedTarget == -9999 && RenderUtil::pointInRect(opponentPlayerRect, x, y)) {
-        clickedTarget = -2;
-    }
+    if (clickedTarget == -9999 && RenderUtil::pointInRect(localPlayerRect, x, y))    clickedTarget = -1;
+    if (clickedTarget == -9999 && RenderUtil::pointInRect(opponentPlayerRect, x, y)) clickedTarget = -2;
 
     const bool isValidTarget = std::find(validTargets.begin(), validTargets.end(), clickedTarget) != validTargets.end();
     if (!isValidTarget) {
-        // Cancel targeting on invalid click; card was never removed from hand.
         pendingAction.clear();
         return false;
     }
@@ -184,14 +364,14 @@ bool Playing::resolvePendingActionAt(int x, int y) {
     }
 
     if (targetIndex >= 0) {
-        std::cout<< "[Playing] Casting at targetIndex: " + std::to_string(targetIndex) + "\n";
-        std::cout<< "[Playing] Casting at targetLane: " + std::to_string(targetLane) + "\n";
+        std::cout << "[Playing] Casting at targetIndex: " + std::to_string(targetIndex) + "\n";
+        std::cout << "[Playing] Casting at targetLane: " + std::to_string(targetLane) + "\n";
 
         authority->playCard(
             static_cast<int>(pendingAction.cardId),
-            pendingAction.sourceLane, // where the spell was dropped
-            targetLane,               // target lane
-            targetIndex              // target player (local or opponent)
+            pendingAction.sourceLane,
+            targetLane,
+            targetIndex
         );
 
         pendingAction.clear();
@@ -230,7 +410,6 @@ void Playing::setup(const Game& game) {
     menuOpen = false;
     pauseModalOpen = false;
     exitModalOpen = false;
-    // surrendered = false;
     animationQueue.clear();
     pendingDestroys.clear();
     pendingAction.clear();
@@ -242,7 +421,7 @@ void Playing::setup(const Game& game) {
     lastDrawTick = SDL_GetTicks();
     combatCycleStartTick = lastDrawTick;
     lastCombatSyncTick = 0;
-    deferredStatUpdates.clear(); 
+    deferredStatUpdates.clear();
     lastEndState = PlayingGameState::Playing;
     gameEndStartTick = 0;
     cachedFont = game.getUIFonts().medium;
@@ -251,7 +430,6 @@ void Playing::setup(const Game& game) {
         authority = std::make_unique<LocalAuthority>(
             &const_cast<Game&>(game).getNetworkClient());
     }
-
 }
 
 void Playing::setDeck(Deck newDeck) {
@@ -292,6 +470,7 @@ SDL_Rect Playing::computeOpponentDeckRect(int screenW, int screenH) const {
         Theme::Playing::SIDE_ZONE_MARGIN
     );
 }
+
 // -------------------------
 // Event handling
 // -------------------------
@@ -309,9 +488,8 @@ void Playing::handleEvents(Game& game, const SDL_Event& event) {
         const int mouseX = event.button.x;
         const int mouseY = event.button.y;
 
-        if (state != PlayingGameState::Playing){
+        if (state != PlayingGameState::Playing) {
             if (RenderUtil::pointInRect(returnToTitleButton, mouseX, mouseY)) {
-                // surrendered = false;
                 pauseModalOpen = false;
                 exitModalOpen = false;
                 game.setNextState(GameState::Title);
@@ -327,9 +505,7 @@ void Playing::handleEvents(Game& game, const SDL_Event& event) {
         if (exitModalOpen) {
             if (RenderUtil::pointInRect(saveExitButton, mouseX, mouseY)) {
                 authority->surrender();
-                // surrendered = true;
                 pauseModalOpen = false;
-                // exitModalOpen = false;
                 return;
             }
             if (RenderUtil::pointInRect(noSaveExitButton, mouseX, mouseY)) {
@@ -423,6 +599,10 @@ void Playing::handleEvents(Game& game, const SDL_Event& event) {
                 bool droppedInDiscard = RenderUtil::pointInRect(discardZone, releaseX, releaseY);
 
                 if (droppedInDiscard) {
+                    if (drag.index >= localPlayer.hand.size()) {
+                        drag.active = false;
+                        return;
+                    }
                     auto& card = localPlayer.hand[drag.index];
                     std::cout << "[Playing] Attempting to Discard " << card->getName() << "\n";
                     if (animationsEnabled) {
@@ -434,15 +614,18 @@ void Playing::handleEvents(Game& game, const SDL_Event& event) {
                     authority->discardCard(card->getId());
                 }
                 else if (laneIndex >= 0) {
+                    if (drag.index >= localPlayer.hand.size()) {
+                        drag.active = false;
+                        return;
+                    }
                     auto& card = localPlayer.hand[drag.index];
                     if (card->getType() == CardType::Creature) {
-                        if (localPlayer.mana >= card->getManaCost()) { //Check if player has sufficient mana
+                        if (localPlayer.mana >= card->getManaCost()) {
                             authority->playCard(
                                 card->getId(),
                                 laneIndex,
-                                std::nullopt,  //NO TARGETING
-                                std::nullopt  //NO TARGETING
-
+                                std::nullopt,
+                                std::nullopt
                             );
                         }
                     } else if (card->getType() == CardType::Spell) {
@@ -451,34 +634,27 @@ void Playing::handleEvents(Game& game, const SDL_Event& event) {
                             auto validTargetsOpt = getValidTargets(*this, *card, pendingAction.sourceLane);
                             if (!validTargetsOpt.has_value()) {
                                 authority->playCard(
-                                        card->getId(),
-                                        laneIndex,
-                                        -1, // no target lane
-                                        -1  // no target player
-                                    );
+                                    card->getId(),
+                                    laneIndex,
+                                    -1,
+                                    -1
+                                );
                             } else {
                                 const std::vector<int>& validTargets = *validTargetsOpt;
                                 if (!validTargets.empty()) {
                                     int allTarget = 0;
                                     switch (validTargets[0]) {
-                                        case 901: // All cards on board
-                                            allTarget = -1;
-                                            break;
-                                        case 902: // All your cards
-                                            allTarget = -2;
-                                            break;
-                                        case 903: // All opponent cards
-                                            allTarget = -3;
-                                            break;
-                                        default:
-                                            break;
+                                        case 901: allTarget = -1; break;
+                                        case 902: allTarget = -2; break;
+                                        case 903: allTarget = -3; break;
+                                        default:  break;
                                     }
                                     if (allTarget != 0) {
                                         authority->playCard(
                                             card->getId(),
                                             laneIndex,
-                                            -1, // no target lane
-                                            allTarget  // no target player
+                                            -1,
+                                            allTarget
                                         );
                                     } else {
                                         pendingAction.active = true;
@@ -487,7 +663,6 @@ void Playing::handleEvents(Game& game, const SDL_Event& event) {
                                     }
                                 }
                             }
-                             
                         }
                     }
                 }
@@ -551,8 +726,6 @@ void Playing::update(Game& game) {
             recvBuffer.erase(0, pos + 1);
             handleServerMessage(line);
         }
-
-        
     }
 
     const Uint32 now = SDL_GetTicks();
@@ -622,7 +795,9 @@ void Playing::flushDeferredStatUpdatesIfReady() {
     }
 }
 
-//need to refactor into command map at some point. Current method is repetitive
+// -------------------------
+// Server message dispatch
+// -------------------------
 bool Playing::handleServerMessage(const std::string& msg) {
     std::istringstream iss(msg);
     std::string cmd;
@@ -630,21 +805,30 @@ bool Playing::handleServerMessage(const std::string& msg) {
 
     const auto syncCombatTimeline = [this]() {
         const Uint32 now = SDL_GetTicks();
-
-        // Gate re-syncs so multiple lane COMBAT messages in the same phase do not jitter the UI.
         if (lastCombatSyncTick != 0 && now - lastCombatSyncTick < (COMBAT_CYCLE_DURATION_MS / 2U)) {
             return;
         }
-
         combatCycleStartTick =
             (now > COMBAT_PREPHASE_DURATION_MS) ? (now - COMBAT_PREPHASE_DURATION_MS) : 0;
         lastCombatSyncTick = now;
     };
 
-// std::cout << "[Playing]: " << msg << "\n";
-    
-    // Stat updates are applied only after combat animation work settles.
-    static const std::vector<std::string> statUpdateCmds = {"AUGMENT", "DESTROY", "HP", "EFFECT_ADD", "EFFECT_REMOVE", "REGEN_SET", "MATCH_WON", "MATCH_LOST"};
+    // FULL_STATE arrives only between combat phases (server guarantees this by
+    // resetting the snapshot timer whenever resolveAttackPhase() runs). Apply
+    // it directly — no need to touch the deferred queue.
+    if (cmd == "FULL_STATE") {
+        std::string jsonStr;
+        std::getline(iss, jsonStr);
+        if (!jsonStr.empty() && jsonStr.front() == ' ') jsonStr.erase(0, 1);
+        handleFullStateMessage(jsonStr);
+        return true;
+    }
+
+    // Stat updates are held until any active combat animation settles.
+    static const std::vector<std::string> statUpdateCmds = {
+        "AUGMENT", "DESTROY", "HP", "EFFECT_ADD", "EFFECT_REMOVE", "REGEN_SET",
+        "MATCH_WON", "MATCH_LOST"
+    };
     if (std::find(statUpdateCmds.begin(), statUpdateCmds.end(), cmd) != statUpdateCmds.end()) {
         if (animationsEnabled && (combatUpdateBarrierActive || animationQueue.hasActiveAnimation())) {
             deferredStatUpdates.push_back(msg);
@@ -666,7 +850,6 @@ bool Playing::handleServerMessage(const std::string& msg) {
 
         Player& player = (playerId == localPlayer.id) ? localPlayer : remotePlayer;
 
-        // Find card in hand by ID
         auto it = std::find_if(
             player.hand.begin(), player.hand.end(),
             [cardId](const std::unique_ptr<Card>& c){ return c->getId() == cardId; }
@@ -674,74 +857,66 @@ bool Playing::handleServerMessage(const std::string& msg) {
 
         if (it == player.hand.end()) {
             std::cerr << "[ERROR] Card ID " << cardId
-                    << " not found in player " << playerId << "'s hand\n";
+                      << " not found in player " << playerId << "'s hand\n";
             return false;
         }
 
         CardType type = (*it)->getType();
 
         if (type == CardType::Creature) {
-            // Move card into board
             playCreature(playerId, std::move(*it), lane);
-            // Remove from hand
             player.hand.erase(it);
-        }
-        else if (type == CardType::Spell) {
-            // Optionally read target lane and target opponent
-            // std::cout<< "[Playing] Casting!\n";
+        } else if (type == CardType::Spell) {
             std::optional<int> targetLane;
             if (iss.peek() != EOF) {
                 int tmp;
                 if (iss >> tmp) targetLane = tmp;
             }
-
             std::optional<int> targetIndex;
             if (iss.peek() != EOF) {
                 int tmp;
                 if (iss >> tmp) targetIndex = tmp;
             }
-
-            // Move card into spell handler
             playSpell(playerId, std::move(*it), lane, targetLane, targetIndex);
             player.hand.erase(it);
         }
-    } else if (cmd == "COMBAT") { //use this to call rendering for the cards attacking each other
+    } else if (cmd == "COMBAT") {
         int playerAId, playerBId, lane, powerA, powerB;
         iss >> playerAId >> playerBId >> lane >> powerA >> powerB;
         combatUpdateBarrierActive = animationsEnabled;
         syncCombatTimeline();
         resolveLaneCombat(playerAId, playerBId, lane, powerA, powerB);
 
-    } else if (cmd == "DIRECT") { //use this to call rendering for direct attack
+    } else if (cmd == "DIRECT") {
         int playerId, lane, damage;
         iss >> playerId >> lane >> damage;
         combatUpdateBarrierActive = animationsEnabled;
         syncCombatTimeline();
         resolveDirectCombat(playerId, lane, damage);
 
-    } else if (cmd == "AUGMENT") { //use this to modify the power/toughness of the cards
+    } else if (cmd == "AUGMENT") {
         int playerId, lane, powerDelta, toughnessDelta;
         iss >> playerId >> lane >> powerDelta >> toughnessDelta;
         augmentCreature(playerId, lane, powerDelta, toughnessDelta);
 
-    } else if (cmd == "DESTROY") { //use this to remove cards from the board
+    } else if (cmd == "DESTROY") {
         int playerId, lane;
         iss >> playerId >> lane;
         destroyCreature(playerId, lane);
 
-    } else if (cmd == "HP") { //use this to modify player health
+    } else if (cmd == "HP") {
         int playerId, delta;
         iss >> playerId >> delta;
         augmentHP(playerId, delta);
 
-    } else if (cmd == "MANA") { //use this to modify player health
+    } else if (cmd == "MANA") {
         int playerId, delta;
         iss >> playerId >> delta;
-        augmentMana(playerId, delta); 
+        augmentMana(playerId, delta);
+
     } else if (cmd == "EFFECT_ADD") {
         int playerId, lane, effectBit;
         iss >> playerId >> lane >> effectBit;
-
         int boardIndex = (playerId == localPlayer.id) ? 0 : 1;
         auto& zone = board.getZoneMutable(lane, boardIndex);
         if (zone.has_value() && zone.value()) {
@@ -750,7 +925,6 @@ bool Playing::handleServerMessage(const std::string& msg) {
     } else if (cmd == "EFFECT_REMOVE") {
         int playerId, lane, effectBit;
         iss >> playerId >> lane >> effectBit;
-
         int boardIndex = (playerId == localPlayer.id) ? 0 : 1;
         auto& zone = board.getZoneMutable(lane, boardIndex);
         if (zone.has_value() && zone.value()) {
@@ -759,37 +933,33 @@ bool Playing::handleServerMessage(const std::string& msg) {
     } else if (cmd == "REGEN_SET") {
         int playerId, lane, regenValue;
         iss >> playerId >> lane >> regenValue;
-
         int boardIndex = (playerId == localPlayer.id) ? 0 : 1;
         auto& zone = board.getZoneMutable(lane, boardIndex);
         if (zone.has_value() && zone.value()) {
-            zone.value()->addGrantedEffect("Regen " + std::to_string(regenValue));
+            zone.value()->removeGrantedEffectsWithPrefix("Regen ");
+            if (regenValue > 0)
+                zone.value()->addGrantedEffect("Regen " + std::to_string(regenValue));
         }
     } else if (cmd == "FATIGUE") {
         int playerId, fatigueDamage;
         iss >> playerId >> fatigueDamage;
-
         if (animationsEnabled) {
             int screenW = 0, screenH = 0;
             SDL_GetRendererOutputSize(renderer, &screenW, &screenH);
-
             const SDL_Rect deckRect = (playerId == localPlayer.id)
                 ? computeSelfDeckRect(screenW, screenH)
                 : computeOpponentDeckRect(screenW, screenH);
-
             animationQueue.enqueue(
                 std::make_shared<FatigueAnimation>(deckRect, fatigueDamage, 400U, cachedFont)
             );
         }
-    }
-    //add a mana command later -> decouple discard logic to offload to mana logic
-    else if (cmd == "MATCH_LOST") {
-        Mix_HaltChannel(-1); 
+    } else if (cmd == "MATCH_LOST") {
+        Mix_HaltChannel(-1);
         Audio::playSFX("gameEnd");
         state = PlayingGameState::Lost;
         std::cout << "[Playing] Lost Match!\n";
     } else if (cmd == "MATCH_WON") {
-        Mix_HaltChannel(-1); 
+        Mix_HaltChannel(-1);
         Audio::playSFX("gameEnd");
         iss >> coinReward;
         state = PlayingGameState::Won;
@@ -799,20 +969,254 @@ bool Playing::handleServerMessage(const std::string& msg) {
     return true;
 }
 
+// -------------------------
+// Full state snapshot
+// -------------------------
+
+void Playing::syncEffectsFromMask(Card* card, int fx) {
+    if (!card) return;
+    card->clearGrantedEffects();
+    for (const auto& [bit, label] : kEffectBits)
+        if (fx & bit) card->addGrantedEffect(label);
+}
+
+void Playing::handleFullStateMessage(const std::string& json) {
+    const FullSnap snap = parseFullSnap(json);
+    if (!snap.valid) {
+        std::cerr << "[FULL_STATE] Failed to parse snapshot – ignoring\n";
+        return;
+    }
+
+    // Map server indices (p0/p1) to local/remote by player ID.
+    int localSrvIdx  = -1;
+    int remoteSrvIdx = -1;
+    for (int i = 0; i < 2; ++i) {
+        if      (snap.players[i].id == localPlayer.id)  localSrvIdx  = i;
+        else if (snap.players[i].id == remotePlayer.id) remoteSrvIdx = i;
+    }
+    if (localSrvIdx == -1 || remoteSrvIdx == -1) {
+        std::cerr << "[FULL_STATE] Could not map player IDs (local="
+                  << localPlayer.id << " remote=" << remotePlayer.id << ")\n";
+        return;
+    }
+
+    // skip all reconciliation work — nothing has drifted.
+    auto alreadySynced = [&]() -> bool {
+        // --- Player stats ---
+        const auto checkPlayer = [](const Player& player, const PlayerSnap& ps) {
+            return player.health        == ps.health
+                && player.mana          == ps.mana
+                && player.fatigueDamage == ps.fatigue;
+        };
+        if (!checkPlayer(localPlayer,  snap.players[localSrvIdx]))  return false;
+        if (!checkPlayer(remotePlayer, snap.players[remoteSrvIdx])) return false;
+
+        // --- Hands (order-independent set comparison) ---
+        const auto handMatchesSnap = [](const std::vector<std::unique_ptr<Card>>& hand,
+                                        const std::vector<int>& snapHand) {
+            if (hand.size() != snapHand.size()) return false;
+
+            // Build count maps for both sides and compare
+            std::unordered_map<int, int> handCounts, snapCounts;
+            for (const auto& c : hand)
+                if (c) handCounts[c->getId()]++;
+            for (int id : snapHand)
+                snapCounts[id]++;
+
+            return handCounts == snapCounts;
+        };
+        if (!handMatchesSnap(localPlayer.hand,  snap.players[localSrvIdx].hand))  return false;
+        if (!handMatchesSnap(remotePlayer.hand, snap.players[remoteSrvIdx].hand)) return false;
+
+        // --- Board lanes ---
+        const int laneCount = board.getLaneCount();
+        for (int srvIdx = 0; srvIdx < 2; ++srvIdx) {
+            const int boardIdx = (srvIdx == localSrvIdx) ? 0 : 1;
+            for (int lane = 0; lane < laneCount; ++lane) {
+                const LaneSlot& slot      = snap.lanes[srvIdx][lane];
+                const bool boardOccupied  = !board.isZoneEmpty(lane, boardIdx);
+
+                if (slot.present != boardOccupied) return false;
+                if (!slot.present) continue; // both empty — nothing to check
+
+                const auto& zoneOpt = board.getZone(lane, boardIdx);
+                if (!zoneOpt.has_value() || !zoneOpt.value()) return false;
+                const Card* card = zoneOpt.value().get();
+
+                if (card->getId() != slot.cardId) return false;
+
+                if (card->getType() == CardType::Creature) {
+                    const auto* creature = static_cast<const CreatureCard*>(card);
+                    const int currentAugP = creature->getPower()     - creature->getBasePower();
+                    const int currentAugT = creature->getToughness() - creature->getBaseToughness();
+                    if (currentAugP != slot.augP || currentAugT != slot.augT) return false;
+                }
+
+                // Check granted effects match the snapshot's fx mask
+                {
+                    int currentGrantedMask = 0;
+                    for (const auto& [bit, label] : kEffectBits)   // ← no local redeclaration
+                        if (card->hasGrantedEffect(label)) currentGrantedMask |= bit;
+                    if (currentGrantedMask != slot.fx) return false;
+                }
+            }
+        }
+
+        return true; // everything matches
+    };
+
+    if (alreadySynced()) {
+        std::cout << "[FULL_STATE] Already in sync: skipping reconciliation\n";
+        return;
+    }
+
+    // 1. Player stats
+    auto reconcileStats = [](Player& player, const PlayerSnap& ps) {
+        if (player.health        != ps.health)  player.health        = ps.health;
+        if (player.mana          != ps.mana)    player.mana          = ps.mana;
+        if (player.fatigueDamage != ps.fatigue) player.fatigueDamage = ps.fatigue;
+    };
+
+    reconcileStats(localPlayer,  snap.players[localSrvIdx]);
+    reconcileStats(remotePlayer, snap.players[remoteSrvIdx]);
+
+    // 2. Hands — remove cards absent from snapshot, pull missing ones from deck.
+    auto reconcileHand = [](Player& player, const std::vector<int>& snapHand) {
+        // Pull all current hand cards into a temporary pool
+        std::vector<std::unique_ptr<Card>> pool;
+        pool.swap(player.hand);
+
+        // Rebuild hand exactly as the snapshot dictates
+        for (int cardId : snapHand) {
+            // Prefer a card already in the pool (avoids unnecessary deck lookups)
+            auto it = std::find_if(pool.begin(), pool.end(),
+                [cardId](const std::unique_ptr<Card>& c) {
+                    return c && c->getId() == cardId;
+                });
+
+            if (it != pool.end()) {
+                player.hand.push_back(std::move(*it));
+                pool.erase(it);
+            } else {
+                auto card = player.getDeck().takeCardById(cardId);
+                if (card)
+                    player.addCardToHand(std::move(card));
+                else
+                    std::cerr << "[FULL_STATE] Card " << cardId
+                            << " not found in deck for hand sync\n";
+            }
+        }
+        // Cards left in pool were removed server-side — silently drop them
+    };
+    reconcileHand(localPlayer,  snap.players[localSrvIdx].hand);
+    reconcileHand(remotePlayer, snap.players[remoteSrvIdx].hand);
+
+    // 3. Board lanes
+    // Pull a card by ID — checks hand first, then deck.
+    auto acquireCard = [](Player& player, int cardId) -> std::unique_ptr<Card> {
+        auto it = std::find_if(player.hand.begin(), player.hand.end(),
+            [cardId](const std::unique_ptr<Card>& c) { return c->getId() == cardId; });
+        if (it != player.hand.end()) {
+            auto card = std::move(*it);
+            player.hand.erase(it);
+            return card;
+        }
+        return player.getDeck().takeCardById(cardId);
+    };
+
+    // Apply a snapshot's augP/augT to a card that is at its base stats.
+    auto applyAugments = [](Card* card, const LaneSlot& slot) {
+        if (card->getType() != CardType::Creature) return;
+        if (slot.augP == 0 && slot.augT == 0) return;
+        static_cast<CreatureCard*>(card)->augmentStats(slot.augP, slot.augT);
+    };
+
+    const int laneCount = board.getLaneCount();
+
+    for (int srvIdx = 0; srvIdx < 2; ++srvIdx) {
+        const int boardIdx = (srvIdx == localSrvIdx) ? 0 : 1;
+        Player& player     = (boardIdx == 0) ? localPlayer : remotePlayer;
+
+        for (int lane = 0; lane < laneCount; ++lane) {
+            const LaneSlot& slot     = snap.lanes[srvIdx][lane];
+            const bool boardOccupied = !board.isZoneEmpty(lane, boardIdx);
+
+            if (!slot.present && boardOccupied) {
+                // Server: empty — remove stale client creature.
+                std::unique_ptr<Card> removed;
+                board.removeFromPlay(lane, boardIdx, removed);
+
+            } else if (slot.present && !boardOccupied) {
+                // Server: has creature — client is missing it.
+                auto card = acquireCard(player, slot.cardId);
+                if (card) {
+                    applyAugments(card.get(), slot);
+                    syncEffectsFromMask(card.get(), slot.fx);
+                    board.addToPlay(lane, boardIdx, std::move(card));
+                } else {
+                    std::cerr << "[FULL_STATE] Cannot find card " << slot.cardId
+                              << " for lane " << lane << " player " << player.id << "\n";
+                }
+
+            } else if (slot.present && boardOccupied) {
+                auto& zoneOpt = board.getZoneMutable(lane, boardIdx);
+                if (!zoneOpt.has_value() || !zoneOpt.value()) continue;
+                Card* card = zoneOpt.value().get();
+
+                if (card->getId() != slot.cardId) {
+                    // Wrong card on the board — replace it.
+                    std::unique_ptr<Card> removed;
+                    board.removeFromPlay(lane, boardIdx, removed);
+
+                    auto newCard = acquireCard(player, slot.cardId);
+                    if (newCard) {
+                        applyAugments(newCard.get(), slot);
+                        syncEffectsFromMask(newCard.get(), slot.fx);
+                        board.addToPlay(lane, boardIdx, std::move(newCard));
+                    } else {
+                        std::cerr << "[FULL_STATE] Cannot find replacement card "
+                                  << slot.cardId << " for lane " << lane << "\n";
+                    }
+
+                } else {
+                    // Correct card — sync augments and effects.
+                    if (card->getType() == CardType::Creature) {
+                        CreatureCard* creature = static_cast<CreatureCard*>(card);
+                        const int currentAugP = creature->getPower()     - creature->getBasePower();
+                        const int currentAugT = creature->getToughness() - creature->getBaseToughness();
+                        const int deltaP = slot.augP - currentAugP;
+                        const int deltaT = slot.augT - currentAugT;
+                        if (deltaP != 0 || deltaT != 0)
+                            creature->augmentStats(deltaP, deltaT);
+                    }
+                    syncEffectsFromMask(card, slot.fx);
+                }
+            }
+            // Both empty → nothing to do.
+        }
+    }
+    drag.active = false;
+    drag.index = 0;
+    hoverIndex = static_cast<std::size_t>(-1);
+    cardRects.clear();
+    std::cout << "[FULL_STATE] Reconciliation complete\n";
+}
+
+// -------------------------
+// Game actions
+// -------------------------
+
 void Playing::playCreature(int playerId, std::unique_ptr<Card> card, int lane) {
-    // Determine player
     Player& player = (playerId == localPlayer.id) ? localPlayer : remotePlayer;
 
     if (lane < 0 || lane >= board.getLaneCount()) return;
     if (!card) return;
-
     if (card->getType() != CardType::Creature) return;
 
     std::string name = card->getName();
     player.mana -= card->getManaCost();
 
-    // Move the card into the board
-    int boardIndex = (playerId == localPlayer.id) ? 0:1;
+    int boardIndex = (playerId == localPlayer.id) ? 0 : 1;
     Audio::playSFX("summon");
     board.addToPlay(lane, boardIndex, std::move(card));
 
@@ -825,9 +1229,8 @@ void Playing::playCreature(int playerId, std::unique_ptr<Card> card, int lane) {
         }
     }
 
-    // Optional: debug output
     std::cout << "[Playing] Summoned " << name
-              << " for " << playerId 
+              << " for " << playerId
               << " at lane " << lane << "\n";
 }
 
@@ -835,9 +1238,7 @@ void Playing::playSpell(int playerId, std::unique_ptr<Card> card, int sourceLane
     Player& player = (playerId == localPlayer.id) ? localPlayer : remotePlayer;
     if (sourceLane < 0 || sourceLane >= board.getLaneCount()) return;
     if (!card) return;
-
     if (card->getType() != CardType::Spell) return;
-    // std::cout<< "[Playing] Casting from playSpell!\n";
 
     recentSpellPreview = card->clone();
     recentSpellPreviewUntil = SDL_GetTicks() + Theme::Playing::SPELL_CAST_PREVIEW_DURATION_MS;
@@ -847,10 +1248,6 @@ void Playing::playSpell(int playerId, std::unique_ptr<Card> card, int sourceLane
     player.mana -= card->getManaCost();
     Audio::playSFX("activate");
 
-    // board.addToPlay(sourceLane, boardIndex, std::move(card));
-
-    //reassign targetIndex value, relative to client instance
-    //targetIndex value received is relative to the caster's client. If the caster is opponent, need to reverse the values
     if (playerId != localPlayer.id) {
         if (targetIndex == 0) targetIndex = 1;
         else if (targetIndex == 1) targetIndex = 0;
@@ -858,22 +1255,16 @@ void Playing::playSpell(int playerId, std::unique_ptr<Card> card, int sourceLane
 
     std::string side = (targetIndex == 0) ? "user's side" : "opponent's side";
     std::cout << "[Playing] Casted " << name
-              << " by player " << playerId 
-              << " at lane " << sourceLane 
+              << " by player " << playerId
+              << " at lane " << sourceLane
               << " targeting lane " << (targetLane.has_value() ? std::to_string(targetLane.value()) : "N/A")
               << " on " << side << "\n";
 }
 
-
-
-
 bool Playing::drawCard(int playerId, int cardId) {
-    Player& player = (playerId == localPlayer.id)
-                     ? localPlayer
-                     : remotePlayer;
+    Player& player = (playerId == localPlayer.id) ? localPlayer : remotePlayer;
 
     auto card = player.getDeck().takeCardById(cardId);
-
     if (!card) {
         std::cerr << "Missing card id " << cardId << "\n";
         return false;
@@ -882,8 +1273,7 @@ bool Playing::drawCard(int playerId, int cardId) {
     Audio::playSFX("draw");
     player.addCardToHand(std::move(card));
 
-    int screenW = 0;
-    int screenH = 0;
+    int screenW = 0, screenH = 0;
     if (SDL_GetRendererOutputSize(renderer, &screenW, &screenH) != 0) {
         return false;
     }
@@ -899,9 +1289,7 @@ bool Playing::drawCard(int playerId, int cardId) {
         animationQueue.enqueue(std::make_shared<DrawCardAnimation>(fromRect, cardRects[handIndex], handIndex, 320U));
     }
 
-    // Recompute all draw destinations now that hand is fully populated
     animationQueue.updateDrawDestinations(cardRects);
-
     return true;
 }
 
@@ -915,7 +1303,6 @@ void Playing::discardCard(int playerId, int cardId) {
 
     if (it == player->hand.end()) return;
 
-    // Snapshot old rects before hand changes
     const std::vector<SDL_Rect> oldRects = cardRects;
     const std::size_t discardedIdx = static_cast<std::size_t>(
         std::distance(player->hand.begin(), it));
@@ -928,27 +1315,23 @@ void Playing::discardCard(int playerId, int cardId) {
             }
         } else {
             int screenW, screenH;
-            if (SDL_GetRendererOutputSize(renderer, &screenW, &screenH) != 0) {
-                return;
-            }
+            if (SDL_GetRendererOutputSize(renderer, &screenW, &screenH) != 0) return;
             SDL_Rect opponentDiscardRect = PlayingRenderUtil::computeOpponentDiscardRect(opponentSlots, screenW, screenH);
             anim = std::make_shared<DiscardAnimation>(opponentDiscardRect, cardId, 500U);
         }
         if (anim) animationQueue.enqueue(anim);
     }
-    
 
     std::unique_ptr<Card> cardToDiscard = std::move(*it);
     std::string name = cardToDiscard->getName();
     player->hand.erase(it);
-    player->addMana(cardToDiscard->getManaValue());
+    // player->addMana(cardToDiscard->getManaValue());
 
-    int boardIndex = (playerId == localPlayer.id) ? 0:1;
+    int boardIndex = (playerId == localPlayer.id) ? 0 : 1;
     Audio::playSFX("discard");
     board.addToDiscard(std::move(cardToDiscard), boardIndex);
 
-    // You can animate this if desired
-    std::cout<< "[Playing] " << playerId << " Discarded " << name << "\n";
+    std::cout << "[Playing] " << playerId << " Discarded " << name << "\n";
 }
 
 void Playing::augmentCreature(int playerId, int lane, int powerDelta, int toughnessDelta) {
@@ -969,9 +1352,7 @@ void Playing::augmentCreature(int playerId, int lane, int powerDelta, int toughn
 
 void Playing::destroyCreature(int playerId, int lane) {
     int boardIndex = (playerId == localPlayer.id) ? 0 : 1;
-    if (lane < 0 || lane >= board.getLaneCount()) {
-        return;
-    }
+    if (lane < 0 || lane >= board.getLaneCount()) return;
 
     auto removeAndAnimate = [&](int targetBoardIndex, int targetLane) {
         std::unique_ptr<Card> card;
@@ -981,22 +1362,15 @@ void Playing::destroyCreature(int playerId, int lane) {
                       << " for player " << playerId << "\n";
             return;
         }
-
         if (animationsEnabled) {
             animationQueue.enqueue(std::make_shared<DeathAnimation>(
-                targetLane,
-                targetBoardIndex == 0,
-                playSlots,
-                opponentSlots,
-                260U
+                targetLane, targetBoardIndex == 0, playSlots, opponentSlots, 260U
             ));
         }
     };
 
     const auto& targetZone = board.getZone(lane, boardIndex);
-    if (!targetZone.has_value() || !targetZone.value()) {
-        return;
-    }
+    if (!targetZone.has_value() || !targetZone.value()) return;
 
     const int opposingBoardIndex = (boardIndex == 0) ? 1 : 0;
     const auto& opposingZone = board.getZone(lane, opposingBoardIndex);
@@ -1008,16 +1382,12 @@ void Playing::destroyCreature(int playerId, int lane) {
     }
 
     const bool alreadyQueued = std::any_of(
-        pendingDestroys.begin(),
-        pendingDestroys.end(),
+        pendingDestroys.begin(), pendingDestroys.end(),
         [&](const PendingDestroyState& pending) {
             return pending.boardIndex == boardIndex && pending.lane == lane;
         }
     );
-
-    if (alreadyQueued) {
-        return;
-    }
+    if (alreadyQueued) return;
 
     if (!animationsEnabled) {
         removeAndAnimate(boardIndex, lane);
@@ -1029,9 +1399,7 @@ void Playing::destroyCreature(int playerId, int lane) {
 }
 
 void Playing::processPendingDestroys(Uint32 now) {
-    if (pendingDestroys.empty()) {
-        return;
-    }
+    if (pendingDestroys.empty()) return;
 
     std::vector<PendingDestroyState> stillPending;
     stillPending.reserve(pendingDestroys.size());
@@ -1041,23 +1409,14 @@ void Playing::processPendingDestroys(Uint32 now) {
             stillPending.push_back(pending);
             continue;
         }
-
-        
-
         if (animationsEnabled) {
             animationQueue.enqueue(std::make_shared<DeathAnimation>(
-                pending.lane,
-                pending.boardIndex == 0,
-                playSlots,
-                opponentSlots,
-                260U
+                pending.lane, pending.boardIndex == 0, playSlots, opponentSlots, 260U
             ));
         }
         std::unique_ptr<Card> card;
         Audio::playSFX("destroyed");
-        if (!board.removeFromPlay(pending.lane, pending.boardIndex, card)) {
-            continue;
-        }
+        if (!board.removeFromPlay(pending.lane, pending.boardIndex, card)) continue;
     }
 
     pendingDestroys.swap(stillPending);
@@ -1067,14 +1426,9 @@ void Playing::resolveLaneCombat(int playerAId, int playerBId, int lane, int powe
     (void)powerA;
     (void)powerB;
 
-    if (lane < 0) {
-        return;
-    }
+    if (lane < 0) return;
     Audio::playSFX("attack");
-
-    if (!animationsEnabled) {
-        return;
-    }
+    if (!animationsEnabled) return;
 
     const int boardIndexA = (playerAId == localPlayer.id) ? 0 : 1;
     const int boardIndexB = (playerBId == localPlayer.id) ? 0 : 1;
@@ -1083,54 +1437,31 @@ void Playing::resolveLaneCombat(int playerAId, int playerBId, int lane, int powe
     const std::vector<SDL_Rect>& slotsB = (boardIndexB == 0) ? playSlots : opponentSlots;
 
     const std::size_t laneIndex = static_cast<std::size_t>(lane);
-    if (laneIndex >= slotsA.size() || laneIndex >= slotsB.size()) {
-        return;
-    }
+    if (laneIndex >= slotsA.size() || laneIndex >= slotsB.size()) return;
 
     const auto& creatureA = board.getZone(lane, boardIndexA);
     const auto& creatureB = board.getZone(lane, boardIndexB);
-    if (!creatureA.has_value() || !creatureA.value() || !creatureB.has_value() || !creatureB.value()) {
-        return;
-    }
+    if (!creatureA.has_value() || !creatureA.value() || !creatureB.has_value() || !creatureB.value()) return;
 
     auto attackGroup = std::make_shared<AnimationGroup>();
-    attackGroup->add(std::make_shared<AttackAnimation>(
-        lane,
-        boardIndexA == 0,
-        playSlots,
-        opponentSlots,
-        420U
-    ));
-    attackGroup->add(std::make_shared<AttackAnimation>(
-        lane,
-        boardIndexB == 0,
-        playSlots,
-        opponentSlots,
-        420U
-    ));
-
+    attackGroup->add(std::make_shared<AttackAnimation>(lane, boardIndexA == 0, playSlots, opponentSlots, 420U));
+    attackGroup->add(std::make_shared<AttackAnimation>(lane, boardIndexB == 0, playSlots, opponentSlots, 420U));
     animationQueue.enqueue(attackGroup);
 }
+
 void Playing::resolveDirectCombat(int playerId, int lane, int damage) {
     (void)damage;
 
-    if (!renderer || lane < 0) {
-        return;
-    }
+    if (!renderer || lane < 0) return;
 
     const int boardIndex = (playerId == localPlayer.id) ? 0 : 1;
     const std::vector<SDL_Rect>& sourceSlots = (boardIndex == 0) ? playSlots : opponentSlots;
 
     const std::size_t laneIndex = static_cast<std::size_t>(lane);
-    if (laneIndex >= sourceSlots.size()) {
-        return;
-    }
+    if (laneIndex >= sourceSlots.size()) return;
 
-    int screenW = 0;
-    int screenH = 0;
-    if (SDL_GetRendererOutputSize(renderer, &screenW, &screenH) != 0) {
-        return;
-    }
+    int screenW = 0, screenH = 0;
+    if (SDL_GetRendererOutputSize(renderer, &screenW, &screenH) != 0) return;
 
     SDL_Rect targetRect{};
     if (boardIndex == 0) {
@@ -1148,21 +1479,16 @@ void Playing::resolveDirectCombat(int playerId, int lane, int damage) {
             Theme::Playing::PLAYER_BAR_HEIGHT
         };
     }
+
     Audio::playSFX("attack");
     if (animationsEnabled) {
         animationQueue.enqueue(std::make_shared<AttackAnimation>(
-            lane,
-            boardIndex == 0,
-            playSlots,
-            opponentSlots,
-            420U,
-            &targetRect
+            lane, boardIndex == 0, playSlots, opponentSlots, 420U, &targetRect
         ));
     }
 }
+
 void Playing::augmentHP(int playerId, int delta) {
-    //get player object reference, change HP according to delta
-    // std::cout << "[DEBUG] AUGMENTING OF " << delta << "\n";
     Player& player = (playerId == localPlayer.id) ? localPlayer : remotePlayer;
     Audio::playSFX("damage");
     player.health += delta;
@@ -1174,7 +1500,9 @@ void Playing::augmentMana(int playerId, int delta) {
     player.mana += delta;
 }
 
-
+// -------------------------
+// Render
+// -------------------------
 void Playing::render(Game& game) {
     RenderPlaying::render(*this, game);
 }
@@ -1190,24 +1518,19 @@ std::vector<SDL_Rect> Playing::computeCardLayout(std::size_t count, int screenW,
         static_cast<float>(screenW) / 1200.0F,
         static_cast<float>(screenH) / 850.0F);
 
-    // Shift the whole layout up so the content block is vertically centered,
-    // not just bottom-anchored. Slack only exists when width limits the scale.
     const int verticalOffset = (screenH - static_cast<int>(850.0F * scale)) / 2;
-
     const int cardWidth   = static_cast<int>(Theme::Playing::CARD_WIDTH        * scale);
     const int cardHeight  = static_cast<int>(Theme::Playing::CARD_HEIGHT       * scale);
     const int handYOffset = static_cast<int>(Theme::Playing::HAND_Y_OFFSET     * scale);
     const int maxWidth    = static_cast<int>(screenW * Theme::Playing::HAND_MAX_WIDTH_RATIO);
 
     int totalWidthNoOverlap = static_cast<int>(count) * cardWidth;
-
     int spacing = static_cast<int>(Theme::Playing::HAND_DEFAULT_SPACING * scale);
     if (totalWidthNoOverlap > maxWidth && count > 1) {
         spacing = (maxWidth - totalWidthNoOverlap) / static_cast<int>(count - 1);
     }
 
     int finalHandWidth = (static_cast<int>(count) * cardWidth) + (static_cast<int>(count - 1) * spacing);
-
     int startX = (screenW - finalHandWidth) / 2;
     int startY = screenH - cardHeight - handYOffset - verticalOffset;
 
@@ -1236,9 +1559,7 @@ void Playing::computeZones(int screenW, int screenH) {
         static_cast<float>(screenW) / 1200.0F,
         static_cast<float>(screenH) / 850.0F);
 
-    // Same centering offset as computeCardLayout — keeps slots aligned with hand.
-    const int verticalOffset = (screenH - static_cast<int>(850.0F * scale)) / 2;
-
+    const int verticalOffset  = (screenH - static_cast<int>(850.0F * scale)) / 2;
     const int handCardHeight  = static_cast<int>(Theme::Playing::CARD_HEIGHT          * scale);
     const int handYOffset     = static_cast<int>(Theme::Playing::HAND_Y_OFFSET         * scale);
     const int slotCount       = Theme::Playing::SLOT_COUNT;
@@ -1252,16 +1573,11 @@ void Playing::computeZones(int screenW, int screenH) {
     const int deckGap         = static_cast<int>(Theme::Playing::SELF_DECK_GAP         * scale);
     const int sideMargin      = static_cast<int>(Theme::Playing::SIDE_ZONE_MARGIN      * scale);
 
-    // Hand Y position
     int handY = screenH - handCardHeight - handYOffset - verticalOffset;
-    if (!cardRects.empty()) {
-        handY = cardRects.front().y;
-    }
+    if (!cardRects.empty()) handY = cardRects.front().y;
 
     int totalSlotsWidth = slotCount * slotWidth + (slotCount - 1) * slotSpacing;
     int startX = (screenW - totalSlotsWidth) / 2;
-
-    // Local player slots — clamped so opponent slots never overlap the scaled stats bar.
     int slotY = handY - slotHeight - slotToHandGap;
     {
         const int statsBarBottom =
@@ -1270,58 +1586,40 @@ void Playing::computeZones(int screenW, int screenH) {
             + margin + verticalOffset;
         slotY = std::max(slotY, statsBarBottom + opponentOffset);
     }
-
     if (slotY < margin) slotY = margin;
 
     playSlots.reserve(static_cast<std::size_t>(slotCount));
     opponentSlots.reserve(static_cast<std::size_t>(slotCount));
 
     for (int i = 0; i < slotCount; ++i) {
-        SDL_Rect localRect{
-            startX + i * (slotWidth + slotSpacing),
-            slotY,
-            slotWidth,
-            slotHeight
-        };
+        SDL_Rect localRect{ startX + i * (slotWidth + slotSpacing), slotY, slotWidth, slotHeight };
         playSlots.push_back(localRect);
-
         SDL_Rect oppRect = localRect;
         oppRect.y -= opponentOffset;
         opponentSlots.push_back(oppRect);
     }
 
     discardZone = PlayingLayoutUtil::computeDiscardRect(
-        playSlots,
-        cardWidth,
+        playSlots, cardWidth,
         static_cast<int>(Theme::Playing::CARD_HEIGHT * scale),
-        deckGap,
-        sideMargin
+        deckGap, sideMargin
     );
 }
 
 void Playing::computeUiRects(int screenW, int screenH) {
     if (screenW <= 0 || screenH <= 0) {
-        menuButton = SDL_Rect{0, 0, 0, 0};
-        pauseModal = SDL_Rect{0, 0, 0, 0};
-        resumeButton = SDL_Rect{0, 0, 0, 0};
-        pauseExitButton = SDL_Rect{0, 0, 0, 0};
-        exitModal = SDL_Rect{0, 0, 0, 0};
-        saveExitButton = SDL_Rect{0, 0, 0, 0};
-        noSaveExitButton = SDL_Rect{0, 0, 0, 0};
-        returnToTitleButton = SDL_Rect{0, 0, 0, 0};
-        requeueButton = SDL_Rect{0,0,0,0};
+        menuButton = pauseModal = resumeButton = pauseExitButton = SDL_Rect{0,0,0,0};
+        exitModal = saveExitButton = noSaveExitButton = SDL_Rect{0,0,0,0};
+        returnToTitleButton = requeueButton = SDL_Rect{0,0,0,0};
         return;
     }
 
     const float scale = std::min(
         static_cast<float>(screenW) / 1200.0F,
         static_cast<float>(screenH) / 850.0F);
-
     const int verticalOffset = (screenH - static_cast<int>(850.0F * scale)) / 2;
-
     const int margin = static_cast<int>(Theme::Playing::SCREEN_MARGIN * scale);
 
-    // Menu button - TOP RIGHT
     const int menuW = static_cast<int>(Theme::Playing::MENU_BUTTON_WIDTH  * scale);
     const int menuH = static_cast<int>(Theme::Playing::MENU_BUTTON_HEIGHT * scale);
     menuButton = SDL_Rect{screenW - menuW - margin, margin + verticalOffset, menuW, menuH};
@@ -1347,22 +1645,23 @@ void Playing::computeUiRects(int screenW, int screenH) {
     const int exitButtonSpacing = static_cast<int>(Theme::Playing::EXIT_BUTTON_SPACING * scale);
     const int exitFirstButtonY  = exitModal.y + static_cast<int>(Theme::Playing::EXIT_BUTTON_TOP * scale);
 
-    saveExitButton  = SDL_Rect{(screenW - exitButtonW * 2 - exitButtonSpacing) / 2, exitFirstButtonY, exitButtonW, exitButtonH};
+    saveExitButton   = SDL_Rect{(screenW - exitButtonW * 2 - exitButtonSpacing) / 2, exitFirstButtonY, exitButtonW, exitButtonH};
     noSaveExitButton = SDL_Rect{saveExitButton.x + exitButtonW + exitButtonSpacing, exitFirstButtonY, exitButtonW, exitButtonH};
 
     const int returnW = static_cast<int>(Theme::Playing::RETURN_BUTTON_WIDTH  * scale);
     const int returnH = static_cast<int>(Theme::Playing::RETURN_BUTTON_HEIGHT * scale);
     const int spacing = static_cast<int>(20 * scale);
-
     const int totalWidth = returnW * 2 + spacing;
     const int startX = (screenW - totalWidth) / 2;
     const int y = (screenH / 2) + static_cast<int>(24 * scale) + verticalOffset;
 
-    returnToTitleButton = SDL_Rect{startX,              y, returnW, returnH};
+    returnToTitleButton = SDL_Rect{startX,                     y, returnW, returnH};
     requeueButton       = SDL_Rect{startX + returnW + spacing, y, returnW, returnH};
 }
 
-
+// -------------------------
+// Accessors
+// -------------------------
 PlayingGameState Playing::getState() const {
     return state;
 }

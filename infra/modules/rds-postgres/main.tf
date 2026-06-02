@@ -44,3 +44,4 @@ resource "aws_db_instance" "this" {
   apply_immediately       = true
   backup_retention_period = 1
 }
+

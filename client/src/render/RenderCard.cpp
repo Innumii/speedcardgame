@@ -24,8 +24,8 @@
 #include <vector>
 #include <unordered_map>
 #include <unordered_set>
-#define CPPHTTPLIB_OPENSSL_SUPPORT
-#include "httplib/httplib.h"
+#include <utils/HttpUtil.hpp>
+#include <utils/SessionUtil.hpp>
 
 // ─────────────────────────────────────────────────────────────────────────────
 // NOTE – Card.h / CreatureCard.h recommended change (not required, but cheap):
@@ -71,28 +71,14 @@ void scheduleCardImageRetry(int cardId, Uint32 now) {
     gCardImageNextRetryTick[cardId] = now + std::min(delay, kMaxCardImageRetryDelayMs);
 }
 
-bool downloadImageBody(const std::string& host, int port, int cardId,
-                       const std::string& extension, std::string& responseBody) {
-    const std::string path = "/cards/images/" + std::to_string(cardId) + "." + extension;
-    httplib::Result res;
-    if (port == 443) {
-        httplib::SSLClient client(host.c_str(), port);
-        client.enable_server_certificate_verification(false);
-        client.set_follow_location(true);
-        client.set_connection_timeout(0, 150000);
-        client.set_read_timeout(0, 250000);
-        client.set_write_timeout(0, 250000);
-        res = client.Get(path.c_str());
-    } else {
-        httplib::Client client(host.c_str(), port);
-        client.set_follow_location(true);
-        client.set_connection_timeout(0, 150000);
-        client.set_read_timeout(0, 250000);
-        client.set_write_timeout(0, 250000);
-        res = client.Get(path.c_str());
+bool downloadImageBody(const std::string& host, int port, int cardId, std::string& responseBody) {
+    const std::string path = "/cards/images/" + std::to_string(cardId);
+    int statusCode = -1;
+    if (!HttpUtil::sendHttp(host, port, "GET", path, "", statusCode, responseBody, SessionUtil::get())
+            || statusCode != 200) {
+        responseBody.clear();
+        return false;
     }
-    if (!res || res->status != 200) { responseBody.clear(); return false; }
-    responseBody = res->body;
     return !responseBody.empty();
 }
 
@@ -114,19 +100,10 @@ SDL_Texture* getCardImageTexture(SDL_Renderer* renderer, int cardId,
 
     const std::string host         = EnvUtil::getCardsServiceHost();
     const int         port         = EnvUtil::getCardsServicePort();
-    const std::string preferredExt = EnvUtil::getEnvOrDefault("CARD_IMAGE_EXT", "");
-    const std::array<std::string, 4> defaultExts{{"png", "jpg", "jpeg", "bmp"}};
 
     std::string imageBytes;
     bool loaded = false;
-    if (!preferredExt.empty())
-        loaded = downloadImageBody(host, port, cardId, preferredExt, imageBytes);
-    if (!loaded) {
-        for (const std::string& ext : defaultExts) {
-            if (!preferredExt.empty() && preferredExt == ext) continue;
-            if (downloadImageBody(host, port, cardId, ext, imageBytes)) { loaded = true; break; }
-        }
-    }
+    loaded = downloadImageBody(host, port, cardId, imageBytes);
     if (!loaded) { scheduleCardImageRetry(cardId, now); return nullptr; }
 
     SDL_RWops* rw = SDL_RWFromConstMem(imageBytes.data(), static_cast<int>(imageBytes.size()));

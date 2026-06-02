@@ -15,6 +15,7 @@
 #include "utils/StringUtil.hpp"
 #include "core/Audio.hpp"
 #include <map>
+#include <utils/SessionUtil.hpp>
 
 namespace {
     int clampPositive(int value, int maxValue) {
@@ -63,8 +64,15 @@ Game::Game(const char *title, int xpos, int ypos, int width, int height, bool fu
         throw std::runtime_error(std::string("Mix_OpenAudio failed: ") + Mix_GetError());
     }
 
-    Uint32 flags = fullscreen ? SDL_WINDOW_FULLSCREEN_DESKTOP : 0;
-    flags |= SDL_WINDOW_RESIZABLE;
+    Uint32 flags = 0;
+    if (fullscreen) {
+        flags |= SDL_WINDOW_FULLSCREEN_DESKTOP;
+    } else {
+        flags |= SDL_WINDOW_RESIZABLE;
+    }
+    // #ifdef __APPLE__
+    // flags |= SDL_WINDOW_ALLOW_HIGHDPI;
+    // #endif
 
     window.reset(SDL_CreateWindow(title, xpos, ypos, width, height, flags));
     if (!window) {
@@ -95,7 +103,7 @@ Game::Game(const char *title, int xpos, int ypos, int width, int height, bool fu
             throw std::runtime_error(std::string("SDL_CreateRenderer Failed: ") + SDL_GetError());
         }
     } else {
-        renderer.reset(SDL_CreateRenderer(window.get(), -1, SDL_RENDERER_ACCELERATED));
+        renderer.reset(SDL_CreateRenderer(window.get(), -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC));
         if (!renderer) {
             SDL_Quit();
             throw std::runtime_error(std::string("SDL_CreateRenderer Failed: ") + SDL_GetError());
@@ -136,6 +144,7 @@ Game::Game(const char *title, int xpos, int ypos, int width, int height, bool fu
 
 Game::~Game() {
     std::cout << "cleaning up!\n";
+    Audio::cleanup();
     clean();
     std::cout << "Goodbye!~\n";
 }
@@ -306,26 +315,15 @@ void Game::setPlayerUsername(std::string username) {
     playerUsername = std::move(username);
 }
 
-const std::string& Game::getAuthSessionId() const {
-    return authSessionId;
-}
-
-void Game::setAuthSessionId(std::string sessionId) {
-    authSessionId = std::move(sessionId);
-}
-
-bool Game::hasActiveAuthSession() const {
-    return !authSessionId.empty();
-}
 
 bool Game::endUserSession() {
-    if (authSessionId.empty()) {
+    if (!SessionUtil::hasSession()) {
         return true;
     }
 
     const std::string host = EnvUtil::getAuthServiceHost();
     const int port = EnvUtil::getAuthServicePort();
-    std::map<std::string, std::string> headers{{"X-Session-ID", authSessionId}};
+    std::map<std::string, std::string> headers{{"X-Session-ID", SessionUtil::get()}};
 
     int statusCode = -1;
     std::string responseBody;
@@ -344,7 +342,7 @@ bool Game::endUserSession() {
         return false;
     }
 
-    authSessionId.clear();
+    SessionUtil::clear();
     return true;
 }
 

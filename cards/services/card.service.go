@@ -3,6 +3,7 @@ package services
 import (
 	"fmt"
 	"net/http"
+	"github.com/go-chi/chi"
 
 	"github.com/FYL-Studios/speedcardgame/cards/config"
 	"github.com/FYL-Studios/speedcardgame/cards/models"
@@ -224,6 +225,14 @@ func DeleteCard(w http.ResponseWriter, r *http.Request) {
 	util.RespondWithJSON(w, http.StatusOK, card)
 }
 
+// GetCardCount godoc
+// @Summary      Get card count
+// @Description  Returns the total number of cards in the database
+// @Tags         cards
+// @Produce      json
+// @Success      200  {object}  map[string]int64
+// @Failure      500  {string}  string  "Failed to count cards"
+// @Router       /cards/count [get]
 func GetCardCount(w http.ResponseWriter, _ *http.Request) {
 	var count int64
 	if err := config.DB.Model(&models.Card{}).Count(&count).Error; err != nil {
@@ -232,3 +241,20 @@ func GetCardCount(w http.ResponseWriter, _ *http.Request) {
 	}
 	util.RespondWithJSON(w, http.StatusOK, map[string]int64{"count": count})
 }
+
+// GetCardImage godoc
+// @Summary      Get card image
+// @Description  Serves the image file for a card by its ID
+// @Tags         cards
+// @Produce      image/png
+// @Param        id   path      string  true  "Card ID"
+// @Success      200  {file}    binary
+// @Failure      404  {string}  string  "Image not found"
+// @Router       /cards/{id}/image [get]
+func GetCardImage(w http.ResponseWriter, r *http.Request) {
+	// Extract the card ID from the URL path
+	cardIDStr := chi.URLParam(r, "id")
+
+	http.FileServer(http.Dir(cardIDStr + ".png")).ServeHTTP(w, r)
+}
+

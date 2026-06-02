@@ -2,6 +2,14 @@
   #define MyAppVersion "1.0.0"
 #endif
 
+#ifndef GameBuildDir
+  #define GameBuildDir "GameBuild"
+#endif
+
+#ifndef OutputBaseFilename
+  #define OutputBaseFilename "ArchcastSetup"
+#endif
+
 [Setup]
 ; -------------------------
 ; Basic app info
@@ -14,22 +22,24 @@ AppPublisher=FYL Studios
 DefaultDirName={autopf}\Archcast
 DefaultGroupName=Archcast
 OutputDir=Output
-OutputBaseFilename=ArchcastSetup
+OutputBaseFilename={#OutputBaseFilename}
 Compression=lzma
 SolidCompression=yes
 WizardStyle=modern
 ArchitecturesInstallIn64BitMode=x64
 SetupIconFile=client\assets\images\logo.ico
 UninstallDisplayIcon={app}\Archcast.exe
+
 [Files]
 ; -------------------------
 ; Include GameBuild contents
 ; -------------------------
-Source: "GameBuild\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "{#GameBuildDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
 Name: "{group}\Archcast"; Filename: "{app}\Archcast.exe"; WorkingDir: "{app}"; IconFilename: "{app}\Archcast.exe"
 Name: "{autodesktop}\Archcast"; Filename: "{app}\Archcast.exe"; WorkingDir: "{app}"; IconFilename: "{app}\Archcast.exe"
+
 [Run]
 ; -------------------------
 ; Launch app post-install

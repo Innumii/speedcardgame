@@ -82,7 +82,8 @@ namespace EnvUtil {
         }
 
         std::string buildServiceKey(const char* servicePrefix, const char* suffix) {
-            std::string key = servicePrefix;
+            std::string key = "DOCKER_";
+            key += servicePrefix;
             key += suffix;
             return key;
         }

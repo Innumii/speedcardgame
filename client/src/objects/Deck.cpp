@@ -13,6 +13,7 @@
 #include <numeric>
 #include <sstream>
 #include <unordered_map>
+#include <utils/SessionUtil.hpp>
 
 void Deck::addCard(std::unique_ptr<Card> card) {
     cards.push_back(std::move(card));
@@ -73,7 +74,7 @@ bool Deck::loadDeckCopiesFromService(
 
     int statusCode = -1;
     std::string responseBody;
-    if (!HttpUtil::sendHttp(host, port, "GET", path, "", statusCode, responseBody)) {
+    if (!HttpUtil::sendHttp(host, port, "GET", path, "", statusCode, responseBody, SessionUtil::get())) {
         outDeckCopies.assign(availableCards.size(), 0);
         return false;
     }
@@ -182,7 +183,7 @@ bool Deck::saveDeckCopiesToService(
 
     int statusCode = -1;
     std::string responseBody;
-    return HttpUtil::sendHttp(host, port, "POST", path, payload.str(), statusCode, responseBody);
+    return HttpUtil::sendHttp(host, port, "POST", path, payload.str(), statusCode, responseBody, SessionUtil::get());
 }
 
 bool Deck::parseCardCounts(const std::string& json, std::vector<std::pair<int, int>>& out) {

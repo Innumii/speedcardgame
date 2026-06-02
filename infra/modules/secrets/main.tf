@@ -20,9 +20,6 @@ resource "aws_secretsmanager_secret" "auth_runtime" {
 
 locals {
   auth_runtime_secret_values = merge(
-    {
-      POSTGRES_PASSWORD = var.auth_postgres_password
-    },
     var.cards_service_base_url != null ? {
       CARDS_SERVICE_BASE_URL = var.cards_service_base_url
     } : {}
@@ -41,9 +38,6 @@ resource "aws_secretsmanager_secret" "cards_runtime" {
 
 locals {
   cards_runtime_secret_values = merge(
-    {
-      DATABASE_URL = var.cards_database_url
-    },
     var.stripe_secret_key != null ? {
       STRIPE_SECRET_KEY = var.stripe_secret_key
     } : {},
@@ -58,15 +52,23 @@ resource "aws_secretsmanager_secret_version" "cards_runtime_version" {
   secret_string = jsonencode(local.cards_runtime_secret_values)
 }
 
-# Output the ARN so you can copy it if needed
-output "ghcr_secret_arn" {
-  value = coalesce(var.existing_ghcr_secret_arn, try(aws_secretsmanager_secret.ghcr_creds[0].arn, null))
+## game-server-tls
+resource "aws_secretsmanager_secret" "service_tls" {
+  name        = "game-server-tls"
+  description = "TLS certificate and key for game server in JSON format with 'cert' and 'key' keys"
 }
 
-output "auth_runtime_secret_arn" {
-  value = aws_secretsmanager_secret.auth_runtime.arn
+locals {
+  server_runtime_secret = merge(
+    {
+      cert = var.tls_cert
+      key  = var.tls_key
+    }
+  )
 }
 
-output "cards_runtime_secret_arn" {
-  value = aws_secretsmanager_secret.cards_runtime.arn
+resource "aws_secretsmanager_secret_version" "service_tls_version" {
+  secret_id     = aws_secretsmanager_secret.service_tls.id
+  secret_string = jsonencode(local.server_runtime_secret)
 }
+

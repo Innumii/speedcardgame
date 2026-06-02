@@ -1,6 +1,6 @@
 output "ecr_repository_url" {
   description = "Server container image reference"
-  value       = "ghcr.io/${var.image_repo}:${var.image_tag}"
+  value       = "ghcr.io/${var.server_image_repo}:${var.image_tag}"
 }
 
 output "ecs_cluster_name" {
@@ -22,3 +22,4 @@ output "game_domain_name" {
   description = "Route53 endpoint for game server"
   value       = trimsuffix(aws_route53_record.game.fqdn, ".")
 }
+

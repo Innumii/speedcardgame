@@ -24,9 +24,80 @@ definitions:
       uid:
         type: integer
     type: object
+  services.createCoinCheckoutRequest:
+    properties:
+      cancel_url:
+        type: string
+      package_id:
+        type: string
+      success_url:
+        type: string
+      uid:
+        type: integer
+    type: object
+  services.processCardPaymentRequest:
+    properties:
+      card_number:
+        type: string
+      cardholder_name:
+        type: string
+      cvc:
+        type: string
+      exp_month:
+        type: integer
+      exp_year:
+        type: integer
+      package_id:
+        type: string
+      uid:
+        type: integer
+    type: object
 info:
   contact: {}
 paths:
+  /cards/{id}/image:
+    get:
+      description: Serves the image file for a card by its ID
+      parameters:
+      - description: Card ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - image/png
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: file
+        "404":
+          description: Image not found
+          schema:
+            type: string
+      summary: Get card image
+      tags:
+      - cards
+  /cards/count:
+    get:
+      description: Returns the total number of cards in the database
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              format: int64
+              type: integer
+            type: object
+        "500":
+          description: Failed to count cards
+          schema:
+            type: string
+      summary: Get card count
+      tags:
+      - cards
   /decks:
     delete:
       consumes:
@@ -330,4 +401,166 @@ paths:
       summary: Add coins to inventory
       tags:
       - inventories
+  /payments/card:
+    post:
+      consumes:
+      - application/json
+      description: Processes a direct card payment for a coin package. Only available
+        when ALLOW_DIRECT_CARD_PAYMENTS is enabled.
+      parameters:
+      - description: Card payment details
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/services.processCardPaymentRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Invalid input or unsupported package
+          schema:
+            type: string
+        "402":
+          description: Payment not completed
+          schema:
+            type: string
+        "403":
+          description: Direct card payments disabled
+          schema:
+            type: string
+        "502":
+          description: Failed to process payment
+          schema:
+            type: string
+        "503":
+          description: Payments module not configured
+          schema:
+            type: string
+      summary: Process direct card payment
+      tags:
+      - payments
+  /payments/checkout-session:
+    post:
+      consumes:
+      - application/json
+      description: Creates a Stripe checkout session for a coin package purchase
+      parameters:
+      - description: Checkout session details
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/services.createCoinCheckoutRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Invalid input or unsupported package
+          schema:
+            type: string
+        "502":
+          description: Failed to create checkout session
+          schema:
+            type: string
+        "503":
+          description: Payments module not configured
+          schema:
+            type: string
+      summary: Create checkout session
+      tags:
+      - payments
+  /payments/checkout-session/status:
+    get:
+      description: Checks the status of a Stripe checkout session and credits coins
+        if payment is confirmed
+      parameters:
+      - description: Stripe checkout session ID
+        in: query
+        name: session_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Missing or invalid session data
+          schema:
+            type: string
+        "502":
+          description: Failed to retrieve session
+          schema:
+            type: string
+        "503":
+          description: Payments module not configured
+          schema:
+            type: string
+      summary: Get checkout session status
+      tags:
+      - payments
+  /payments/packages:
+    get:
+      description: Returns all available coin packages for purchase
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      summary: List coin packages
+      tags:
+      - payments
+  /payments/webhook:
+    post:
+      consumes:
+      - application/json
+      description: Receives and processes Stripe webhook events. On successful checkout,
+        credits coins to the user's inventory.
+      parameters:
+      - description: Stripe webhook signature
+        in: header
+        name: Stripe-Signature
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Invalid webhook payload or metadata
+          schema:
+            type: string
+        "500":
+          description: Failed to apply coin purchase
+          schema:
+            type: string
+        "503":
+          description: Payments module not configured
+          schema:
+            type: string
+      summary: Handle payment webhook
+      tags:
+      - payments
 swagger: "2.0"

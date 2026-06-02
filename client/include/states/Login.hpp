@@ -37,6 +37,7 @@ private:
     SDL_Rect backButtonRect{0, 0, 0, 0};
 
     Field activeField{Field::Username};
+    Field lastActiveField = Field::None;
     std::string username;
     std::string password;
     std::string statusMessage; // add auth status msg

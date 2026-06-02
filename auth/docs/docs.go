@@ -17,6 +17,12 @@ const docTemplate = `{
     "paths": {
         "/change-password": {
             "patch": {
+                "security": [
+                    {
+                        "SessionAuth": []
+                    }
+                ],
+                "description": "Changes the user's password using their current password for verification",
                 "consumes": [
                     "application/json"
                 ],
@@ -24,13 +30,13 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "users"
+                    "auth"
                 ],
-                "summary": "Change password with old password",
+                "summary": "Change password",
                 "parameters": [
                     {
-                        "description": "Change password",
-                        "name": "changePasswordDto",
+                        "description": "Old and new password",
+                        "name": "body",
                         "in": "body",
                         "required": true,
                         "schema": {
@@ -40,22 +46,47 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK"
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
                     },
                     "400": {
-                        "description": "Bad Request"
+                        "description": "Validation error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
                     },
                     "401": {
-                        "description": "Unauthorized"
+                        "description": "No session provided",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
                     },
                     "500": {
-                        "description": "Internal Server Error"
+                        "description": "Failed to change password",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
                     }
                 }
             }
         },
         "/login": {
             "post": {
+                "description": "Authenticates a user and returns a session ID",
                 "consumes": [
                     "application/json"
                 ],
@@ -63,13 +94,13 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "users"
+                    "auth"
                 ],
                 "summary": "Login user",
                 "parameters": [
                     {
                         "description": "Login details",
-                        "name": "loginDTO",
+                        "name": "body",
                         "in": "body",
                         "required": true,
                         "schema": {
@@ -79,66 +110,133 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK"
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
                     },
                     "401": {
-                        "description": "Unauthorized"
+                        "description": "Invalid credentials",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Already logged in",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
                     }
                 }
             }
         },
         "/logout": {
             "post": {
-                "consumes": [
-                    "application/json"
+                "security": [
+                    {
+                        "SessionAuth": []
+                    }
                 ],
+                "description": "Invalidates the current session. Accepts session via X-Session-ID header or session_id cookie.",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
-                    "users"
+                    "auth"
                 ],
                 "summary": "Logout user",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Session ID",
+                        "name": "X-Session-ID",
+                        "in": "header"
+                    }
+                ],
                 "responses": {
                     "200": {
-                        "description": "OK"
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
                     },
                     "401": {
-                        "description": "Unauthorized"
+                        "description": "No session provided",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
                     },
                     "500": {
-                        "description": "Internal Server Error"
+                        "description": "Failed to log out",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
                     }
                 }
             }
         },
         "/me": {
             "get": {
-                "consumes": [
-                    "application/json"
+                "security": [
+                    {
+                        "SessionAuth": []
+                    }
                 ],
+                "description": "Returns the logged-in user's details. Accepts session via X-Session-ID header or session_id cookie.",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
-                    "users"
+                    "auth"
                 ],
-                "summary": "Get logged in user info using session id cookie",
+                "summary": "Get current user",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Session ID",
+                        "name": "X-Session-ID",
+                        "in": "header"
+                    }
+                ],
                 "responses": {
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/models.User"
+                            "type": "object",
+                            "additionalProperties": true
                         }
                     },
                     "401": {
-                        "description": "Unauthorized"
+                        "description": "Invalid or missing session",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
                     }
                 }
             }
         },
         "/register": {
             "post": {
+                "description": "Creates a new user account and initialises their inventory",
                 "consumes": [
                     "application/json"
                 ],
@@ -146,13 +244,13 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "users"
+                    "auth"
                 ],
                 "summary": "Register user",
                 "parameters": [
                     {
                         "description": "Registration details",
-                        "name": "registerDTO",
+                        "name": "body",
                         "in": "body",
                         "required": true,
                         "schema": {
@@ -162,16 +260,27 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "201": {
-                        "description": "Created"
+                        "description": "Created",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
                     },
                     "400": {
-                        "description": "Bad Request"
+                        "description": "Validation error or email taken",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
                     }
                 }
             }
         },
         "/reset-password": {
             "post": {
+                "description": "Generates a password reset token and returns it (token should be emailed to the user)",
                 "consumes": [
                     "application/json"
                 ],
@@ -179,13 +288,13 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "users"
+                    "auth"
                 ],
-                "summary": "Reset password request",
+                "summary": "Request password reset",
                 "parameters": [
                     {
-                        "description": "Request password reset",
-                        "name": "requestPasswordResetDTO",
+                        "description": "Email address",
+                        "name": "body",
                         "in": "body",
                         "required": true,
                         "schema": {
@@ -195,19 +304,38 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK"
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
                     },
                     "400": {
-                        "description": "Bad Request"
+                        "description": "Validation error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
                     },
                     "500": {
-                        "description": "Internal Server Error"
+                        "description": "Failed to generate token",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
                     }
                 }
             }
         },
         "/reset-password/confirm": {
             "post": {
+                "description": "Verifies the reset token and updates the user's password",
                 "consumes": [
                     "application/json"
                 ],
@@ -215,13 +343,13 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "users"
+                    "auth"
                 ],
-                "summary": "Reset password request",
+                "summary": "Confirm password reset",
                 "parameters": [
                     {
-                        "description": "Confirm password reset",
-                        "name": "confirmPasswordResetDTO",
+                        "description": "Reset token and new password",
+                        "name": "body",
                         "in": "body",
                         "required": true,
                         "schema": {
@@ -231,13 +359,31 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK"
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
                     },
                     "400": {
-                        "description": "Bad Request"
+                        "description": "Validation error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
                     },
                     "500": {
-                        "description": "Internal Server Error"
+                        "description": "Invalid or expired token",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
                     }
                 }
             }
@@ -324,38 +470,6 @@ const docTemplate = `{
             ],
             "properties": {
                 "email": {
-                    "type": "string"
-                }
-            }
-        },
-        "models.User": {
-            "type": "object",
-            "properties": {
-                "createdAt": {
-                    "type": "string"
-                },
-                "email": {
-                    "type": "string"
-                },
-                "id": {
-                    "type": "integer"
-                },
-                "name": {
-                    "type": "string"
-                },
-                "password": {
-                    "type": "string"
-                },
-                "passwordResetExpiry": {
-                    "type": "string"
-                },
-                "resetPasswordToken": {
-                    "type": "string"
-                },
-                "role": {
-                    "type": "string"
-                },
-                "updatedAt": {
                     "type": "string"
                 }
             }

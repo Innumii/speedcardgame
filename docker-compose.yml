@@ -4,7 +4,7 @@ services:
     env_file:
       - ./.env
     ports:
-      - "${AUTH_APP_PORT:-8081}:8080"
+      - "${DOCKER_AUTH_SERVICE_PORT:-8081}:8080"
     restart: unless-stopped
     volumes:
       - ./auth/certs:/app/certs:ro
@@ -19,11 +19,11 @@ services:
       REDIS_HOST: auth-redis
       REDIS_PORT: ${AUTH_REDIS_PORT}
       CARDS_SERVICE_HOST: cards
-      CARDS_SERVICE_PORT: ${CARDS_PORT}
-      TLS_VERIFY_CERTS: "true"
+      TLS_VERIFY_CERTS: "${TLS_VERIFY_CERTS:-false}"
       CARDS_CA_CERT_PATH: ${CARDS_CA_CERT_PATH:-/app/certs/ca.crt}
       DEBUG_LOG_ENABLED: ${DEBUG_LOG_ENABLED:-false}
       HTTP_REQUEST_LOG_ENABLED: ${HTTP_REQUEST_LOG_ENABLED:-true}
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY}
     depends_on:
       auth-db:
         condition: service_healthy
@@ -77,15 +77,23 @@ services:
       cards-db:
         condition: service_healthy
     environment:
-      PORT: ${CARDS_PORT}
-      DATABASE_URL: ${CARDS_DATABASE_URL}
+      POSTGRES_HOST: cards-db
+      POSTGRES_USER: ${CARDS_POSTGRES_USER}
+      POSTGRES_PASSWORD: ${CARDS_POSTGRES_PASSWORD}
+      POSTGRES_DB: ${CARDS_POSTGRES_DB}
+      POSTGRES_PORT: 5432
+      POSTGRES_SSLMODE: disable
+      POSTGRES_TIMEZONE: UTC
+      REDIS_HOST: auth-redis
+      REDIS_PORT: ${AUTH_REDIS_PORT}
       DEBUG_LOG_ENABLED: ${DEBUG_LOG_ENABLED:-false}
       HTTP_REQUEST_LOG_ENABLED: ${HTTP_REQUEST_LOG_ENABLED:-true}
       STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY}
       STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET}
       ALLOW_DIRECT_CARD_PAYMENTS: ${ALLOW_DIRECT_CARD_PAYMENTS:-false}
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY}
     ports:
-      - "${CARDS_APP_PORT:-8082}:${CARDS_PORT}"
+      - "${DOCKER_CARDS_SERVICE_PORT:-8082}:${DOCKER_CARDS_SERVICE_PORT:-8082}"
 
   cards-db:
     image: postgres:16
@@ -108,9 +116,6 @@ services:
     build: ./server
     env_file:
       - ./.env
-    environment:
-      CARDS_SERVICE_HOST: cards
-      CARDS_SERVICE_PORT: ${CARDS_PORT}
     ports:
       - "4000:4000"
     restart: unless-stopped

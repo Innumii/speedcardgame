@@ -15,14 +15,176 @@
 #include <queue>
 #include <sstream>
 
-/* TODO: Full State Snapshot
-FULL_STATE {
-  player0: {health: 90, mana: 3, hand: [1,2,5]},
-  player1: {health: 80, mana: 2, hand: [7,8,9]},
-  lanes: [[null,1,2,3,null],[4,5,null,6,7]],
-  discard: [[8,9],[10,11]]
+
+// --------------------------------------------------
+// Full State Snapshot
+// --------------------------------------------------
+/*  Message format (sent to both players):
+ *
+ *  FULL_STATE <json>\n
+ *
+ *  JSON shape:
+ *  {
+ *    "p0": { "id":1, "health":90, "mana":3, "hand":[1,2,5], "fatigue":1 },
+ *    "p1": { "id":2, "health":80, "mana":2, "hand":[7,8,9], "fatigue":1 },
+ *    "lanes": [
+ *      [ null, {"id":3,"augP":0,"augT":-2,"fx":3}, null, null, null ],   <- player 0 lanes
+ *      [ {"id":7,"augP":1,"augT":0,"fx":0}, null, null, null, null ]     <- player 1 lanes
+ *    ],
+ *    "discard": [ [8,9], [10,11] ]
+ *  }
+ *
+ *  Lane slot fields:
+ *    id   – card ID
+ *    augP – power augment (sum of board.augments delta, 0 if none)
+ *    augT – toughness augment (0 if none)
+ *    fx   – continuousEffects bitmask (0 if none)
+ */
+void MatchSession::broadcastFullState() {
+    if (!running.load()) return;
+
+    std::ostringstream json;
+    json << "{";
+
+    // ---- players ----
+    for (int p = 0; p < 2; ++p) {
+        const PlayerState& ps = players[p];
+        json << "\"p" << p << "\":{"
+             << "\"id\":"      << ps.id      << ","
+             << "\"health\":"  << ps.health  << ","
+             << "\"mana\":"    << ps.mana    << ","
+             << "\"fatigue\":" << ps.fatigueDamage << ","
+             << "\"hand\":[";
+
+        for (std::size_t i = 0; i < ps.hand.size(); ++i) {
+            if (i) json << ",";
+            json << ps.hand[i];
+        }
+        json << "]},";
+    }
+
+    // ---- lanes ----
+    // "lanes":[ [<slot>,<slot>,...], [<slot>,...] ]
+    // Each slot is either null or {"id":X,"augP":N,"augT":N,"fx":N}
+    json << "\"lanes\":[";
+    for (int p = 0; p < 2; ++p) {
+        if (p) json << ",";
+        json << "[";
+        for (int lane = 0; lane < board.laneCount; ++lane) {
+            if (lane) json << ",";
+
+            const auto& cardOpt = board.lanes[p][lane];
+            if (!cardOpt.has_value()) {
+                json << "null";
+                continue;
+            }
+
+            const int augP = board.augments[p][lane].has_value()
+                           ? board.augments[p][lane]->first  : 0;
+            const int augT = board.augments[p][lane].has_value()
+                           ? board.augments[p][lane]->second : 0;
+            const int nativeMask = CombatEffects::getMaskFromCard(getCard(*cardOpt));
+            const int fullMask   = board.continuousEffects[p][lane].value_or(0);
+            const int fx         = fullMask & ~nativeMask;
+
+            json << "{\"id\":"   << *cardOpt
+                 << ",\"augP\":" << augP
+                 << ",\"augT\":" << augT
+                 << ",\"fx\":"   << fx
+                 << "}";
+        }
+        json << "]";
+    }
+    json << "],";
+
+    // ---- discard piles ----
+    json << "\"discard\":[";
+    for (int p = 0; p < 2; ++p) {
+        if (p) json << ",";
+        json << "[";
+        const auto& pile = board.discard[p];
+        for (std::size_t i = 0; i < pile.size(); ++i) {
+            if (i) json << ",";
+            json << pile[i];
+        }
+        json << "]";
+    }
+    json << "]";
+
+    json << "}";
+
+    std::string msg = "FULL_STATE " + json.str() + "\n";
+    playerA->send(msg);
+    playerB->send(msg);
 }
-*/
+
+
+// --------------------------------------------------
+// Game Loop  (replace the existing gameLoop body)
+// --------------------------------------------------
+void MatchSession::gameLoop() {
+    using namespace std::chrono;
+    auto self = shared_from_this();
+
+    auto lastDrawTime     = steady_clock::now();
+    auto lastAttackTime   = steady_clock::now();
+    auto lastSnapshotTime = steady_clock::now();   // <-- new
+
+    std::cout << "[MatchSession] Game loop started\n";
+
+    std::string msgA = "MATCH_START " + std::to_string(playerB->getPlayerId()) + "\n";
+    std::string msgB = "MATCH_START " + std::to_string(playerA->getPlayerId()) + "\n";
+
+    playerA->send(msgA);
+    playerB->send(msgB);
+
+    setupDecks();
+    sendOpeningHands();
+
+    // Send an initial snapshot so clients start in a known state
+    broadcastFullState();
+
+    while (running.load()) {
+
+        if (!playerA->isAlive()) {
+            handleDisconnect(playerA);
+            break;
+        }
+
+        if (!playerB->isAlive()) {
+            handleDisconnect(playerB);
+            break;
+        }
+
+        processActions();
+
+        auto now = steady_clock::now();
+
+        if (duration_cast<seconds>(now - lastDrawTime).count() >= drawInterval) {
+            naturalDraw(0);
+            naturalDraw(1);
+            lastDrawTime = now;
+        }
+
+        if (duration_cast<seconds>(now - lastAttackTime).count() >= attackInterval) {
+            // Broadcast a reconciliation snapshot only when the interval has
+            // elapsed, and always immediately before combat — never after,
+            // where it would race client-side animations.
+            if (duration_cast<seconds>(now - lastSnapshotTime).count() >= snapshotInterval) {
+                broadcastFullState();
+                lastSnapshotTime = now;
+            }
+
+            resolveAttackPhase();
+            lastAttackTime = now;
+        }
+
+        std::this_thread::sleep_for(10ms);
+    }
+
+    if (onMatchEnd) onMatchEnd(self);
+    std::cout << "[MatchSession] Exiting Match Game Loop...\n";
+}
 
 MatchSession::MatchSession(
     std::shared_ptr<PlayerConnection> a,
@@ -257,62 +419,6 @@ bool MatchSession::naturalDraw(int playerIndex) {
     return draw(playerIndex);
 }
 
-
-
-// --------------------------------------------------
-// Game Loop
-// --------------------------------------------------
-void MatchSession::gameLoop() {
-    using namespace std::chrono;
-    auto self = shared_from_this();
-    auto lastDrawTime = steady_clock::now();
-    auto lastAttackTime = steady_clock::now();
-
-    std::cout << "[MatchSession] Game loop started\n";
-
-    std::string msgA = "MATCH_START " + std::to_string(playerB->getPlayerId()) + "\n";
-    std::string msgB = "MATCH_START " + std::to_string(playerA->getPlayerId()) + "\n";
-
-    playerA->send(msgA);
-    playerB->send(msgB);
-
-    setupDecks();
-    sendOpeningHands();
-
-    while (running.load()) {
-
-        if (!playerA->isAlive()) {
-            handleDisconnect(playerA);
-            break;
-        }
-
-        if (!playerB->isAlive()) {
-            handleDisconnect(playerB);
-            break;
-        }
-
-        processActions();
-
-        auto now = steady_clock::now();
-
-        if (duration_cast<seconds>(now - lastDrawTime).count() >= drawInterval) {
-            naturalDraw(0);
-            naturalDraw(1);
-            lastDrawTime = now;
-        }
-
-        if (duration_cast<seconds>(now - lastAttackTime).count() >= attackInterval) {
-            resolveAttackPhase();
-            lastAttackTime = now;
-        }
-
-        std::this_thread::sleep_for(10ms);
-    }
-
-    if (onMatchEnd) onMatchEnd(self);
-    std::cout << "[MatchSession] Exiting Match Game Loop...\n";
-}
-
 //This function handles player actions
 /*  Summon Creature
     Cast Spell
@@ -369,7 +475,7 @@ void MatchSession::processActions() {
                     targetIndex = action.args[3];
                 }
 
-                PlayerState& player = players[action.playerIndex];
+                // PlayerState& player = players[action.playerIndex];
                 const ServerCard* card = getCard(cardId);
 
                 if (!card) {
@@ -421,7 +527,7 @@ void MatchSession::handleFatigue(int playerIndex) {
     if (!running.load()) return;
     auto& player = players[playerIndex];
     int fatigueDamage = player.fatigueDamage;
-    
+
     std::ostringstream ss;
     ss << "FATIGUE " << player.id << " " << fatigueDamage << "\n";
     playerA->send(ss.str());
@@ -562,9 +668,6 @@ void MatchSession::handleDiscard(int playerIndex, int cardId) {
     const ServerCard* card = getCard(cardId);
     if (!card) return;
 
-    // increment mana
-    player.mana += card->getManaCost();
-
     std::cout << "[MatchSession] " << getUsername(playerIndex) << " Discards " << card->getName() << "\n";
 
     // add to discard
@@ -584,6 +687,9 @@ void MatchSession::handleDiscard(int playerIndex, int cardId) {
                     + " " + std::to_string(cardId) + "\n";
     playerA->send(msg);
     playerB->send(msg);
+
+    // increment mana
+    augmentMana(playerIndex, card->getManaValue());
 }
 
 // --------------------------------------------------

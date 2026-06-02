@@ -114,6 +114,8 @@ void Audio::cleanup() {
     }
     sfxMap.clear();
     sfxOverrides.clear();
+    Mix_CloseAudio();
+    Mix_Quit();
 }
 
 int Audio::getMusicVolume() {

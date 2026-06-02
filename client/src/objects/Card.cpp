@@ -61,3 +61,18 @@ void Card::removeGrantedEffect(const std::string& effectText) {
 void Card::clearGrantedEffects() {
   grantedEffects.clear();
 }
+
+bool Card::hasGrantedEffect(const std::string& effectText) const {
+    return std::find(grantedEffects.begin(), grantedEffects.end(), effectText)
+           != grantedEffects.end();
+}
+
+void Card::removeGrantedEffectsWithPrefix(const std::string& prefix) {
+    grantedEffects.erase(
+        std::remove_if(grantedEffects.begin(), grantedEffects.end(),
+            [&prefix](const std::string& e) {
+                return e.rfind(prefix, 0) == 0; // starts with prefix
+            }),
+        grantedEffects.end()
+    );
+}

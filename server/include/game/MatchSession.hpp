@@ -148,10 +148,16 @@ public:
 
     //end of match
     bool giveRewards(std::shared_ptr<PlayerConnection> winner);
+
+    // Broadcasts full authoritative state snapshot to both players
+    // FULL_STATE {"p0":{...},"p1":{...},"lanes":[[...],[...]],"discard":[[...],[...]]}
+    void broadcastFullState();
+
 private:
     const int handLimit = 7;
     const int drawInterval = 5;
-    const int attackInterval = 5; 
+    const int attackInterval = 5;
+    const int snapshotInterval = 5;  // seconds between full state syncs
     const int coinReward = 50;
 
     void gameLoop();

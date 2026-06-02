@@ -39,18 +39,19 @@ variable "image_tag" {
   default     = "latest"
 }
 
-variable "image_repo" {
-  description = "Image repository for the auth service image"
+variable "auth_image_repo" {
+  description = "Auth-specific image repository fallback when using a shared tfvars file"
   type        = string
+  default     = null
 }
 
-variable "cpu" {
+variable "auth_cpu" {
   description = "Fargate CPU units"
   type        = string
   default     = "256"
 }
 
-variable "memory" {
+variable "auth_memory" {
   description = "Fargate memory"
   type        = string
   default     = "512"
@@ -114,16 +115,16 @@ variable "postgres_password" {
   default   = null
 }
 
-variable "postgres_password_secret_arn" {
-  description = "Secrets Manager ARN containing POSTGRES_PASSWORD JSON key for auth runtime"
-  type        = string
-  default     = null
-}
-
 variable "cards_service_base_url_secret_arn" {
   description = "Secrets Manager ARN containing CARDS_SERVICE_BASE_URL JSON key for auth runtime"
   type        = string
   default     = null
+}
+
+variable "base_domain" {
+  description = "Base public domain used for DNS records and endpoints"
+  type        = string
+  sensitive   = true
 }
 
 variable "postgres_db" {
@@ -162,24 +163,6 @@ variable "use_aws_services" {
   default     = true
 }
 
-variable "cards_service_host" {
-  description = "Cards service host reachable from auth task"
-  type        = string
-  default     = null
-}
-
-variable "cards_service_base_url" {
-  description = "Base URL for cards service (e.g. https://example.com)"
-  type        = string
-  default     = null
-}
-
-variable "cards_service_port" {
-  description = "Cards service port"
-  type        = number
-  default     = 443
-}
-
 variable "debug_log_enabled" {
   description = "Enable debug logging in auth service"
   type        = bool
@@ -190,4 +173,16 @@ variable "http_request_log_enabled" {
   description = "Enable HTTP request logging in auth service"
   type        = bool
   default     = true
+}
+
+variable "auth_desired_count" {
+  description = "Number of desired auth service tasks"
+  type        = number
+  default     = 1
+}
+
+variable "internal_api_key" {
+  description = "api key for JWT"
+  type        = string
+  sensitive   = true
 }

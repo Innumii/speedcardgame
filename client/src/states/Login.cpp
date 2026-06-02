@@ -17,6 +17,7 @@
 #include <iostream>
 #include <sstream>
 #include <cmath>
+#include <utils/SessionUtil.hpp>
 
 // ── network helpers ───────────────────────────────────────────────────────────
 
@@ -199,6 +200,7 @@ void Login::handleEvents(Game& game, const SDL_Event& event) {
 }
 
 void Login::update(Game& game) {
+
     if (loginPressed) {
         loginPressed = false;
         statusMessage.clear();
@@ -233,7 +235,7 @@ void Login::update(Game& game) {
             return;
         }
         game.setPlayerId(userId);
-        game.setAuthSessionId(sessionId);
+        SessionUtil::set(sessionId);
         std::cout << game.getPlayer().id << "\n";
         game.setPlayerUsername(username);
         game.setNextState(GameState::Loading);

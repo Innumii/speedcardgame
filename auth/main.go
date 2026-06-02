@@ -17,6 +17,7 @@ import (
 	"github.com/FYL-Studios/speedcardgame/auth/controllers"
 	_ "github.com/FYL-Studios/speedcardgame/auth/docs"
 	"github.com/FYL-Studios/speedcardgame/auth/dtos"
+	"github.com/FYL-Studios/speedcardgame/auth/middleware"
 	"github.com/FYL-Studios/speedcardgame/auth/models"
 	"github.com/FYL-Studios/speedcardgame/auth/repositories"
 	"github.com/FYL-Studios/speedcardgame/auth/services"
@@ -27,12 +28,18 @@ import (
 	"gorm.io/gorm"
 )
 
-func main() {
-
-	err := godotenv.Load(".env", "../.env")
-	if err != nil {
-		log.Printf("Warning: .env file not found, using existing environment variables")
+func loadOptionalEnvFiles(paths ...string) {
+	for _, path := range paths {
+		if info, err := os.Stat(path); err == nil && !info.IsDir() {
+			if loadErr := godotenv.Overload(path); loadErr != nil {
+				log.Printf("Warning: failed to load %s: %v", path, loadErr)
+			}
+		}
 	}
+}
+
+func main() {
+	loadOptionalEnvFiles("../.env", "./.env")
 
 	// Construct DSN from environment variables
 	dsn := fmt.Sprintf(
@@ -110,20 +117,30 @@ func main() {
 
 	// Allow CORS
 	r.Use(cors.New(cors.Config{
-		AllowOrigins:     []string{"https://localhost:3000"}, // Add your frontend domain
+		AllowOrigins:     []string{"https://localhost:3000"},
 		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
-		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization"},
+		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization", "X-Session-ID", "X-Internal-Key"}, // add X-Session-ID
 		AllowCredentials: true,
 		MaxAge:           12 * time.Hour,
 	}))
 
-	registerAuthRoutes := func(group gin.IRoutes) {
-		group.POST("/register", authController.Register)
-		group.POST("/login", authController.Login)
-		group.POST("/logout", authController.Logout)
+	// Public routes — no auth required
+	public := r.Group("/auth")
+	{
+		public.POST("/register", authController.Register)
+		public.POST("/login", authController.Login)
+		public.POST("/password/reset/request", authController.RequestPasswordReset)
+		public.POST("/password/reset/confirm", authController.ConfirmPasswordReset)
 	}
 
-	registerAuthRoutes(r.Group("/auth"))
+	// Protected routes — must be logged in
+	protected := r.Group("/auth")
+	protected.Use(middleware.RequireAuth(sessionService))
+	{
+		protected.POST("/logout", authController.Logout)
+		protected.GET("/me", authController.GetMe)
+		protected.PATCH("/password/change", authController.ChangePassword)
+	}
 
 	// Health check endpoint for AWS
 	r.GET("/health", func(c *gin.Context) {

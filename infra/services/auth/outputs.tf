@@ -1,3 +1,8 @@
+output "ecr_repository_url" {
+  description = "Cards container image reference"
+  value       = "ghcr.io/${var.auth_image_repo}:${var.image_tag}"
+}
+
 output "ecs_cluster_name" {
   description = "Auth ECS cluster name"
   value       = module.service.cluster_id

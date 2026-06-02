@@ -3,14 +3,63 @@
 #include "featureFlag/DebugFlag.hpp"
 #include <cstdlib>
 #include <cctype>
+#include <filesystem>
 #include <fstream>
 #include <stdexcept>
 #include <vector>
 #include <iostream>
 
+#ifdef _WIN32
+#include <windows.h>
+#elif defined(__APPLE__)
+#include <mach-o/dyld.h>
+#else
+#include <limits.h>
+#include <unistd.h>
+#endif
+
 namespace EnvUtil {
     namespace {
         bool envLoaded = false;
+
+        std::string getExecutableDir() {
+#ifdef _WIN32
+            char buffer[MAX_PATH];
+            const DWORD len = GetModuleFileNameA(nullptr, buffer, MAX_PATH);
+            if (len == 0 || len >= MAX_PATH) return "";
+            return std::filesystem::path(std::string(buffer, len)).parent_path().string();
+#elif defined(__APPLE__)
+            uint32_t size = 0;
+            (void)_NSGetExecutablePath(nullptr, &size);
+            if (size == 0) return "";
+
+            std::string path(size, '\0');
+            if (_NSGetExecutablePath(path.data(), &size) != 0) return "";
+            if (!path.empty() && path.back() == '\0') path.pop_back();
+            return std::filesystem::path(path).parent_path().string();
+#else
+            char buffer[PATH_MAX];
+            const ssize_t len = readlink("/proc/self/exe", buffer, sizeof(buffer) - 1);
+            if (len <= 0) return "";
+            buffer[len] = '\0';
+            return std::filesystem::path(buffer).parent_path().string();
+#endif
+        }
+
+        std::vector<std::string> getEnvCandidatePaths() {
+            std::vector<std::string> paths = {
+                "./env/.env"
+            };
+
+            const std::string exeDir = getExecutableDir();
+            if (!exeDir.empty()) {
+                const std::filesystem::path exePath(exeDir);
+                paths.push_back((exePath / "env" / ".env").string());
+                paths.push_back((exePath / ".." / "Resources" / "env" / ".env").string());
+            }
+
+            return paths;
+        }
 
         void setProcessEnvVar(const std::string& key, const std::string& value) {
 #ifdef _WIN32
@@ -57,9 +106,7 @@ namespace EnvUtil {
             if (envLoaded) return;
             envLoaded = true;
 
-            const std::vector<std::string> candidatePaths = {
-                "./env/.env"
-            };
+            const std::vector<std::string> candidatePaths = getEnvCandidatePaths();
 
             for (const std::string& path : candidatePaths) {
                 loadEnvFile(path);

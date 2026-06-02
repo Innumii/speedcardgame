@@ -22,7 +22,8 @@ build/
 *.tfvars.json
 
 # personal scripts
-*.ps1
+build_installer.ps1
+
 # Test coverage
 coverage.out
 coverage.html

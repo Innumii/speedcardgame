@@ -9,10 +9,13 @@ namespace HttpUtil {
                              const std::string& path, const std::string& body,
                              const std::map<std::string, std::string>& headers,
                              int& statusCode, std::string& responseBody);
-
+    bool sendHttpAuthenticated(const std::string& host, int port, const std::string& method,
+                            const std::string& path, const std::string& body,
+                            const std::string& sessionId,
+                            int& statusCode, std::string& responseBody);
     bool sendHttp(const std::string& host, int port, const std::string& method,
                   const std::string& path, const std::string& body,
-                  int& statusCode, std::string& responseBody);
+                  int& statusCode, std::string& responseBody, const std::string& sessionId = "");
 }
 
 #endif

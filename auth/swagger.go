@@ -1,4 +1,4 @@
-// @title           Mana Kaisen Auth API
+// @title           Archcast Auth API
 // @version         1.0
 // @description     Authentication service for SpeedCardGame
 // @host            localhost:8081
